@@ -11,7 +11,17 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -b --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,json,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
@@ -41,6 +51,8 @@
     "eslint-plugin-react-refresh": "^0.5.3",
     "eslint-plugin-simple-import-sort": "^14.0.0",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "~6.0.2",

@@ -1,4 +1,5 @@
 node_modules
+/.pnpm-store/
 dist
 dist-ssr
 *.tsbuildinfo
@@ -6,6 +7,7 @@ dist-ssr
 *.local
 
 .claude/
+/.idea/
 .serena
 
 .env
@@ -24,5 +26,7 @@ storybook-static
 # 로컬 전용 문서
 *.xlsx
 *.xls
+/docs/
+/prompt
 
 e2e/**/*-snapshots/

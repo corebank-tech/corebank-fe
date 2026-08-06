@@ -25,8 +25,8 @@ reviews:
   request_changes_workflow: false
 
   # PR 요약
-  high_level_summary: true       # PR 전반적인 변경 내용 요약
-  changed_files_summary: true    # 파일별 변경 내용 요약
+  high_level_summary: true # PR 전반적인 변경 내용 요약
+  changed_files_summary: true # 파일별 변경 내용 요약
 
   # 워크스루를 접힌 상태로 표시해 PR 페이지가 너무 길어지는 것을 방지
   collapse_walkthrough: true

@@ -1,4 +1,3 @@
-import * as React from "react"
 import { useNavigate } from "react-router"
 import { Check } from "lucide-react"
 import { Button } from "@/shared/ui/button"

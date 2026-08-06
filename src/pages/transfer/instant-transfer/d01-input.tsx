@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Button } from "@/shared/ui/button"
 import { Chip } from "@/shared/ui/chip"
 import { FormSection } from "@/shared/ui/form-section"

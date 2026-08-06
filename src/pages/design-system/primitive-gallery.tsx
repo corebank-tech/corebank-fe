@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Star } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Badge, type BadgeVariant } from "@/shared/ui/badge"

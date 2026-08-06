@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Button } from "@/shared/ui/button"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"

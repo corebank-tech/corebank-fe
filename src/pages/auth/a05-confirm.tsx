@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { FormSection } from "@/shared/ui/form-section"

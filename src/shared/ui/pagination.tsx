@@ -1,4 +1,3 @@
-import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { IconButton } from "@/shared/ui/icon-button"
 import { cn } from "@/shared/lib/utils"

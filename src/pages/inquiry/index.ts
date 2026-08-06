@@ -1,0 +1,8 @@
+export { B01AllAccounts } from "@/pages/inquiry/b01-all-accounts"
+export { B02DepositAccounts } from "@/pages/inquiry/b02-deposit-accounts"
+export { D04TransferHistory } from "@/pages/inquiry/d04-transfer-history"
+export { E04ReservationList } from "@/pages/inquiry/e04-reservation-list"
+export { E05ReservationResults } from "@/pages/inquiry/e05-reservation-results"
+export { F02NotificationInbox } from "@/pages/inquiry/f02-notification-inbox"
+export { G04AutoTransferList } from "@/pages/inquiry/g04-auto-transfer-list"
+export { G05AutoTransferResults } from "@/pages/inquiry/g05-auto-transfer-results"

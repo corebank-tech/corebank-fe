@@ -1,0 +1,6 @@
+export { AppHeader } from "@/widgets/shell/app-header"
+export { BreadcrumbBar } from "@/widgets/shell/breadcrumb-bar"
+export { Footer } from "@/widgets/shell/footer"
+export { FullMenuOverlay } from "@/widgets/shell/full-menu-overlay"
+export { PageHeader } from "@/widgets/shell/page-header"
+export { SideNav } from "@/widgets/shell/side-nav"

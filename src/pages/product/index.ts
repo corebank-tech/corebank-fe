@@ -1,0 +1,6 @@
+export { C01ProductList } from "@/pages/product/c01-product-list"
+export { C02ProductDetail } from "@/pages/product/c02-product-detail"
+export { C03Terms } from "@/pages/product/c03-terms"
+export { C04InputInfo } from "@/pages/product/c04-input-info"
+export { C05ConfirmAuth } from "@/pages/product/c05-confirm-auth"
+export { C06Complete } from "@/pages/product/c06-complete"

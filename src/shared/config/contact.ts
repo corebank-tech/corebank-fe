@@ -1,0 +1,2 @@
+export const CUSTOMER_CENTER_PHONE = "1599-0000"
+export const CUSTOMER_CENTER_HOURS = "평일 09:00~18:00"

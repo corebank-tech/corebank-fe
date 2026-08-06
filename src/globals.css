@@ -1,0 +1,313 @@
+@import "tailwindcss";
+
+/* ============================================================
+   CoreBank Design Tokens
+   ============================================================ */
+:root {
+  /* Brand palette — 구조색(navy)과 상호작용색(primary)을 분리한다.
+     navy: 페이지를 바닥에 고정 — DataGrid 상단 룰, FormSection 하단 라인, 강조 헤더 배경 전용.
+     primary: 버튼·탭·링크 등 상호작용 요소 전용. */
+  --color-navy: #0a2e7d; /* H220 S85% L26% */
+  --color-primary: #0a60f5; /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
+  --color-primary-tint: #ecf2fe; /* notice box background */
+  --color-link: #0a60f5; /* inline text links */
+
+  /* Neutrals */
+  --color-surface: #f3f5f8; /* form label cell background */
+  --color-surface-2: #fafbfc;
+  --color-surface-elevated: #ffffff; /* 버튼·인풋·카드·모달 등 흰 표면 — 다크모드에서 반전 */
+  --color-border: #e1e5ea;
+  --color-border-strong: #c3c9d2;
+  --color-footer-bg: #f9fafb; /* footer */
+  --color-ink: #17202e; /* primary text */
+  --color-ink-muted: #4b5563; /* secondary text */
+  --color-ink-faint: #6b7280; /* 팀 피드백: 저대비 개선(2026-07). WCAG AA 4.5:1 이상 확보 */
+  --color-white: #ffffff;
+
+  /* Feedback — 기관 톤. 소비자 앱 채도를 피한다 */
+  --color-danger: #d81e18; /* 팀 피드백: 채도 상향(2026-07) */
+  --color-danger-tint: #fbf0ef;
+  --color-danger-ring: color-mix(in srgb, var(--color-danger) 20%, white);
+  --color-success: #107f46;
+  --color-success-tint: #e7f4ee;
+  --color-warning: #ad6200;
+  --color-warning-tint: #fbf3e2;
+  --color-ring-soft: color-mix(in srgb, var(--color-primary) 30%, white);
+  --color-skeleton: color-mix(in srgb, var(--color-border) 60%, white);
+
+  /* Soft borders — 흰 배경 위에 20% 알파를 미리 섞은 고정값.
+     Alert/Badge 테두리 전용. 컴포넌트에서 투명도 표기(border-x/20)를 쓰지 않기 위함(POL-039) */
+  --color-primary-border-soft: #cfdef9;
+  --color-success-border-soft: #d0e2d9;
+  --color-warning-border-soft: #eddecc;
+  --color-danger-border-soft: #f4d6d5;
+
+  /* Overlay — 뒤 배경이 고정색이 아니어서 실제 반투명이 필요한 경우 전용 */
+  --color-overlay-scrim: rgba(
+    23,
+    32,
+    46,
+    0.5
+  ); /* 모달 백드롭, 전체메뉴 레이어 */
+  --overlay-white-15: rgba(
+    255,
+    255,
+    255,
+    0.15
+  ); /* 색상 바 위 아이콘버튼 hover */
+  --overlay-white-70: rgba(255, 255, 255, 0.7); /* 색상 바 위 포커스 링 */
+
+  /* Grid / ledger — 출금액은 danger와 hex가 완전히 같아 별도 토큰을 두지 않는다.
+     입금·출금을 함께 보여줄 때는 --color-deposit과 --color-danger를 쓴다. */
+  --color-deposit: #0c5bbb; /* 입금 amounts — 팀 피드백: 채도 상향(2026-07) */
+
+  /* Type scale — 6단 (2026-07 5차: 인접 단계가 1px 차이라 사용자가 구분하지
+     못하고 개발 시 어떤 걸 골라야 할지도 헷갈린다는 피드백에 따라, 9단→7단(h3·md
+     흡수)에 이어 text-sm(13px)을 text-base(14px)에 흡수했다 — 이제 각 단계는
+     최소 2px 이상 차이난다(2xs·xs 제외 — 이 둘은 각주 vs 라벨이라는 별개 용도로
+     CLAUDE.md에 고정 규정돼 있어 유지). DataGrid·SummaryRow는 text-[14px] 리터럴로
+     직접 고정해 스케일과 분리한다(POL-041 3차 피드백: 표만 13→14px로 소폭 상향). */
+  --text-page: 26px;
+  --text-h2: 20px;
+  --text-lg: 16px;
+  --text-base: 14px;
+  --text-xs: 12px;
+  --text-2xs: 11px;
+
+  /* 간격은 Tailwind 기본 spacing 스케일(--spacing: 0.25rem 배수인 gap, p, m 계열
+     유틸리티)을 쓴다. 그룹 내부 gap-1~gap-2(4~8px) / 블록 사이 gap-3~gap-4(12~16px) /
+     섹션 사이 mb-8~mt-10(32~40px). 과거 여기 있던 --space-1~12 리터럴은 @theme에
+     등록되지 않아 참조 0건이었으므로 제거했다 — 다시 만들지 않는다. */
+
+  /* Radius */
+  --radius-sm: 6px; /* 뱃지, 스텝 숫자, 소형 표식 */
+  --radius: 10px; /* 버튼, 인풋, 셀렉트, 체크박스 */
+  --radius-lg: 16px; /* 카드, 패널, 모달, 검색조건 박스 */
+  --radius-pill: 999px; /* 토글 칩 전용 */
+
+  /* Elevation */
+  --shadow-card:
+    0 1px 2px rgba(25, 31, 40, 0.03), 0 4px 16px rgba(25, 31, 40, 0.06);
+  --shadow-pop: 0 8px 32px rgba(25, 31, 40, 0.14);
+
+  /* Weight — 색이 아니라 굵기로 위계를 만든다 */
+  --weight-label: 500;
+  --weight-value: 700;
+  --weight-heading: 700;
+
+  /* Footer foreground (light footer, dark text) */
+  --color-footer-fg: var(--color-ink-muted);
+  --color-footer-fg-strong: var(--color-ink);
+  --color-footer-fg-faint: var(--color-ink-faint);
+  --color-footer-divider: var(--color-border);
+  --color-footer-hover-bg: var(--color-surface);
+
+  /* Font */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+
+  /* z-index layers */
+  --z-header: 100;
+  --z-dropdown: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+
+  /* shadcn 스타일 시맨틱 매핑 — 실제로 유틸리티가 쓰는 4개(primary·primary-foreground·
+     border·ring)만 남긴다. background/foreground/card/card-foreground/popover/
+     popover-foreground/secondary/secondary-foreground/muted/muted-foreground/
+     accent/accent-foreground/destructive/destructive-foreground/input 15개는
+     정의만 있고 사용처가 0건이라 제거했다(신규 shadcn 프리미티브 도입 시 필요한
+     만큼만 다시 추가한다). */
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-white);
+  --border: var(--color-border);
+  --ring: var(--color-primary);
+}
+
+/* ============================================================
+   Dark theme — 팀 피드백(2026-07) POL-039 확장.
+   <html data-theme="dark"> 속성으로 전환한다 (src/shared/lib/theme.ts).
+   컴포넌트는 변수만 참조하므로(POL-039) 이 블록만으로 대부분 자동 반영된다.
+   --color-white는 버튼 위 아이콘/텍스트 등 "항상 흰색이어야 하는" 고정값이라
+   재정의하지 않는다. 흰 표면(카드·버튼·인풋 등)은 --color-surface-elevated로
+   분리해 다크에서 반전시킨다.
+   ============================================================ */
+:root[data-theme="dark"] {
+  /* 팀 피드백(2026-07, 2차): outline 버튼 등 --color-surface-elevated 위 텍스트로 쓰일 때
+     AA(4.5:1) 미달이었던 primary/danger/info를 카드 표면 기준으로 재보정. */
+  --color-navy: #3c71dd;
+  --color-primary: #5a95f7;
+  --color-primary-tint: #14203a;
+  --color-link: #7aa8ff;
+
+  --color-surface: #171c27; /* 폼 라벨 셀 배경 */
+  --color-surface-2: #10141c; /* 페이지 배경 */
+  --color-surface-elevated: #232b3c; /* 버튼·인풋·카드·모달 표면 */
+  --color-overlay-scrim: rgba(
+    0,
+    0,
+    0,
+    0.72
+  ); /* 모달·전체메뉴 배경. surface-elevated와 대비를 확보 */
+  /* 팀 피드백(2026-07, 2차): 다크모드에서 표 셀 구분선이 거의 안 보인다는 지적에 따라
+     테두리 대비를 크게 상향(기존 대비 약 2배, 페이지 배경 대비 ≥2.8:1). */
+  --color-border: #545e77;
+  --color-border-strong: #6b7590;
+  --color-footer-bg: #171c27;
+  --color-ink: #eceff4;
+  --color-ink-muted: #a7afbf;
+  --color-ink-faint: #8f97ab;
+
+  --color-danger: #f2645f;
+  --color-danger-tint: #2c1614;
+  --color-danger-ring: color-mix(
+    in srgb,
+    var(--color-danger) 30%,
+    var(--color-surface-elevated)
+  );
+  --color-success: #2eb870;
+  --color-success-tint: #12281c;
+  --color-warning: #f28f0d;
+  --color-warning-tint: #2c2110;
+  --color-ring-soft: color-mix(
+    in srgb,
+    var(--color-primary) 35%,
+    var(--color-surface-elevated)
+  );
+  --color-skeleton: color-mix(
+    in srgb,
+    var(--color-border) 60%,
+    var(--color-surface-elevated)
+  );
+
+  --color-primary-border-soft: #294274;
+  --color-success-border-soft: #1c4331;
+  --color-warning-border-soft: #4a3315;
+  --color-danger-border-soft: #4a2321;
+
+  --color-deposit: #3e8bea;
+
+  --color-footer-fg: var(--color-ink-muted);
+  --color-footer-fg-strong: var(--color-ink);
+  --color-footer-fg-faint: var(--color-ink-faint);
+  --color-footer-divider: var(--color-border);
+  --color-footer-hover-bg: var(--color-surface);
+
+  /* 라이트 값(거의 검정 위 낮은 알파)을 어두운 배경 위에 그대로 쓰면 사실상 안 보인다.
+     순검정 기반으로 알파를 크게 올려 카드·모달이 배경에서 실제로 떠 보이게 한다. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.48);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-tint: var(--color-primary-tint);
+  --color-link: var(--color-link);
+  --color-border: var(--border);
+  --color-border-strong: var(--color-border-strong);
+  --color-ring: var(--ring);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-footer-bg: var(--color-footer-bg);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-faint: var(--color-ink-faint);
+  --color-danger: var(--color-danger);
+  --color-danger-tint: var(--color-danger-tint);
+  --color-success: var(--color-success);
+  --color-success-tint: var(--color-success-tint);
+  --color-warning: var(--color-warning);
+  --color-warning-tint: var(--color-warning-tint);
+  --color-primary-border-soft: var(--color-primary-border-soft);
+  --color-success-border-soft: var(--color-success-border-soft);
+  --color-warning-border-soft: var(--color-warning-border-soft);
+  --color-danger-border-soft: var(--color-danger-border-soft);
+  --color-navy: var(--color-navy);
+  --color-deposit: var(--color-deposit);
+  --color-danger-ring: var(--color-danger-ring);
+  --color-ring-soft: var(--color-ring-soft);
+  --color-skeleton: var(--color-skeleton);
+  --color-overlay-scrim: var(--color-overlay-scrim);
+  --color-overlay-white-15: var(--overlay-white-15);
+  --color-overlay-white-70: var(--overlay-white-70);
+  --color-footer-fg: var(--color-footer-fg);
+  --color-footer-fg-strong: var(--color-footer-fg-strong);
+  --color-footer-fg-faint: var(--color-footer-fg-faint);
+  --color-footer-divider: var(--color-footer-divider);
+  --color-footer-hover-bg: var(--color-footer-hover-bg);
+
+  /* 7단 스케일을 봉인한다 — text-xl 같은 Tailwind 기본 스케일 클래스가 컴파일되지
+     않게 해 리뷰가 아니라 컴파일러가 스케일을 지킨다. line-height는 Tailwind
+     기본값과 동일하게 재선언해 봉인 전후 렌더 결과가 바뀌지 않도록 한다. */
+  --text-*: initial;
+  --text-page: var(--text-page);
+  --text-page--line-height: 1.3;
+  --text-h2: var(--text-h2);
+  --text-h2--line-height: 1.4;
+  --text-lg: var(--text-lg);
+  --text-lg--line-height: calc(1.75 / 1.125);
+  --text-base: var(--text-base);
+  --text-base--line-height: calc(1.5 / 1);
+  --text-xs: var(--text-xs);
+  --text-xs--line-height: calc(1 / 0.75);
+  --text-2xs: var(--text-2xs);
+
+  /* radius 4단 스케일을 봉인한다 — rounded-xl 같은 Tailwind 기본 반경 클래스가
+     컴파일되지 않게 한다. rounded-none/rounded-full은 정적 유틸리티라 영향받지 않는다. */
+  --radius-*: initial;
+  --radius-sm: var(--radius-sm);
+  --radius: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --font-weight-label: var(--weight-label);
+  --font-weight-value: var(--weight-value);
+  --font-weight-heading: var(--weight-heading);
+
+  --z-index-header: var(--z-header);
+  --z-index-dropdown: var(--z-dropdown);
+  --z-index-overlay: var(--z-overlay);
+  --z-index-modal: var(--z-modal);
+  --z-index-toast: var(--z-toast);
+
+  /* 인증코드·계좌번호 등 숫자 입력 필드의 letter-spacing. 이름은 em 값을 그대로 딴 것이다. */
+  --tracking-1: 0.1em;
+  --tracking-15: 0.15em;
+  --tracking-2: 0.2em;
+  --tracking-3: 0.3em;
+  --tracking-4: 0.4em;
+}
+
+/* 이 reset은 @layer base 안에 있어야 한다. 레이어 없이 두면(과거 상태) 캐스케이드
+   레이어 규칙상 이 선언이 border-strong/danger/navy/footer-divider 등 다른 모든
+   border-color 유틸리티(@layer utilities)를 무조건 이긴다 — 즉 border-[var(--color-navy)]
+   같은 명시적 지정이 전부 무시되고 항상 회색(--color-border)으로만 보인다.
+   DataGrid 상단 룰·FormSection 하단 라인(POL-040 navy)이 이 버그로 안 보이고 있었다. */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+html {
+  background-color: var(--color-surface-2);
+}
+
+body {
+  min-width: 1280px;
+  background-color: var(--color-surface-2);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

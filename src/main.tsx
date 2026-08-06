@@ -1,15 +1,32 @@
-import "@/index.css";
+import React from "react"
+import ReactDOM from "react-dom/client"
+import { BrowserRouter } from "react-router"
+import { AppProviders } from "@/app/providers/app-providers"
+import App from "@/App"
+import { NotificationsProvider } from "@/features/notifications"
+import { SessionProvider } from "@/features/session"
+import "@/globals.css"
 
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+const enableMocking = async (): Promise<void> => {
+  if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_MSW !== "true") return
+  const { worker } = await import("@/mocks/browser")
+  await worker.start({ onUnhandledRequest: "bypass" })
+}
 
-import { AppProvider } from "@/app/providers/app-provider";
-import { AppRouter } from "@/app/router/app-router";
+const root = ReactDOM.createRoot(document.getElementById("root")!)
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <AppProvider>
-      <AppRouter />
-    </AppProvider>
-  </StrictMode>,
-);
+enableMocking().then(() => {
+  root.render(
+    <React.StrictMode>
+      <AppProviders>
+        <BrowserRouter>
+          <SessionProvider>
+            <NotificationsProvider>
+              <App />
+            </NotificationsProvider>
+          </SessionProvider>
+        </BrowserRouter>
+      </AppProviders>
+    </React.StrictMode>,
+  )
+})

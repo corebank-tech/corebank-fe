@@ -19,7 +19,7 @@ type OtpModalProps = {
   guide?: React.ReactNode
 }
 
-function generateOtp(): string {
+const generateOtp = (): string => {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 

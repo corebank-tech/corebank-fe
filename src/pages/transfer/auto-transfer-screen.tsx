@@ -55,7 +55,7 @@ const INITIAL_FORM: AutoTransferForm = {
   myMemo: "",
 }
 
-function toCycleMonths(raw: string | null): TransferCycleMonths {
+const toCycleMonths = (raw: string | null): TransferCycleMonths => {
   if (raw === "3") return 3
   if (raw === "6") return 6
   return 1
@@ -66,7 +66,7 @@ function toCycleMonths(raw: string | null): TransferCycleMonths {
  * querystring(toAccount/amount/cycleMonths/endDate)으로 넘어온 값을 초기 폼에 반영한다.
  * 고객은 출금계좌와 이체지정일만 추가로 선택하면 되도록 나머지 값을 미리 채운다.
  */
-function buildInitialForm(searchParams: URLSearchParams): AutoTransferForm {
+const buildInitialForm = (searchParams: URLSearchParams): AutoTransferForm => {
   const toAccount = searchParams.get("toAccount") ?? ""
   const amountParam = searchParams.get("amount")
   const endDate = searchParams.get("endDate") ?? ""
@@ -83,7 +83,7 @@ function buildInitialForm(searchParams: URLSearchParams): AutoTransferForm {
   }
 }
 
-function isDuplicate(form: AutoTransferForm): boolean {
+const isDuplicate = (form: AutoTransferForm): boolean => {
   if (!form.toConfirmed) return false
   return MOCK_AUTO_TRANSFERS.some(
     (a) =>
@@ -95,13 +95,13 @@ function isDuplicate(form: AutoTransferForm): boolean {
 }
 
 /** 대상 월에 지정일이 없으면(29·30·31일) 말일로 보정한다 (POL-034). */
-function clampToMonth(year: number, monthIndex: number, day: number): Date {
+const clampToMonth = (year: number, monthIndex: number, day: number): Date => {
   const lastDay = new Date(year, monthIndex + 1, 0).getDate()
   return new Date(year, monthIndex, Math.min(day, lastDay))
 }
 
 /** 시작일 이후 첫 이체지정일(말일 보정 포함)을 첫 실행 예정일로 산출한다. */
-function computeFirstExecDate(startISO: string, dayOfMonth: number): string {
+const computeFirstExecDate = (startISO: string, dayOfMonth: number): string => {
   const start = parseISO(startISO)
   let candidate = clampToMonth(
     start.getFullYear(),

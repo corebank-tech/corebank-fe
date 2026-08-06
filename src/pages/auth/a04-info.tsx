@@ -22,7 +22,7 @@ import { formatClock, useCountdown } from "@/shared/lib/hooks/use-countdown"
 import { MOCK_EXISTING_USER_IDS, MOCK_EXISTING_EMAILS } from "@/entities/auth"
 import { SIGNUP_STEPS, type SignupData } from "@/pages/auth/signup-shared"
 
-function generateCode(): string {
+const generateCode = (): string => {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 

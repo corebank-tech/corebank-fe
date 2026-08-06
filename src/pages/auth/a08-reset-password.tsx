@@ -17,7 +17,7 @@ import { MOCK_MEMBERS, type Member } from "@/entities/auth"
 import { EMAIL_CODE_TTL_SECONDS as OTP_TTL } from "@/shared/config/policy"
 import { formatClock, useCountdown } from "@/shared/lib/hooks/use-countdown"
 
-function generateCode(): string {
+const generateCode = (): string => {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 

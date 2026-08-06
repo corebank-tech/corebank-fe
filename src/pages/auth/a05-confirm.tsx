@@ -11,7 +11,7 @@ type A05ConfirmProps = {
   onComplete: () => void
 }
 
-function birthToDisplay(birth: string): string {
+const birthToDisplay = (birth: string): string => {
   if (birth.length !== 6) return birth
   return `${birth.slice(0, 2)}.${birth.slice(2, 4)}.${birth.slice(4, 6)}`
 }

@@ -45,7 +45,7 @@ const STATUS_OPTIONS = [
 ]
 
 /** REQ-RSV-008: 이체 예정일 전일 23:59:59까지 취소 가능, 당일은 취소 불가. */
-function isCancelable(row: ReservationRow): boolean {
+const isCancelable = (row: ReservationRow): boolean => {
   return row.status === "대기" && row.scheduledDate > TODAY
 }
 

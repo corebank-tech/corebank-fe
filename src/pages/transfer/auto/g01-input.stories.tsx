@@ -30,7 +30,7 @@ const INITIAL_FORM: AutoTransferForm = {
 }
 
 /** AutoTransferScreen의 중복 등록 검증(REQ-AUTO-008)을 그대로 가져온 것. */
-function isDuplicate(form: AutoTransferForm): boolean {
+const isDuplicate = (form: AutoTransferForm): boolean => {
   if (!form.toConfirmed) return false
   return MOCK_AUTO_TRANSFERS.some(
     (a) =>

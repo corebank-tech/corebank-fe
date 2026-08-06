@@ -19,11 +19,11 @@ import { MOCK_NOW } from "@/shared/config/mock-clock"
 
 const BASE_TIME = MOCK_NOW
 
-function onlyDigits(value: string): string {
+const onlyDigits = (value: string): string => {
   return onlyDigitsBase(value, 15)
 }
 
-function formatDraft(value: string): string {
+const formatDraft = (value: string): string => {
   if (!value) return ""
   return Number(value).toLocaleString("ko-KR")
 }

@@ -54,7 +54,7 @@ const ORDER_OPTIONS = [
   { label: "과거거래순", value: "past" },
 ]
 
-function amountCell(value: number, color: string) {
+const amountCell = (value: number, color: string) => {
   if (value === 0) return <span className="text-ink-faint">-</span>
   return <span style={{ color }}>{formatAmount(value, { suffix: false })}</span>
 }

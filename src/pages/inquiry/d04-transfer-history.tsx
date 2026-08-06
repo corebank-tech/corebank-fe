@@ -55,7 +55,7 @@ const FROM_ACCOUNTS = Array.from(
   ).entries(),
 )
 
-function toISODate(datetime: string) {
+const toISODate = (datetime: string) => {
   return datetime.slice(0, 10)
 }
 

@@ -27,7 +27,7 @@ const INITIAL_FORM: ReservedTransferForm = {
 }
 
 /** ReservedTransferScreen의 중복 예약 검증(REQ-RSV-006)을 그대로 가져온 것. */
-function isDuplicate(form: ReservedTransferForm): boolean {
+const isDuplicate = (form: ReservedTransferForm): boolean => {
   if (!form.toConfirmed || form.amount == null || !form.scheduledDate)
     return false
   return MOCK_RESERVATIONS.some(

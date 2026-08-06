@@ -48,7 +48,7 @@ const INITIAL_FORM: ReservedTransferForm = {
   myMemo: "",
 }
 
-function isDuplicate(form: ReservedTransferForm): boolean {
+const isDuplicate = (form: ReservedTransferForm): boolean => {
   if (!form.toConfirmed || form.amount == null || !form.scheduledDate)
     return false
   return MOCK_RESERVATIONS.some(

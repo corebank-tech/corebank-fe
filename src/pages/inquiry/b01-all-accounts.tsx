@@ -41,11 +41,11 @@ const SEARCH_FIELDS: GridSearchField[] = [
 ]
 
 /** REQ-INQR-004: 계좌명, 계좌번호, 신규일, 최근거래일(예적금은 만기일), 잔액, 업무. */
-function buildColumns(
+const buildColumns = (
   group: AccountGroupId,
   onInquire: (accountNo: string) => void,
   onTransfer: (accountNo: string) => void,
-): DataGridColumn<OverviewAccount>[] {
+): DataGridColumn<OverviewAccount>[] => {
   return [
     { key: "alias", header: "계좌명", width: 180 },
     {

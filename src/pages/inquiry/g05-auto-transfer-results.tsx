@@ -114,7 +114,7 @@ export const G05AutoTransferResults = () => {
       sortable: true,
       sortValue: (r) => r.processedAt,
       render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.processedAt)}</span>
+        <span className="font-tabular">{formatDateTime(r.processedAt)}</span>
       ),
     },
     {
@@ -124,7 +124,7 @@ export const G05AutoTransferResults = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {formatAccountNo(r.fromAccountNo)}
           </span>
         </span>
@@ -135,7 +135,7 @@ export const G05AutoTransferResults = () => {
       header: "입금계좌",
       width: 150,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
       ),
     },
     {

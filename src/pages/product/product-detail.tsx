@@ -65,7 +65,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
           </p>
 
           <div className="mt-5 flex items-baseline gap-1 border-t border-border pt-5">
-            <span className="text-[32px] leading-none font-bold text-primary tabular-nums">
+            <span className="text-[32px] leading-none font-bold text-primary">
               {product.maxRate.toFixed(2)}
             </span>
             <span className="text-lg font-bold text-primary">%</span>
@@ -80,7 +80,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-ink-muted">가입금액</dt>
-              <dd className="font-bold text-ink tabular-nums">
+              <dd className="font-tabular font-bold text-ink">
                 {formatAmount(product.minAmount)} ~{" "}
                 {formatAmount(product.maxAmount)}
               </dd>

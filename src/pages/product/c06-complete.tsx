@@ -24,7 +24,7 @@ const resultColumns: DataGridColumn<JoinResultRow>[] = [
     header: "신규계좌번호",
     align: "center",
     render: (r) => (
-      <span className="tabular-nums">{formatAccountNo(r.newAccountNo)}</span>
+      <span className="font-tabular">{formatAccountNo(r.newAccountNo)}</span>
     ),
   },
   { key: "productName", header: "상품명", align: "center" },
@@ -33,7 +33,7 @@ const resultColumns: DataGridColumn<JoinResultRow>[] = [
     header: "가입금액(원)",
     align: "right",
     render: (r) => (
-      <span className="tabular-nums">
+      <span className="font-tabular">
         {formatAmount(r.amount, { suffix: false })}
       </span>
     ),

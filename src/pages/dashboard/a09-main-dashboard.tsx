@@ -102,7 +102,7 @@ export const A09MainDashboard = ({
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.accountNo,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
       ),
     },
     {
@@ -111,7 +111,7 @@ export const A09MainDashboard = ({
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.openedDate,
       render: (r) => (
-        <span className="tabular-nums">{formatDate(r.openedDate)}</span>
+        <span className="font-tabular">{formatDate(r.openedDate)}</span>
       ),
     },
     {
@@ -120,7 +120,7 @@ export const A09MainDashboard = ({
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.lastTxDate,
       render: (r) => (
-        <span className="tabular-nums">{formatDate(r.lastTxDate)}</span>
+        <span className="font-tabular">{formatDate(r.lastTxDate)}</span>
       ),
     },
     {
@@ -198,11 +198,11 @@ export const A09MainDashboard = ({
                   <span className="text-base font-bold text-ink-muted">
                     기본 입출금계좌 · {accounts[0].alias}
                   </span>
-                  <span className="text-base font-bold text-ink-muted tabular-nums">
+                  <span className="font-tabular text-base font-bold text-ink-muted">
                     {formatAccountNo(accounts[0].accountNo)}
                   </span>
                 </div>
-                <span className="text-h2 font-value text-ink tabular-nums">
+                <span className="font-tabular text-h2 font-value text-ink">
                   {formatAmount(accounts[0].balance)}
                 </span>
               </div>

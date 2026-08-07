@@ -53,7 +53,7 @@ const buildColumns = (
       header: "계좌번호",
       width: 160,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
       ),
     },
     {
@@ -62,7 +62,7 @@ const buildColumns = (
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="tabular-nums">{formatDate(r.openedDate)}</span>
+        <span className="font-tabular">{formatDate(r.openedDate)}</span>
       ),
     },
     {
@@ -71,7 +71,7 @@ const buildColumns = (
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="tabular-nums">{formatDate(r.lastActivityDate)}</span>
+        <span className="font-tabular">{formatDate(r.lastActivityDate)}</span>
       ),
     },
     {

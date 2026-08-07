@@ -67,7 +67,7 @@ export const LimitModal = ({
               >
                 {row.label}
               </th>
-              <td className="border-b border-border bg-surface-elevated px-3 py-3 text-right text-ink tabular-nums">
+              <td className="border-b border-border bg-surface-elevated px-3 py-3 text-right font-tabular text-ink">
                 {formatAmount(row.value)}
               </td>
             </tr>

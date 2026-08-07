@@ -239,7 +239,7 @@ export const DataGrid = <Row,>({
                       className={cn(
                         "border-r border-b border-border px-3 py-2.5 text-[14px] whitespace-nowrap text-ink last:border-r-0",
                         ALIGN_CLASSES[col.align ?? "left"],
-                        col.align === "right" && "tabular-nums",
+                        col.align === "right" && "font-tabular",
                         col.className,
                       )}
                     >

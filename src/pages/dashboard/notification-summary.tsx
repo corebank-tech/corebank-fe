@@ -28,7 +28,7 @@ export const NotificationSummary = ({
         title={
           <>
             미읽음 알림{" "}
-            <span className="text-primary tabular-nums">
+            <span className="font-tabular text-primary">
               {totalCount ?? items.length}
             </span>
             건
@@ -60,7 +60,7 @@ export const NotificationSummary = ({
             <span className="min-w-0 flex-1 truncate text-base text-ink">
               {item.title}
             </span>
-            <time className="shrink-0 text-2xs text-ink-faint tabular-nums">
+            <time className="shrink-0 font-tabular text-2xs text-ink-faint">
               {formatDateTime(item.datetime)}
             </time>
           </li>

@@ -78,7 +78,7 @@ export const B06AccountAlias = () => {
       header: "계좌번호",
       width: 180,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
       ),
     },
     {

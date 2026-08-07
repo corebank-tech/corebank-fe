@@ -38,7 +38,7 @@ const buildColumns = (
     header: "거래번호",
     align: "center",
     width: 190,
-    render: (r) => <span className="tabular-nums">{r.transactionId}</span>,
+    render: (r) => <span className="font-tabular">{r.transactionId}</span>,
   },
   {
     key: "processedAt",
@@ -46,7 +46,7 @@ const buildColumns = (
     align: "center",
     width: 150,
     render: (r) => (
-      <span className="tabular-nums">{formatDateTime(r.processedAt)}</span>
+      <span className="font-tabular">{formatDateTime(r.processedAt)}</span>
     ),
   },
   {
@@ -54,7 +54,7 @@ const buildColumns = (
     header: "출금계좌",
     align: "center",
     render: (r) => (
-      <span className="tabular-nums">{formatAccountNo(r.fromAccountNo)}</span>
+      <span className="font-tabular">{formatAccountNo(r.fromAccountNo)}</span>
     ),
   },
   {
@@ -62,7 +62,7 @@ const buildColumns = (
     header: "입금계좌",
     align: "center",
     render: (r) => (
-      <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
+      <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
     ),
   },
   {

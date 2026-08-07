@@ -91,7 +91,7 @@ const InfoRow = ({
               item.dominant
                 ? "text-h2 font-bold text-primary"
                 : "text-base font-bold text-ink",
-              item.numeric && "tabular-nums",
+              item.numeric && "font-tabular",
             )}
           >
             {item.desc}
@@ -169,14 +169,14 @@ export const B03TransactionInquiry = () => {
       width: 110,
       sortable: true,
       sortValue: (r) => `${r.date}T${r.time}`,
-      render: (r) => <span className="tabular-nums">{formatDate(r.date)}</span>,
+      render: (r) => <span className="font-tabular">{formatDate(r.date)}</span>,
     },
     {
       key: "time",
       header: "거래시각",
       align: "center",
       width: 90,
-      render: (r) => <span className="tabular-nums">{r.time}</span>,
+      render: (r) => <span className="font-tabular">{r.time}</span>,
     },
     { key: "description", header: "적요", align: "left", width: 100 },
     {

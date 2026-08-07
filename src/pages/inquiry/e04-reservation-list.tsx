@@ -162,7 +162,7 @@ export const E04ReservationList = () => {
       sortable: true,
       sortValue: (r) => r.scheduledDate,
       render: (r) => (
-        <span className="tabular-nums">{formatDate(r.scheduledDate)}</span>
+        <span className="font-tabular">{formatDate(r.scheduledDate)}</span>
       ),
     },
     {
@@ -172,7 +172,7 @@ export const E04ReservationList = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {formatAccountNo(r.fromAccountNo)}
           </span>
         </span>
@@ -183,7 +183,7 @@ export const E04ReservationList = () => {
       header: "입금계좌",
       width: 150,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
       ),
     },
     {
@@ -206,7 +206,7 @@ export const E04ReservationList = () => {
       header: "등록일시",
       width: 150,
       render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.registeredAt)}</span>
+        <span className="font-tabular">{formatDateTime(r.registeredAt)}</span>
       ),
     },
   ]

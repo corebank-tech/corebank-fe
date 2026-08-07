@@ -33,15 +33,15 @@ const meta = {
       <InstantTransferStep2
         steps={TRANSFER_STEPS}
         scheduledAt={
-          <span className="tabular-nums">{formatDateTime(MOCK_NOW)}</span>
+          <span className="font-tabular">{formatDateTime(MOCK_NOW)}</span>
         }
         fromAccount={
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
         toAccount={
-          <span className="tabular-nums">{formatAccountNo(TO_ACCOUNT_NO)}</span>
+          <span className="font-tabular">{formatAccountNo(TO_ACCOUNT_NO)}</span>
         }
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
@@ -73,15 +73,15 @@ export const WithAuthError: Story = {
       <InstantTransferStep2
         steps={TRANSFER_STEPS}
         scheduledAt={
-          <span className="tabular-nums">{formatDateTime(MOCK_NOW)}</span>
+          <span className="font-tabular">{formatDateTime(MOCK_NOW)}</span>
         }
         fromAccount={
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
         toAccount={
-          <span className="tabular-nums">{formatAccountNo(TO_ACCOUNT_NO)}</span>
+          <span className="font-tabular">{formatAccountNo(TO_ACCOUNT_NO)}</span>
         }
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}

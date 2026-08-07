@@ -156,7 +156,7 @@ export const C04InputInfo = () => {
         <FormSection title="예상 만기금액(참고)">
           <div className="border border-border bg-surface px-5 py-4">
             <p className="text-2xs text-ink-faint">세전 단리 기준 참고값</p>
-            <p className="mt-1 text-page font-bold text-primary tabular-nums">
+            <p className="mt-1 text-page font-bold text-primary">
               {expectedMaturity != null
                 ? formatKoreanAmount(expectedMaturity)
                 : "-"}

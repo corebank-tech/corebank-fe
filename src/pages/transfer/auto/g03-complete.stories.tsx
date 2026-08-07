@@ -37,7 +37,7 @@ const meta = {
         steps={TRANSFER_STEPS}
         row={{
           fromAccount: (
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
             </span>
           ),

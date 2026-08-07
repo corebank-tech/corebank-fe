@@ -149,7 +149,7 @@ export const D04TransferHistory = () => {
       sortable: true,
       sortValue: (r) => r.datetime,
       render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.datetime)}</span>
+        <span className="font-tabular">{formatDateTime(r.datetime)}</span>
       ),
     },
     {
@@ -159,7 +159,7 @@ export const D04TransferHistory = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {formatAccountNo(r.fromAccountNo)}
           </span>
         </span>
@@ -170,7 +170,7 @@ export const D04TransferHistory = () => {
       header: "입금계좌",
       width: 150,
       render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
+        <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
       ),
     },
     {
@@ -208,7 +208,7 @@ export const D04TransferHistory = () => {
         <button
           type="button"
           onClick={() => setDetail(r)}
-          className="text-base text-link tabular-nums hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="font-tabular text-base text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {r.txId}
         </button>
@@ -302,8 +302,8 @@ export const D04TransferHistory = () => {
                     <dd
                       className={
                         item.dominant
-                          ? "min-w-0 flex-1 text-h2 font-bold text-primary tabular-nums"
-                          : "min-w-0 flex-1 text-base font-bold text-ink tabular-nums"
+                          ? "min-w-0 flex-1 font-tabular text-h2 font-bold text-primary"
+                          : "min-w-0 flex-1 font-tabular text-base font-bold text-ink"
                       }
                     >
                       {item.value}

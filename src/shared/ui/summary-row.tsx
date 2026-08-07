@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/utils"
 export type SummaryItem = {
   label: React.ReactNode
   value: React.ReactNode
-  /** Right-align + tabular-nums for numeric values. Defaults to true. */
+  /** Right-align + font-tabular for numeric values. Defaults to true. */
   numeric?: boolean
   /** Optional value color token, e.g. "var(--color-deposit)". */
   valueColor?: string
@@ -45,7 +45,7 @@ export const SummaryRow = ({
           <div
             className={cn(
               "flex flex-1 items-center border-r border-b bg-surface-elevated px-3 py-2.5 text-[14px] whitespace-nowrap text-ink",
-              (item.numeric ?? true) && "justify-end font-bold tabular-nums",
+              (item.numeric ?? true) && "justify-end font-tabular font-bold",
             )}
             style={item.valueColor ? { color: item.valueColor } : undefined}
           >

@@ -185,12 +185,12 @@ export const AutoTransferScreen = () => {
         <AutoTransferStep2
           steps={STEPS}
           fromAccount={
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           }
           toAccount={
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {formatAccountNo(form.toAccount)}
             </span>
           }
@@ -198,7 +198,7 @@ export const AutoTransferScreen = () => {
           amount={formatAmount(form.amount ?? 0, { suffix: false })}
           cycle={`${form.cycleMonths}개월`}
           dayOfMonth={`매월 ${form.dayOfMonth}일`}
-          period={<span className="tabular-nums">{periodLabel}</span>}
+          period={<span className="font-tabular">{periodLabel}</span>}
           payeeMemo={form.payeeMemo || "-"}
           onPrev={() => setStep(1)}
           onSubmit={() => setConfirmOpen(true)}
@@ -267,7 +267,7 @@ export const AutoTransferScreen = () => {
         steps={STEPS}
         row={{
           fromAccount: (
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           ),

@@ -138,7 +138,7 @@ export const AppHeader = ({
               </span>
 
               <span
-                className="text-base text-ink-muted tabular-nums"
+                className="font-tabular text-base text-ink-muted"
                 aria-live="off"
               >
                 {formatSession(remainingSeconds)}

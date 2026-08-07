@@ -157,10 +157,10 @@ export const F01ProfileContactForm = ({ profile, onProfileChange }: Props) => {
                 setPhoneDraft(onlyDigits(event.target.value, 11))
                 if (infoError) setInfoError(null)
               }}
-              className="max-w-[180px] tabular-nums"
+              className="max-w-[180px] font-tabular"
             />
             {phoneDraft.length === 11 && (
-              <span className="text-base text-ink-muted tabular-nums">
+              <span className="font-tabular text-base text-ink-muted">
                 {formatPhone(phoneDraft)}
               </span>
             )}
@@ -191,7 +191,7 @@ export const F01ProfileContactForm = ({ profile, onProfileChange }: Props) => {
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "text-lg font-bold tracking-15 tabular-nums",
+                      "font-tabular text-lg font-bold tracking-15",
                       codeExpired
                         ? "text-ink-faint line-through"
                         : "text-primary",
@@ -199,7 +199,7 @@ export const F01ProfileContactForm = ({ profile, onProfileChange }: Props) => {
                   >
                     {issuedCode}
                   </span>
-                  <span className="text-base font-bold text-ink tabular-nums">
+                  <span className="font-tabular text-base font-bold text-ink">
                     {formatClock(codeRemaining)}
                   </span>
                   <Input

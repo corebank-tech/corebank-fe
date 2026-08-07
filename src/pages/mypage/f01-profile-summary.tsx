@@ -23,17 +23,17 @@ export const F01ProfileSummary = ({ profile }: Props) => {
           <span className="text-ink">{maskName(profile.name)}</span>
         </FormRow>
         <FormRow label="아이디" labelWidth={180}>
-          <span className="text-ink tabular-nums">
+          <span className="font-tabular text-ink">
             {maskUserId(profile.userId)}
           </span>
         </FormRow>
         <FormRow label="생년월일" labelWidth={180}>
-          <span className="text-ink tabular-nums">
+          <span className="font-tabular text-ink">
             {maskBirthDate(profile.dob)}
           </span>
         </FormRow>
         <FormRow label="휴대폰번호" labelWidth={180}>
-          <span className="text-ink tabular-nums">
+          <span className="font-tabular text-ink">
             {maskPhone(profile.phone)}
           </span>
         </FormRow>
@@ -41,7 +41,7 @@ export const F01ProfileSummary = ({ profile }: Props) => {
           <span className="text-ink">{maskEmail(profile.email)}</span>
         </FormRow>
       </div>
-      <p className="mt-2 text-right text-2xs text-ink-muted tabular-nums">
+      <p className="mt-2 text-right font-tabular text-2xs text-ink-muted">
         기준일시 : {formatDateTime(BASE_TIME)}
       </p>
     </FormSection>

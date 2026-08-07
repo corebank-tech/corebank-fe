@@ -314,15 +314,15 @@ export const InstantTransferScreen = () => {
         <InstantTransferStep2
           steps={STEPS}
           scheduledAt={
-            <span className="tabular-nums">{formatDateTime(BASE_TIME)}</span>
+            <span className="font-tabular">{formatDateTime(BASE_TIME)}</span>
           }
           fromAccount={
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           }
           toAccount={
-            <span className="tabular-nums">
+            <span className="font-tabular">
               {formatAccountNo(form.toAccount)}
             </span>
           }
@@ -397,7 +397,7 @@ export const InstantTransferScreen = () => {
         header: "거래번호",
         align: "center",
         width: 190,
-        render: (r) => <span className="tabular-nums">{r.transactionId}</span>,
+        render: (r) => <span className="font-tabular">{r.transactionId}</span>,
       },
       {
         key: "processedAt",
@@ -405,7 +405,7 @@ export const InstantTransferScreen = () => {
         align: "center",
         width: 150,
         render: (r) => (
-          <span className="tabular-nums">{formatDateTime(r.processedAt)}</span>
+          <span className="font-tabular">{formatDateTime(r.processedAt)}</span>
         ),
       },
       {
@@ -413,7 +413,7 @@ export const InstantTransferScreen = () => {
         header: "출금계좌",
         align: "center",
         render: (r) => (
-          <span className="tabular-nums">
+          <span className="font-tabular">
             {formatAccountNo(r.fromAccountNo)}
           </span>
         ),
@@ -423,7 +423,7 @@ export const InstantTransferScreen = () => {
         header: "입금계좌",
         align: "center",
         render: (r) => (
-          <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
+          <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
         ),
       },
       {

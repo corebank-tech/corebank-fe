@@ -24,7 +24,7 @@ const columns: DataGridColumn<OverviewAccount>[] = [
     header: "계좌번호",
     width: 160,
     render: (row) => (
-      <span className="tabular-nums">{formatAccountNo(row.accountNo)}</span>
+      <span className="font-tabular">{formatAccountNo(row.accountNo)}</span>
     ),
   },
   {
@@ -33,7 +33,7 @@ const columns: DataGridColumn<OverviewAccount>[] = [
     align: "center",
     width: 110,
     render: (row) => (
-      <span className="tabular-nums">{formatDate(row.openedDate)}</span>
+      <span className="font-tabular">{formatDate(row.openedDate)}</span>
     ),
   },
   {

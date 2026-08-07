@@ -3,6 +3,7 @@ import { Link } from "react-router"
 import { X } from "lucide-react"
 import { NAV } from "@/shared/config/nav"
 import { IconButton } from "@/shared/ui/icon-button"
+import { cn } from "@/shared/lib/utils"
 
 type FullMenuOverlayProps = {
   open: boolean
@@ -32,12 +33,7 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
       aria-modal="true"
       aria-label="전체메뉴"
     >
-      <div
-        className="absolute inset-0 bg-overlay-scrim"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="absolute inset-x-0 top-0 bg-surface-elevated shadow-pop">
+      <div className="absolute inset-0 overflow-y-auto bg-surface-elevated shadow-pop">
         <div className="mx-auto w-320 px-4">
           <div className="flex h-18 items-center justify-between border-b border-border">
             <span className="text-h2 leading-[1.5] font-heading text-primary">
@@ -52,26 +48,32 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
             </IconButton>
           </div>
 
-          <div className="grid grid-cols-4 gap-8 pt-8 pb-12">
-            {NAV.map((cat) => (
-              <div key={cat.id}>
-                <h3 className="mb-3 text-lg leading-[1.5] font-heading text-primary">
+          <div className="grid grid-cols-4 pt-8 pb-12">
+            {NAV.map((cat, index) => (
+              <div
+                key={cat.id}
+                className={cn(
+                  "pr-12",
+                  index > 0 && "border-l border-border pl-12",
+                )}
+              >
+                <h3 className="mb-3 text-[24px] leading-[1.5] font-heading text-primary">
                   {cat.label}
                 </h3>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-[18px]">
                   {cat.groups.map((group) => (
                     <div key={group.title}>
-                      <p className="mb-1 text-base leading-[1.5] whitespace-nowrap text-ink-faint">
+                      <p className="mb-1 text-lg leading-[1.5] whitespace-nowrap text-ink-faint">
                         {group.title}
                       </p>
-                      <ul className="flex flex-col gap-1">
+                      <ul className="flex flex-col gap-3">
                         {group.items.map((item) => (
                           <li key={`${item.screenId}-${item.path}`}>
                             <Link
                               to={item.path}
                               data-screen-id={item.screenId}
                               onClick={onClose}
-                              className="inline-block py-0.5 text-lg leading-[1.5] font-label whitespace-nowrap text-ink hover:text-primary hover:underline"
+                              className="inline-block py-0.5 text-base leading-[1.5] font-label whitespace-nowrap text-ink hover:text-primary hover:underline"
                             >
                               {item.label}
                             </Link>

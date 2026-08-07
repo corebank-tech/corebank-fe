@@ -52,27 +52,21 @@ const buildColumns = (
       key: "accountNo",
       header: "계좌번호",
       width: 160,
-      render: (r) => (
-        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "openedDate",
       header: "신규일",
       align: "center",
       width: 120,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.openedDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
       key: "lastActivityDate",
       header: group === "deposit" ? "만기일" : "최근거래일",
       align: "center",
       width: 120,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.lastActivityDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.lastActivityDate)}</span>,
     },
     {
       key: "balance",

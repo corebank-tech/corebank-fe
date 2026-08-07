@@ -108,10 +108,7 @@ export const ProductCardGrid = ({
                 <span className="ml-1 text-xs text-ink-faint">(연, 세전)</span>
               </div>
               <p className="mt-1 text-xs text-ink-faint">
-                최고 금리{" "}
-                <span className="font-tabular">
-                  (기본금리 {p.baseRate.toFixed(2)}%)
-                </span>
+                최고 금리 <span>(기본금리 {p.baseRate.toFixed(2)}%)</span>
               </p>
 
               <dl className="mt-5 flex flex-col gap-2 border-t border-border pt-4 text-base">
@@ -121,13 +118,13 @@ export const ProductCardGrid = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-ink-muted">최소금액</dt>
-                  <dd className="font-tabular font-bold text-ink">
+                  <dd className="font-bold text-ink">
                     {formatAmount(p.minAmount)}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-ink-muted">최대금액</dt>
-                  <dd className="font-tabular font-bold text-ink">
+                  <dd className="font-bold text-ink">
                     {formatAmount(p.maxAmount)}
                   </dd>
                 </div>

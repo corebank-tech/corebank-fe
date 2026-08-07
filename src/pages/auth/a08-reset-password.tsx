@@ -195,13 +195,13 @@ export const A08ResetPassword = () => {
         <FormSection title="이메일 인증">
           <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
             <span
-              className={`font-tabular text-lg font-bold tracking-2 ${expired ? "text-ink-faint line-through" : "text-primary"}`}
+              className={`text-lg font-bold tracking-2 ${expired ? "text-ink-faint line-through" : "text-primary"}`}
               aria-label="발송된 이메일 인증번호"
             >
               {issued}
             </span>
             <span
-              className={`font-tabular text-base font-bold ${expired ? "text-ink-faint" : "text-ink"}`}
+              className={`text-base font-bold ${expired ? "text-ink-faint" : "text-ink"}`}
             >
               {formatClock(remaining)}
             </span>

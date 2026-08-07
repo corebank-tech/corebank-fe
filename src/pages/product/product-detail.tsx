@@ -80,7 +80,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-ink-muted">가입금액</dt>
-              <dd className="font-tabular font-bold text-ink">
+              <dd className="font-bold text-ink">
                 {formatAmount(product.minAmount)} ~{" "}
                 {formatAmount(product.maxAmount)}
               </dd>

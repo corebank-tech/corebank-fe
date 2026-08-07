@@ -28,7 +28,7 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
             key={label}
             aria-current={isCurrent ? "step" : undefined}
             className={cn(
-              "flex items-center gap-1.5 font-tabular text-base whitespace-nowrap",
+              "flex items-center gap-1.5 text-base whitespace-nowrap",
               active ? "text-primary" : "text-ink-faint",
             )}
           >

@@ -137,10 +137,7 @@ export const AppHeader = ({
                 <span className="font-value">{customerName}</span> 님
               </span>
 
-              <span
-                className="font-tabular text-base text-ink-muted"
-                aria-live="off"
-              >
+              <span className="text-base text-ink-muted" aria-live="off">
                 {formatSession(remainingSeconds)}
               </span>
 

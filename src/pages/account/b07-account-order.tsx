@@ -45,25 +45,21 @@ export const B07AccountOrder = () => {
       header: "순서",
       align: "center",
       width: 70,
-      render: (_r, i) => <span className="font-tabular">{i + 1}</span>,
+      render: (_r, i) => <span>{i + 1}</span>,
     },
     { key: "alias", header: "계좌명", width: 200 },
     {
       key: "accountNo",
       header: "계좌번호",
       width: 180,
-      render: (r) => (
-        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "openedDate",
       header: "신규일",
       align: "center",
       width: 120,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.openedDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
       key: "balance",

@@ -101,27 +101,21 @@ export const A09MainDashboard = ({
       header: "계좌번호",
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.accountNo,
-      render: (r) => (
-        <span className="font-tabular">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "openedDate",
       header: "신규일",
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.openedDate,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.openedDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
       key: "lastTxDate",
       header: "최근거래일",
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.lastTxDate,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.lastTxDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.lastTxDate)}</span>,
     },
     {
       key: "balance",
@@ -198,11 +192,11 @@ export const A09MainDashboard = ({
                   <span className="text-base font-bold text-ink-muted">
                     기본 입출금계좌 · {accounts[0].alias}
                   </span>
-                  <span className="font-tabular text-base font-bold text-ink-muted">
+                  <span className="text-base font-bold text-ink-muted">
                     {formatAccountNo(accounts[0].accountNo)}
                   </span>
                 </div>
-                <span className="font-tabular text-h2 font-value text-ink">
+                <span className="text-h2 font-value text-ink">
                   {formatAmount(accounts[0].balance)}
                 </span>
               </div>

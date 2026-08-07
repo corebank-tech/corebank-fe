@@ -101,7 +101,7 @@ export const ErrorDialog = ({
               />
             </button>
             {codeOpen && (
-              <p className="mt-1.5 text-center font-tabular text-base text-ink-muted">
+              <p className="mt-1.5 text-center text-base text-ink-muted">
                 오류코드 : {code}
               </p>
             )}

@@ -313,19 +313,13 @@ export const InstantTransferScreen = () => {
       <>
         <InstantTransferStep2
           steps={STEPS}
-          scheduledAt={
-            <span className="font-tabular">{formatDateTime(BASE_TIME)}</span>
-          }
+          scheduledAt={<span>{formatDateTime(BASE_TIME)}</span>}
           fromAccount={
-            <span className="font-tabular">
+            <span>
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           }
-          toAccount={
-            <span className="font-tabular">
-              {formatAccountNo(form.toAccount)}
-            </span>
-          }
+          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
           payeeName={maskName(form.payeeName)}
           amount={formatAmount(amount, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
@@ -397,34 +391,26 @@ export const InstantTransferScreen = () => {
         header: "거래번호",
         align: "center",
         width: 190,
-        render: (r) => <span className="font-tabular">{r.transactionId}</span>,
+        render: (r) => <span>{r.transactionId}</span>,
       },
       {
         key: "processedAt",
         header: "거래일시",
         align: "center",
         width: 150,
-        render: (r) => (
-          <span className="font-tabular">{formatDateTime(r.processedAt)}</span>
-        ),
+        render: (r) => <span>{formatDateTime(r.processedAt)}</span>,
       },
       {
         key: "fromAccountNo",
         header: "출금계좌",
         align: "center",
-        render: (r) => (
-          <span className="font-tabular">
-            {formatAccountNo(r.fromAccountNo)}
-          </span>
-        ),
+        render: (r) => <span>{formatAccountNo(r.fromAccountNo)}</span>,
       },
       {
         key: "toAccountNo",
         header: "입금계좌",
         align: "center",
-        render: (r) => (
-          <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
-        ),
+        render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
       },
       {
         key: "payeeName",

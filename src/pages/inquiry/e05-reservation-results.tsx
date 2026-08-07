@@ -117,9 +117,7 @@ export const E05ReservationResults = () => {
       width: 110,
       sortable: true,
       sortValue: (r) => r.transferDate,
-      render: (r) => (
-        <span className="font-tabular">{formatDate(r.transferDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.transferDate)}</span>,
     },
     {
       key: "fromAccountNo",
@@ -128,9 +126,7 @@ export const E05ReservationResults = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="font-tabular">
-            {formatAccountNo(r.fromAccountNo)}
-          </span>
+          <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),
     },
@@ -138,9 +134,7 @@ export const E05ReservationResults = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="font-tabular">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -161,7 +155,7 @@ export const E05ReservationResults = () => {
       header: "거래번호",
       width: 170,
       render: (r) => (
-        <span className="font-tabular">
+        <span>
           {r.txId ?? <span className="text-2xs text-ink-faint">-</span>}
         </span>
       ),

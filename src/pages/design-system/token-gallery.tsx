@@ -172,7 +172,7 @@ export const TokenGallery = () => {
           {Z_INDEX.map((z) => (
             <div key={z.name} className="flex items-center gap-3 text-base">
               <span className="w-28 font-bold text-ink">{z.name}</span>
-              <span className="font-tabular text-ink-muted">{z.value}</span>
+              <span className="text-ink-muted">{z.value}</span>
             </div>
           ))}
         </div>

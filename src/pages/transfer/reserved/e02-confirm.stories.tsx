@@ -31,17 +31,13 @@ const meta = {
     >
       <ReservedTransferStep2
         steps={TRANSFER_STEPS}
-        scheduledDate={
-          <span className="font-tabular">{formatDate(SCHEDULED_DATE)}</span>
-        }
+        scheduledDate={<span>{formatDate(SCHEDULED_DATE)}</span>}
         fromAccount={
-          <span className="font-tabular">
+          <span>
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
-        toAccount={
-          <span className="font-tabular">{formatAccountNo(TO_ACCOUNT_NO)}</span>
-        }
+        toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(MOCK_PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
         fee={formatAmount(0, { suffix: false })}

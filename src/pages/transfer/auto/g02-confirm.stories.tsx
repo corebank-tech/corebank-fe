@@ -35,19 +35,17 @@ const meta = {
       <AutoTransferStep2
         steps={TRANSFER_STEPS}
         fromAccount={
-          <span className="font-tabular">
+          <span>
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
-        toAccount={
-          <span className="font-tabular">{formatAccountNo(TO_ACCOUNT_NO)}</span>
-        }
+        toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(MOCK_PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
         cycle={`${CYCLE_MONTHS}개월`}
         dayOfMonth={`매월 ${DAY_OF_MONTH}일`}
         period={
-          <span className="font-tabular">
+          <span>
             {formatDate(START_DATE)} ~ {formatDate(END_DATE)}
           </span>
         }

@@ -56,7 +56,7 @@ export const ConfirmSummary = ({
                 className={cn(
                   "bg-surface-elevated px-3 py-3 text-center align-middle whitespace-nowrap text-ink [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border",
                   col.emphasis
-                    ? "font-tabular text-h2 font-bold text-primary"
+                    ? "text-h2 font-bold text-primary"
                     : "text-base font-bold",
                 )}
               >

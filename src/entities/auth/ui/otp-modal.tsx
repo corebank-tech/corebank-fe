@@ -145,7 +145,7 @@ export const OtpModal = ({
           <>
             <span
               className={cn(
-                "font-tabular text-page font-bold tracking-2",
+                "text-page font-bold tracking-2",
                 expired ? "text-ink-faint line-through" : "text-primary",
               )}
               aria-label="발급된 OTP 번호"
@@ -155,7 +155,7 @@ export const OtpModal = ({
             <div className="flex flex-col items-end gap-1">
               <span
                 className={cn(
-                  "font-tabular text-base font-bold",
+                  "text-base font-bold",
                   expired ? "text-ink-faint" : "text-ink",
                 )}
               >
@@ -182,7 +182,7 @@ export const OtpModal = ({
           setValue(e.target.value.replace(/\D/g, "").slice(0, 6))
           if (error) setError(null)
         }}
-        className="text-center font-tabular text-lg tracking-4"
+        className="text-center text-lg tracking-4"
         aria-label="OTP 입력"
       />
 

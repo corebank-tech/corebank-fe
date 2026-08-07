@@ -36,11 +36,11 @@ export const TermMonthsField = ({
             const digits = e.target.value.replace(/\D/g, "").slice(0, 3)
             onChange(digits ? Number(digits) : null)
           }}
-          className="w-24 text-right font-tabular"
+          className="w-24 text-right"
         />
         <span className="shrink-0 text-base text-ink-muted">개월</span>
       </div>
-      <p className="font-tabular text-2xs text-ink-muted">
+      <p className="text-2xs text-ink-muted">
         ※ 가입 가능 기간 {min}개월 ~ {max}개월
       </p>
       {outOfRange && (
@@ -93,7 +93,7 @@ export const JoinAmountField = ({
             const digits = e.target.value.replace(/\D/g, "")
             onChange(digits ? Number(digits) : null)
           }}
-          className="max-w-xs text-right font-tabular"
+          className="max-w-xs text-right"
         />
         <span className="shrink-0 text-base text-ink-muted">원</span>
       </div>
@@ -104,7 +104,7 @@ export const JoinAmountField = ({
         </span>
       )}
 
-      <p className="font-tabular text-2xs text-ink-muted">
+      <p className="text-2xs text-ink-muted">
         ※ 가입 가능 금액 {formatAmount(min)} ~ {formatAmount(max)}
       </p>
 

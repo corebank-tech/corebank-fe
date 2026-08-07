@@ -40,7 +40,7 @@ type ModalProps = {
  * Shared modal shell: a colored title bar with an optional close button, a
  * white padded body, and a centered footer action row. Rendered in a portal
  * over a translucent black overlay. ESC and overlay clicks close it unless
- * disabled. box-shadow is used only here, on the overlay panel.
+ * disabled.
  */
 export const Modal = ({
   open,

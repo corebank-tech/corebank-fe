@@ -1,6 +1,48 @@
 @import "tailwindcss";
 
 /* ============================================================
+   Font loading — 한글: Spoqa Han Sans Neo(신한 참고, .claude/tasks/font-decision.md).
+   숫자·콤마·하이픈: Roboto Mono를 unicode-range로 같은 --font-sans 스택에 얹어 클래스
+   없이 자동으로 고정폭 처리한다(tnum 대체). 마침표(U+002E)는 문장이 끝나는 마침표까지
+   전부 영향받는 부작용이 있어 범위에서 뺐다 — .claude/tasks/font-compare.html에서 실측.
+   ============================================================ */
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Medium.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "AppNumerals";
+  font-weight: 400;
+  src: url("https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5/files/roboto-mono-latin-400-normal.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+002C, U+002D;
+}
+@font-face {
+  font-family: "AppNumerals";
+  font-weight: 700;
+  src: url("https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5/files/roboto-mono-latin-700-normal.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+002C, U+002D;
+}
+
+/* ============================================================
    CoreBank Design Tokens
    ============================================================ */
 :root {
@@ -102,8 +144,9 @@
   --color-footer-divider: var(--color-border);
   --color-footer-hover-bg: var(--color-surface);
 
-  /* Font */
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  /* Font — AppNumerals는 숫자·콤마·하이픈만 커버하므로(unicode-range) 이 순서대로 두면
+     그 외 모든 글자(한글 포함)는 자동으로 Spoqa Han Sans Neo로 넘어간다. */
+  --font-sans: "AppNumerals", "Spoqa Han Sans Neo", -apple-system, sans-serif;
 
   /* z-index layers */
   --z-header: 100;

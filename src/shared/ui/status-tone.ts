@@ -11,11 +11,6 @@ export const STATUS_TONE_CLASSES = {
     bg: "bg-primary-tint",
     text: "text-primary",
   },
-  secondary: {
-    border: "border-secondary-border-soft",
-    bg: "bg-secondary-tint",
-    text: "text-secondary",
-  },
   success: {
     border: "border-success-border-soft",
     bg: "bg-success-tint",

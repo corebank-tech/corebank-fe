@@ -1,4 +1,5 @@
 export { GridToolbar } from "@/widgets/query/grid-toolbar"
+export { SavedConditionAlert } from "@/widgets/query/saved-condition-alert"
 export {
   AccountSelectField,
   KeywordField,

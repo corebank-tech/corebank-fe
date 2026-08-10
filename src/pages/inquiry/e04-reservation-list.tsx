@@ -8,6 +8,7 @@ import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
@@ -15,9 +16,9 @@ import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -63,7 +64,7 @@ export const E04ReservationList = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const filtered = React.useMemo(() => {
@@ -93,7 +94,7 @@ export const E04ReservationList = () => {
     setStatus("all")
     setPeriod({ start: "2026-06-23", end: "2026-08-23" })
     setPage(1)
-    setSavedOpen(false)
+    savedCondition.clear()
   }
 
   const handleCancelClick = () => {
@@ -266,9 +267,9 @@ export const E04ReservationList = () => {
           onReset={handleReset}
           onSearch={() => {
             setPage(1)
-            setSavedOpen(false)
+            savedCondition.clear()
           }}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="상태">
             <RadioRowField
@@ -339,11 +340,7 @@ export const E04ReservationList = () => {
           onPageChange={setPage}
         />
 
-        {savedOpen && (
-          <Alert variant="success" className="mt-2">
-            조회조건이 저장되었습니다.
-          </Alert>
-        )}
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
       </FormSection>
     </QueryPageLayout>
   )

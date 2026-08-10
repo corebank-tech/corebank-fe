@@ -5,15 +5,20 @@ import { FormRow } from "@/shared/ui/form-row"
 import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
-import { GridToolbar, RadioRowField, SearchPanel } from "@/widgets/query"
+import {
+  GridToolbar,
+  RadioRowField,
+  SavedConditionAlert,
+  SearchPanel,
+} from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -69,7 +74,7 @@ export const G04AutoTransferList = () => {
   const [editTarget, setEditTarget] = React.useState<AutoTransferRow | null>(
     null,
   )
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const filtered = React.useMemo(() => {
@@ -91,7 +96,7 @@ export const G04AutoTransferList = () => {
     setFromAccount("all")
     setStatus("all")
     setPage(1)
-    setSavedOpen(false)
+    savedCondition.clear()
   }
 
   const handleTerminateClick = () => {
@@ -299,9 +304,9 @@ export const G04AutoTransferList = () => {
           onReset={handleReset}
           onSearch={() => {
             setPage(1)
-            setSavedOpen(false)
+            savedCondition.clear()
           }}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="출금계좌번호" htmlFor="g04-from">
             <Select
@@ -375,11 +380,7 @@ export const G04AutoTransferList = () => {
           onPageChange={setPage}
         />
 
-        {savedOpen && (
-          <Alert variant="success" className="mt-2">
-            조회조건이 저장되었습니다.
-          </Alert>
-        )}
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
       </FormSection>
     </QueryPageLayout>
   )

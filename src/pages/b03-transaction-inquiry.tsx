@@ -10,13 +10,13 @@ import {
   KeywordField,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
-import { Alert } from "@/shared/ui/alert"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
@@ -36,6 +36,7 @@ import {
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { daysBetween } from "@/shared/lib/date"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   MOCK_NOW as BASE_TIME,
   MOCK_TODAY as TODAY,
@@ -117,7 +118,7 @@ export const B03TransactionInquiry = () => {
   const [keyword, setKeyword] = React.useState("")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
     string | null
@@ -238,11 +239,11 @@ export const B03TransactionInquiry = () => {
     setOrder("recent")
     setKeyword("")
     setPage(1)
-    setSavedOpen(false)
+    savedCondition.clear()
   }
 
   const handleSearch = () => {
-    setSavedOpen(false)
+    savedCondition.clear()
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
     if (periodReversed) {
       setPeriodAlertMessage(
@@ -266,7 +267,7 @@ export const B03TransactionInquiry = () => {
         <SearchPanel
           onReset={handleReset}
           onSearch={handleSearch}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회계좌번호" htmlFor="inq-account">
             <AccountSelectField
@@ -314,11 +315,7 @@ export const B03TransactionInquiry = () => {
         </SearchPanel>
       </FormSection>
 
-      {savedOpen && (
-        <Alert variant="success" className="mb-6">
-          조회조건이 저장되었습니다.
-        </Alert>
-      )}
+      <SavedConditionAlert open={savedCondition.saved} className="mb-6" />
 
       <CollapsibleSection title="계좌정보" className="mb-6">
         <div>

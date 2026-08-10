@@ -7,11 +7,11 @@ import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Modal } from "@/shared/ui/modal"
-import { Alert } from "@/shared/ui/alert"
 import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
@@ -23,6 +23,7 @@ import {
   type GridSearchField,
 } from "@/shared/ui/grid-search-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -78,7 +79,7 @@ export const D04TransferHistory = () => {
   const [page, setPage] = React.useState(1)
   const [detail, setDetail] = React.useState<TransferHistoryRow | null>(null)
   const [statsOpen, setStatsOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [search, setSearch] = React.useState<{
@@ -120,7 +121,7 @@ export const D04TransferHistory = () => {
     setFromAccount("all")
     setSearch(null)
     setPage(1)
-    setSavedOpen(false)
+    savedCondition.clear()
   }
 
   const exportHeaders = [
@@ -381,9 +382,9 @@ export const D04TransferHistory = () => {
           onReset={handleReset}
           onSearch={() => {
             setPage(1)
-            setSavedOpen(false)
+            savedCondition.clear()
           }}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회기간">
             <PeriodField
@@ -493,11 +494,7 @@ export const D04TransferHistory = () => {
           onPageChange={setPage}
         />
 
-        {savedOpen && (
-          <Alert variant="success" className="mt-2">
-            조회조건이 저장되었습니다.
-          </Alert>
-        )}
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
       </FormSection>
     </QueryPageLayout>
   )

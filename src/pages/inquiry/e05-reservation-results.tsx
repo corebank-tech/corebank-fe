@@ -7,14 +7,15 @@ import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
-import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -46,7 +47,7 @@ export const E05ReservationResults = () => {
   const [order, setOrder] = React.useState("recent")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const rows = React.useMemo(() => {
@@ -75,7 +76,7 @@ export const E05ReservationResults = () => {
     setPeriod({ start: "2026-06-23", end: TODAY })
     setOrder("recent")
     setPage(1)
-    setSavedOpen(false)
+    savedCondition.clear()
   }
 
   const exportHeaders = [
@@ -196,9 +197,9 @@ export const E05ReservationResults = () => {
           onReset={handleReset}
           onSearch={() => {
             setPage(1)
-            setSavedOpen(false)
+            savedCondition.clear()
           }}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회기간">
             <PeriodField
@@ -298,11 +299,7 @@ export const E05ReservationResults = () => {
           onPageChange={setPage}
         />
 
-        {savedOpen && (
-          <Alert variant="success" className="mt-2">
-            조회조건이 저장되었습니다.
-          </Alert>
-        )}
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
       </FormSection>
     </QueryPageLayout>
   )

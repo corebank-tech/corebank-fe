@@ -99,6 +99,7 @@ export const C06Complete = () => {
         highlightValue={formatAmount(result.amount)}
         columns={resultColumns}
         row={row}
+        gridHoverable={false}
         footnote="※ 예적금 계좌는 계좌비밀번호를 별도로 부여하지 않습니다."
         actions={
           <>

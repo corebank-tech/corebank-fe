@@ -47,13 +47,7 @@ export const F02NotificationInbox = () => {
         r.read ? (
           <span className="text-xs text-ink-faint">읽음</span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">
-            <span
-              className="h-1.5 w-1.5 rounded-full bg-primary"
-              aria-hidden="true"
-            />
-            안읽음
-          </span>
+          <span className="text-xs font-bold text-primary">안읽음</span>
         ),
     },
     {

@@ -27,10 +27,10 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
 
   return (
     // 상단 GNB 헤더(h-18)는 그대로 두고, 그 아래 영역만 메뉴 시트로 덮는다.
-    <div
+    <nav
+      id="full-menu"
+      aria-label="전체 메뉴"
       className="fixed inset-x-0 top-18 bottom-0 z-overlay"
-      role="dialog"
-      aria-label="전체메뉴"
     >
       <div
         onClick={onClose}
@@ -91,6 +91,6 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
           </div>
         </div>
       </div>
-    </div>
+    </nav>
   )
 }

@@ -81,6 +81,7 @@ export const GridToolbar = ({
             variant="secondary"
             size="sm"
             className="whitespace-nowrap"
+            aria-haspopup="dialog"
             onClick={() => setSaveConfirmOpen(true)}
           >
             <Download className="h-4 w-4" aria-hidden="true" />

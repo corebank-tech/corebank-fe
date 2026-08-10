@@ -202,6 +202,13 @@
   color-scheme: dark;
 }
 
+/* a01-login 카드는 라이트모드부터 border를 쓰고 있어, 다크모드의 shadow-card outline과
+   겹치면 border(안쪽)+shadow(바깥쪽)가 이어져 2px 이중 경계로 보인다 — 다크모드에서는
+   shadow-card 링 하나만 경계를 담당하도록 border를 끈다. */
+:root[data-theme="dark"] .login-card {
+  border-color: transparent;
+}
+
 @theme inline {
   --font-sans: var(--font-sans);
 

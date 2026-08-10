@@ -35,7 +35,7 @@ export const A01Login = () => {
   return (
     <div className="flex flex-col items-center py-10">
       <div className="w-full max-w-[480px]">
-        <div className="border border-border-strong bg-surface-elevated p-8 shadow-card">
+        <div className="login-card border border-border-strong bg-surface-elevated p-8 shadow-card">
           <div className="mb-6 text-center">
             <h1 className="text-page font-bold text-ink">로그인</h1>
             <p className="mt-1 text-base text-ink-muted">

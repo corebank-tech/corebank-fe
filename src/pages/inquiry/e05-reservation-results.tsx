@@ -12,7 +12,7 @@ import {
 import { SummaryRow } from "@/shared/ui/summary-row"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
+import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
@@ -75,6 +75,7 @@ export const E05ReservationResults = () => {
     setPeriod({ start: "2026-06-23", end: TODAY })
     setOrder("recent")
     setPage(1)
+    setSavedOpen(false)
   }
 
   const exportHeaders = [
@@ -180,12 +181,6 @@ export const E05ReservationResults = () => {
       ]}
       modals={
         <>
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -199,7 +194,10 @@ export const E05ReservationResults = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
+          onSearch={() => {
+            setPage(1)
+            setSavedOpen(false)
+          }}
           onSaveCondition={() => setSavedOpen(true)}
         >
           <FormRow label="조회기간">
@@ -299,6 +297,12 @@ export const E05ReservationResults = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        {savedOpen && (
+          <Alert variant="success" className="mt-2">
+            조회조건이 저장되었습니다.
+          </Alert>
+        )}
       </FormSection>
     </QueryPageLayout>
   )

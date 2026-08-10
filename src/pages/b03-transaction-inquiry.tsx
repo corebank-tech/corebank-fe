@@ -16,6 +16,7 @@ import { SummaryRow } from "@/shared/ui/summary-row"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
+import { Alert } from "@/shared/ui/alert"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
@@ -237,9 +238,11 @@ export const B03TransactionInquiry = () => {
     setOrder("recent")
     setKeyword("")
     setPage(1)
+    setSavedOpen(false)
   }
 
   const handleSearch = () => {
+    setSavedOpen(false)
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
     if (periodReversed) {
       setPeriodAlertMessage(
@@ -310,6 +313,12 @@ export const B03TransactionInquiry = () => {
           </FormRow>
         </SearchPanel>
       </FormSection>
+
+      {savedOpen && (
+        <Alert variant="success" className="mb-6">
+          조회조건이 저장되었습니다.
+        </Alert>
+      )}
 
       <CollapsibleSection title="계좌정보" className="mb-6">
         <div>
@@ -429,12 +438,6 @@ export const B03TransactionInquiry = () => {
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
           "조회 결과는 CSV 파일로 저장할 수 있으며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}
-      />
-
-      <AlertDialog
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        messages={["조회조건이 저장되었습니다."]}
       />
 
       <AlertDialog

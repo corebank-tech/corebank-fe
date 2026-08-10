@@ -15,7 +15,7 @@ import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
+import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
@@ -93,6 +93,7 @@ export const E04ReservationList = () => {
     setStatus("all")
     setPeriod({ start: "2026-06-23", end: "2026-08-23" })
     setPage(1)
+    setSavedOpen(false)
   }
 
   const handleCancelClick = () => {
@@ -250,12 +251,6 @@ export const E04ReservationList = () => {
             ]}
           />
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -269,7 +264,10 @@ export const E04ReservationList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
+          onSearch={() => {
+            setPage(1)
+            setSavedOpen(false)
+          }}
           onSaveCondition={() => setSavedOpen(true)}
         >
           <FormRow label="상태">
@@ -340,6 +338,12 @@ export const E04ReservationList = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        {savedOpen && (
+          <Alert variant="success" className="mt-2">
+            조회조건이 저장되었습니다.
+          </Alert>
+        )}
       </FormSection>
     </QueryPageLayout>
   )

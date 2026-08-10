@@ -7,7 +7,7 @@ import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Modal } from "@/shared/ui/modal"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
+import { Alert } from "@/shared/ui/alert"
 import {
   GridToolbar,
   PeriodField,
@@ -120,6 +120,7 @@ export const D04TransferHistory = () => {
     setFromAccount("all")
     setSearch(null)
     setPage(1)
+    setSavedOpen(false)
   }
 
   const exportHeaders = [
@@ -355,12 +356,6 @@ export const D04TransferHistory = () => {
             />
           </Modal>
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -384,7 +379,10 @@ export const D04TransferHistory = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
+          onSearch={() => {
+            setPage(1)
+            setSavedOpen(false)
+          }}
           onSaveCondition={() => setSavedOpen(true)}
         >
           <FormRow label="조회기간">
@@ -494,6 +492,12 @@ export const D04TransferHistory = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        {savedOpen && (
+          <Alert variant="success" className="mt-2">
+            조회조건이 저장되었습니다.
+          </Alert>
+        )}
       </FormSection>
     </QueryPageLayout>
   )

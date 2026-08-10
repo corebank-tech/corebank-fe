@@ -11,7 +11,7 @@ import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
+import { Alert } from "@/shared/ui/alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
@@ -91,6 +91,7 @@ export const G04AutoTransferList = () => {
     setFromAccount("all")
     setStatus("all")
     setPage(1)
+    setSavedOpen(false)
   }
 
   const handleTerminateClick = () => {
@@ -283,12 +284,6 @@ export const G04AutoTransferList = () => {
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -302,7 +297,10 @@ export const G04AutoTransferList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
+          onSearch={() => {
+            setPage(1)
+            setSavedOpen(false)
+          }}
           onSaveCondition={() => setSavedOpen(true)}
         >
           <FormRow label="출금계좌번호" htmlFor="g04-from">
@@ -376,6 +374,12 @@ export const G04AutoTransferList = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        {savedOpen && (
+          <Alert variant="success" className="mt-2">
+            조회조건이 저장되었습니다.
+          </Alert>
+        )}
       </FormSection>
     </QueryPageLayout>
   )

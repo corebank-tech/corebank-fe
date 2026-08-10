@@ -198,6 +198,7 @@ export const B01AllAccounts = () => {
         onSaveFile={() =>
           downloadCsv(`전체계좌조회_${TODAY}.csv`, exportHeaders, exportRows)
         }
+        saveFileLabel="전체계좌조회"
         onSearch={() => setSearchOpen(true)}
       />
 

@@ -3,6 +3,7 @@ import { Accessibility, Download, Printer, Search } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Select } from "@/shared/ui/select"
 import { Divider } from "@/shared/ui/divider"
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { cn } from "@/shared/lib/utils"
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50] as const
@@ -20,6 +21,8 @@ type GridToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   onPrint?: () => void
   onBrailleView?: () => void
   onSaveFile?: () => void
+  /** What onSaveFile downloads, e.g. "예약이체 조회 결과". Shown in the confirm dialog. */
+  saveFileLabel?: string
   onSearch?: () => void
 }
 
@@ -32,10 +35,13 @@ export const GridToolbar = ({
   onPrint,
   onBrailleView,
   onSaveFile,
+  saveFileLabel,
   onSearch,
   className,
   ...props
 }: GridToolbarProps) => {
+  const [saveConfirmOpen, setSaveConfirmOpen] = React.useState(false)
+
   return (
     <div className={cn("mb-2 flex flex-col gap-1", className)} {...props}>
       <div className="flex items-end justify-between gap-4">
@@ -75,7 +81,7 @@ export const GridToolbar = ({
             variant="secondary"
             size="sm"
             className="whitespace-nowrap"
-            onClick={onSaveFile}
+            onClick={() => setSaveConfirmOpen(true)}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             파일저장
@@ -116,6 +122,19 @@ export const GridToolbar = ({
           기준일시 : {baseTimeLabel}
         </p>
       )}
+
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onClose={() => setSaveConfirmOpen(false)}
+        onConfirm={() => {
+          setSaveConfirmOpen(false)
+          onSaveFile?.()
+        }}
+        title="파일저장 확인"
+        messages={[`${saveFileLabel ?? "조회 결과"} 파일을 저장하시겠습니까?`]}
+        confirmLabel="저장"
+        cancelLabel="취소"
+      />
     </div>
   )
 }

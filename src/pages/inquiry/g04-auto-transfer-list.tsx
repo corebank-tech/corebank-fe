@@ -358,6 +358,7 @@ export const G04AutoTransferList = () => {
           onSaveFile={() =>
             downloadCsv(`자동이체조회_${TODAY}.csv`, exportHeaders, exportRows)
           }
+          saveFileLabel="자동이체조회"
         />
 
         <DataGrid

@@ -478,6 +478,7 @@ export const D04TransferHistory = () => {
           onSaveFile={() =>
             downloadCsv(`이체결과조회_${TODAY}.csv`, exportHeaders, exportRows)
           }
+          saveFileLabel="이체결과조회"
           onSearch={() => setSearchOpen(true)}
         />
 

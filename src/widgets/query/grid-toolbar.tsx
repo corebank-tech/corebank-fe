@@ -131,9 +131,15 @@ export const GridToolbar = ({
         open={pendingAction != null}
         onClose={() => setPendingAction(null)}
         onConfirm={() => {
-          if (pendingAction === "print") onPrint?.()
-          if (pendingAction === "save") onSaveFile?.()
+          const action = pendingAction
           setPendingAction(null)
+          if (action === "print") {
+            // 다이얼로그가 화면에서 완전히 사라진 뒤 인쇄해야 인쇄 결과에
+            // 다이얼로그가 찍히지 않는다.
+            window.setTimeout(() => onPrint?.(), 0)
+          } else if (action === "save") {
+            onSaveFile?.()
+          }
         }}
         title={pendingAction === "print" ? "인쇄 확인" : "파일저장 확인"}
         messages={[

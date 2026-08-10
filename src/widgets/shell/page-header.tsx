@@ -68,7 +68,9 @@ export const PageHeader = ({
         onClose={() => setPrintConfirmOpen(false)}
         onConfirm={() => {
           setPrintConfirmOpen(false)
-          window.print()
+          // 다이얼로그가 화면에서 완전히 사라진 뒤 인쇄해야 인쇄 결과에
+          // 다이얼로그가 찍히지 않는다.
+          window.setTimeout(() => window.print(), 0)
         }}
         title="인쇄 확인"
         messages={[<>{title} 화면을 인쇄하시겠습니까?</>]}

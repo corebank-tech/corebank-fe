@@ -321,7 +321,7 @@ export const E04ReservationList = () => {
           onSaveFile={() =>
             downloadCsv(`예약이체조회_${TODAY}.csv`, exportHeaders, exportRows)
           }
-          saveFileLabel="예약이체조회"
+          resultLabel="예약이체조회"
         />
 
         <DataGrid

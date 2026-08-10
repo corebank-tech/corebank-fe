@@ -283,7 +283,7 @@ export const E05ReservationResults = () => {
               exportRows,
             )
           }
-          saveFileLabel="예약이체처리결과"
+          resultLabel="예약이체처리결과"
         />
 
         <DataGrid

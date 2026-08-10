@@ -278,7 +278,7 @@ export const G05AutoTransferResults = () => {
               exportRows,
             )
           }
-          saveFileLabel="자동이체결과조회"
+          resultLabel="자동이체결과조회"
         />
 
         <DataGrid

@@ -129,7 +129,7 @@ export const F02NotificationInbox = () => {
           onSaveFile={() =>
             downloadCsv(`알림함_${TODAY}.csv`, exportHeaders, exportRows)
           }
-          saveFileLabel="알림함"
+          resultLabel="알림함"
         />
 
         <DataGrid

@@ -410,7 +410,7 @@ export const B03TransactionInquiry = () => {
           onSaveFile={() =>
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
           }
-          saveFileLabel="거래내역조회"
+          resultLabel="거래내역조회"
         />
 
         <DataGrid

@@ -21,10 +21,12 @@ type GridToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   onPrint?: () => void
   onBrailleView?: () => void
   onSaveFile?: () => void
-  /** What onSaveFile downloads, e.g. "예약이체 조회 결과". Shown in the confirm dialog. */
-  saveFileLabel?: string
+  /** What onPrint/onSaveFile produces, e.g. "예약이체 조회 결과". Shown in the confirm dialog. */
+  resultLabel?: string
   onSearch?: () => void
 }
+
+type PendingAction = "print" | "save" | null
 
 export const GridToolbar = ({
   periodLabel,
@@ -35,12 +37,12 @@ export const GridToolbar = ({
   onPrint,
   onBrailleView,
   onSaveFile,
-  saveFileLabel,
+  resultLabel,
   onSearch,
   className,
   ...props
 }: GridToolbarProps) => {
-  const [saveConfirmOpen, setSaveConfirmOpen] = React.useState(false)
+  const [pendingAction, setPendingAction] = React.useState<PendingAction>(null)
 
   return (
     <div className={cn("mb-2 flex flex-col gap-1", className)} {...props}>
@@ -63,7 +65,8 @@ export const GridToolbar = ({
             variant="secondary"
             size="sm"
             className="whitespace-nowrap"
-            onClick={onPrint}
+            aria-haspopup="dialog"
+            onClick={() => setPendingAction("print")}
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
             보고서인쇄
@@ -82,7 +85,7 @@ export const GridToolbar = ({
             size="sm"
             className="whitespace-nowrap"
             aria-haspopup="dialog"
-            onClick={() => setSaveConfirmOpen(true)}
+            onClick={() => setPendingAction("save")}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             파일저장
@@ -125,15 +128,20 @@ export const GridToolbar = ({
       )}
 
       <ConfirmDialog
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
+        open={pendingAction != null}
+        onClose={() => setPendingAction(null)}
         onConfirm={() => {
-          setSaveConfirmOpen(false)
-          onSaveFile?.()
+          if (pendingAction === "print") onPrint?.()
+          if (pendingAction === "save") onSaveFile?.()
+          setPendingAction(null)
         }}
-        title="파일저장 확인"
-        messages={[`${saveFileLabel ?? "조회 결과"} 파일을 저장하시겠습니까?`]}
-        confirmLabel="저장"
+        title={pendingAction === "print" ? "인쇄 확인" : "파일저장 확인"}
+        messages={[
+          pendingAction === "print"
+            ? `${resultLabel ?? "조회 결과"}를 인쇄하시겠습니까?`
+            : `${resultLabel ?? "조회 결과"} 파일을 저장하시겠습니까?`,
+        ]}
+        confirmLabel={pendingAction === "print" ? "인쇄" : "저장"}
         cancelLabel="취소"
       />
     </div>

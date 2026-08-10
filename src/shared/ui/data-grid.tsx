@@ -32,6 +32,7 @@ type DataGridProps<Row> = {
   rowKey?: (row: Row, index: number) => string
   /** Number of skeleton rows while loading. */
   skeletonRows?: number
+  hoverable?: boolean
 }
 
 const SELECT_COLUMN_WIDTH_PX = 44
@@ -51,6 +52,7 @@ export const DataGrid = <Row,>({
   onSelectionChange,
   rowKey,
   skeletonRows = 6,
+  hoverable = true,
 }: DataGridProps<Row>) => {
   const [sort, setSort] = React.useState<{
     key: string
@@ -218,8 +220,12 @@ export const DataGrid = <Row,>({
                 <tr
                   key={key}
                   className={cn(
-                    "hover:bg-surface",
-                    isSelected && "bg-primary-tint hover:bg-primary-tint",
+                    hoverable && "hover:bg-surface",
+                    isSelected &&
+                      cn(
+                        "bg-primary-tint",
+                        hoverable && "hover:bg-primary-tint",
+                      ),
                   )}
                 >
                   {selectable && (

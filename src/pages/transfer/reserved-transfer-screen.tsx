@@ -111,21 +111,13 @@ export const ReservedTransferScreen = () => {
       <>
         <ReservedTransferStep2
           steps={STEPS}
-          scheduledDate={
-            <span className="tabular-nums">
-              {formatDate(form.scheduledDate)}
-            </span>
-          }
+          scheduledDate={<span>{formatDate(form.scheduledDate)}</span>}
           fromAccount={
-            <span className="tabular-nums">
+            <span>
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           }
-          toAccount={
-            <span className="tabular-nums">
-              {formatAccountNo(form.toAccount)}
-            </span>
-          }
+          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
           payeeName={maskName(MOCK_PAYEE_NAME)}
           amount={formatAmount(form.amount ?? 0, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
@@ -195,7 +187,7 @@ export const ReservedTransferScreen = () => {
         row={{
           scheduledDate: formatDate(form.scheduledDate),
           fromAccount: (
-            <span className="tabular-nums">
+            <span>
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
             </span>
           ),

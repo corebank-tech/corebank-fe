@@ -89,7 +89,7 @@ export const ResultPanel = <Row,>({
         {highlightValue != null && (
           <div className="mt-4 flex flex-col items-center gap-1">
             <span className="text-ink-muted">{highlightLabel}</span>
-            <span className="text-page font-bold text-primary tabular-nums">
+            <span className="text-page font-bold text-primary">
               {highlightValue}
             </span>
           </div>

@@ -44,10 +44,10 @@ export const GridToolbar = ({
           {periodLabel != null && (
             <>
               <Divider tone="ink-faint" />
-              <span className="text-ink-muted tabular-nums">{periodLabel}</span>
+              <span className="text-ink-muted">{periodLabel}</span>
             </>
           )}
-          <span className="font-bold text-primary tabular-nums">
+          <span className="font-bold text-primary">
             [총 {totalCount.toLocaleString("ko-KR")}건]
           </span>
         </p>
@@ -112,7 +112,7 @@ export const GridToolbar = ({
       </div>
 
       {baseTimeLabel != null && (
-        <p className="text-right text-2xs text-ink-muted tabular-nums">
+        <p className="text-right text-2xs text-ink-muted">
           기준일시 : {baseTimeLabel}
         </p>
       )}

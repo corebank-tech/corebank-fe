@@ -159,9 +159,7 @@ export const G04AutoTransferList = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -182,7 +180,7 @@ export const G04AutoTransferList = () => {
       header: "이체기간",
       width: 200,
       render: (r) => (
-        <span className="tabular-nums">
+        <span>
           {formatDate(r.startDate)} ~ {formatDate(r.endDate)}
         </span>
       ),

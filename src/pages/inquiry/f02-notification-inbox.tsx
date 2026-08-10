@@ -63,9 +63,7 @@ export const F02NotificationInbox = () => {
       sortable: true,
       sortValue: (r) => r.occurredAt,
       render: (r) => (
-        <span className="text-ink-muted tabular-nums">
-          {formatDateTime(r.occurredAt)}
-        </span>
+        <span className="text-ink-muted">{formatDateTime(r.occurredAt)}</span>
       ),
     },
     {

@@ -1,6 +1,34 @@
 @import "tailwindcss";
 
 /* ============================================================
+   Font loading — Spoqa Han Sans Neo(신한 참고).
+   Roboto Mono를 unicode-range로 숫자에만 얹는 방식도 시도했으나(tnum 대체),
+   실제 화면에서 두 서체가 섞이는 이음새가 계속 거슬린다는 피드백을 받아
+   걷어냈다 — Spoqa Han Sans Neo 하나로 통일한다.
+   ============================================================ */
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Medium.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.woff2")
+    format("woff2");
+}
+
+/* ============================================================
    CoreBank Design Tokens
    ============================================================ */
 :root {
@@ -103,7 +131,7 @@
   --color-footer-hover-bg: var(--color-surface);
 
   /* Font */
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  --font-sans: "Spoqa Han Sans Neo", -apple-system, sans-serif;
 
   /* z-index layers */
   --z-header: 100;

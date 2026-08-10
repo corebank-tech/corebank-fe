@@ -38,9 +38,7 @@ export const B02DepositAccounts = () => {
       key: "accountNo",
       header: "계좌번호",
       width: 160,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "openedDate",
@@ -48,9 +46,7 @@ export const B02DepositAccounts = () => {
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="text-ink-muted tabular-nums">
-          {formatDate(r.openedDate)}
-        </span>
+        <span className="text-ink-muted">{formatDate(r.openedDate)}</span>
       ),
     },
     {
@@ -59,9 +55,7 @@ export const B02DepositAccounts = () => {
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="text-ink-muted tabular-nums">
-          {formatDate(r.lastActivityDate)}
-        </span>
+        <span className="text-ink-muted">{formatDate(r.lastActivityDate)}</span>
       ),
     },
     {
@@ -127,7 +121,7 @@ export const B02DepositAccounts = () => {
       >
         {open && (
           <>
-            <p className="mb-2 text-right text-2xs text-ink-muted tabular-nums">
+            <p className="mb-2 text-right text-2xs text-ink-muted">
               기준일시 : {formatDateTime(BASE_TIME)}
             </p>
             <DataGrid

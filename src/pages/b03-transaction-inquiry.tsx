@@ -62,7 +62,6 @@ const amountCell = (value: number, color: string) => {
 type InfoItem = {
   term: string
   desc: React.ReactNode
-  numeric?: boolean
   dominant?: boolean
 }
 
@@ -91,7 +90,6 @@ const InfoRow = ({
               item.dominant
                 ? "text-h2 font-bold text-primary"
                 : "text-base font-bold text-ink",
-              item.numeric && "tabular-nums",
             )}
           >
             {item.desc}
@@ -169,14 +167,14 @@ export const B03TransactionInquiry = () => {
       width: 110,
       sortable: true,
       sortValue: (r) => `${r.date}T${r.time}`,
-      render: (r) => <span className="tabular-nums">{formatDate(r.date)}</span>,
+      render: (r) => <span>{formatDate(r.date)}</span>,
     },
     {
       key: "time",
       header: "거래시각",
       align: "center",
       width: 90,
-      render: (r) => <span className="tabular-nums">{r.time}</span>,
+      render: (r) => <span>{r.time}</span>,
     },
     { key: "description", header: "적요", align: "left", width: 100 },
     {
@@ -323,7 +321,6 @@ export const B03TransactionInquiry = () => {
               {
                 term: "계좌번호",
                 desc: formatAccountNo(selectedAccount.accountNo),
-                numeric: true,
               },
               {
                 term: "계좌상태",
@@ -346,18 +343,15 @@ export const B03TransactionInquiry = () => {
                 {
                   term: "계좌잔액",
                   desc: formatAmount(selectedAccount.balance),
-                  numeric: true,
                   dominant: true,
                 },
                 {
                   term: "출금가능금액",
                   desc: formatAmount(selectedAccount.withdrawable),
-                  numeric: true,
                 },
                 {
                   term: "신규일자",
                   desc: formatDate(selectedAccount.openedDate),
-                  numeric: true,
                 },
               ]}
             />

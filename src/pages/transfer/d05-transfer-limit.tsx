@@ -164,11 +164,11 @@ export const D05TransferLimit = () => {
           <span className="font-normal text-ink-muted">
             당일 잔여 이체가능금액
           </span>
-          <span className="text-page font-bold text-primary tabular-nums">
+          <span className="text-page font-bold text-primary">
             {formatAmount(dailyRemaining)}
           </span>
         </div>
-        <p className="mt-2 text-right text-2xs text-ink-muted tabular-nums">
+        <p className="mt-2 text-right text-2xs text-ink-muted">
           기준일시 : {formatDateTime(BASE_TIME)}
         </p>
       </FormSection>
@@ -186,7 +186,7 @@ export const D05TransferLimit = () => {
               inputMode="numeric"
               value={formatDraft(perTransferDraft)}
               onChange={(e) => setPerTransferDraft(onlyDigits(e.target.value))}
-              className="max-w-[220px] text-right tabular-nums"
+              className="max-w-[220px] text-right"
             />
             <span className="shrink-0 text-base text-ink-muted">원</span>
           </FormRow>
@@ -201,7 +201,7 @@ export const D05TransferLimit = () => {
               inputMode="numeric"
               value={formatDraft(perDayDraft)}
               onChange={(e) => setPerDayDraft(onlyDigits(e.target.value))}
-              className="max-w-[220px] text-right tabular-nums"
+              className="max-w-[220px] text-right"
             />
             <span className="shrink-0 text-base text-ink-muted">원</span>
           </FormRow>

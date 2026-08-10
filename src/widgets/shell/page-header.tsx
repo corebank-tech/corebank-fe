@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Star, Type, Printer } from "lucide-react"
 import { IconButton } from "@/shared/ui/icon-button"
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { cn } from "@/shared/lib/utils"
 
 type PageHeaderProps = {
@@ -20,6 +21,7 @@ export const PageHeader = ({
   textScaleActive = false,
 }: PageHeaderProps) => {
   const [favorite, setFavorite] = React.useState(false)
+  const [printConfirmOpen, setPrintConfirmOpen] = React.useState(false)
 
   return (
     <div className="mb-6 flex items-center justify-between gap-4">
@@ -52,13 +54,27 @@ export const PageHeader = ({
           <Type className="h-4.5 w-4.5" aria-hidden="true" />
         </IconButton>
         <IconButton
-          onClick={() => window.print()}
+          onClick={() => setPrintConfirmOpen(true)}
           className={ICON_BTN_CLASS}
+          aria-haspopup="dialog"
           aria-label="인쇄"
         >
           <Printer className="h-4.5 w-4.5" aria-hidden="true" />
         </IconButton>
       </div>
+
+      <ConfirmDialog
+        open={printConfirmOpen}
+        onClose={() => setPrintConfirmOpen(false)}
+        onConfirm={() => {
+          setPrintConfirmOpen(false)
+          window.print()
+        }}
+        title="인쇄 확인"
+        messages={[<>{title} 화면을 인쇄하시겠습니까?</>]}
+        confirmLabel="인쇄"
+        cancelLabel="취소"
+      />
     </div>
   )
 }

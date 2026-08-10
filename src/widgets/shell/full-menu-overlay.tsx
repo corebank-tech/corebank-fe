@@ -30,7 +30,6 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
     <div
       className="fixed inset-x-0 top-18 bottom-0 z-overlay"
       role="dialog"
-      aria-modal="true"
       aria-label="전체메뉴"
     >
       <div

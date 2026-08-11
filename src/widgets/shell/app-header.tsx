@@ -127,7 +127,7 @@ export const AppHeader = ({
               >
                 <Bell className="h-4.5 w-4.5" aria-hidden="true" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 inline-flex min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] leading-4 font-bold text-white">
+                  <span className="absolute top-0.5 right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-2xs leading-none font-bold text-white">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}

@@ -154,7 +154,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
                 rows={product.rates}
                 rowKey={(r) => r.period}
               />
-              <p className="mt-3 text-xs text-ink-faint">
+              <p className="mt-3 text-2xs text-ink-faint">
                 표시된 금리는 연 세전 기준이며, 우대금리는 조건 충족 시
                 적용됩니다.
               </p>

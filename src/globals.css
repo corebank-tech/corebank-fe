@@ -89,17 +89,14 @@
      입금·출금을 함께 보여줄 때는 --color-deposit과 --color-danger를 쓴다. */
   --color-deposit: #0c5bbb; /* 입금 amounts — 팀 피드백: 채도 상향(2026-07) */
 
-  /* Type scale — 6단 (2026-07 5차: 인접 단계가 1px 차이라 사용자가 구분하지
-     못하고 개발 시 어떤 걸 골라야 할지도 헷갈린다는 피드백에 따라, 9단→7단(h3·md
-     흡수)에 이어 text-sm(13px)을 text-base(14px)에 흡수했다 — 이제 각 단계는
-     최소 2px 이상 차이난다(2xs·xs 제외 — 이 둘은 각주 vs 라벨이라는 별개 용도로
-     CLAUDE.md에 고정 규정돼 있어 유지). DataGrid·SummaryRow는 text-[14px] 리터럴로
-     직접 고정해 스케일과 분리한다(POL-041 3차 피드백: 표만 13→14px로 소폭 상향). */
+  /* Type scale — 6단 (2026-08 6차: 최소 폰트 크기가 15px이어야 한다는 피드백에 따라,
+     폰트를 정보 위계에 맞춰 15/13/11px로 재정리했다. — 이제 각 단계는 최소 2px 이상 차이난다.
+     DataGrid·SummaryRow는 text-base 를 사용해 통일성을 주었다. */
   --text-page: 26px;
   --text-h2: 20px;
   --text-lg: 16px;
-  --text-base: 14px;
-  --text-xs: 12px;
+  --text-base: 15px;
+  --text-xs: 13px;
   --text-2xs: 11px;
 
   /* 간격은 Tailwind 기본 spacing 스케일(--spacing: 0.25rem 배수인 gap, p, m 계열

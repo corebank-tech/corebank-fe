@@ -110,7 +110,7 @@ export const DataGrid = <Row,>({
 
   return (
     <div className="overflow-x-auto border-t-2 border-b border-border border-t-navy">
-      <table className="w-full border-collapse text-[14px]">
+      <table className="w-full border-collapse text-base">
         <colgroup>
           {selectable && <col style={{ width: SELECT_COLUMN_WIDTH_PX }} />}
           {columns.map((c) => (
@@ -145,7 +145,7 @@ export const DataGrid = <Row,>({
                       : undefined
                   }
                   className={cn(
-                    "border-r border-b border-border px-3 py-2.5 text-[14px] font-bold whitespace-nowrap text-ink last:border-r-0",
+                    "border-r border-b border-border px-3 py-2.5 text-base font-bold whitespace-nowrap text-ink last:border-r-0",
                     ALIGN_CLASSES[col.align ?? "left"],
                   )}
                 >
@@ -243,7 +243,7 @@ export const DataGrid = <Row,>({
                     <td
                       key={col.key}
                       className={cn(
-                        "border-r border-b border-border px-3 py-2.5 text-[14px] whitespace-nowrap text-ink last:border-r-0",
+                        "border-r border-b border-border px-3 py-2.5 text-base whitespace-nowrap text-ink last:border-r-0",
                         ALIGN_CLASSES[col.align ?? "left"],
                         col.className,
                       )}

@@ -79,11 +79,10 @@ const InfoRow = ({
       {items.map((item) => (
         <div key={item.term} className="flex flex-col gap-1 px-4 py-3">
           <dt
-            className={
-              item.dominant
-                ? "text-xs text-ink-faint"
-                : "text-base text-ink-muted"
-            }
+            className={cn(
+              "text-xs",
+              item.dominant ? "text-ink-faint" : "text-ink-muted",
+            )}
           >
             {item.term}
           </dt>

@@ -41,7 +41,6 @@ export const C03Terms = () => {
           <TermsAgreement
             terms={MOCK_JOIN_TERMS}
             onAllRequiredAgreedChange={setAllRequiredAgreed}
-            showAllAgreement={false}
           />
 
           {allRequiredAgreed && (

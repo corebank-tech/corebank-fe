@@ -13,7 +13,6 @@ type TermsAgreementProps = {
    * 부모는 이 값으로 onNext 버튼의 활성화를 제어한다.
    */
   onAllRequiredAgreedChange?: (allRequiredAgreed: boolean) => void
-  showAllAgreement?: boolean
 }
 
 export type TermsAgreementHandle = {
@@ -33,8 +32,7 @@ export type TermsAgreementHandle = {
 export const TermsAgreement = React.forwardRef<
   TermsAgreementHandle,
   TermsAgreementProps
->((props, ref) => {
-  const { terms, onAllRequiredAgreedChange, showAllAgreement = true } = props
+>(({ terms, onAllRequiredAgreedChange }, ref) => {
   const [checked, setChecked] = React.useState<Record<string, boolean>>({})
   const [viewed, setViewed] = React.useState<Record<string, boolean>>({})
   const [viewing, setViewing] = React.useState<TermItem | null>(null)
@@ -43,7 +41,6 @@ export const TermsAgreement = React.forwardRef<
     openTerm?: TermItem
   } | null>(null)
 
-  const allChecked = terms.length > 0 && terms.every((t) => checked[t.id])
   const allRequiredAgreed = terms
     .filter((t) => t.required)
     .every((t) => checked[t.id])
@@ -55,13 +52,6 @@ export const TermsAgreement = React.forwardRef<
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))
     setViewing(term)
-  }
-
-  const toggleAll = () => {
-    const next = !allChecked
-    const map: Record<string, boolean> = {}
-    for (const t of terms) map[t.id] = next && !!viewed[t.id]
-    setChecked(map)
   }
 
   const toggleOne = (id: string) => {
@@ -94,22 +84,6 @@ export const TermsAgreement = React.forwardRef<
 
   return (
     <div className="overflow-hidden border border-border">
-      {/* 전체 동의 */}
-      {showAllAgreement && (
-        <div className="flex items-center justify-between bg-surface px-5 py-4">
-          <Checkbox
-            checked={allChecked}
-            onChange={toggleAll}
-            label={
-              <span className="text-lg font-bold text-ink">약관 전체 동의</span>
-            }
-          />
-          <span className="text-base text-ink-muted">
-            필수 및 선택 항목에 모두 동의합니다.
-          </span>
-        </div>
-      )}
-
       <ul>
         {terms.map((term) => (
           <li key={term.id} className="border-t border-border">

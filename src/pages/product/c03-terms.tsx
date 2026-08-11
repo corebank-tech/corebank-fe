@@ -6,6 +6,7 @@ import { TermsAgreement } from "@/widgets"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { MOCK_JOIN_PRODUCTS, MOCK_JOIN_TERMS } from "@/entities/product"
 import { PRODUCT_JOIN_STEPS } from "@/pages/product/join-shared"
+import { Alert } from "@/shared/ui/alert"
 
 /** C-03 상품가입 1단계 · 약관동의 (REQ-PRDT-005) */
 export const C03Terms = () => {
@@ -36,10 +37,19 @@ export const C03Terms = () => {
           </Button>
         }
       >
-        <TermsAgreement
-          terms={MOCK_JOIN_TERMS}
-          onAllRequiredAgreedChange={setAllRequiredAgreed}
-        />
+        <div className="flex flex-col gap-4">
+          <TermsAgreement
+            terms={MOCK_JOIN_TERMS}
+            onAllRequiredAgreedChange={setAllRequiredAgreed}
+            showAllAgreement={false}
+          />
+
+          {allRequiredAgreed && (
+            <Alert variant="success">
+              필수 약관을 모두 확인하고 동의했습니다.
+            </Alert>
+          )}
+        </div>
       </StepLayout>
 
       <NoticeBoxFooter

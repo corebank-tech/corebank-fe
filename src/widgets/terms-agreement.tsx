@@ -13,6 +13,7 @@ type TermsAgreementProps = {
    * 부모는 이 값으로 onNext 버튼의 활성화를 제어한다.
    */
   onAllRequiredAgreedChange?: (allRequiredAgreed: boolean) => void
+  showAllAgreement?: boolean
 }
 
 export type TermsAgreementHandle = {
@@ -32,7 +33,8 @@ export type TermsAgreementHandle = {
 export const TermsAgreement = React.forwardRef<
   TermsAgreementHandle,
   TermsAgreementProps
->(({ terms, onAllRequiredAgreedChange }, ref) => {
+>((props, ref) => {
+  const { terms, onAllRequiredAgreedChange, showAllAgreement = true } = props
   const [checked, setChecked] = React.useState<Record<string, boolean>>({})
   const [viewed, setViewed] = React.useState<Record<string, boolean>>({})
   const [viewing, setViewing] = React.useState<TermItem | null>(null)
@@ -93,18 +95,20 @@ export const TermsAgreement = React.forwardRef<
   return (
     <div className="overflow-hidden border border-border">
       {/* 전체 동의 */}
-      <div className="flex items-center justify-between bg-surface px-5 py-4">
-        <Checkbox
-          checked={allChecked}
-          onChange={toggleAll}
-          label={
-            <span className="text-lg font-bold text-ink">약관 전체 동의</span>
-          }
-        />
-        <span className="text-base text-ink-muted">
-          필수 및 선택 항목에 모두 동의합니다.
-        </span>
-      </div>
+      {showAllAgreement && (
+        <div className="flex items-center justify-between bg-surface px-5 py-4">
+          <Checkbox
+            checked={allChecked}
+            onChange={toggleAll}
+            label={
+              <span className="text-lg font-bold text-ink">약관 전체 동의</span>
+            }
+          />
+          <span className="text-base text-ink-muted">
+            필수 및 선택 항목에 모두 동의합니다.
+          </span>
+        </div>
+      )}
 
       <ul>
         {terms.map((term) => (

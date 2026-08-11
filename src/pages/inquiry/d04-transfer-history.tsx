@@ -7,11 +7,11 @@ import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Modal } from "@/shared/ui/modal"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
 import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
@@ -23,6 +23,7 @@ import {
   type GridSearchField,
 } from "@/shared/ui/grid-search-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -78,7 +79,8 @@ export const D04TransferHistory = () => {
   const [page, setPage] = React.useState(1)
   const [detail, setDetail] = React.useState<TransferHistoryRow | null>(null)
   const [statsOpen, setStatsOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [search, setSearch] = React.useState<{
@@ -120,6 +122,8 @@ export const D04TransferHistory = () => {
     setFromAccount("all")
     setSearch(null)
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const exportHeaders = [
@@ -355,12 +359,6 @@ export const D04TransferHistory = () => {
             />
           </Modal>
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -384,8 +382,12 @@ export const D04TransferHistory = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={() => {
+            setPage(1)
+            savedCondition.clear()
+            downloadComplete.clear()
+          }}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회기간">
             <PeriodField
@@ -475,9 +477,11 @@ export const D04TransferHistory = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`이체결과조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="이체결과조회"
           onSearch={() => setSearchOpen(true)}
         />
 
@@ -492,6 +496,13 @@ export const D04TransferHistory = () => {
           page={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

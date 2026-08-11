@@ -3,6 +3,7 @@ import { Accessibility, Download, Printer, Search } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Select } from "@/shared/ui/select"
 import { Divider } from "@/shared/ui/divider"
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { cn } from "@/shared/lib/utils"
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50] as const
@@ -20,8 +21,12 @@ type GridToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   onPrint?: () => void
   onBrailleView?: () => void
   onSaveFile?: () => void
+  /** What onPrint/onSaveFile produces, e.g. "예약이체 조회 결과". Shown in the confirm dialog. */
+  resultLabel?: string
   onSearch?: () => void
 }
+
+type PendingAction = "print" | "save" | null
 
 export const GridToolbar = ({
   periodLabel,
@@ -32,10 +37,13 @@ export const GridToolbar = ({
   onPrint,
   onBrailleView,
   onSaveFile,
+  resultLabel,
   onSearch,
   className,
   ...props
 }: GridToolbarProps) => {
+  const [pendingAction, setPendingAction] = React.useState<PendingAction>(null)
+
   return (
     <div className={cn("mb-2 flex flex-col gap-1", className)} {...props}>
       <div className="flex items-end justify-between gap-4">
@@ -57,7 +65,8 @@ export const GridToolbar = ({
             variant="secondary"
             size="sm"
             className="whitespace-nowrap"
-            onClick={onPrint}
+            aria-haspopup="dialog"
+            onClick={() => setPendingAction("print")}
           >
             <Printer className="h-4 w-4" aria-hidden="true" />
             보고서인쇄
@@ -75,7 +84,8 @@ export const GridToolbar = ({
             variant="secondary"
             size="sm"
             className="whitespace-nowrap"
-            onClick={onSaveFile}
+            aria-haspopup="dialog"
+            onClick={() => setPendingAction("save")}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             파일저장
@@ -116,6 +126,30 @@ export const GridToolbar = ({
           기준일시 : {baseTimeLabel}
         </p>
       )}
+
+      <ConfirmDialog
+        open={pendingAction != null}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => {
+          const action = pendingAction
+          setPendingAction(null)
+          if (action === "print") {
+            // 다이얼로그가 화면에서 완전히 사라진 뒤 인쇄해야 인쇄 결과에
+            // 다이얼로그가 찍히지 않는다.
+            window.setTimeout(() => onPrint?.(), 0)
+          } else if (action === "save") {
+            onSaveFile?.()
+          }
+        }}
+        title={pendingAction === "print" ? "인쇄 확인" : "파일저장 확인"}
+        messages={[
+          pendingAction === "print"
+            ? `${resultLabel ?? "조회 결과"}를 인쇄하시겠습니까?`
+            : `${resultLabel ?? "조회 결과"} 파일을 저장하시겠습니까?`,
+        ]}
+        confirmLabel={pendingAction === "print" ? "인쇄" : "저장"}
+        cancelLabel="취소"
+      />
     </div>
   )
 }

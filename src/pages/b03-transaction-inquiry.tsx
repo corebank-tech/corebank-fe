@@ -10,6 +10,7 @@ import {
   KeywordField,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
@@ -35,6 +36,7 @@ import {
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { daysBetween } from "@/shared/lib/date"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   MOCK_NOW as BASE_TIME,
   MOCK_TODAY as TODAY,
@@ -116,7 +118,8 @@ export const B03TransactionInquiry = () => {
   const [keyword, setKeyword] = React.useState("")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
     string | null
@@ -237,9 +240,13 @@ export const B03TransactionInquiry = () => {
     setOrder("recent")
     setKeyword("")
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const handleSearch = () => {
+    savedCondition.clear()
+    downloadComplete.clear()
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
     if (periodReversed) {
       setPeriodAlertMessage(
@@ -263,7 +270,7 @@ export const B03TransactionInquiry = () => {
         <SearchPanel
           onReset={handleReset}
           onSearch={handleSearch}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회계좌번호" htmlFor="inq-account">
             <AccountSelectField
@@ -401,9 +408,11 @@ export const B03TransactionInquiry = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="거래내역조회"
         />
 
         <DataGrid
@@ -418,6 +427,13 @@ export const B03TransactionInquiry = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
 
       <NoticeBoxFooter
@@ -428,12 +444,6 @@ export const B03TransactionInquiry = () => {
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
           "조회 결과는 CSV 파일로 저장할 수 있으며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}
-      />
-
-      <AlertDialog
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        messages={["조회조건이 저장되었습니다."]}
       />
 
       <AlertDialog

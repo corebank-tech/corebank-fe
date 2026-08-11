@@ -8,6 +8,7 @@ import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
@@ -15,9 +16,9 @@ import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -63,7 +64,8 @@ export const E04ReservationList = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const filtered = React.useMemo(() => {
@@ -93,6 +95,8 @@ export const E04ReservationList = () => {
     setStatus("all")
     setPeriod({ start: "2026-06-23", end: "2026-08-23" })
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const handleCancelClick = () => {
@@ -250,12 +254,6 @@ export const E04ReservationList = () => {
             ]}
           />
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -269,8 +267,12 @@ export const E04ReservationList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={() => {
+            setPage(1)
+            savedCondition.clear()
+            downloadComplete.clear()
+          }}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="상태">
             <RadioRowField
@@ -319,9 +321,11 @@ export const E04ReservationList = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`예약이체조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="예약이체조회"
         />
 
         <DataGrid
@@ -338,6 +342,13 @@ export const E04ReservationList = () => {
           page={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

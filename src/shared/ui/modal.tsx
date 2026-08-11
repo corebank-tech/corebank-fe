@@ -59,6 +59,19 @@ export const Modal = ({
 }: ModalProps) => {
   const titleId = React.useId()
   const dialogRef = React.useRef<HTMLDivElement>(null)
+  const [prevOpen, setPrevOpen] = React.useState(open)
+  const [previouslyFocused, setPreviouslyFocused] =
+    React.useState<HTMLElement | null>(null)
+
+  // open이 false→true로 바뀌는 렌더 시점(커밋·autoFocus 이전)에 캡처해야
+  // 실제 트리거 요소를 얻는다 — effect 안에서 읽으면 다이얼로그 내부의
+  // autoFocus 요소가 이미 activeElement가 된 뒤라 잘못된 값을 저장한다.
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open && typeof document !== "undefined") {
+      setPreviouslyFocused(document.activeElement as HTMLElement | null)
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !closeOnEsc) return
@@ -82,11 +95,16 @@ export const Modal = ({
   // 안에 가둔 뒤, 닫히면 이전에 포커스가 있던 요소로 되돌린다.
   React.useEffect(() => {
     if (!open) return
-    const previouslyFocused = document.activeElement as HTMLElement | null
     const dialog = dialogRef.current
-    const firstFocusable =
-      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
-    ;(firstFocusable ?? dialog)?.focus()
+    // children의 autoFocus가 이미 다이얼로그 안으로 포커스를 옮겨뒀다면
+    // 그대로 존중하고 덮어쓰지 않는다.
+    const alreadyFocusedInside =
+      !!dialog && dialog.contains(document.activeElement)
+    if (!alreadyFocusedInside) {
+      const firstFocusable =
+        dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      ;(firstFocusable ?? dialog)?.focus()
+    }
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !dialogRef.current) return
@@ -113,7 +131,7 @@ export const Modal = ({
       document.removeEventListener("keydown", onKeyDown)
       previouslyFocused?.focus()
     }
-  }, [open])
+  }, [open, previouslyFocused])
 
   if (!open || typeof document === "undefined") return null
 

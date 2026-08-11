@@ -315,8 +315,6 @@ export const B03TransactionInquiry = () => {
         </SearchPanel>
       </FormSection>
 
-      <SavedConditionAlert open={savedCondition.saved} className="mb-6" />
-
       <CollapsibleSection title="계좌정보" className="mb-6">
         <div>
           <InfoRow
@@ -425,6 +423,8 @@ export const B03TransactionInquiry = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
       </FormSection>
 
       <NoticeBoxFooter

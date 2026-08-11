@@ -5,6 +5,7 @@ import { TermsAgreement, type TermsAgreementHandle } from "@/widgets"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { SIGNUP_TERMS } from "@/entities/auth"
 import { SIGNUP_STEPS } from "@/pages/auth/signup-shared"
+import { Alert } from "@/shared/ui/alert"
 
 type A02TermsProps = {
   onNext: () => void
@@ -13,6 +14,7 @@ type A02TermsProps = {
 /** A-02 회원가입 1단계 · 약관동의 (REQ-AUTH-003·004) */
 export const A02Terms = ({ onNext }: A02TermsProps) => {
   const termsRef = React.useRef<TermsAgreementHandle>(null)
+  const [allRequiredAgreed, setAllRequiredAgreed] = React.useState(false)
 
   return (
     <>
@@ -37,7 +39,19 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
           </Button>
         }
       >
-        <TermsAgreement ref={termsRef} terms={SIGNUP_TERMS} />
+        <div className="flex flex-col gap-4">
+          <TermsAgreement
+            ref={termsRef}
+            terms={SIGNUP_TERMS}
+            onAllRequiredAgreedChange={setAllRequiredAgreed}
+          />
+
+          {allRequiredAgreed && (
+            <Alert variant="success">
+              필수 약관을 모두 확인하고 동의했습니다.
+            </Alert>
+          )}
+        </div>
       </StepLayout>
 
       <NoticeBoxFooter

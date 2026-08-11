@@ -80,6 +80,7 @@ export const D04TransferHistory = () => {
   const [detail, setDetail] = React.useState<TransferHistoryRow | null>(null)
   const [statsOpen, setStatsOpen] = React.useState(false)
   const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [search, setSearch] = React.useState<{
@@ -122,6 +123,7 @@ export const D04TransferHistory = () => {
     setSearch(null)
     setPage(1)
     savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const exportHeaders = [
@@ -383,6 +385,7 @@ export const D04TransferHistory = () => {
           onSearch={() => {
             setPage(1)
             savedCondition.clear()
+            downloadComplete.clear()
           }}
           onSaveCondition={savedCondition.save}
         >
@@ -474,9 +477,10 @@ export const D04TransferHistory = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`이체결과조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
           resultLabel="이체결과조회"
           onSearch={() => setSearchOpen(true)}
         />
@@ -495,6 +499,11 @@ export const D04TransferHistory = () => {
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
     </QueryPageLayout>
   )

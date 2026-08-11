@@ -5,7 +5,8 @@ import { FormSection } from "@/shared/ui/form-section"
 import { Button } from "@/shared/ui/button"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { SummaryRow } from "@/shared/ui/summary-row"
-import { GridToolbar } from "@/widgets/query"
+import { GridToolbar, SavedConditionAlert } from "@/widgets/query"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import {
   GridSearchModal,
@@ -117,6 +118,7 @@ export const B01AllAccounts = () => {
     field: string
     keyword: string
   } | null>(null)
+  const downloadComplete = useSavedConditionAlert()
 
   const handleInquire = (accountNo: string) => {
     navigate(`/inquiry?account=${accountNo}`)
@@ -181,9 +183,10 @@ export const B01AllAccounts = () => {
             open={searchOpen}
             onClose={() => setSearchOpen(false)}
             fields={SEARCH_FIELDS}
-            onApply={(field, keyword) =>
+            onApply={(field, keyword) => {
               setSearch(keyword ? { field, keyword } : null)
-            }
+              downloadComplete.clear()
+            }}
           />
         </>
       }
@@ -195,9 +198,10 @@ export const B01AllAccounts = () => {
         baseTimeLabel={formatDateTime(BASE_TIME)}
         onPrint={() => window.print()}
         onBrailleView={() => setBrailleOpen(true)}
-        onSaveFile={() =>
+        onSaveFile={() => {
           downloadCsv(`전체계좌조회_${TODAY}.csv`, exportHeaders, exportRows)
-        }
+          downloadComplete.save()
+        }}
         resultLabel="전체계좌조회"
         onSearch={() => setSearchOpen(true)}
       />
@@ -225,6 +229,12 @@ export const B01AllAccounts = () => {
           </FormSection>
         )
       })}
+
+      <SavedConditionAlert
+        open={downloadComplete.saved}
+        message="파일이 저장되었습니다."
+        className="mb-3"
+      />
 
       <div>
         <SummaryRow

@@ -75,6 +75,7 @@ export const G04AutoTransferList = () => {
     null,
   )
   const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const filtered = React.useMemo(() => {
@@ -97,6 +98,7 @@ export const G04AutoTransferList = () => {
     setStatus("all")
     setPage(1)
     savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const handleTerminateClick = () => {
@@ -305,6 +307,7 @@ export const G04AutoTransferList = () => {
           onSearch={() => {
             setPage(1)
             savedCondition.clear()
+            downloadComplete.clear()
           }}
           onSaveCondition={savedCondition.save}
         >
@@ -358,9 +361,10 @@ export const G04AutoTransferList = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`자동이체조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
           resultLabel="자동이체조회"
         />
 
@@ -381,6 +385,11 @@ export const G04AutoTransferList = () => {
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
     </QueryPageLayout>
   )

@@ -119,6 +119,7 @@ export const B03TransactionInquiry = () => {
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
     string | null
@@ -240,10 +241,12 @@ export const B03TransactionInquiry = () => {
     setKeyword("")
     setPage(1)
     savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const handleSearch = () => {
     savedCondition.clear()
+    downloadComplete.clear()
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
     if (periodReversed) {
       setPeriodAlertMessage(
@@ -405,9 +408,10 @@ export const B03TransactionInquiry = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
           resultLabel="거래내역조회"
         />
 
@@ -425,6 +429,11 @@ export const B03TransactionInquiry = () => {
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
 
       <NoticeBoxFooter

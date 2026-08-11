@@ -50,6 +50,7 @@ export const G05AutoTransferResults = () => {
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const rows = React.useMemo(() => {
@@ -76,6 +77,7 @@ export const G05AutoTransferResults = () => {
     setPeriod({ start: "2026-06-23", end: TODAY })
     setPage(1)
     savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const exportHeaders = [
@@ -196,6 +198,7 @@ export const G05AutoTransferResults = () => {
           onSearch={() => {
             setPage(1)
             savedCondition.clear()
+            downloadComplete.clear()
           }}
           onSaveCondition={savedCondition.save}
         >
@@ -271,13 +274,14 @@ export const G05AutoTransferResults = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(
               `자동이체결과조회_${TODAY}.csv`,
               exportHeaders,
               exportRows,
             )
-          }
+            downloadComplete.save()
+          }}
           resultLabel="자동이체결과조회"
         />
 
@@ -295,6 +299,11 @@ export const G05AutoTransferResults = () => {
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
     </QueryPageLayout>
   )

@@ -2,11 +2,12 @@ import * as React from "react"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { Badge } from "@/shared/ui/badge"
-import { GridToolbar } from "@/widgets/query"
+import { GridToolbar, SavedConditionAlert } from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { formatDateTime } from "@/shared/lib/format"
 import type { NotificationInboxRow } from "@/entities/notification"
 import { useNotifications } from "@/features/notifications"
@@ -22,6 +23,7 @@ export const F02NotificationInbox = () => {
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [brailleOpen, setBrailleOpen] = React.useState(false)
+  const downloadComplete = useSavedConditionAlert()
 
   const size = pageSize === "all" ? rows.length || 1 : pageSize
   const totalPages = Math.max(1, Math.ceil(rows.length / size))
@@ -126,9 +128,10 @@ export const F02NotificationInbox = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`알림함_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
           resultLabel="알림함"
         />
 
@@ -143,6 +146,12 @@ export const F02NotificationInbox = () => {
           page={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
+        />
+
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

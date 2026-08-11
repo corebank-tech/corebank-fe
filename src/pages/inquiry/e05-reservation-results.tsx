@@ -48,6 +48,7 @@ export const E05ReservationResults = () => {
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const rows = React.useMemo(() => {
@@ -77,6 +78,7 @@ export const E05ReservationResults = () => {
     setOrder("recent")
     setPage(1)
     savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const exportHeaders = [
@@ -198,6 +200,7 @@ export const E05ReservationResults = () => {
           onSearch={() => {
             setPage(1)
             savedCondition.clear()
+            downloadComplete.clear()
           }}
           onSaveCondition={savedCondition.save}
         >
@@ -276,13 +279,14 @@ export const E05ReservationResults = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(
               `예약이체처리결과_${TODAY}.csv`,
               exportHeaders,
               exportRows,
             )
-          }
+            downloadComplete.save()
+          }}
           resultLabel="예약이체처리결과"
         />
 
@@ -300,6 +304,11 @@ export const E05ReservationResults = () => {
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
     </QueryPageLayout>
   )

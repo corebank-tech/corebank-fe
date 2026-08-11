@@ -42,6 +42,9 @@ type ModalProps = {
  * over a translucent black overlay. ESC and overlay clicks close it unless
  * disabled.
  */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export const Modal = ({
   open,
   onClose,
@@ -55,6 +58,7 @@ export const Modal = ({
   children,
 }: ModalProps) => {
   const titleId = React.useId()
+  const dialogRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     if (!open || !closeOnEsc) return
@@ -74,6 +78,43 @@ export const Modal = ({
     }
   }, [open])
 
+  // 열릴 때 다이얼로그 안으로 포커스를 옮기고, Tab/Shift+Tab을 다이얼로그
+  // 안에 가둔 뒤, 닫히면 이전에 포커스가 있던 요소로 되돌린다.
+  React.useEffect(() => {
+    if (!open) return
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    const firstFocusable =
+      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+    ;(firstFocusable ?? dialog)?.focus()
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !dialogRef.current) return
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      )
+      if (focusable.length === 0) {
+        e.preventDefault()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener("keydown", onKeyDown)
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown)
+      previouslyFocused?.focus()
+    }
+  }, [open])
+
   if (!open || typeof document === "undefined") return null
 
   return createPortal(
@@ -84,9 +125,11 @@ export const Modal = ({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
           "flex max-h-[calc(100vh-48px)] w-full flex-col overflow-hidden rounded-lg bg-surface-elevated shadow-pop",
           MODAL_SIZE_CLASSES[size],

@@ -152,7 +152,7 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
             <Input
               id="g04-edit-amount"
               type="number"
-              min={1}
+              step={10000}
               value={editForm.amount}
               onChange={(event) =>
                 setEditForm({ ...editForm, amount: event.target.value })

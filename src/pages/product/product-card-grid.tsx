@@ -22,6 +22,9 @@ type ProductCardGridProps = {
   onSortChange?: (sort: SortKey) => void
   onViewDetail?: (id: number) => void
   onJoin?: (id: number) => void
+  /** 목록 조회 상태. true면 필터·정렬 칩은 그대로 두고 목록 영역만 로딩/에러로 바꾼다. */
+  isLoading?: boolean
+  isError?: boolean
 }
 
 const FILTERS: CategoryFilter[] = ["전체", "정기예금", "정기적금"]
@@ -35,6 +38,8 @@ export const ProductCardGrid = ({
   onSortChange,
   onViewDetail,
   onJoin,
+  isLoading = false,
+  isError = false,
 }: ProductCardGridProps) => {
   return (
     <div>
@@ -69,7 +74,14 @@ export const ProductCardGrid = ({
         </div>
       </div>
 
-      {products.length === 0 ? (
+      {isLoading ? (
+        <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+      ) : isError ? (
+        <EmptyState
+          message="상품 목록을 불러오지 못했습니다."
+          description="잠시 후 다시 시도해 주세요."
+        />
+      ) : products.length === 0 ? (
         <EmptyState
           message="조회된 상품이 없습니다."
           description="다른 상품 유형을 선택해 다시 확인해 주세요."

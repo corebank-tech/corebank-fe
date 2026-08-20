@@ -1,5 +1,6 @@
 import * as React from "react"
 import { useNavigate } from "react-router"
+import { keepPreviousData } from "@tanstack/react-query"
 import {
   ProductCardGrid,
   type CategoryFilter,
@@ -35,31 +36,22 @@ export const C01ProductList = () => {
   const [filter, setFilter] = React.useState<CategoryFilter>("전체")
   const [sort, setSort] = React.useState<SortKey>("rate")
 
-  const { data, isLoading, isError } = useSearchProducts({
-    productGroup: filter === "전체" ? undefined : CATEGORY_TO_GROUP[filter],
-    sort: SORT_KEY_TO_SERVER[sort],
-    size: PAGE_SIZE,
-  })
+  const { data, isLoading, isError } = useSearchProducts(
+    {
+      productGroup: filter === "전체" ? undefined : CATEGORY_TO_GROUP[filter],
+      sort: SORT_KEY_TO_SERVER[sort],
+      size: PAGE_SIZE,
+    },
+    // 필터/정렬을 바꾸면 새 쿼리 키라 곧장 로딩으로 빠진다. 결과가 올 때까지 이전
+    // 목록을 유지해서 필터 칩이 화면째로 사라졌다 돌아오지 않게 한다.
+    { query: { placeholderData: keepPreviousData } },
+  )
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
   const page = data as unknown as
     PageResponseProductListItemResponse | undefined
   const products = (page?.items ?? []).map(toProductCard)
-
-  if (isLoading) {
-    return (
-      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="py-20 text-center text-ink-muted">
-        상품 목록을 불러오지 못했습니다.
-      </div>
-    )
-  }
 
   return (
     <ProductCardGrid
@@ -70,6 +62,8 @@ export const C01ProductList = () => {
       onSortChange={setSort}
       onViewDetail={(id) => navigate(`/products/${id}`)}
       onJoin={(id) => navigate(`/product/${id}/join/1`)}
+      isLoading={isLoading}
+      isError={isError}
     />
   )
 }

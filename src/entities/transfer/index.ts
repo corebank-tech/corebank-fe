@@ -17,6 +17,8 @@ export type {
 } from "@/entities/transfer/api/e04-reservations"
 export { MOCK_RESERVATIONS } from "@/entities/transfer/api/e04-reservations"
 
+export { toReservationRow } from "@/entities/transfer/lib/mappers"
+
 export type {
   ReservationResult,
   ReservationResultRow,

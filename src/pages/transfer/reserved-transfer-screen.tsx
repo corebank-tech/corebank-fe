@@ -171,6 +171,7 @@ export const ReservedTransferScreen = () => {
               payeeName: MOCK_PAYEE_NAME,
               amount: form.amount ?? 0,
               memo: form.payeeMemo || "-",
+              cancelable: true,
             })
             setStep(3)
           }}

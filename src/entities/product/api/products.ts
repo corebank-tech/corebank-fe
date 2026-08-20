@@ -103,6 +103,7 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "36개월", baseRate: 3.6, primeRate: 0.25, maxRate: 3.85 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
   2: {
     id: 2,
@@ -127,6 +128,7 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "36개월", baseRate: 3.9, primeRate: 0.3, maxRate: 4.2 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
   3: {
     id: 3,
@@ -149,6 +151,7 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "60개월", baseRate: 3.75, primeRate: 0.3, maxRate: 4.05 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
   4: {
     id: 4,
@@ -173,6 +176,7 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "24개월", baseRate: 3.9, primeRate: 0.35, maxRate: 4.25 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
   5: {
     id: 5,
@@ -195,6 +199,7 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "12개월", baseRate: 3.15, primeRate: 0.25, maxRate: 3.4 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
   6: {
     id: 6,
@@ -219,5 +224,6 @@ export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
       { period: "36개월", baseRate: 4.05, primeRate: 0.45, maxRate: 4.5 },
     ],
     notices: COMMON_NOTICES,
+    saleStatus: "ON_SALE",
   },
 }

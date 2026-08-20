@@ -3,6 +3,8 @@ import type { AccountOption } from "@/shared/types/account"
 /** 취급 상품은 정기예금·정기적금 2종뿐이다(POL-029). */
 export type ProductCategory = "정기예금" | "정기적금"
 
+export type ProductSaleStatus = "ON_SALE" | "SUSPENDED"
+
 /** 상품목록(C-01)에 노출되는 정기예금·정기적금 카드. */
 export type ProductCard = {
   id: number
@@ -50,6 +52,7 @@ export type ProductDetailData = {
   guide: ProductGuideItem[]
   rates: ProductRateRow[]
   notices: string[]
+  saleStatus: ProductSaleStatus
 }
 
 export type ProductJoinMaster = {

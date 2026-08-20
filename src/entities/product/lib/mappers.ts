@@ -11,15 +11,24 @@ import type {
   ProductRateRow,
 } from "@/entities/product/model/types"
 
-const PRODUCT_GROUP_TO_CATEGORY: Record<string, ProductCategory> = {
-  DEPOSIT: "정기예금",
-  SAVINGS: "정기적금",
+/**
+ * productGroup은 스펙상 DEPOSIT|SAVINGS 뿐이지만, 백엔드가 새 값을 추가하거나
+ * 응답이 깨지면 Record 인덱싱은 조용히 undefined를 반환해 뱃지가 빈칸으로 렌더된다
+ * (R5). 알 수 없는 값은 콘솔에 남기고 눈에 띄는 기본값으로 폴백한다.
+ */
+const toProductCategory = (
+  productGroup: string | undefined,
+): ProductCategory => {
+  if (productGroup === "SAVINGS") return "정기적금"
+  if (productGroup === "DEPOSIT") return "정기예금"
+  console.error(`[entities/product] 알 수 없는 productGroup: ${productGroup}`)
+  return "정기예금"
 }
 
 /** 상품목록(C-01) 응답 한 건을 카드 표시용 타입으로 변환한다. */
 export const toProductCard = (item: ProductListItemResponse): ProductCard => ({
   id: item.productId ?? 0,
-  category: PRODUCT_GROUP_TO_CATEGORY[item.productGroup ?? "DEPOSIT"],
+  category: toProductCategory(item.productGroup),
   name: item.productName ?? "",
   summary: item.summary ?? "",
   maxRate: item.maxRate ?? 0,
@@ -107,7 +116,7 @@ export const toProductDetailData = (
   const termOptions = detail.termOptions ?? []
   return {
     id: detail.productId ?? 0,
-    category: PRODUCT_GROUP_TO_CATEGORY[detail.productGroup ?? "DEPOSIT"],
+    category: toProductCategory(detail.productGroup),
     name: detail.productName ?? "",
     // summary는 상세 응답에 없다(목록 응답 전용 필드) — BE가 추가하기 전까지 상품설명으로 대체한다.
     summary: detail.description ?? "",
@@ -121,5 +130,7 @@ export const toProductDetailData = (
     guide: toGuideItems(detail),
     rates: toRateRows(detail),
     notices: detail.notices ?? [],
+    // 응답에 없으면(구버전 스펙 등) 판매중으로 취급해 기존 동작을 유지한다.
+    saleStatus: detail.saleStatus === "SUSPENDED" ? "SUSPENDED" : "ON_SALE",
   }
 }

@@ -402,6 +402,169 @@
                 },
             },
         },
+      "/scheduled-transfers":
+        {
+          "get":
+            {
+              "tags": ["scheduled-transfer-controller"],
+              "operationId": "searchScheduledTransfers",
+              "parameters":
+                [
+                  {
+                    "name": "status",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "withdrawalAccountId",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "fromDate",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "string", "format": "date" },
+                  },
+                  {
+                    "name": "toDate",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "string", "format": "date" },
+                  },
+                  {
+                    "name": "page",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 0 },
+                  },
+                  {
+                    "name": "size",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 10 },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponsePageResponseScheduledTransferListItemResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "post":
+            {
+              "tags": ["scheduled-transfer-controller"],
+              "operationId": "registerScheduledTransfer",
+              "parameters":
+                [
+                  {
+                    "name": "Idempotency-Key",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "$ref": "#/components/schemas/ScheduledTransferRegisterRequest",
+                            },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseScheduledTransferResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/scheduled-transfers/{scheduledTransferId}/cancel":
+        {
+          "post":
+            {
+              "tags": ["scheduled-transfer-controller"],
+              "operationId": "cancelScheduledTransfer",
+              "parameters":
+                [
+                  {
+                    "name": "scheduledTransferId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "Idempotency-Key",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "Account-Password-Auth-Token",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "Otp-Auth-Token",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseScheduledTransferCancelResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     },
   "components":
     {
@@ -796,6 +959,160 @@
                   "code": { "type": "string" },
                   "message": { "type": "string" },
                   "data": {},
+                },
+            },
+          "ScheduledTransferRegisterRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "scheduledDate": { "type": "string", "format": "date" },
+                  "myPassbookMemo": { "type": "string" },
+                  "recipientPassbookMemo": { "type": "string" },
+                  "accountPasswordAuthToken": { "type": "string" },
+                  "otpAuthToken": { "type": "string" },
+                },
+            },
+          "ApiResponseScheduledTransferResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/ScheduledTransferResponse",
+                    },
+                },
+            },
+          "ScheduledTransferResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "scheduledTransferId":
+                    { "type": "integer", "format": "int64" },
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "scheduledDate": { "type": "string", "format": "date" },
+                  "myPassbookMemo": { "type": "string" },
+                  "recipientPassbookMemo": { "type": "string" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "WAITING",
+                          "PROCESSING",
+                          "SUCCESS",
+                          "FAILED",
+                          "CANCELED",
+                        ],
+                    },
+                },
+            },
+          "ApiResponsePageResponseScheduledTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/PageResponseScheduledTransferListItemResponse",
+                    },
+                },
+            },
+          "PageResponseScheduledTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "page": { "type": "integer", "format": "int32" },
+                  "size": { "type": "integer", "format": "int32" },
+                  "totalCount": { "type": "integer", "format": "int64" },
+                  "totalPages": { "type": "integer", "format": "int32" },
+                  "items":
+                    {
+                      "type": "array",
+                      "items":
+                        {
+                          "$ref": "#/components/schemas/ScheduledTransferListItemResponse",
+                        },
+                    },
+                },
+            },
+          "ScheduledTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "scheduledTransferId":
+                    { "type": "integer", "format": "int64" },
+                  "scheduledDate": { "type": "string", "format": "date" },
+                  "withdrawalAccountNumber": { "type": "string" },
+                  "payeeBankName": { "type": "string" },
+                  "accountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "WAITING",
+                          "PROCESSING",
+                          "SUCCESS",
+                          "FAILED",
+                          "CANCELED",
+                        ],
+                    },
+                  "cancelable": { "type": "boolean" },
+                },
+            },
+          "ApiResponseScheduledTransferCancelResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/ScheduledTransferCancelResponse",
+                    },
+                },
+            },
+          "ScheduledTransferCancelResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "scheduledTransferId":
+                    { "type": "integer", "format": "int64" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "WAITING",
+                          "PROCESSING",
+                          "SUCCESS",
+                          "FAILED",
+                          "CANCELED",
+                        ],
+                    },
+                  "canceledAt": { "type": "string", "format": "date-time" },
                 },
             },
         },

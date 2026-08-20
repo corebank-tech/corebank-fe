@@ -28,14 +28,19 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import {
-  MOCK_RESERVATIONS,
   getReservationStatusBadgeVariant,
+  toReservationRow,
   type ReservationRow,
 } from "@/entities/transfer"
 import {
   MOCK_NOW as BASE_TIME,
   MOCK_TODAY as TODAY,
 } from "@/shared/config/mock-clock"
+import {
+  useSearchScheduledTransfers,
+  useCancelScheduledTransfer,
+} from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
+import type { PageResponseScheduledTransferListItemResponse } from "@/shared/api/generated/model"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -45,13 +50,32 @@ const STATUS_OPTIONS = [
   { label: "취소", value: "취소" },
 ]
 
-/** REQ-RSV-008: 이체 예정일 전일 23:59:59까지 취소 가능, 당일은 취소 불가. */
-const isCancelable = (row: ReservationRow): boolean => {
-  return row.status === "대기" && row.scheduledDate > TODAY
+const STATUS_TO_API: Record<string, string | undefined> = {
+  all: undefined,
+  대기: "WAITING",
+  완료: "SUCCESS",
+  실패: "FAILED",
+  취소: "CANCELED",
 }
 
+/** 서버가 정렬 파라미터를 제공하지 않아, 현재 페이지 안에서만 대기 건을 우선 정렬한다. */
+const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
+  const waiting = rows
+    .filter((r) => r.status === "대기")
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+  const others = rows
+    .filter((r) => r.status !== "대기")
+    .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate))
+  return [...waiting, ...others]
+}
+
+/**
+ * scheduledtransfer 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 임시로 쓴다.
+ * 계좌비밀번호/OTP를 실제로 발급받는 화면이 연동되면 그 결과 토큰으로 교체해야 한다.
+ */
+const TEMP_AUTH_TOKEN = "temp-auth-token"
+
 export const E04ReservationList = () => {
-  const [rows, setRows] = React.useState(MOCK_RESERVATIONS)
   const [status, setStatus] = React.useState("all")
   const [period, setPeriod] = React.useState({
     start: "2026-06-23",
@@ -68,28 +92,34 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const filtered = React.useMemo(() => {
-    const next = rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false
-      if (r.scheduledDate < period.start || r.scheduledDate > period.end)
-        return false
-      return true
-    })
-    const waiting = next
-      .filter((r) => r.status === "대기")
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
-    const others = next
-      .filter((r) => r.status !== "대기")
-      .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate))
-    return [...waiting, ...others]
-  }, [rows, status, period])
+  const { data, isLoading, isError, refetch } = useSearchScheduledTransfers({
+    status: STATUS_TO_API[status],
+    fromDate: period.start,
+    toDate: period.end,
+    page: page - 1,
+    size: pageSize === "all" ? 1000 : pageSize,
+  })
 
-  const size = pageSize === "all" ? filtered.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(filtered.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice((safePage - 1) * size, safePage * size)
+  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
+  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const pageData = data as unknown as
+    PageResponseScheduledTransferListItemResponse | undefined
+  const pageRows = sortWaitingFirst(
+    (pageData?.items ?? []).map(toReservationRow),
+  )
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
 
-  const selectedRows = rows.filter((r) => selectedIds.includes(r.id))
+  const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
+
+  const cancelMutation = useCancelScheduledTransfer({
+    request: {
+      headers: {
+        "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+        "Otp-Auth-Token": TEMP_AUTH_TOKEN,
+      },
+    },
+  })
 
   const handleReset = () => {
     setStatus("all")
@@ -101,7 +131,7 @@ export const E04ReservationList = () => {
 
   const handleCancelClick = () => {
     if (selectedRows.length === 0) return
-    if (selectedRows.some((r) => !isCancelable(r))) {
+    if (selectedRows.some((r) => !r.cancelable)) {
       setBlockedOpen(true)
       return
     }
@@ -114,15 +144,30 @@ export const E04ReservationList = () => {
     setOtpOpen(true)
   }
 
-  const handleOtpConfirm = () => {
-    setRows((prev) =>
-      prev.map((r) =>
-        selectedIds.includes(r.id) ? { ...r, status: "취소" as const } : r,
+  const handleOtpConfirm = async () => {
+    await Promise.all(
+      selectedRows.map((r) =>
+        cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
       ),
     )
     setOtpOpen(false)
     setSelectedIds([])
     setGridKey((k) => k + 1)
+    refetch()
+  }
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="py-20 text-center text-ink-muted">
+        예약이체 목록을 불러오지 못했습니다.
+      </div>
+    )
   }
 
   const exportHeaders = [
@@ -135,15 +180,16 @@ export const E04ReservationList = () => {
     "표시내용",
     "등록일시",
   ]
-  const exportRows = filtered.map((r) => [
+  // 서버 페이지네이션이라 현재 페이지에 보이는 건만 내보낸다.
+  const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
+    `${r.fromAlias ?? ""} ${maskAccountNo(r.fromAccountNo)}`,
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
     formatAmount(r.amount),
-    r.memo,
-    formatDateTime(r.registeredAt),
+    r.memo ?? "-",
+    r.registeredAt ? formatDateTime(r.registeredAt) : "-",
   ])
 
   const columns: DataGridColumn<ReservationRow>[] = [
@@ -173,7 +219,7 @@ export const E04ReservationList = () => {
       width: 170,
       render: (r) => (
         <span className="whitespace-nowrap">
-          {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
+          {r.fromAlias ?? ""} <span className="text-ink-faint">/</span>{" "}
           <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),
@@ -198,12 +244,19 @@ export const E04ReservationList = () => {
       width: 120,
       render: (r) => formatAmount(r.amount),
     },
-    { key: "memo", header: "표시내용", align: "left" },
+    {
+      key: "memo",
+      header: "표시내용",
+      align: "left",
+      render: (r) => <span>{r.memo ?? "-"}</span>,
+    },
     {
       key: "registeredAt",
       header: "등록일시",
       width: 150,
-      render: (r) => <span>{formatDateTime(r.registeredAt)}</span>,
+      render: (r) => (
+        <span>{r.registeredAt ? formatDateTime(r.registeredAt) : "-"}</span>
+      ),
     },
   ]
 
@@ -233,7 +286,7 @@ export const E04ReservationList = () => {
             cancelLabel="닫기"
             items={selectedRows.map((r) => ({
               label: formatDate(r.scheduledDate),
-              value: `${r.fromAlias} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
+              value: `${r.fromAlias ?? formatAccountNo(r.fromAccountNo)} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
             }))}
           />
 
@@ -312,7 +365,7 @@ export const E04ReservationList = () => {
         </p>
 
         <GridToolbar
-          totalCount={filtered.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
@@ -339,7 +392,7 @@ export const E04ReservationList = () => {
         />
 
         <Pagination
-          page={safePage}
+          page={Math.min(page, totalPages)}
           totalPages={totalPages}
           onPageChange={setPage}
         />

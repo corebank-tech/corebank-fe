@@ -1,0 +1,803 @@
+{
+  "openapi": "3.1.0",
+  "info":
+    {
+      "title": "CoreBank API Specification",
+      "description": "Corebank REST API 명세서",
+      "version": "v1.0.0",
+    },
+  "servers":
+    [
+      {
+        "url": "http://localhost:8080/api/v1",
+        "description": "Generated server url",
+      },
+    ],
+  "paths":
+    {
+      "/product-subscriptions/validation":
+        {
+          "post":
+            {
+              "tags": ["product-subscription-controller"],
+              "operationId": "validate",
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "$ref": "#/components/schemas/ProductSubscriptionValidationRequest",
+                            },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseProductSubscriptionValidationResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/auto-transfers":
+        {
+          "get":
+            {
+              "tags": ["auto-transfer-controller"],
+              "operationId": "search",
+              "parameters":
+                [
+                  {
+                    "name": "customerId",
+                    "in": "query",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "withdrawalAccountId",
+                    "in": "query",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "status",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "page",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 0 },
+                  },
+                  {
+                    "name": "size",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 10 },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponsePageResponseAutoTransferListItemResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "post":
+            {
+              "tags": ["auto-transfer-controller"],
+              "operationId": "register",
+              "parameters":
+                [
+                  {
+                    "name": "Idempotency-Key",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "$ref": "#/components/schemas/AutoTransferRegisterRequest",
+                            },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseAutoTransferResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/auto-transfers/{autoTransferId}":
+        {
+          "delete":
+            {
+              "tags": ["auto-transfer-controller"],
+              "operationId": "cancel",
+              "parameters":
+                [
+                  {
+                    "name": "autoTransferId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "Idempotency-Key",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "customerId",
+                    "in": "query",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "Account-Password-Auth-Token",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseVoid",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "patch":
+            {
+              "tags": ["auto-transfer-controller"],
+              "operationId": "change",
+              "parameters":
+                [
+                  {
+                    "name": "autoTransferId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "Idempotency-Key",
+                    "in": "header",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            {
+                              "$ref": "#/components/schemas/AutoTransferChangeRequest",
+                            },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseAutoTransferResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/products":
+        {
+          "get":
+            {
+              "tags": ["product-controller"],
+              "operationId": "searchProducts",
+              "parameters":
+                [
+                  {
+                    "name": "productGroup",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "string", "enum": ["SAVINGS", "DEPOSIT"] },
+                  },
+                  {
+                    "name": "keyword",
+                    "in": "query",
+                    "required": false,
+                    "schema": { "type": "string" },
+                  },
+                  {
+                    "name": "sort",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      {
+                        "type": "string",
+                        "default": "RATE",
+                        "enum": ["RATE", "NEW", "NAME"],
+                      },
+                  },
+                  {
+                    "name": "page",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 0 },
+                  },
+                  {
+                    "name": "size",
+                    "in": "query",
+                    "required": false,
+                    "schema":
+                      { "type": "integer", "format": "int32", "default": 10 },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/products/{productId}":
+        {
+          "get":
+            {
+              "tags": ["product-controller"],
+              "operationId": "getProductDetail",
+              "parameters":
+                [
+                  {
+                    "name": "productId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/products/{productId}/terms/{termsId}":
+        {
+          "get":
+            {
+              "tags": ["product-controller"],
+              "operationId": "getProductTerms",
+              "parameters":
+                [
+                  {
+                    "name": "productId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                  {
+                    "name": "termsId",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "integer", "format": "int64" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseProductTermsViewResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+  "components":
+    {
+      "schemas":
+        {
+          "AgreedTermsItem":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "termsId": { "type": "integer", "format": "int64" },
+                  "version": { "type": "string" },
+                },
+              "required": ["termsId", "version"],
+            },
+          "ProductSubscriptionValidationRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "productId": { "type": "integer", "format": "int64" },
+                  "subscriptionAmount":
+                    { "type": "integer", "format": "int64" },
+                  "termMonths": { "type": "integer", "format": "int32" },
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "agreedTerms":
+                    {
+                      "type": "array",
+                      "items":
+                        { "$ref": "#/components/schemas/AgreedTermsItem" },
+                    },
+                  "satisfiedConditionCodes":
+                    { "type": "array", "items": { "type": "string" } },
+                },
+              "required":
+                [
+                  "agreedTerms",
+                  "productId",
+                  "subscriptionAmount",
+                  "termMonths",
+                  "withdrawalAccountId",
+                ],
+            },
+          "ApiResponseProductSubscriptionValidationResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/ProductSubscriptionValidationResponse",
+                    },
+                },
+            },
+          "ProductSubscriptionValidationResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "valid": { "type": "boolean" },
+                  "violations":
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ViolationItem" },
+                    },
+                  "productGroup":
+                    { "type": "string", "enum": ["SAVINGS", "DEPOSIT"] },
+                  "baseRate": { "type": "number" },
+                  "preferentialRate": { "type": "number" },
+                  "appliedRate": { "type": "number" },
+                  "maturityDate": { "type": "string", "format": "date" },
+                  "expectedPrincipal": { "type": "integer", "format": "int64" },
+                  "expectedInterest": { "type": "integer", "format": "int64" },
+                  "expectedMaturityAmount":
+                    { "type": "integer", "format": "int64" },
+                  "withdrawalAccountNumber": { "type": "string" },
+                  "withdrawalAccountBalance":
+                    { "type": "integer", "format": "int64" },
+                },
+            },
+          "ViolationItem":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "field": { "type": "string" },
+                  "reason": { "type": "string" },
+                },
+            },
+          "AutoTransferRegisterRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "customerId": { "type": "integer", "format": "int64" },
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "cycleMonths": { "type": "integer", "format": "int32" },
+                  "transferDay": { "type": "integer", "format": "int32" },
+                  "startDate": { "type": "string", "format": "date" },
+                  "endDate": { "type": "string", "format": "date" },
+                  "myPassbookMemo": { "type": "string" },
+                  "recipientPassbookMemo": { "type": "string" },
+                  "accountPasswordAuthToken": { "type": "string" },
+                },
+            },
+          "ApiResponseAutoTransferResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    { "$ref": "#/components/schemas/AutoTransferResponse" },
+                },
+            },
+          "AutoTransferResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "autoTransferId": { "type": "integer", "format": "int64" },
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "cycleMonths": { "type": "integer", "format": "int32" },
+                  "transferDay": { "type": "integer", "format": "int32" },
+                  "startDate": { "type": "string", "format": "date" },
+                  "endDate": { "type": "string", "format": "date" },
+                  "nextExecutionDate": { "type": "string", "format": "date" },
+                  "myPassbookMemo": { "type": "string" },
+                  "recipientPassbookMemo": { "type": "string" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum": ["NORMAL", "EXPIRED", "TERMINATED"],
+                    },
+                },
+            },
+          "AutoTransferChangeRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "customerId": { "type": "integer", "format": "int64" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "cycleMonths": { "type": "integer", "format": "int32" },
+                  "endDate": { "type": "string", "format": "date" },
+                  "myPassbookMemo": { "type": "string" },
+                  "recipientPassbookMemo": { "type": "string" },
+                  "withdrawalAccountId":
+                    { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "transferDay": { "type": "integer", "format": "int32" },
+                  "accountPasswordAuthToken": { "type": "string" },
+                },
+            },
+          "ApiResponsePageResponseProductListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/PageResponseProductListItemResponse",
+                    },
+                },
+            },
+          "PageResponseProductListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "page": { "type": "integer", "format": "int32" },
+                  "size": { "type": "integer", "format": "int32" },
+                  "totalCount": { "type": "integer", "format": "int64" },
+                  "totalPages": { "type": "integer", "format": "int32" },
+                  "items":
+                    {
+                      "type": "array",
+                      "items":
+                        {
+                          "$ref": "#/components/schemas/ProductListItemResponse",
+                        },
+                    },
+                },
+            },
+          "ProductListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "productId": { "type": "integer", "format": "int64" },
+                  "productCode": { "type": "string" },
+                  "productName": { "type": "string" },
+                  "productGroup":
+                    { "type": "string", "enum": ["SAVINGS", "DEPOSIT"] },
+                  "summary": { "type": "string" },
+                  "baseRate": { "type": "number" },
+                  "maxRate": { "type": "number" },
+                  "minTermMonths": { "type": "integer", "format": "int32" },
+                  "maxTermMonths": { "type": "integer", "format": "int32" },
+                  "minAmount": { "type": "integer", "format": "int64" },
+                  "maxAmount": { "type": "integer", "format": "int64" },
+                  "newProduct": { "type": "boolean" },
+                },
+            },
+          "ApiResponseProductDetailResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    { "$ref": "#/components/schemas/ProductDetailResponse" },
+                },
+            },
+          "PreferentialRateItem":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "conditionCode": { "type": "string" },
+                  "conditionName": { "type": "string" },
+                  "rate": { "type": "number" },
+                },
+            },
+          "ProductDetailResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "productId": { "type": "integer", "format": "int64" },
+                  "productCode": { "type": "string" },
+                  "productName": { "type": "string" },
+                  "productGroup":
+                    { "type": "string", "enum": ["SAVINGS", "DEPOSIT"] },
+                  "description": { "type": "string" },
+                  "baseRate": { "type": "number" },
+                  "maxRate": { "type": "number" },
+                  "minAmount": { "type": "integer", "format": "int64" },
+                  "maxAmount": { "type": "integer", "format": "int64" },
+                  "amountUnit": { "type": "integer", "format": "int64" },
+                  "termOptions":
+                    {
+                      "type": "array",
+                      "items": { "type": "integer", "format": "int32" },
+                    },
+                  "rateTiers":
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RateTierItem" },
+                    },
+                  "preferentialRates":
+                    {
+                      "type": "array",
+                      "items":
+                        { "$ref": "#/components/schemas/PreferentialRateItem" },
+                    },
+                  "eligibility": { "type": "string" },
+                  "subscriptionRestrictions":
+                    { "type": "array", "items": { "type": "string" } },
+                  "notices": { "type": "array", "items": { "type": "string" } },
+                  "saleStatus":
+                    { "type": "string", "enum": ["ON_SALE", "SUSPENDED"] },
+                  "saleEndDate": { "type": "string", "format": "date" },
+                  "terms":
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/TermsItem" },
+                    },
+                },
+            },
+          "RateTierItem":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "termMonths": { "type": "integer", "format": "int32" },
+                  "rate": { "type": "number" },
+                },
+            },
+          "TermsItem":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "termsId": { "type": "integer", "format": "int64" },
+                  "termsName": { "type": "string" },
+                  "version": { "type": "string" },
+                  "required": { "type": "boolean" },
+                  "viewRequired": { "type": "boolean" },
+                  "displayOrder": { "type": "integer", "format": "int32" },
+                },
+            },
+          "ApiResponseProductTermsViewResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    { "$ref": "#/components/schemas/ProductTermsViewResponse" },
+                },
+            },
+          "ProductTermsViewResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "termsId": { "type": "integer", "format": "int64" },
+                  "termsName": { "type": "string" },
+                  "version": { "type": "string" },
+                  "required": { "type": "boolean" },
+                  "viewRequired": { "type": "boolean" },
+                  "content": { "type": "string" },
+                  "viewedAt": { "type": "string", "format": "date-time" },
+                  "viewExpiresAt": { "type": "string", "format": "date-time" },
+                },
+            },
+          "ApiResponsePageResponseAutoTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    {
+                      "$ref": "#/components/schemas/PageResponseAutoTransferListItemResponse",
+                    },
+                },
+            },
+          "AutoTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "autoTransferId": { "type": "integer", "format": "int64" },
+                  "depositAccountNumber": { "type": "string" },
+                  "payeeName": { "type": "string" },
+                  "amount": { "type": "integer", "format": "int64" },
+                  "startDate": { "type": "string", "format": "date" },
+                  "endDate": { "type": "string", "format": "date" },
+                  "transferDay": { "type": "integer", "format": "int32" },
+                  "cycleMonths": { "type": "integer", "format": "int32" },
+                  "myPassbookMemo": { "type": "string" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum": ["NORMAL", "EXPIRED", "TERMINATED"],
+                    },
+                },
+            },
+          "PageResponseAutoTransferListItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "page": { "type": "integer", "format": "int32" },
+                  "size": { "type": "integer", "format": "int32" },
+                  "totalCount": { "type": "integer", "format": "int64" },
+                  "totalPages": { "type": "integer", "format": "int32" },
+                  "items":
+                    {
+                      "type": "array",
+                      "items":
+                        {
+                          "$ref": "#/components/schemas/AutoTransferListItemResponse",
+                        },
+                    },
+                },
+            },
+          "ApiResponseVoid":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data": {},
+                },
+            },
+        },
+    },
+}

@@ -16,46 +16,32 @@ import {
 import {
   addMonthsWithEomCorrection,
   estimateMaturityAmount,
+  getAppliedRateForTerm,
+  getProductTermRange,
+  toProductDetailData,
 } from "@/entities/product"
-import {
-  JOIN_DATE,
-  MOCK_JOIN_ACCOUNTS,
-  MOCK_JOIN_PRODUCTS,
-} from "@/entities/product"
+import { JOIN_DATE, MOCK_JOIN_ACCOUNTS } from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
+  mockNewAccountNo,
   type ProductJoinFormState,
   type ProductJoinResult,
 } from "@/pages/product/join-shared"
 import { ACCOUNT_PASSWORD_ERROR_LIMIT as ERROR_LIMIT } from "@/shared/config/policy"
+import { EmptyState } from "@/shared/ui/empty-state"
+import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
+import type { ProductDetailResponse } from "@/shared/api/generated/model"
 
 const PASSWORD_LIMIT = 4
 
 /** C-05 상품가입 3단계 · 확인 및 인증 (REQ-PRDT-010, REQ-ACCT-007) */
 export const C05ConfirmAuth = () => {
-  const { productId = "P001" } = useParams()
+  const { productId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const product = MOCK_JOIN_PRODUCTS[productId] ?? MOCK_JOIN_PRODUCTS.P001
-
-  const form = (location.state as ProductJoinFormState | null) ?? {
-    termMonths: product.minTermMonths,
-    fromAccount: MOCK_JOIN_ACCOUNTS[0].accountNo,
-    amount: product.minAmount,
-  }
-
-  const account =
-    MOCK_JOIN_ACCOUNTS.find((a) => a.accountNo === form.fromAccount) ??
-    MOCK_JOIN_ACCOUNTS[0]
-  const termMonths = form.termMonths ?? product.minTermMonths
-  const amount = form.amount ?? product.minAmount
-
-  const maturityDate = addMonthsWithEomCorrection(JOIN_DATE, termMonths)
-  const expectedMaturity = estimateMaturityAmount({
-    category: product.category,
-    amount,
-    termMonths,
-    annualRatePercent: product.rate,
+  const id = Number(productId)
+  const { data, isLoading, isError } = useGetProductDetail(id, {
+    query: { enabled: Number.isFinite(id) },
   })
 
   const [password, setPassword] = React.useState("")
@@ -63,6 +49,49 @@ export const C05ConfirmAuth = () => {
   const [errorCount, setErrorCount] = React.useState(0)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedDialog, setBlockedDialog] = React.useState(false)
+
+  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
+  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const detail = data as unknown as ProductDetailResponse | undefined
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
+
+  if (isError || !detail) {
+    return (
+      <EmptyState
+        message="상품을 찾을 수 없습니다."
+        description={`상품ID: ${productId}`}
+      />
+    )
+  }
+
+  const product = toProductDetailData(detail)
+  const { minTermMonths } = getProductTermRange(detail)
+
+  const form = (location.state as ProductJoinFormState | null) ?? {
+    termMonths: minTermMonths,
+    fromAccount: MOCK_JOIN_ACCOUNTS[0].accountNo,
+    amount: product.minAmount,
+  }
+
+  const account =
+    MOCK_JOIN_ACCOUNTS.find((a) => a.accountNo === form.fromAccount) ??
+    MOCK_JOIN_ACCOUNTS[0]
+  const termMonths = form.termMonths ?? minTermMonths
+  const amount = form.amount ?? product.minAmount
+  const appliedRate = getAppliedRateForTerm(detail, termMonths)
+
+  const maturityDate = addMonthsWithEomCorrection(JOIN_DATE, termMonths)
+  const expectedMaturity = estimateMaturityAmount({
+    category: product.category,
+    amount,
+    termMonths,
+    annualRatePercent: appliedRate,
+  })
 
   const blocked = errorCount >= ERROR_LIMIT
 
@@ -94,11 +123,11 @@ export const C05ConfirmAuth = () => {
       productId: product.id,
       productName: product.name,
       category: product.category,
-      newAccountNo: product.mockNewAccountNo,
+      newAccountNo: mockNewAccountNo(product.id),
       amount,
       termMonths,
       maturityDate,
-      rate: product.rate,
+      rate: appliedRate,
     }
     navigate(`/product/${product.id}/join/4`, { state: result })
   }

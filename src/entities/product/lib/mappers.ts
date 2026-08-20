@@ -65,6 +65,41 @@ const toGuideItems = (detail: ProductDetailResponse): ProductGuideItem[] => {
   ]
 }
 
+/** termOptions 중 최소/최대 가입기간(개월). 비어있으면 0으로 취급한다. */
+export const getProductTermRange = (
+  detail: ProductDetailResponse,
+): { minTermMonths: number; maxTermMonths: number } => {
+  const options = detail.termOptions ?? []
+  return {
+    minTermMonths: options.length > 0 ? Math.min(...options) : 0,
+    maxTermMonths: options.length > 0 ? Math.max(...options) : 0,
+  }
+}
+
+/**
+ * 가입기간(개월)에 해당하는 적용금리(기본금리+우대금리 합산, 연 %)를 찾는다.
+ * 정확히 일치하는 구간이 없으면 가장 가까운 구간을 참고값으로 쓴다(REQ-PRDT-009는
+ * 정확한 가입기간별 금리 조회를 요구하지 않고, 화면도 "참고값"으로 안내한다).
+ */
+export const getAppliedRateForTerm = (
+  detail: ProductDetailResponse,
+  termMonths: number,
+): number => {
+  const primeRate = (detail.preferentialRates ?? []).reduce(
+    (sum, r) => sum + (r.rate ?? 0),
+    0,
+  )
+  const tiers = detail.rateTiers ?? []
+  if (tiers.length === 0) return primeRate
+  const closest = tiers.reduce((best, tier) =>
+    Math.abs((tier.termMonths ?? 0) - termMonths) <
+    Math.abs((best.termMonths ?? 0) - termMonths)
+      ? tier
+      : best,
+  )
+  return (closest.rate ?? 0) + primeRate
+}
+
 /** 상품상세(C-02) 응답을 화면 표시용 타입으로 변환한다. */
 export const toProductDetailData = (
   detail: ProductDetailResponse,

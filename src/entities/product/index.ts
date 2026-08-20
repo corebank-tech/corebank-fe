@@ -25,4 +25,6 @@ export { getProductCategoryBadgeVariant } from "@/entities/product/lib/status-ba
 export {
   toProductCard,
   toProductDetailData,
+  getProductTermRange,
+  getAppliedRateForTerm,
 } from "@/entities/product/lib/mappers"

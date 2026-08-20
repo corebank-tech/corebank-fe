@@ -3,14 +3,14 @@ import { PageShell } from "@/app/page-shell"
 import { C02ProductDetail } from "@/pages/product/c02-product-detail"
 import { WithAuthenticatedPage } from "../../../.storybook/decorators/page-providers"
 
-/**
- * `useParams()`가 `MemoryRouter`에 매칭되는 라우트 없이 빈 객체를 반환하므로
- * 컴포넌트의 `productId = "P001"` 기본값이 그대로 적용된다.
- */
 const meta = {
   title: "pages/C02 상품상세",
   decorators: [WithAuthenticatedPage],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    route: "/products/1",
+    routePattern: "/products/:productId",
+  },
   render: () => (
     <PageShell
       activeId="product"

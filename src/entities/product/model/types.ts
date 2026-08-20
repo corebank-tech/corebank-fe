@@ -53,7 +53,7 @@ export type ProductDetailData = {
 }
 
 export type ProductJoinMaster = {
-  id: string
+  id: number
   category: ProductCategory
   name: string
   /** 적용금리, 연 세전 %. Phase 1 데모용 고정값(POL-030). */

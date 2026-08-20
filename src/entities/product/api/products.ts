@@ -3,10 +3,10 @@ import type {
   ProductDetailData,
 } from "@/entities/product/model/types"
 
-/** 상품목록(C-01)에 노출되는 정기예금·정기적금 카드. */
+/** 상품목록(C-01)에 노출되는 정기예금·정기적금 카드. Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. */
 export const MOCK_PRODUCTS: ProductCard[] = [
   {
-    id: "P001",
+    id: 1,
     category: "정기예금",
     name: "코어 정기예금",
     summary: "여윳돈을 안전하게 굴리는 기본 정기예금입니다.",
@@ -15,10 +15,9 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "6개월 ~ 36개월",
     minAmount: 100_000,
     maxAmount: 500_000_000,
-    updatedAt: "2026-07-20",
   },
   {
-    id: "P002",
+    id: 2,
     category: "정기적금",
     name: "코어 자유적금",
     summary: "매달 원하는 금액을 자유롭게 납입하는 적금입니다.",
@@ -27,10 +26,9 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "12개월 ~ 36개월",
     minAmount: 10_000,
     maxAmount: 3_000_000,
-    updatedAt: "2026-07-25",
   },
   {
-    id: "P003",
+    id: 3,
     category: "정기예금",
     name: "코어 목돈예금",
     summary: "목돈을 장기간 예치할수록 금리가 높아지는 예금입니다.",
@@ -39,10 +37,9 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "12개월 ~ 60개월",
     minAmount: 1_000_000,
     maxAmount: 1_000_000_000,
-    updatedAt: "2026-07-18",
   },
   {
-    id: "P004",
+    id: 4,
     category: "정기적금",
     name: "코어 정기적금",
     summary: "매달 같은 금액을 납입해 만기에 목돈을 만드는 적금입니다.",
@@ -51,10 +48,9 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "6개월 ~ 24개월",
     minAmount: 50_000,
     maxAmount: 2_000_000,
-    updatedAt: "2026-07-22",
   },
   {
-    id: "P005",
+    id: 5,
     category: "정기예금",
     name: "코어 단기예금",
     summary: "짧은 기간 자금을 예치하기 좋은 단기 정기예금입니다.",
@@ -63,10 +59,9 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "1개월 ~ 12개월",
     minAmount: 500_000,
     maxAmount: 300_000_000,
-    updatedAt: "2026-07-15",
   },
   {
-    id: "P006",
+    id: 6,
     category: "정기적금",
     name: "코어 목표적금",
     summary: "목표 금액을 정해 꾸준히 모으는 정기적금입니다.",
@@ -75,7 +70,6 @@ export const MOCK_PRODUCTS: ProductCard[] = [
     period: "12개월 ~ 36개월",
     minAmount: 30_000,
     maxAmount: 5_000_000,
-    updatedAt: "2026-07-28",
   },
 ]
 
@@ -86,10 +80,10 @@ const COMMON_NOTICES = [
   "세금은 관련 세법에 따라 부과되며, 표시된 금리는 세전 기준입니다.",
 ]
 
-/** 상품상세(C-02) 데이터. 상품목록(C-01)의 id 별로 조회한다. */
-export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
-  P001: {
-    id: "P001",
+/** 상품상세(C-02) 데이터. Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. */
+export const MOCK_PRODUCT_DETAILS: Record<number, ProductDetailData> = {
+  1: {
+    id: 1,
     category: "정기예금",
     name: "코어 정기예금",
     summary: "여윳돈을 안전하게 굴리는 기본 정기예금입니다.",
@@ -97,19 +91,10 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "6개월 ~ 36개월",
     minAmount: 100_000,
     maxAmount: 500_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 및 개인사업자 (1인 1계좌)" },
       { label: "가입기간", value: "6개월 이상 36개월 이하 (월 단위 선택)" },
       { label: "가입금액", value: "최소 100,000원 이상, 최대 5억원 이하" },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
-      },
     ],
     rates: [
       { period: "6개월", baseRate: 3.1, primeRate: 0.25, maxRate: 3.35 },
@@ -119,8 +104,8 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     ],
     notices: COMMON_NOTICES,
   },
-  P002: {
-    id: "P002",
+  2: {
+    id: 2,
     category: "정기적금",
     name: "코어 자유적금",
     summary: "매달 원하는 금액을 자유롭게 납입하는 적금입니다.",
@@ -128,21 +113,12 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "12개월 ~ 36개월",
     minAmount: 10_000,
     maxAmount: 3_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 (1인 1계좌)" },
       { label: "가입기간", value: "12개월 이상 36개월 이하 (월 단위 선택)" },
       {
         label: "가입금액",
         value: "매월 10,000원 이상, 3,000,000원 이하 자유 납입",
-      },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
       },
     ],
     rates: [
@@ -152,8 +128,8 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     ],
     notices: COMMON_NOTICES,
   },
-  P003: {
-    id: "P003",
+  3: {
+    id: 3,
     category: "정기예금",
     name: "코어 목돈예금",
     summary: "목돈을 장기간 예치할수록 금리가 높아지는 예금입니다.",
@@ -161,19 +137,10 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "12개월 ~ 60개월",
     minAmount: 1_000_000,
     maxAmount: 1_000_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 및 개인사업자 (1인 1계좌)" },
       { label: "가입기간", value: "12개월 이상 60개월 이하 (월 단위 선택)" },
       { label: "가입금액", value: "최소 1,000,000원 이상, 최대 10억원 이하" },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
-      },
     ],
     rates: [
       { period: "12개월", baseRate: 3.5, primeRate: 0.3, maxRate: 3.8 },
@@ -183,8 +150,8 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     ],
     notices: COMMON_NOTICES,
   },
-  P004: {
-    id: "P004",
+  4: {
+    id: 4,
     category: "정기적금",
     name: "코어 정기적금",
     summary: "매달 같은 금액을 납입해 만기에 목돈을 만드는 적금입니다.",
@@ -192,21 +159,12 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "6개월 ~ 24개월",
     minAmount: 50_000,
     maxAmount: 2_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 (1인 1계좌)" },
       { label: "가입기간", value: "6개월 이상 24개월 이하 (월 단위 선택)" },
       {
         label: "가입금액",
         value: "매월 50,000원 이상, 2,000,000원 이하 정액 납입",
-      },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
       },
     ],
     rates: [
@@ -216,8 +174,8 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     ],
     notices: COMMON_NOTICES,
   },
-  P005: {
-    id: "P005",
+  5: {
+    id: 5,
     category: "정기예금",
     name: "코어 단기예금",
     summary: "짧은 기간 자금을 예치하기 좋은 단기 정기예금입니다.",
@@ -225,19 +183,10 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "1개월 ~ 12개월",
     minAmount: 500_000,
     maxAmount: 300_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 및 개인사업자 (1인 1계좌)" },
       { label: "가입기간", value: "1개월 이상 12개월 이하 (월 단위 선택)" },
       { label: "가입금액", value: "최소 500,000원 이상, 최대 3억원 이하" },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
-      },
     ],
     rates: [
       { period: "1개월", baseRate: 2.6, primeRate: 0.1, maxRate: 2.7 },
@@ -247,8 +196,8 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     ],
     notices: COMMON_NOTICES,
   },
-  P006: {
-    id: "P006",
+  6: {
+    id: 6,
     category: "정기적금",
     name: "코어 목표적금",
     summary: "목표 금액을 정해 꾸준히 모으는 정기적금입니다.",
@@ -256,21 +205,12 @@ export const MOCK_PRODUCT_DETAILS: Record<string, ProductDetailData> = {
     period: "12개월 ~ 36개월",
     minAmount: 30_000,
     maxAmount: 5_000_000,
-    interestMethod: "만기일시지급식",
     guide: [
       { label: "가입대상", value: "실명의 개인 (1인 1계좌)" },
       { label: "가입기간", value: "12개월 이상 36개월 이하 (월 단위 선택)" },
       {
         label: "가입금액",
         value: "매월 30,000원 이상, 5,000,000원 이하 정액 납입",
-      },
-      {
-        label: "이자지급시기",
-        value: "만기일에 원금과 이자를 함께 지급합니다.",
-      },
-      {
-        label: "중도해지",
-        value: "만기 전 해지 시 중도해지이율이 적용됩니다.",
       },
     ],
     rates: [

@@ -22,3 +22,7 @@ export {
   estimateMaturityAmount,
 } from "@/entities/product/lib/product-join-calc"
 export { getProductCategoryBadgeVariant } from "@/entities/product/lib/status-badge"
+export {
+  toProductCard,
+  toProductDetailData,
+} from "@/entities/product/lib/mappers"

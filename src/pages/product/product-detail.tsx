@@ -12,7 +12,7 @@ import {
 
 type ProductDetailProps = {
   product: ProductDetailData
-  onJoin?: (id: string) => void
+  onJoin?: (id: number) => void
 }
 
 type TabKey = "guide" | "rate" | "notice"
@@ -84,10 +84,6 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
                 {formatAmount(product.minAmount)} ~{" "}
                 {formatAmount(product.maxAmount)}
               </dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-ink-muted">이자지급방식</dt>
-              <dd className="font-bold text-ink">{product.interestMethod}</dd>
             </div>
           </dl>
 

@@ -6,16 +6,20 @@
  * OpenAPI spec version: v1.0.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -174,78 +178,48 @@ export const registerScheduledTransfer = async (scheduledTransferRegisterRequest
 
 
 
-export const getRegisterScheduledTransferQueryKey = (scheduledTransferRegisterRequest?: ScheduledTransferRegisterRequest,) => {
-    return [
-    'POST', `/scheduled-transfers`, scheduledTransferRegisterRequest
-    ] as const;
+export const getRegisterScheduledTransferMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext> => {
+
+const mutationKey = ['registerScheduledTransfer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerScheduledTransfer>>, {data: ScheduledTransferRegisterRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerScheduledTransfer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterScheduledTransferMutationResult = NonNullable<Awaited<ReturnType<typeof registerScheduledTransfer>>>
+    export type RegisterScheduledTransferMutationBody = ScheduledTransferRegisterRequest
+    export type RegisterScheduledTransferMutationError = unknown
+
+    export const useRegisterScheduledTransfer = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof registerScheduledTransfer>>,
+        TError,
+        {data: ScheduledTransferRegisterRequest},
+        TContext
+      > => {
+      return useMutation(getRegisterScheduledTransferMutationOptions(options), queryClient);
     }
-
-
-export const getRegisterScheduledTransferQueryOptions = <TData = Awaited<ReturnType<typeof registerScheduledTransfer>>, TError = unknown>(scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getRegisterScheduledTransferQueryKey(scheduledTransferRegisterRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof registerScheduledTransfer>>> = ({ signal }) => registerScheduledTransfer(scheduledTransferRegisterRequest, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type RegisterScheduledTransferQueryResult = NonNullable<Awaited<ReturnType<typeof registerScheduledTransfer>>>
-export type RegisterScheduledTransferQueryError = unknown
-
-
-export function useRegisterScheduledTransfer<TData = Awaited<ReturnType<typeof registerScheduledTransfer>>, TError = unknown>(
- scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof registerScheduledTransfer>>,
-          TError,
-          Awaited<ReturnType<typeof registerScheduledTransfer>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRegisterScheduledTransfer<TData = Awaited<ReturnType<typeof registerScheduledTransfer>>, TError = unknown>(
- scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof registerScheduledTransfer>>,
-          TError,
-          Awaited<ReturnType<typeof registerScheduledTransfer>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRegisterScheduledTransfer<TData = Awaited<ReturnType<typeof registerScheduledTransfer>>, TError = unknown>(
- scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useRegisterScheduledTransfer<TData = Awaited<ReturnType<typeof registerScheduledTransfer>>, TError = unknown>(
- scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getRegisterScheduledTransferQueryOptions(scheduledTransferRegisterRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-export const getCancelScheduledTransferUrl = (scheduledTransferId: number,) => {
+    export const getCancelScheduledTransferUrl = (scheduledTransferId: number,) => {
 
 
 
@@ -268,74 +242,44 @@ export const cancelScheduledTransfer = async (scheduledTransferId: number, optio
 
 
 
-export const getCancelScheduledTransferQueryKey = (scheduledTransferId: number,) => {
-    return [
-    'POST', `/scheduled-transfers/${scheduledTransferId}/cancel`
-    ] as const;
+export const getCancelScheduledTransferMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext> => {
+
+const mutationKey = ['cancelScheduledTransfer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelScheduledTransfer>>, {scheduledTransferId: number}> = (props) => {
+          const {scheduledTransferId} = props ?? {};
+
+          return  cancelScheduledTransfer(scheduledTransferId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelScheduledTransferMutationResult = NonNullable<Awaited<ReturnType<typeof cancelScheduledTransfer>>>
+
+    export type CancelScheduledTransferMutationError = unknown
+
+    export const useCancelScheduledTransfer = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelScheduledTransfer>>,
+        TError,
+        {scheduledTransferId: number},
+        TContext
+      > => {
+      return useMutation(getCancelScheduledTransferMutationOptions(options), queryClient);
     }
-
-
-export const getCancelScheduledTransferQueryOptions = <TData = Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError = unknown>(scheduledTransferId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getCancelScheduledTransferQueryKey(scheduledTransferId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof cancelScheduledTransfer>>> = ({ signal }) => cancelScheduledTransfer(scheduledTransferId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: scheduledTransferId !== null && scheduledTransferId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type CancelScheduledTransferQueryResult = NonNullable<Awaited<ReturnType<typeof cancelScheduledTransfer>>>
-export type CancelScheduledTransferQueryError = unknown
-
-
-export function useCancelScheduledTransfer<TData = Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError = unknown>(
- scheduledTransferId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof cancelScheduledTransfer>>,
-          TError,
-          Awaited<ReturnType<typeof cancelScheduledTransfer>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCancelScheduledTransfer<TData = Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError = unknown>(
- scheduledTransferId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof cancelScheduledTransfer>>,
-          TError,
-          Awaited<ReturnType<typeof cancelScheduledTransfer>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCancelScheduledTransfer<TData = Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError = unknown>(
- scheduledTransferId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useCancelScheduledTransfer<TData = Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError = unknown>(
- scheduledTransferId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getCancelScheduledTransferQueryOptions(scheduledTransferId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-

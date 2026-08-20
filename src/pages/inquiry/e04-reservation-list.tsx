@@ -41,6 +41,7 @@ import {
   useCancelScheduledTransfer,
 } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
 import type { PageResponseScheduledTransferListItemResponse } from "@/shared/api/generated/model"
+import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -69,10 +70,9 @@ const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
   return [...waiting, ...others]
 }
 
-/**
- * scheduledtransfer 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 임시로 쓴다.
- * 계좌비밀번호/OTP를 실제로 발급받는 화면이 연동되면 그 결과 토큰으로 교체해야 한다.
- */
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify)·OTP(POST /otp/issue, /otp/verify)
+// 실제 발급 API가 연동되면 그 결과 토큰으로 교체한다. scheduledtransfer 도메인의 토큰
+// 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export const E04ReservationList = () => {
@@ -88,6 +88,9 @@ export const E04ReservationList = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
+  const [cancelErrorMessage, setCancelErrorMessage] = React.useState<
+    string | null
+  >(null)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
@@ -145,15 +148,23 @@ export const E04ReservationList = () => {
   }
 
   const handleOtpConfirm = async () => {
-    await Promise.all(
-      selectedRows.map((r) =>
-        cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
-      ),
-    )
     setOtpOpen(false)
-    setSelectedIds([])
-    setGridKey((k) => k + 1)
-    refetch()
+    try {
+      await Promise.all(
+        selectedRows.map((r) =>
+          cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
+        ),
+      )
+      setSelectedIds([])
+      setGridKey((k) => k + 1)
+      refetch()
+    } catch (e) {
+      setCancelErrorMessage(
+        e instanceof ApiError ? e.message : "예약이체 취소에 실패했습니다.",
+      )
+      // 일부만 성공했을 수 있으니 최신 상태를 다시 불러온다.
+      refetch()
+    }
   }
 
   if (isLoading) {
@@ -307,6 +318,13 @@ export const E04ReservationList = () => {
             ]}
           />
 
+          <ErrorDialog
+            open={cancelErrorMessage != null}
+            onClose={() => setCancelErrorMessage(null)}
+            title="예약이체 취소 실패"
+            messages={cancelErrorMessage ? [cancelErrorMessage] : []}
+          />
+
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -364,6 +382,8 @@ export const E04ReservationList = () => {
           ※ 대기 상태이고 이체 예정일 전일까지인 건만 선택할 수 있습니다.
         </p>
 
+        {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
+            동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
           totalCount={totalCount}
           pageSize={pageSize}

@@ -565,6 +565,31 @@
                 },
             },
         },
+      "/accounts":
+        {
+          "get":
+            {
+              "tags": ["account-controller"],
+              "operationId": "getAccounts",
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseAccountOverviewResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     },
   "components":
     {
@@ -959,6 +984,82 @@
                   "code": { "type": "string" },
                   "message": { "type": "string" },
                   "data": {},
+                },
+            },
+          "ApiResponseAccountOverviewResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data":
+                    { "$ref": "#/components/schemas/AccountOverviewResponse" },
+                },
+            },
+          "AccountOverviewResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "asOf": { "type": "string", "format": "date-time" },
+                  "totalAssets": { "type": "integer", "format": "int64" },
+                  "items":
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/GroupResponse" },
+                    },
+                },
+            },
+          "GroupResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "groupCode":
+                    {
+                      "type": "string",
+                      "enum": ["DEMAND_DEPOSIT", "DEPOSIT_SAVINGS"],
+                    },
+                  "groupName": { "type": "string" },
+                  "groupTotalBalance": { "type": "integer", "format": "int64" },
+                  "accounts":
+                    {
+                      "type": "array",
+                      "items":
+                        { "$ref": "#/components/schemas/AccountItemResponse" },
+                    },
+                },
+            },
+          "AccountItemResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "accountId": { "type": "integer", "format": "int64" },
+                  "accountName": { "type": "string" },
+                  "accountNumber": { "type": "string" },
+                  "accountType":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "DEMAND_DEPOSIT",
+                          "TIME_DEPOSIT",
+                          "INSTALLMENT_SAVINGS",
+                        ],
+                    },
+                  "balance": { "type": "integer", "format": "int64" },
+                  "status":
+                    {
+                      "type": "string",
+                      "enum": ["ACTIVE", "SUSPENDED", "CLOSED"],
+                    },
+                  "openedDate": { "type": "string", "format": "date" },
+                  "lastTransactionAt":
+                    { "type": "string", "format": "date-time" },
+                  "maturityDate": { "type": "string", "format": "date" },
+                  "transferEnabled": { "type": "boolean" },
                 },
             },
           "ScheduledTransferRegisterRequest":

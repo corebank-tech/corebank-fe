@@ -263,7 +263,6 @@ export const ReservedTransferScreen = () => {
       today={TODAY}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
-      duplicate={false}
       canSubmit={canSubmit}
       onNext={() => setStep(2)}
     />

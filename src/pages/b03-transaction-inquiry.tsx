@@ -38,7 +38,7 @@ import { cn } from "@/shared/lib/utils"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import { QUERY_MAX_RANGE_DAYS as MAX_PERIOD_DAYS } from "@/shared/config/policy"
 import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
 
@@ -148,7 +148,7 @@ export const B03TransactionInquiry = () => {
     incomplete: periodIncomplete,
     reversed: periodReversed,
     overLimit: periodOverLimit,
-  } = checkPeriodRange(period.start, period.end, TODAY, MAX_RANGE_DAYS)
+  } = checkPeriodRange(period.start, period.end, TODAY, MAX_PERIOD_DAYS)
 
   // Presentation-only filtering/ordering over the mock rows.
   const rows = React.useMemo(() => {

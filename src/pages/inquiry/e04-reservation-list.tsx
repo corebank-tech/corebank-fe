@@ -89,11 +89,12 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
 const DEFAULT_PERIOD_MONTHS = 2
 
 /**
- * 조회 시작일 소급 한도. 값은 POL-021(거래내역 조회 최대 1년)과 같지만 별개 규칙이라
- * 상수를 공유하지 않는다 — 예약이체 조회 기간을 정한 POL·REQ가 없고(REQ-RSV-007),
- * `policy.ts`는 POL 수치의 단일 출처라 번호 없는 값을 넣지 않는다.
+ * 조회기간 한도. 시작일 소급 한도와 기간 폭 한도를 겸한다(`checkPeriodRange`).
+ * 값은 POL-021(거래내역 조회 최대 1년)과 같지만 별개 규칙이라 상수를 공유하지 않는다 —
+ * 예약이체 조회 기간을 정한 POL·REQ가 없고(REQ-RSV-007), `policy.ts`는 POL 수치의
+ * 단일 출처라 번호 없는 값을 넣지 않는다.
  */
-const MAX_RANGE_DAYS = 365
+const MAX_PERIOD_DAYS = 365
 
 /**
  * 이 화면의 조회 대상은 미래 일자 예약건이다. 공용 프리셋은 전부 종료일을 오늘로
@@ -210,7 +211,7 @@ export const E04ReservationList = () => {
       period.start,
       period.end,
       TODAY,
-      MAX_RANGE_DAYS,
+      MAX_PERIOD_DAYS,
     )
     // 비워두면 daysBetween이 NaN을 내고 NaN은 어떤 비교에도 false라, 막지 않으면
     // fromDate= 로 요청이 나간다.
@@ -474,7 +475,7 @@ export const E04ReservationList = () => {
               onChange={setPeriod}
               today={TODAY}
               presets={PERIOD_PRESETS}
-              maxRangeDays={MAX_RANGE_DAYS}
+              maxPeriodDays={MAX_PERIOD_DAYS}
             />
           </FormRow>
         </SearchPanel>

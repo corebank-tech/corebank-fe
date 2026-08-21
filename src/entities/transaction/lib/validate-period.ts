@@ -19,12 +19,16 @@ export type PeriodRangeCheck = {
  *
  * 빈 문자열은 `daysBetween`이 NaN을 내고 NaN은 어떤 비교에도 false라 두 검사를 그냥
  * 통과한다. 조용히 빈 목록이 나오므로 `incomplete`로 따로 구분한다.
+ *
+ * @param maxPeriodDays 시작일 소급 한도이자 기간 폭 한도. 두 한도를 한 값으로
+ *   겸한다 — 지금은 어느 화면에서도 같은 값이라 하나로 되지만, 한쪽만 다른 화면이
+ *   생기면 인자를 둘로 갈라야 한다.
  */
 export function checkPeriodRange(
   start: string,
   end: string,
   today: string,
-  maxRangeDays: number,
+  maxPeriodDays: number,
 ): PeriodRangeCheck {
   if (!start || !end) {
     return { incomplete: true, reversed: false, overLimit: false }
@@ -33,6 +37,7 @@ export function checkPeriodRange(
   return {
     incomplete: false,
     reversed: span < 0,
-    overLimit: daysBetween(start, today) > maxRangeDays || span > maxRangeDays,
+    overLimit:
+      daysBetween(start, today) > maxPeriodDays || span > maxPeriodDays,
   }
 }

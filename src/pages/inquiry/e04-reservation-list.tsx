@@ -144,6 +144,11 @@ export const E04ReservationList = () => {
   const totalCount = pageData?.totalCount ?? 0
   const totalPages = Math.max(1, pageData?.totalPages ?? 1)
 
+  // 취소·재조회로 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
+
   const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
 
   const cancelMutation = useCancelScheduledTransfer({
@@ -237,16 +242,7 @@ export const E04ReservationList = () => {
           : "예약이체 취소에 실패했습니다.",
       )
     }
-    const refreshed = await refetch()
-    // 마지막 페이지의 건을 전부 취소하면 totalPages만 줄고 page는 그대로라,
-    // 요청은 범위 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 새 응답 기준으로 당긴다.
-    const refreshedTotalPages = (
-      refreshed.data as unknown as
-        PageResponseScheduledTransferListItemResponse | undefined
-    )?.totalPages
-    if (refreshedTotalPages != null) {
-      setPage((p) => Math.min(p, Math.max(1, refreshedTotalPages)))
-    }
+    await refetch()
   }
 
   const exportHeaders = [
@@ -488,7 +484,7 @@ export const E04ReservationList = () => {
         />
 
         <Pagination
-          page={Math.min(page, totalPages)}
+          page={page}
           totalPages={totalPages}
           onPageChange={(p) => {
             clearSelection()

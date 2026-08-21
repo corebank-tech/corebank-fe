@@ -42,11 +42,8 @@ import {
   cancelAutoTransfer,
   changeAutoTransfer,
 } from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
-import type {
-  AccountOverviewResponse,
-  PageResponseAutoTransferListItemResponse,
-} from "@/shared/api/generated/model"
+import { useWithdrawAccounts } from "@/entities/account"
+import type { PageResponseAutoTransferListItemResponse } from "@/shared/api/generated/model"
 import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
@@ -99,22 +96,7 @@ export const G04AutoTransferList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const { data: accountsData } = useGetAccounts()
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const overview = accountsData as unknown as
-    AccountOverviewResponse | undefined
-  const withdrawAccounts = React.useMemo(() => {
-    const items = (overview?.items ?? []).flatMap((g) => g.accounts ?? [])
-    // 출금계좌로 쓸 수 있는 건 입출금계좌 중 이체 가능한 활성 계좌뿐이다.
-    return items.filter(
-      (a) =>
-        a.accountType === "DEMAND_DEPOSIT" &&
-        a.status === "ACTIVE" &&
-        a.transferEnabled,
-    )
-  }, [overview])
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
   // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
   // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).

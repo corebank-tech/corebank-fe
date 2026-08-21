@@ -23,9 +23,8 @@ import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
 import { ReservedTransferStep2 } from "@/pages/transfer/reserved/e02-confirm"
 import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
 import { useRegisterScheduledTransfer } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
-import type { AccountOverviewResponse } from "@/shared/api/generated/model"
+import { useWithdrawAccounts } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 import type { AccountOption } from "@/shared/types/account"
 
@@ -77,23 +76,9 @@ export const ReservedTransferScreen = () => {
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
 
-  const { data: accountsData, isLoading: accountsLoading } = useGetAccounts()
+  const { accounts: withdrawAccounts, isLoading: accountsLoading } =
+    useWithdrawAccounts()
   const registerMutation = useRegisterScheduledTransfer()
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const overview = accountsData as unknown as
-    AccountOverviewResponse | undefined
-  const withdrawAccounts = React.useMemo(() => {
-    const items = (overview?.items ?? []).flatMap((g) => g.accounts ?? [])
-    // 출금계좌로 쓸 수 있는 건 입출금계좌 중 이체 가능한 활성 계좌뿐이다.
-    return items.filter(
-      (a) =>
-        a.accountType === "DEMAND_DEPOSIT" &&
-        a.status === "ACTIVE" &&
-        a.transferEnabled,
-    )
-  }, [overview])
 
   const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
     alias: a.accountName ?? "",

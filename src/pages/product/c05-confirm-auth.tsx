@@ -17,11 +17,8 @@ import {
   addMonthsWithEomCorrection,
   estimateMaturityAmount,
 } from "@/entities/product"
-import {
-  getJoinDate,
-  MOCK_JOIN_ACCOUNTS,
-  MOCK_JOIN_PRODUCTS,
-} from "@/entities/product"
+import { MOCK_JOIN_ACCOUNTS, MOCK_JOIN_PRODUCTS } from "@/entities/product"
+import { getToday } from "@/shared/config/clock"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
@@ -50,7 +47,7 @@ export const C05ConfirmAuth = () => {
   const termMonths = form.termMonths ?? product.minTermMonths
   const amount = form.amount ?? product.minAmount
 
-  const maturityDate = addMonthsWithEomCorrection(getJoinDate(), termMonths)
+  const maturityDate = addMonthsWithEomCorrection(getToday(), termMonths)
   const expectedMaturity = estimateMaturityAmount({
     category: product.category,
     amount,

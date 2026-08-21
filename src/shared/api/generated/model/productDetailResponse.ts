@@ -6,6 +6,7 @@
  * OpenAPI spec version: v1.0.0
  */
 import type { PreferentialRateItem } from './preferentialRateItem';
+import type { ProductDetailResponseInterestPayType } from './productDetailResponseInterestPayType';
 import type { ProductDetailResponseProductGroup } from './productDetailResponseProductGroup';
 import type { ProductDetailResponseSaleStatus } from './productDetailResponseSaleStatus';
 import type { RateTierItem } from './rateTierItem';
@@ -16,12 +17,16 @@ export interface ProductDetailResponse {
   productCode?: string;
   productName?: string;
   productGroup?: ProductDetailResponseProductGroup;
+  summary?: string;
   description?: string;
   baseRate?: number;
   maxRate?: number;
   minAmount?: number;
   maxAmount?: number;
   amountUnit?: number;
+  minTermMonths?: number;
+  maxTermMonths?: number;
+  interestPayType?: ProductDetailResponseInterestPayType;
   termOptions?: number[];
   rateTiers?: RateTierItem[];
   preferentialRates?: PreferentialRateItem[];

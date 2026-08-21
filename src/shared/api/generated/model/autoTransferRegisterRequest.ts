@@ -7,7 +7,6 @@
  */
 
 export interface AutoTransferRegisterRequest {
-  customerId?: number;
   withdrawalAccountId?: number;
   depositAccountNumber?: string;
   payeeName?: string;

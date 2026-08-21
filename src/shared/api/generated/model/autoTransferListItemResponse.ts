@@ -10,6 +10,7 @@ import type { AutoTransferListItemResponseStatus } from './autoTransferListItemR
 export interface AutoTransferListItemResponse {
   autoTransferId?: number;
   depositAccountNumber?: string;
+  fromAlias?: string;
   payeeName?: string;
   amount?: number;
   startDate?: string;
@@ -18,4 +19,5 @@ export interface AutoTransferListItemResponse {
   cycleMonths?: number;
   myPassbookMemo?: string;
   status?: AutoTransferListItemResponseStatus;
+  registeredAt?: string;
 }

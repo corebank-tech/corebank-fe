@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 계좌 그룹 코드
+ */
 export type GroupResponseGroupCode = typeof GroupResponseGroupCode[keyof typeof GroupResponseGroupCode];
 
 

@@ -11,10 +11,13 @@ export interface ScheduledTransferListItemResponse {
   scheduledTransferId?: number;
   scheduledDate?: string;
   withdrawalAccountNumber?: string;
+  fromAlias?: string;
   payeeBankName?: string;
   accountNumber?: string;
   payeeName?: string;
   amount?: number;
+  myPassbookMemo?: string;
   status?: ScheduledTransferListItemResponseStatus;
   cancelable?: boolean;
+  registeredAt?: string;
 }

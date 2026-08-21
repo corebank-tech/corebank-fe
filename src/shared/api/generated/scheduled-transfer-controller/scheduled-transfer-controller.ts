@@ -27,8 +27,10 @@ import type {
 import type {
   ApiResponsePageResponseScheduledTransferListItemResponse,
   ApiResponseScheduledTransferCancelResponse,
+  ApiResponseScheduledTransferExecutionResultPageResponse,
   ApiResponseScheduledTransferResponse,
   ScheduledTransferRegisterRequest,
+  SearchScheduledTransferExecutionsParams,
   SearchScheduledTransfersParams
 } from '../model';
 
@@ -283,3 +285,104 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCancelScheduledTransferMutationOptions(options), queryClient);
     }
+    export const getSearchScheduledTransferExecutionsUrl = (params?: SearchScheduledTransferExecutionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/scheduled-transfers/executions?${stringifiedParams}` : `/scheduled-transfers/executions`
+}
+
+export const searchScheduledTransferExecutions = async (params?: SearchScheduledTransferExecutionsParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseScheduledTransferExecutionResultPageResponse> => {
+
+  return customFetch<ApiResponseScheduledTransferExecutionResultPageResponse>(getSearchScheduledTransferExecutionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchScheduledTransferExecutionsQueryKey = (params?: SearchScheduledTransferExecutionsParams,) => {
+    return [
+    `/scheduled-transfers/executions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchScheduledTransferExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchScheduledTransferExecutionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>> = ({ signal }) => searchScheduledTransferExecutions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchScheduledTransferExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>>
+export type SearchScheduledTransferExecutionsQueryError = unknown
+
+
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+ params: undefined |  SearchScheduledTransferExecutionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchScheduledTransferExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof searchScheduledTransferExecutions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+ params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchScheduledTransferExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof searchScheduledTransferExecutions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+ params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+ params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchScheduledTransferExecutionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

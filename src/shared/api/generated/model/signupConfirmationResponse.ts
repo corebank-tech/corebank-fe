@@ -6,6 +6,10 @@
  * OpenAPI spec version: v1.0.0
  */
 
-export type CancelParams = {
-customerId: number;
-};
+export interface SignupConfirmationResponse {
+  userName?: string;
+  userId?: string;
+  birthDate?: string;
+  phoneNumber?: string;
+  email?: string;
+}

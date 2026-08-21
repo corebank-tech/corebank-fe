@@ -7,7 +7,6 @@
  */
 
 export interface AutoTransferChangeRequest {
-  customerId?: number;
   amount?: number;
   cycleMonths?: number;
   endDate?: string;

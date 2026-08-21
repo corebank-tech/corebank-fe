@@ -6,10 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
-export type SearchParams = {
-customerId: number;
-withdrawalAccountId: number;
-status?: string;
-page?: number;
-size?: number;
+export type InquirePayeeParams = {
+/**
+ * 조회할 입금계좌번호 (하이픈 없이)
+ */
+accountNumber: string;
 };

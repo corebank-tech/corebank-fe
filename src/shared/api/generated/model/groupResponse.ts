@@ -9,8 +9,12 @@ import type { AccountItemResponse } from './accountItemResponse';
 import type { GroupResponseGroupCode } from './groupResponseGroupCode';
 
 export interface GroupResponse {
+  /** 계좌 그룹 코드 */
   groupCode?: GroupResponseGroupCode;
+  /** 계좌 그룹 표시명 */
   groupName?: string;
+  /** 해당 그룹 계좌 잔액 합계(원) */
   groupTotalBalance?: number;
+  /** 그룹에 포함된 계좌 목록 */
   accounts?: AccountItemResponse[];
 }

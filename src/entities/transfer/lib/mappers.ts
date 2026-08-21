@@ -1,4 +1,5 @@
 import type {
+  AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
   ScheduledTransferListItemResponse,
 } from "@/shared/api/generated/model"
@@ -11,6 +12,10 @@ import type {
   AutoTransferStatus,
   TransferCycle,
 } from "@/entities/transfer/api/g04-auto-transfers"
+import type {
+  AutoTransferResult,
+  AutoTransferResultRow,
+} from "@/entities/transfer/api/g05-auto-transfer-results"
 
 const RESERVATION_STATUS_MAP: Record<string, ReservationStatus> = {
   WAITING: "대기",
@@ -89,4 +94,44 @@ export const toAutoTransferRow = (
   endDate: item.endDate ?? "",
   memo: item.myPassbookMemo ?? "",
   status: toAutoTransferStatus(item.status),
+})
+
+const AUTO_TRANSFER_RESULT_MAP: Record<string, AutoTransferResult> = {
+  SUCCESS: "정상",
+  ERROR: "오류",
+  // 배치가 실행 중인 짧은 순간의 상태. 정상·오류 중 하나로 뭉개면 확정되지 않은
+  // 회차를 확정된 것처럼 보여주게 된다.
+  PROCESSING: "처리중",
+}
+
+const toAutoTransferResult = (
+  status: string | undefined,
+): AutoTransferResult => {
+  const mapped = status ? AUTO_TRANSFER_RESULT_MAP[status] : undefined
+  if (mapped) return mapped
+  console.error(`[entities/transfer] 알 수 없는 자동이체 실행결과: ${status}`)
+  return "처리중"
+}
+
+/**
+ * 자동이체결과 조회(G-05) 응답 한 건을 화면 표시용 타입으로 변환한다.
+ *
+ * 출금계좌번호·별칭은 응답에 없다(withdrawalAccountId만 온다). 조회 조건으로
+ * 지정한 계좌라 호출부가 이미 아는 값이고, 그대로 넘겨받는다.
+ */
+export const toAutoTransferResultRow = (
+  item: AutoTransferExecutionHistoryItemResponse,
+  fromAccount: { accountNo: string; alias: string },
+): AutoTransferResultRow => ({
+  id: String(item.executionId ?? ""),
+  result: toAutoTransferResult(item.status),
+  processedAt: item.executedAt ?? "",
+  fromAccountNo: fromAccount.accountNo,
+  fromAlias: fromAccount.alias,
+  toAccountNo: item.depositAccountNumber ?? "",
+  payeeName: item.payeeName ?? "",
+  amount: item.amount ?? 0,
+  cycleMonths: toTransferCycle(item.cycleMonths),
+  memo: item.myPassbookMemo ?? "",
+  failReason: item.failureReason ?? undefined,
 })

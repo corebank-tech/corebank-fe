@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
-import { toAutoTransferRow } from "@/entities/transfer/lib/mappers"
-import type { AutoTransferListItemResponse } from "@/shared/api/generated/model"
+import {
+  toAutoTransferRow,
+  toAutoTransferResultRow,
+} from "@/entities/transfer/lib/mappers"
+import type {
+  AutoTransferExecutionHistoryItemResponse,
+  AutoTransferListItemResponse,
+} from "@/shared/api/generated/model"
 
 const FROM_ACCOUNT_NO = "110632892336"
 
@@ -132,5 +138,103 @@ describe("toAutoTransferRow", () => {
       memo: "",
     })
     spy.mockRestore()
+  })
+})
+
+const FROM_ACCOUNT = { accountNo: FROM_ACCOUNT_NO, alias: "자유입출금" }
+
+const BASE_EXECUTION: AutoTransferExecutionHistoryItemResponse = {
+  executionId: 7,
+  status: "SUCCESS",
+  executedAt: "2026-07-21T00:10:00",
+  withdrawalAccountId: 1,
+  depositAccountNumber: "110550098213",
+  payeeName: "박지훈",
+  amount: 187_400,
+  cycleMonths: 1,
+  myPassbookMemo: "관리비",
+  failureReason: null,
+}
+
+describe("toAutoTransferResultRow", () => {
+  it("응답 필드를 화면 표시용 타입으로 옮긴다", () => {
+    const row = toAutoTransferResultRow(BASE_EXECUTION, FROM_ACCOUNT)
+
+    expect(row).toEqual({
+      id: "7",
+      result: "정상",
+      processedAt: "2026-07-21T00:10:00",
+      fromAccountNo: FROM_ACCOUNT_NO,
+      fromAlias: "자유입출금",
+      toAccountNo: "110550098213",
+      payeeName: "박지훈",
+      amount: 187_400,
+      cycleMonths: 1,
+      memo: "관리비",
+      failReason: undefined,
+    })
+  })
+
+  it("출금계좌 정보는 응답이 아니라 인자로 받은 값을 쓴다", () => {
+    const row = toAutoTransferResultRow(BASE_EXECUTION, {
+      accountNo: "302998112233",
+      alias: "급여통장",
+    })
+    expect(row.fromAccountNo).toBe("302998112233")
+    expect(row.fromAlias).toBe("급여통장")
+  })
+
+  it.each([
+    ["SUCCESS", "정상"],
+    ["ERROR", "오류"],
+    ["PROCESSING", "처리중"],
+  ])("실행결과 %s를 %s로 옮긴다", (apiStatus, expected) => {
+    const row = toAutoTransferResultRow(
+      {
+        ...BASE_EXECUTION,
+        status: apiStatus as AutoTransferExecutionHistoryItemResponse["status"],
+      },
+      FROM_ACCOUNT,
+    )
+    expect(row.result).toBe(expected)
+  })
+
+  it("실패 사유를 그대로 싣는다", () => {
+    const row = toAutoTransferResultRow(
+      {
+        ...BASE_EXECUTION,
+        status: "ERROR",
+        failureReason: "출금계좌 잔액 부족",
+      },
+      FROM_ACCOUNT,
+    )
+    expect(row.result).toBe("오류")
+    expect(row.failReason).toBe("출금계좌 잔액 부족")
+  })
+
+  it("모르는 실행결과는 콘솔에 남기고 '처리중'으로 폴백한다", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const row = toAutoTransferResultRow(
+      {
+        ...BASE_EXECUTION,
+        status:
+          "RETRYING" as AutoTransferExecutionHistoryItemResponse["status"],
+      },
+      FROM_ACCOUNT,
+    )
+
+    // 정상·오류 중 하나로 폴백하면 확정되지 않은 회차를 확정된 것처럼 보여준다.
+    expect(row.result).toBe("처리중")
+    expect(spy).toHaveBeenCalledOnce()
+    spy.mockRestore()
+  })
+
+  it("failureReason이 null이면 undefined로 둔다", () => {
+    const row = toAutoTransferResultRow(
+      { ...BASE_EXECUTION, failureReason: null },
+      FROM_ACCOUNT,
+    )
+    expect(row.failReason).toBeUndefined()
   })
 })

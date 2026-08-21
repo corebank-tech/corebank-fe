@@ -39,13 +39,8 @@ import {
   type TransferHistoryRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
-import { addMonths } from "@/shared/lib/date"
+import { recentPeriod } from "@/shared/config/query-period"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
-
-const defaultPeriod = () => {
-  const today = getToday()
-  return { start: addMonths(today, -2), end: today }
-}
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -75,7 +70,7 @@ const SEARCH_FIELDS: GridSearchField[] = [
 export const D04TransferHistory = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
-  const [period, setPeriod] = React.useState(defaultPeriod)
+  const [period, setPeriod] = React.useState(recentPeriod)
   const [status, setStatus] = React.useState("all")
   const [fromAccount, setFromAccount] = React.useState("all")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
@@ -120,7 +115,7 @@ export const D04TransferHistory = () => {
   const pageRows = rows.slice((safePage - 1) * size, safePage * size)
 
   const handleReset = () => {
-    setPeriod(defaultPeriod())
+    setPeriod(recentPeriod())
     setStatus("all")
     setFromAccount("all")
     setSearch(null)

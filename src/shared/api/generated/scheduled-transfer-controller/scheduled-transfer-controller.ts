@@ -29,6 +29,7 @@ import type {
   ApiResponseScheduledTransferCancelResponse,
   ApiResponseScheduledTransferExecutionResultPageResponse,
   ApiResponseScheduledTransferResponse,
+  ErrorResponse,
   ScheduledTransferRegisterRequest,
   SearchScheduledTransferExecutionsParams,
   SearchScheduledTransfersParams
@@ -71,6 +72,10 @@ export const getSearchScheduledTransfersUrl = (params?: SearchScheduledTransfers
   return stringifiedParams.length > 0 ? `/scheduled-transfers?${stringifiedParams}` : `/scheduled-transfers`
 }
 
+/**
+ * 등록된 예약이체(대기중·실행완료·취소 등) 목록을 상태·출금계좌·조회기간으로 조회한다.
+ * @summary 예약이체 목록조회
+ */
 export const searchScheduledTransfers = async (params?: SearchScheduledTransfersParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponsePageResponseScheduledTransferListItemResponse> => {
 
   return customFetch<ApiResponsePageResponseScheduledTransferListItemResponse>(getSearchScheduledTransfersUrl(params),
@@ -93,7 +98,7 @@ export const getSearchScheduledTransfersQueryKey = (params?: SearchScheduledTran
     }
 
 
-export const getSearchScheduledTransfersQueryOptions = <TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = unknown>(params?: SearchScheduledTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getSearchScheduledTransfersQueryOptions = <TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = ErrorResponse>(params?: SearchScheduledTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -112,10 +117,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type SearchScheduledTransfersQueryResult = NonNullable<Awaited<ReturnType<typeof searchScheduledTransfers>>>
-export type SearchScheduledTransfersQueryError = unknown
+export type SearchScheduledTransfersQueryError = ErrorResponse
 
 
-export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = unknown>(
+export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = ErrorResponse>(
  params: undefined |  SearchScheduledTransfersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchScheduledTransfers>>,
@@ -125,7 +130,7 @@ export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof se
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = unknown>(
+export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = ErrorResponse>(
  params?: SearchScheduledTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchScheduledTransfers>>,
@@ -135,12 +140,15 @@ export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof se
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = unknown>(
+export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = ErrorResponse>(
  params?: SearchScheduledTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 예약이체 목록조회
+ */
 
-export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = unknown>(
+export function useSearchScheduledTransfers<TData = Awaited<ReturnType<typeof searchScheduledTransfers>>, TError = ErrorResponse>(
  params?: SearchScheduledTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -165,6 +173,10 @@ export const getRegisterScheduledTransferUrl = () => {
   return `/scheduled-transfers`
 }
 
+/**
+ * 지정한 출금계좌에서 미래 특정일에 1회 실행되도록 예약이체를 등록한다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.
+ * @summary 예약이체 등록
+ */
 export const registerScheduledTransfer = async (scheduledTransferRegisterRequest: ScheduledTransferRegisterRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseScheduledTransferResponse> => {
 
   return customFetch<ApiResponseScheduledTransferResponse>(getRegisterScheduledTransferUrl(),
@@ -180,7 +192,7 @@ export const registerScheduledTransfer = async (scheduledTransferRegisterRequest
 
 
 
-export const getRegisterScheduledTransferMutationOptions = <TError = unknown,
+export const getRegisterScheduledTransferMutationOptions = <TError = ErrorResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext> => {
 
@@ -209,9 +221,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type RegisterScheduledTransferMutationResult = NonNullable<Awaited<ReturnType<typeof registerScheduledTransfer>>>
     export type RegisterScheduledTransferMutationBody = ScheduledTransferRegisterRequest
-    export type RegisterScheduledTransferMutationError = unknown
+    export type RegisterScheduledTransferMutationError = ErrorResponse
 
-    export const useRegisterScheduledTransfer = <TError = unknown,
+    /**
+ * @summary 예약이체 등록
+ */
+export const useRegisterScheduledTransfer = <TError = ErrorResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerScheduledTransfer>>, TError,{data: ScheduledTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof registerScheduledTransfer>>,
@@ -229,6 +244,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return `/scheduled-transfers/${scheduledTransferId}/cancel`
 }
 
+/**
+ * 대기(WAITING) 상태의 예약이체를 취소한다. 실행 예정일 당일에는 취소할 수 없다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.
+ * @summary 예약이체 취소
+ */
 export const cancelScheduledTransfer = async (scheduledTransferId: number, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseScheduledTransferCancelResponse> => {
 
   return customFetch<ApiResponseScheduledTransferCancelResponse>(getCancelScheduledTransferUrl(scheduledTransferId),
@@ -244,7 +263,7 @@ export const cancelScheduledTransfer = async (scheduledTransferId: number, optio
 
 
 
-export const getCancelScheduledTransferMutationOptions = <TError = unknown,
+export const getCancelScheduledTransferMutationOptions = <TError = ErrorResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext> => {
 
@@ -273,9 +292,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CancelScheduledTransferMutationResult = NonNullable<Awaited<ReturnType<typeof cancelScheduledTransfer>>>
 
-    export type CancelScheduledTransferMutationError = unknown
+    export type CancelScheduledTransferMutationError = ErrorResponse
 
-    export const useCancelScheduledTransfer = <TError = unknown,
+    /**
+ * @summary 예약이체 취소
+ */
+export const useCancelScheduledTransfer = <TError = ErrorResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelScheduledTransfer>>, TError,{scheduledTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof cancelScheduledTransfer>>,
@@ -300,6 +322,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return stringifiedParams.length > 0 ? `/scheduled-transfers/executions?${stringifiedParams}` : `/scheduled-transfers/executions`
 }
 
+/**
+ * 등록된 예약이체의 처리결과(정상/오류/취소)를 조회기간별로 조회한다. 조회기간을 지정하지 않으면 최근 1개월(오늘 기준)을 기본값으로 조회한다. 목록 상단에 정상처리금액·오류처리금액·취소건수 집계를 함께 반환한다.
+ * @summary 예약이체 처리결과 조회
+ */
 export const searchScheduledTransferExecutions = async (params?: SearchScheduledTransferExecutionsParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseScheduledTransferExecutionResultPageResponse> => {
 
   return customFetch<ApiResponseScheduledTransferExecutionResultPageResponse>(getSearchScheduledTransferExecutionsUrl(params),
@@ -322,7 +348,7 @@ export const getSearchScheduledTransferExecutionsQueryKey = (params?: SearchSche
     }
 
 
-export const getSearchScheduledTransferExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getSearchScheduledTransferExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = ErrorResponse>(params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -341,10 +367,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type SearchScheduledTransferExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>>
-export type SearchScheduledTransferExecutionsQueryError = unknown
+export type SearchScheduledTransferExecutionsQueryError = ErrorResponse
 
 
-export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = ErrorResponse>(
  params: undefined |  SearchScheduledTransferExecutionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchScheduledTransferExecutions>>,
@@ -354,7 +380,7 @@ export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = ErrorResponse>(
  params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchScheduledTransferExecutions>>,
@@ -364,12 +390,15 @@ export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = ErrorResponse>(
  params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 예약이체 처리결과 조회
+ */
 
-export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = unknown>(
+export function useSearchScheduledTransferExecutions<TData = Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError = ErrorResponse>(
  params?: SearchScheduledTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchScheduledTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

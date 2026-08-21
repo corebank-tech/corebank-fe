@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 자동이체 상태
+ */
 export type AutoTransferResponseStatus = typeof AutoTransferResponseStatus[keyof typeof AutoTransferResponseStatus];
 
 

@@ -8,7 +8,10 @@
 import type { ScheduledTransferCancelResponseStatus } from './scheduledTransferCancelResponseStatus';
 
 export interface ScheduledTransferCancelResponse {
+  /** 예약이체 ID */
   scheduledTransferId?: number;
+  /** 예약이체 상태 */
   status?: ScheduledTransferCancelResponseStatus;
+  /** 취소 시각 */
   canceledAt?: string;
 }

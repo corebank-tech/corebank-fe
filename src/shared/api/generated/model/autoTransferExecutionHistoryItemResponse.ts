@@ -8,14 +8,27 @@
 import type { AutoTransferExecutionHistoryItemResponseStatus } from './autoTransferExecutionHistoryItemResponseStatus';
 
 export interface AutoTransferExecutionHistoryItemResponse {
+  /** 실행 이력 ID */
   executionId?: number;
+  /** 실행 결과. SUCCESS/ERROR */
   status?: AutoTransferExecutionHistoryItemResponseStatus;
+  /** 실행 시각 */
   executedAt?: string;
+  /** 출금계좌 ID (내 계좌) */
   withdrawalAccountId?: number;
+  /** 입금계좌번호 */
   depositAccountNumber?: string;
+  /** 예금주명 */
   payeeName?: string;
+  /** 이체금액 */
   amount?: number;
+  /** 이체주기(개월) */
   cycleMonths?: number;
+  /** 내 통장 표시내용 */
   myPassbookMemo?: string;
-  failureReason?: string;
+  /**
+     * 실패 사유. status=SUCCESS일 때는 비어있음
+     * @nullable
+     */
+  failureReason?: string | null;
 }

@@ -20,14 +20,32 @@ import type {
 
 import type {
   ApiResponsePayeeResponse,
+  ApiResponseTransferHistoryDetailResponse,
+  ApiResponseTransferHistoryPageResponse,
   ApiResponseTransferResponse
 } from '../model';
 
 
+export const getSearchResponseMock = (overrideResponse: Partial<Extract<ApiResponseTransferHistoryPageResponse, object>> = {}): ApiResponseTransferHistoryPageResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{asOf: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined]), summary: faker.helpers.arrayElement([{successCount: faker.helpers.arrayElement([faker.number.int(), undefined]), successAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), failureCount: faker.helpers.arrayElement([faker.number.int(), undefined]), failureAmount: faker.helpers.arrayElement([faker.number.int(), undefined])}, undefined]), page: faker.helpers.arrayElement([faker.number.int(), undefined]), size: faker.helpers.arrayElement([faker.number.int(), undefined]), totalCount: faker.helpers.arrayElement([faker.number.int(), undefined]), totalPages: faker.helpers.arrayElement([faker.number.int(), undefined]), items: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({transactionNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['SUCCESS','ERROR','PROCESSING'] as const), undefined]), executedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined]), accountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), payeeName: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), amount: faker.helpers.arrayElement([faker.number.int(), undefined]), transferType: faker.helpers.arrayElement([faker.helpers.arrayElement(['IMMEDIATE','SCHEDULED','AUTO'] as const), undefined]), channel: faker.helpers.arrayElement([faker.helpers.arrayElement(['WB','BT'] as const), undefined]), errorCode: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), failureReason: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])})), undefined])}, undefined]), ...overrideResponse})
+
 export const getExecuteResponseMock = (overrideResponse: Partial<Extract<ApiResponseTransferResponse, object>> = {}): ApiResponseTransferResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{status: faker.helpers.arrayElement([faker.helpers.arrayElement(['SUCCESS','ERROR','PROCESSING'] as const), undefined]), transactionNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), transferredAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined]), errorCode: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), errorMessage: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), withdrawalBalanceAfter: faker.helpers.arrayElement([faker.number.int(), undefined])}, undefined]), ...overrideResponse})
+
+export const getGetDetailResponseMock = (overrideResponse: Partial<Extract<ApiResponseTransferHistoryDetailResponse, object>> = {}): ApiResponseTransferHistoryDetailResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{transactionNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['SUCCESS','ERROR','PROCESSING'] as const), undefined]), accountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), payeeName: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), amount: faker.helpers.arrayElement([faker.number.int(), undefined]), fee: faker.helpers.arrayElement([faker.number.int(), undefined]), transferType: faker.helpers.arrayElement([faker.helpers.arrayElement(['IMMEDIATE','SCHEDULED','AUTO'] as const), undefined]), channel: faker.helpers.arrayElement([faker.helpers.arrayElement(['WB','BT'] as const), undefined]), myPassbookMemo: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), recipientPassbookMemo: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), balanceAfter: faker.helpers.arrayElement([faker.number.int(), undefined]), errorCode: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), failureReason: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), executedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined])}, undefined]), ...overrideResponse})
 
 export const getInquirePayeeResponseMock = (overrideResponse: Partial<Extract<ApiResponsePayeeResponse, object>> = {}): ApiResponsePayeeResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{accountId: faker.helpers.arrayElement([faker.number.int(), undefined]), payeeName: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])}, undefined]), ...overrideResponse})
 
+
+export const getSearchMockHandler = (overrideResponse?: ApiResponseTransferHistoryPageResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ApiResponseTransferHistoryPageResponse> | ApiResponseTransferHistoryPageResponse), options?: RequestHandlerOptions) => {
+  return http.get('*/transfers', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {await delay(300);
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getSearchResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 
 export const getExecuteMockHandler = (overrideResponse?: ApiResponseTransferResponse | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<ApiResponseTransferResponse> | ApiResponseTransferResponse), options?: RequestHandlerOptions) => {
   return http.post('*/transfers', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {await delay(300);
@@ -36,6 +54,18 @@ export const getExecuteMockHandler = (overrideResponse?: ApiResponseTransferResp
     return HttpResponse.json(overrideResponse !== undefined
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
     : getExecuteResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getGetDetailMockHandler = (overrideResponse?: ApiResponseTransferHistoryDetailResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ApiResponseTransferHistoryDetailResponse> | ApiResponseTransferHistoryDetailResponse), options?: RequestHandlerOptions) => {
+  return http.get('*/transfers/:transactionNumber', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {await delay(300);
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetDetailResponseMock(),
       { status: 200
       })
   }, options)
@@ -53,6 +83,8 @@ export const getInquirePayeeMockHandler = (overrideResponse?: ApiResponsePayeeRe
   }, options)
 }
 export const getTransferControllerMock = () => [
+  getSearchMockHandler(),
   getExecuteMockHandler(),
+  getGetDetailMockHandler(),
   getInquirePayeeMockHandler()
 ]

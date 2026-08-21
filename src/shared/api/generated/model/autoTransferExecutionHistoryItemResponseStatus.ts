@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 실행 결과. SUCCESS/ERROR
+ */
 export type AutoTransferExecutionHistoryItemResponseStatus = typeof AutoTransferExecutionHistoryItemResponseStatus[keyof typeof AutoTransferExecutionHistoryItemResponseStatus];
 
 

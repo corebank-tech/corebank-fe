@@ -7,10 +7,16 @@
  */
 
 export interface ScheduledTransferExecutionResultSummaryResponse {
+  /** 조회 기간 내 정상처리 건수 */
   successCount?: number;
+  /** 조회 기간 내 정상처리 금액 합계 */
   successAmount?: number;
+  /** 조회 기간 내 오류처리 건수 */
   failureCount?: number;
+  /** 조회 기간 내 오류처리 금액 합계 */
   failureAmount?: number;
+  /** 조회 기간 내 취소 건수 */
   canceledCount?: number;
+  /** 조회 기간 내 취소 금액 합계 */
   canceledAmount?: number;
 }

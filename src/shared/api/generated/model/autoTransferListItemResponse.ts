@@ -8,16 +8,28 @@
 import type { AutoTransferListItemResponseStatus } from './autoTransferListItemResponseStatus';
 
 export interface AutoTransferListItemResponse {
+  /** 자동이체 ID */
   autoTransferId?: number;
+  /** 입금계좌번호 */
   depositAccountNumber?: string;
+  /** 출금계좌 별칭 (미설정 시 null) */
   fromAlias?: string;
+  /** 예금주명 */
   payeeName?: string;
+  /** 회당 이체금액 */
   amount?: number;
+  /** 이체 시작일 */
   startDate?: string;
+  /** 이체 종료일 */
   endDate?: string;
+  /** 이체지정일 */
   transferDay?: number;
+  /** 이체주기(개월) */
   cycleMonths?: number;
+  /** 내 통장 표시내용 */
   myPassbookMemo?: string;
+  /** 자동이체 상태 */
   status?: AutoTransferListItemResponseStatus;
+  /** 등록일시 */
   registeredAt?: string;
 }

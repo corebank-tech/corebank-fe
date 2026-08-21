@@ -25,8 +25,10 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiResponseProductSubscriptionExecuteResponse,
   ApiResponseProductSubscriptionResultResponse,
   ApiResponseProductSubscriptionValidationResponse,
+  ProductSubscriptionExecuteRequest,
   ProductSubscriptionValidationRequest
 } from '../model';
 
@@ -52,7 +54,71 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const getValidateUrl = () => {
+export const getExecute1Url = () => {
+
+
+
+
+  return `/product-subscriptions`
+}
+
+export const execute1 = async (productSubscriptionExecuteRequest: ProductSubscriptionExecuteRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseProductSubscriptionExecuteResponse> => {
+
+  return customFetch<ApiResponseProductSubscriptionExecuteResponse>(getExecute1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(productSubscriptionExecuteRequest)
+  }
+);}
+
+
+
+
+
+export const getExecute1MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext> => {
+
+const mutationKey = ['execute1'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof execute1>>, {data: ProductSubscriptionExecuteRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  execute1(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type Execute1MutationResult = NonNullable<Awaited<ReturnType<typeof execute1>>>
+    export type Execute1MutationBody = ProductSubscriptionExecuteRequest
+    export type Execute1MutationError = unknown
+
+    export const useExecute1 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof execute1>>,
+        TError,
+        {data: ProductSubscriptionExecuteRequest},
+        TContext
+      > => {
+      return useMutation(getExecute1MutationOptions(options), queryClient);
+    }
+    export const getValidateUrl = () => {
 
 
 

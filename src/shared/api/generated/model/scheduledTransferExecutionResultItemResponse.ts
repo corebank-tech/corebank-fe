@@ -8,14 +8,36 @@
 import type { ScheduledTransferExecutionResultItemResponseStatus } from './scheduledTransferExecutionResultItemResponseStatus';
 
 export interface ScheduledTransferExecutionResultItemResponse {
+  /** 예약이체 ID */
   scheduledTransferId?: number;
+  /** 처리결과 상태 */
   status?: ScheduledTransferExecutionResultItemResponseStatus;
-  executedAt?: string;
-  canceledAt?: string;
+  /**
+     * 실행(확정) 시각. SUCCESS/FAILED만 채워짐
+     * @nullable
+     */
+  executedAt?: string | null;
+  /**
+     * 취소 시각. CANCELED만 채워짐
+     * @nullable
+     */
+  canceledAt?: string | null;
+  /** 출금계좌번호 (마스킹, 예: 110******877) */
   withdrawalAccountNumber?: string;
+  /** 입금계좌번호 (마스킹, 예: 110******877) */
   accountNumber?: string;
+  /** 예금주명 (마스킹, 예: 홍*동) */
   payeeName?: string;
+  /** 이체금액 */
   amount?: number;
-  transactionNumber?: string;
-  failureReason?: string;
+  /**
+     * 거래번호. SUCCESS/FAILED만 채워짐
+     * @nullable
+     */
+  transactionNumber?: string | null;
+  /**
+     * 실패 사유. status=SUCCESS일 때는 비어있음
+     * @nullable
+     */
+  failureReason?: string | null;
 }

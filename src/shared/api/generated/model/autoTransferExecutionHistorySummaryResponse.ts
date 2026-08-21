@@ -7,8 +7,12 @@
  */
 
 export interface AutoTransferExecutionHistorySummaryResponse {
+  /** 조회 기간 내 성공 건수 */
   successCount?: number;
+  /** 조회 기간 내 성공 금액 합계 */
   successAmount?: number;
+  /** 조회 기간 내 실패 건수 */
   errorCount?: number;
+  /** 조회 기간 내 실패 금액 합계 */
   errorAmount?: number;
 }

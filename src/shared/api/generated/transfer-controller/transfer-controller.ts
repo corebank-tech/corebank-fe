@@ -26,9 +26,12 @@ import type {
 
 import type {
   ApiResponsePayeeResponse,
+  ApiResponseTransferHistoryDetailResponse,
+  ApiResponseTransferHistoryPageResponse,
   ApiResponseTransferResponse,
   ErrorResponse,
   InquirePayeeParams,
+  SearchParams,
   TransferRequest
 } from '../model';
 
@@ -53,6 +56,114 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getSearchUrl = (params: SearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/transfers?${stringifiedParams}` : `/transfers`
+}
+
+/**
+ * 출금계좌 단위로 기간·처리상태·정렬·페이징 조건에 맞는 이체결과 목록과 집계를 조회한다.
+ * @summary 이체결과 목록 조회
+ */
+export const search = async (params: SearchParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseTransferHistoryPageResponse> => {
+
+  return customFetch<ApiResponseTransferHistoryPageResponse>(getSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchQueryKey = (params?: SearchParams,) => {
+    return [
+    `/transfers`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchQueryOptions = <TData = Awaited<ReturnType<typeof search>>, TError = ErrorResponse>(params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof search>>> = ({ signal }) => search(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchQueryResult = NonNullable<Awaited<ReturnType<typeof search>>>
+export type SearchQueryError = ErrorResponse
+
+
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorResponse>(
+ params: SearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof search>>,
+          TError,
+          Awaited<ReturnType<typeof search>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorResponse>(
+ params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof search>>,
+          TError,
+          Awaited<ReturnType<typeof search>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorResponse>(
+ params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 이체결과 목록 조회
+ */
+
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorResponse>(
+ params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
 
 export const getExecuteUrl = () => {
 
@@ -125,7 +236,108 @@ export const useExecute = <TError = ErrorResponse,
       > => {
       return useMutation(getExecuteMutationOptions(options), queryClient);
     }
-    export const getInquirePayeeUrl = (params: InquirePayeeParams,) => {
+    export const getGetDetailUrl = (transactionNumber: string,) => {
+
+
+
+
+  return `/transfers/${transactionNumber}`
+}
+
+/**
+ * 거래번호로 이체결과 상세를 조회한다.
+ * @summary 이체결과 상세 조회
+ */
+export const getDetail = async (transactionNumber: string, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseTransferHistoryDetailResponse> => {
+
+  return customFetch<ApiResponseTransferHistoryDetailResponse>(getGetDetailUrl(transactionNumber),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDetailQueryKey = (transactionNumber: string,) => {
+    return [
+    `/transfers/${transactionNumber}`
+    ] as const;
+    }
+
+
+export const getGetDetailQueryOptions = <TData = Awaited<ReturnType<typeof getDetail>>, TError = ErrorResponse>(transactionNumber: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDetailQueryKey(transactionNumber);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDetail>>> = ({ signal }) => getDetail(transactionNumber, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: transactionNumber !== null && transactionNumber !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getDetail>>>
+export type GetDetailQueryError = ErrorResponse
+
+
+export function useGetDetail<TData = Awaited<ReturnType<typeof getDetail>>, TError = ErrorResponse>(
+ transactionNumber: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDetail<TData = Awaited<ReturnType<typeof getDetail>>, TError = ErrorResponse>(
+ transactionNumber: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDetail<TData = Awaited<ReturnType<typeof getDetail>>, TError = ErrorResponse>(
+ transactionNumber: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 이체결과 상세 조회
+ */
+
+export function useGetDetail<TData = Awaited<ReturnType<typeof getDetail>>, TError = ErrorResponse>(
+ transactionNumber: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDetail>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDetailQueryOptions(transactionNumber,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getInquirePayeeUrl = (params: InquirePayeeParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {

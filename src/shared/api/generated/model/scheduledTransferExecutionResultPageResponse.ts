@@ -9,10 +9,16 @@ import type { ScheduledTransferExecutionResultItemResponse } from './scheduledTr
 import type { ScheduledTransferExecutionResultSummaryResponse } from './scheduledTransferExecutionResultSummaryResponse';
 
 export interface ScheduledTransferExecutionResultPageResponse {
+  /** 조회 기간 내 정상/오류/취소 건수·금액 집계 */
   summary?: ScheduledTransferExecutionResultSummaryResponse;
+  /** 현재 페이지 번호(0부터 시작) */
   page?: number;
+  /** 페이지 크기 */
   size?: number;
+  /** 전체 건수 */
   totalCount?: number;
+  /** 전체 페이지 수 */
   totalPages?: number;
+  /** 처리결과 목록 */
   items?: ScheduledTransferExecutionResultItemResponse[];
 }

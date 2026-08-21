@@ -9,10 +9,16 @@ import type { AutoTransferExecutionHistoryItemResponse } from './autoTransferExe
 import type { AutoTransferExecutionHistorySummaryResponse } from './autoTransferExecutionHistorySummaryResponse';
 
 export interface AutoTransferExecutionHistoryPageResponse {
+  /** 조회 기간 내 성공/실패 건수·금액 집계 */
   summary?: AutoTransferExecutionHistorySummaryResponse;
+  /** 현재 페이지 번호(0부터 시작) */
   page?: number;
+  /** 페이지 크기 */
   size?: number;
+  /** 전체 건수 */
   totalCount?: number;
+  /** 전체 페이지 수 */
   totalPages?: number;
+  /** 실행 이력 목록 */
   items?: AutoTransferExecutionHistoryItemResponse[];
 }

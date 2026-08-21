@@ -23,7 +23,7 @@ export type {
   ReservationResult,
   ReservationResultRow,
 } from "@/entities/transfer/api/e05-reservation-results"
-export { MOCK_RESERVATION_RESULTS } from "@/entities/transfer/api/e05-reservation-results"
+export { toReservationResultRow } from "@/entities/transfer/lib/mappers"
 
 export type {
   AutoTransferStatus,
@@ -32,13 +32,15 @@ export type {
 } from "@/entities/transfer/api/g04-auto-transfers"
 export { MOCK_AUTO_TRANSFERS } from "@/entities/transfer/api/g04-auto-transfers"
 
-export { toAutoTransferRow } from "@/entities/transfer/lib/mappers"
+export {
+  toAutoTransferRow,
+  toAutoTransferResultRow,
+} from "@/entities/transfer/lib/mappers"
 
 export type {
   AutoTransferResult,
   AutoTransferResultRow,
 } from "@/entities/transfer/api/g05-auto-transfer-results"
-export { MOCK_AUTO_TRANSFER_RESULTS } from "@/entities/transfer/api/g05-auto-transfer-results"
 
 export type {
   PayeeAccountStatus,
@@ -83,3 +85,8 @@ export {
 } from "@/entities/transfer/lib/validate-transfer"
 
 export { LimitModal } from "@/entities/transfer/ui/limit-modal"
+
+export {
+  useAutoTransferExecutions,
+  useScheduledTransferExecutions,
+} from "@/entities/transfer/api/use-transfer-executions"

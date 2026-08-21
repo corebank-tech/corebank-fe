@@ -240,6 +240,11 @@ export const E04ReservationList = () => {
     clearSelection()
 
     const failed = results.find((r) => r.status === "rejected")
+    const refreshed = await refetch()
+
+    // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+    // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
+    // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
     if (failed) {
       const reason = failed.reason
       setCancelErrorMessage(
@@ -247,8 +252,11 @@ export const E04ReservationList = () => {
           ? reason.message
           : "예약이체 취소에 실패했습니다.",
       )
+    } else if (refreshed.isError) {
+      setCancelErrorMessage(
+        "취소 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+      )
     }
-    await refetch()
   }
 
   const exportHeaders = [
@@ -443,7 +451,7 @@ export const E04ReservationList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedRows.length === 0}
+            disabled={selectedRows.length === 0 || cancelMutation.isPending}
             onClick={handleCancelClick}
           >
             선택 취소

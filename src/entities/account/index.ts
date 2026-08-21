@@ -19,3 +19,4 @@ export {
   MOCK_ORDER_ACCOUNTS,
   sortByOpenedDateAsc,
 } from "@/entities/account/api/b07-account-order"
+export { useAccountOverviewQuery } from "@/entities/account/api/account-overview-query"

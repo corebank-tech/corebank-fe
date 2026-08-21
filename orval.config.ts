@@ -20,8 +20,6 @@ export default defineConfig({
       // 스펙 도착 시 대체된다)
       mock: { generators: [{ type: "msw", delay: 300 }] },
       override: {
-        // 서버 스냅샷의 한글 태그·불안정한 operationId 를 정리한다.
-        transformer: "./openapi-transformer.ts",
         // 공통 봉투는 customFetch 가 벗기므로 data 만 반환하게 한다
         fetch: { includeHttpResponseReturnType: false },
         mutator: {

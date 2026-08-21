@@ -42,6 +42,16 @@ import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 
+/**
+ * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-TRSF-021,
+ * REQ-INQR-014: 기준일시는 조회 실행 시각이다).
+ */
+const defaultCondition = () => ({
+  period: recentPeriod(),
+  status: "all",
+  fromAccount: "all",
+})
+
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
   { label: "정상", value: "정상" },
@@ -70,9 +80,13 @@ const SEARCH_FIELDS: GridSearchField[] = [
 export const D04TransferHistory = () => {
   const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
-  const [period, setPeriod] = React.useState(recentPeriod)
-  const [status, setStatus] = React.useState("all")
-  const [fromAccount, setFromAccount] = React.useState("all")
+  // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
+  // 분리하지 않으면 조건을 건드리는 즉시 목록·집계가 바뀌는데 기준일시는 [조회]
+  // 시점에 머물러, 화면이 언제 받은 데이터인지 알 수 없게 된다.
+  const [applied, setApplied] = React.useState(defaultCondition)
+  const [period, setPeriod] = React.useState(applied.period)
+  const [status, setStatus] = React.useState(applied.status)
+  const [fromAccount, setFromAccount] = React.useState(applied.fromAccount)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [detail, setDetail] = React.useState<TransferHistoryRow | null>(null)
@@ -89,16 +103,20 @@ export const D04TransferHistory = () => {
   const rows = React.useMemo(() => {
     return MOCK_TRANSFER_HISTORY.filter((r) => {
       const d = toISODate(r.datetime)
-      if (d < period.start || d > period.end) return false
-      if (status !== "all" && r.status !== status) return false
-      if (fromAccount !== "all" && r.fromAccountNo !== fromAccount) return false
+      if (d < applied.period.start || d > applied.period.end) return false
+      if (applied.status !== "all" && r.status !== applied.status) return false
+      if (
+        applied.fromAccount !== "all" &&
+        r.fromAccountNo !== applied.fromAccount
+      )
+        return false
       if (search && search.keyword) {
         const value = String(r[search.field as keyof TransferHistoryRow] ?? "")
         if (!value.includes(search.keyword)) return false
       }
       return true
     }).sort((a, b) => b.datetime.localeCompare(a.datetime))
-  }, [period, status, fromAccount, search])
+  }, [applied, search])
 
   const normalCount = rows.filter((r) => r.status === "정상").length
   const normalAmount = rows
@@ -115,9 +133,11 @@ export const D04TransferHistory = () => {
   const pageRows = rows.slice((safePage - 1) * size, safePage * size)
 
   const handleReset = () => {
-    setPeriod(recentPeriod())
-    setStatus("all")
-    setFromAccount("all")
+    const next = defaultCondition()
+    setApplied(next)
+    setPeriod(next.period)
+    setStatus(next.status)
+    setFromAccount(next.fromAccount)
     setSearch(null)
     setPage(1)
     savedCondition.clear()
@@ -372,6 +392,7 @@ export const D04TransferHistory = () => {
             onApply={(field, keyword) => {
               setSearch(keyword ? { field, keyword } : null)
               setPage(1)
+              captureBaseTime()
             }}
           />
         </>
@@ -381,6 +402,7 @@ export const D04TransferHistory = () => {
         <SearchPanel
           onReset={handleReset}
           onSearch={() => {
+            setApplied({ period, status, fromAccount })
             setPage(1)
             savedCondition.clear()
             downloadComplete.clear()
@@ -466,7 +488,7 @@ export const D04TransferHistory = () => {
         />
 
         <GridToolbar
-          periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
+          periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
           totalCount={rows.length}
           pageSize={pageSize}
           onPageSizeChange={(s) => {

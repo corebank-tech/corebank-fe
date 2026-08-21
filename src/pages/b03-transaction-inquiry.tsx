@@ -42,6 +42,18 @@ import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { recentPeriod } from "@/shared/config/query-period"
 
+/**
+ * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-INQR-009 인수기준:
+ * "각 조건 변경 후 재조회 시 결과가 조건에 맞게 필터링·정렬된다").
+ */
+const defaultCondition = (accountNo: string) => ({
+  account: accountNo,
+  period: recentPeriod(),
+  content: "all",
+  order: "recent",
+  keyword: "",
+})
+
 const CONTENT_OPTIONS = [
   { label: "전체", value: "all" },
   { label: "입금만", value: "deposit" },
@@ -102,18 +114,22 @@ export const B03TransactionInquiry = () => {
   const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
-  const [account, setAccount] = React.useState(() => {
+  // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
+  // 분리하지 않으면 조건을 건드리는 즉시 목록·집계가 바뀌는데 기준일시는 [조회]
+  // 시점에 머물러, 화면이 언제 받은 데이터인지 알 수 없게 된다(REQ-INQR-014).
+  const [applied, setApplied] = React.useState(() => {
     /** REQ-INQR-005: 계좌목록의 [조회] 진입 시 해당 계좌가 선택된 상태로 시작한다. */
     const accountParam = searchParams.get("account")
     const preselected = MOCK_ACCOUNTS.find((a) => a.accountNo === accountParam)
-    return preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo
+    return defaultCondition(
+      preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo,
+    )
   })
-  // periodDraft는 입력 중인 값, period는 [조회] 통과 후 실제 필터링에 반영되는 값이다(REQ-INQR-010).
-  const [periodDraft, setPeriodDraft] = React.useState(recentPeriod)
-  const [period, setPeriod] = React.useState(recentPeriod)
-  const [content, setContent] = React.useState("all")
-  const [order, setOrder] = React.useState("recent")
-  const [keyword, setKeyword] = React.useState("")
+  const [account, setAccount] = React.useState(applied.account)
+  const [period, setPeriod] = React.useState(applied.period)
+  const [content, setContent] = React.useState(applied.content)
+  const [order, setOrder] = React.useState(applied.order)
+  const [keyword, setKeyword] = React.useState(applied.keyword)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
@@ -124,18 +140,20 @@ export const B03TransactionInquiry = () => {
   >(null)
 
   const selectedAccount =
-    MOCK_ACCOUNTS.find((a) => a.accountNo === account) ?? MOCK_ACCOUNTS[0]
+    MOCK_ACCOUNTS.find((a) => a.accountNo === applied.account) ??
+    MOCK_ACCOUNTS[0]
 
-  const periodReversed = daysBetween(periodDraft.start, periodDraft.end) < 0
-  const periodOverLimit = daysBetween(periodDraft.start, TODAY) > MAX_RANGE_DAYS
+  const periodReversed = daysBetween(period.start, period.end) < 0
+  const periodOverLimit = daysBetween(period.start, TODAY) > MAX_RANGE_DAYS
 
   // Presentation-only filtering/ordering over the mock rows.
   const rows = React.useMemo(() => {
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = applied.keyword.trim()
     let next = MOCK_TRANSACTIONS.filter((t) => {
-      if (t.date < period.start || t.date > period.end) return false
-      if (content === "deposit" && t.deposit <= 0) return false
-      if (content === "withdraw" && t.withdraw <= 0) return false
+      if (t.date < applied.period.start || t.date > applied.period.end)
+        return false
+      if (applied.content === "deposit" && t.deposit <= 0) return false
+      if (applied.content === "withdraw" && t.withdraw <= 0) return false
       if (trimmedKeyword && !t.description.includes(trimmedKeyword))
         return false
       return true
@@ -143,12 +161,12 @@ export const B03TransactionInquiry = () => {
     next = [...next].sort((a, b) => {
       const aKey = `${a.date}T${a.time}`
       const bKey = `${b.date}T${b.time}`
-      return order === "recent"
+      return applied.order === "recent"
         ? bKey.localeCompare(aKey)
         : aKey.localeCompare(bKey)
     })
     return next
-  }, [period, content, order, keyword])
+  }, [applied])
 
   const depositSum = rows.reduce((s, t) => s + t.deposit, 0)
   const depositCount = rows.filter((t) => t.deposit > 0).length
@@ -231,12 +249,13 @@ export const B03TransactionInquiry = () => {
   ])
 
   const handleReset = () => {
-    setAccount(MOCK_ACCOUNTS[0].accountNo)
-    setPeriodDraft(recentPeriod())
-    setPeriod(recentPeriod())
-    setContent("all")
-    setOrder("recent")
-    setKeyword("")
+    const next = defaultCondition(MOCK_ACCOUNTS[0].accountNo)
+    setApplied(next)
+    setAccount(next.account)
+    setPeriod(next.period)
+    setContent(next.content)
+    setOrder(next.order)
+    setKeyword(next.keyword)
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
@@ -258,7 +277,7 @@ export const B03TransactionInquiry = () => {
       )
       return
     }
-    setPeriod(periodDraft)
+    setApplied({ account, period, content, order, keyword })
     setPage(1)
     captureBaseTime()
   }
@@ -281,9 +300,9 @@ export const B03TransactionInquiry = () => {
           </FormRow>
           <FormRow label="조회기간">
             <PeriodField
-              start={periodDraft.start}
-              end={periodDraft.end}
-              onChange={setPeriodDraft}
+              start={period.start}
+              end={period.end}
+              onChange={setPeriod}
               today={TODAY}
             />
             <p className="mt-1 text-2xs text-ink-muted">
@@ -397,7 +416,7 @@ export const B03TransactionInquiry = () => {
         />
 
         <GridToolbar
-          periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
+          periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
           totalCount={rows.length}
           pageSize={pageSize}
           onPageSizeChange={(s) => {

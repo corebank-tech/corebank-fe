@@ -33,6 +33,14 @@ import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 
+/**
+ * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-RSV-014).
+ */
+const defaultCondition = () => ({
+  period: recentPeriod(),
+  order: "recent",
+})
+
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
   { label: "과거거래순", value: "past" },
@@ -41,8 +49,12 @@ const ORDER_OPTIONS = [
 export const E05ReservationResults = () => {
   const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
-  const [period, setPeriod] = React.useState(recentPeriod)
-  const [order, setOrder] = React.useState("recent")
+  // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
+  // 분리하지 않으면 조건을 건드리는 즉시 목록·집계가 바뀌는데 기준일시는 [조회]
+  // 시점에 머물러, 화면이 언제 받은 데이터인지 알 수 없게 된다.
+  const [applied, setApplied] = React.useState(defaultCondition)
+  const [period, setPeriod] = React.useState(applied.period)
+  const [order, setOrder] = React.useState(applied.order)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
@@ -51,14 +63,16 @@ export const E05ReservationResults = () => {
 
   const rows = React.useMemo(() => {
     const next = MOCK_RESERVATION_RESULTS.filter(
-      (r) => r.transferDate >= period.start && r.transferDate <= period.end,
+      (r) =>
+        r.transferDate >= applied.period.start &&
+        r.transferDate <= applied.period.end,
     )
     return [...next].sort((a, b) =>
-      order === "recent"
+      applied.order === "recent"
         ? b.transferDate.localeCompare(a.transferDate)
         : a.transferDate.localeCompare(b.transferDate),
     )
-  }, [period, order])
+  }, [applied])
 
   const normal = rows.filter((r) => r.result === "정상")
   const error = rows.filter((r) => r.result === "오류")
@@ -72,8 +86,10 @@ export const E05ReservationResults = () => {
   const pageRows = rows.slice((safePage - 1) * size, safePage * size)
 
   const handleReset = () => {
-    setPeriod(recentPeriod())
-    setOrder("recent")
+    const next = defaultCondition()
+    setApplied(next)
+    setPeriod(next.period)
+    setOrder(next.order)
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
@@ -196,6 +212,7 @@ export const E05ReservationResults = () => {
         <SearchPanel
           onReset={handleReset}
           onSearch={() => {
+            setApplied({ period, order })
             setPage(1)
             savedCondition.clear()
             downloadComplete.clear()
@@ -268,7 +285,7 @@ export const E05ReservationResults = () => {
         </p>
 
         <GridToolbar
-          periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
+          periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
           totalCount={rows.length}
           pageSize={pageSize}
           onPageSizeChange={(s) => {

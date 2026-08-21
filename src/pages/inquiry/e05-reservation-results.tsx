@@ -30,13 +30,8 @@ import {
   type ReservationResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
-import { addMonths } from "@/shared/lib/date"
+import { recentPeriod } from "@/shared/config/query-period"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
-
-const defaultPeriod = () => {
-  const today = getToday()
-  return { start: addMonths(today, -2), end: today }
-}
 
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
@@ -46,7 +41,7 @@ const ORDER_OPTIONS = [
 export const E05ReservationResults = () => {
   const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
-  const [period, setPeriod] = React.useState(defaultPeriod)
+  const [period, setPeriod] = React.useState(recentPeriod)
   const [order, setOrder] = React.useState("recent")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
@@ -77,7 +72,7 @@ export const E05ReservationResults = () => {
   const pageRows = rows.slice((safePage - 1) * size, safePage * size)
 
   const handleReset = () => {
-    setPeriod(defaultPeriod())
+    setPeriod(recentPeriod())
     setOrder("recent")
     setPage(1)
     savedCondition.clear()

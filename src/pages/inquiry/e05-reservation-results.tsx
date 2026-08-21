@@ -31,7 +31,7 @@ import {
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const defaultPeriod = () => {
   const today = getToday()
@@ -44,7 +44,7 @@ const ORDER_OPTIONS = [
 ]
 
 export const E05ReservationResults = () => {
-  const BASE_TIME = useBaseTime()
+  const [BASE_TIME, captureBaseTime] = useCapturedBaseTime()
   const TODAY = getToday()
   const [period, setPeriod] = React.useState(defaultPeriod)
   const [order, setOrder] = React.useState("recent")
@@ -204,6 +204,7 @@ export const E05ReservationResults = () => {
             setPage(1)
             savedCondition.clear()
             downloadComplete.clear()
+            captureBaseTime()
           }}
           onSaveCondition={savedCondition.save}
         >

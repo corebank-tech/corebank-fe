@@ -38,7 +38,7 @@ import { cn } from "@/shared/lib/utils"
 import { addMonths, daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 
 const defaultPeriod = () => {
@@ -103,7 +103,7 @@ const InfoRow = ({
 }
 
 export const B03TransactionInquiry = () => {
-  const BASE_TIME = useBaseTime()
+  const [BASE_TIME, captureBaseTime] = useCapturedBaseTime()
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
   const [account, setAccount] = React.useState(() => {
@@ -264,6 +264,7 @@ export const B03TransactionInquiry = () => {
     }
     setPeriod(periodDraft)
     setPage(1)
+    captureBaseTime()
   }
 
   return (

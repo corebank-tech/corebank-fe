@@ -32,9 +32,8 @@ import {
   useExecuteProductSubscription,
   getProductSubscriptions,
 } from "@/shared/api/generated/product-subscription-controller/product-subscription-controller"
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
+import { useWithdrawAccounts } from "@/entities/account"
 import type {
-  AccountOverviewResponse,
   ProductDetailResponse,
   ProductSubscriptionExecuteResponse,
   ProductSubscriptionResultResponse,
@@ -62,17 +61,12 @@ export const C05ConfirmAuth = () => {
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [executeError, setExecuteError] = React.useState<string | null>(null)
 
-  const { data: accountsData } = useGetAccounts()
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
   const executeMutation = useExecuteProductSubscription()
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
   const detail = data as unknown as ProductDetailResponse | undefined
-  const overview = accountsData as unknown as
-    AccountOverviewResponse | undefined
-  const withdrawAccounts = (overview?.items ?? []).flatMap(
-    (g) => g.accounts ?? [],
-  )
 
   if (isLoading) {
     return (

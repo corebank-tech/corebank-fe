@@ -20,11 +20,8 @@ import {
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
-import type {
-  AccountOverviewResponse,
-  ProductDetailResponse,
-} from "@/shared/api/generated/model"
+import { useWithdrawAccounts } from "@/entities/account"
+import type { ProductDetailResponse } from "@/shared/api/generated/model"
 import type { AccountOption } from "@/shared/types/account"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
@@ -48,23 +45,11 @@ export const C04InputInfo = () => {
     prev?.amount ?? null,
   )
 
-  const { data: accountsData } = useGetAccounts()
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
   const detail = data as unknown as ProductDetailResponse | undefined
-  const overview = accountsData as unknown as
-    AccountOverviewResponse | undefined
-  const withdrawAccounts = React.useMemo(() => {
-    const items = (overview?.items ?? []).flatMap((g) => g.accounts ?? [])
-    // 출금계좌로 쓸 수 있는 건 입출금계좌 중 이체 가능한 활성 계좌뿐이다.
-    return items.filter(
-      (a) =>
-        a.accountType === "DEMAND_DEPOSIT" &&
-        a.status === "ACTIVE" &&
-        a.transferEnabled,
-    )
-  }, [overview])
 
   if (isLoading) {
     return (

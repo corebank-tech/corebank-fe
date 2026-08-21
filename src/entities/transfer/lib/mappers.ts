@@ -1,12 +1,17 @@
 import type {
   AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
+  ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
 } from "@/shared/api/generated/model"
 import type {
   ReservationRow,
   ReservationStatus,
 } from "@/entities/transfer/api/e04-reservations"
+import type {
+  ReservationResult,
+  ReservationResultRow,
+} from "@/entities/transfer/api/e05-reservation-results"
 import type {
   AutoTransferRow,
   AutoTransferStatus,
@@ -38,6 +43,41 @@ export const toReservationRow = (
   payeeName: item.payeeName ?? "",
   amount: item.amount ?? 0,
   cancelable: item.cancelable ?? false,
+})
+
+const RESERVATION_RESULT_MAP: Record<string, ReservationResult> = {
+  SUCCESS: "정상",
+  FAILED: "오류",
+  CANCELED: "취소",
+}
+
+const toReservationResult = (status: string | undefined): ReservationResult => {
+  const mapped = status ? RESERVATION_RESULT_MAP[status] : undefined
+  if (mapped) return mapped
+  console.error(`[entities/transfer] 알 수 없는 예약이체 처리결과: ${status}`)
+  return "처리중"
+}
+
+/**
+ * 예약이체 처리결과 조회(E-05) 응답 한 건을 화면 표시용 타입으로 변환한다.
+ *
+ * 계좌번호·예금주명은 서버가 이미 마스킹해서 내려준다. 화면에서 다시 가공하면
+ * 마스킹 문자가 깎여 나가므로 받은 값을 그대로 옮긴다.
+ */
+export const toReservationResultRow = (
+  item: ScheduledTransferExecutionResultItemResponse,
+): ReservationResultRow => ({
+  id: String(item.scheduledTransferId ?? ""),
+  result: toReservationResult(item.status),
+  // 정상·오류는 실행 시각, 취소는 취소 시각이 채워진다. 서버가 목록을 정렬하는
+  // 기준도 이 둘의 COALESCE라 같은 값을 쓴다.
+  transferDate: item.executedAt ?? item.canceledAt ?? "",
+  fromAccountNo: item.withdrawalAccountNumber ?? "",
+  toAccountNo: item.accountNumber ?? "",
+  payeeName: item.payeeName ?? "",
+  amount: item.amount ?? 0,
+  txId: item.transactionNumber ?? undefined,
+  failReason: item.failureReason ?? undefined,
 })
 
 /**
@@ -94,6 +134,7 @@ export const toAutoTransferRow = (
   endDate: item.endDate ?? "",
   memo: item.myPassbookMemo ?? "",
   status: toAutoTransferStatus(item.status),
+  cancelable: item.cancelable ?? false,
 })
 
 const AUTO_TRANSFER_RESULT_MAP: Record<string, AutoTransferResult> = {

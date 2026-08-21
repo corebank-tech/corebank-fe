@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest"
 import {
   toAutoTransferRow,
   toAutoTransferResultRow,
+  toReservationResultRow,
 } from "@/entities/transfer/lib/mappers"
 import type {
   AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
+  ScheduledTransferExecutionResultItemResponse,
 } from "@/shared/api/generated/model"
 
 const FROM_ACCOUNT_NO = "110632892336"
@@ -22,6 +24,7 @@ const BASE_ITEM: AutoTransferListItemResponse = {
   cycleMonths: 1,
   myPassbookMemo: "내집마련적금",
   status: "NORMAL",
+  cancelable: true,
   registeredAt: "2025-09-01T10:00:00",
 }
 
@@ -42,7 +45,18 @@ describe("toAutoTransferRow", () => {
       endDate: "2027-08-05",
       memo: "내집마련적금",
       status: "정상",
+      cancelable: true,
     })
+  })
+
+  // 해지 가능 여부가 빠진 응답을 '가능'으로 읽으면 해지할 수 없는 건에 해지 버튼이
+  // 열린다. 서버 거부로 끝나긴 하지만 사용자는 인증까지 끝낸 뒤에야 알게 된다.
+  it("해지 가능 여부가 없으면 해지 불가로 읽는다", () => {
+    const row = toAutoTransferRow(
+      { ...BASE_ITEM, cancelable: undefined },
+      FROM_ACCOUNT_NO,
+    )
+    expect(row.cancelable).toBe(false)
   })
 
   it("출금계좌번호는 응답이 아니라 인자로 받은 값을 쓴다", () => {
@@ -236,5 +250,84 @@ describe("toAutoTransferResultRow", () => {
       FROM_ACCOUNT,
     )
     expect(row.failReason).toBeUndefined()
+  })
+})
+
+const BASE_RESULT: ScheduledTransferExecutionResultItemResponse = {
+  scheduledTransferId: 77,
+  status: "SUCCESS",
+  executedAt: "2026-07-15T00:10:00",
+  canceledAt: null,
+  // 서버가 마스킹해서 내려주는 값이다.
+  withdrawalAccountNumber: "110******336",
+  accountNumber: "333******135",
+  payeeName: "김*수",
+  amount: 500_000,
+  transactionNumber: "20260715019000001120",
+  failureReason: null,
+}
+
+describe("toReservationResultRow", () => {
+  it("응답 필드를 화면 표시용 타입으로 옮긴다", () => {
+    expect(toReservationResultRow(BASE_RESULT)).toEqual({
+      id: "77",
+      result: "정상",
+      transferDate: "2026-07-15T00:10:00",
+      fromAccountNo: "110******336",
+      toAccountNo: "333******135",
+      payeeName: "김*수",
+      amount: 500_000,
+      txId: "20260715019000001120",
+      failReason: undefined,
+    })
+  })
+
+  it.each([
+    ["SUCCESS", "정상"],
+    ["FAILED", "오류"],
+    ["CANCELED", "취소"],
+  ])("상태 %s를 %s로 옮긴다", (apiStatus, expected) => {
+    const row = toReservationResultRow({
+      ...BASE_RESULT,
+      status:
+        apiStatus as ScheduledTransferExecutionResultItemResponse["status"],
+    })
+    expect(row.result).toBe(expected)
+  })
+
+  // 취소 건은 실행된 적이 없어 executedAt이 비어 있다. 서버가 목록을 정렬하는
+  // 기준도 executedAt과 canceledAt의 COALESCE라 같은 값을 써야 순서가 맞는다.
+  it("취소 건은 취소 시각을 이체일자로 쓴다", () => {
+    const row = toReservationResultRow({
+      ...BASE_RESULT,
+      status: "CANCELED",
+      executedAt: null,
+      canceledAt: "2026-07-10T09:30:00",
+      transactionNumber: null,
+    })
+    expect(row.transferDate).toBe("2026-07-10T09:30:00")
+    expect(row.txId).toBeUndefined()
+  })
+
+  it("실패 사유를 그대로 싣는다", () => {
+    const row = toReservationResultRow({
+      ...BASE_RESULT,
+      status: "FAILED",
+      failureReason: "출금계좌 잔액 부족(RSV0012)",
+    })
+    expect(row.result).toBe("오류")
+    expect(row.failReason).toBe("출금계좌 잔액 부족(RSV0012)")
+  })
+
+  it("모르는 처리결과는 콘솔에 남기고 '처리중'으로 폴백한다", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    // 서버는 확정된 건만 내려주지만 status enum에는 WAITING·PROCESSING이 남아 있다.
+    // 정상·오류·취소 중 하나로 폴백하면 확정되지 않은 건을 확정된 것처럼 보여준다.
+    const row = toReservationResultRow({ ...BASE_RESULT, status: "WAITING" })
+
+    expect(row.result).toBe("처리중")
+    expect(spy).toHaveBeenCalledOnce()
+    spy.mockRestore()
   })
 })

@@ -5,11 +5,26 @@
  * Corebank REST API 명세서
  * OpenAPI spec version: v1.0.0
  */
+import type { SearchSort } from './searchSort';
 
 export type SearchParams = {
-customerId: number;
+/**
+ * 조회할 출금계좌 ID
+ */
 withdrawalAccountId: number;
+/**
+ * 처리상태 필터. SUCCESS/ERROR/PROCESSING, 미지정 또는 ALL이면 전체
+ */
 status?: string;
+/**
+ * 조회 시작일(미지정 시 종료일-1개월)
+ */
+fromDate?: string;
+/**
+ * 조회 종료일(미지정 시 오늘)
+ */
+toDate?: string;
+sort?: SearchSort;
 page?: number;
 size?: number;
 };

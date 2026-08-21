@@ -5,7 +5,6 @@ import { AutoTransferStep1 } from "@/pages/transfer/auto/g01-input"
 import type { AutoTransferForm } from "@/pages/transfer/auto-transfer-screen"
 import { TRANSFER_STEPS } from "@/pages/transfer/transfer-steps"
 import {
-  MOCK_AUTO_TRANSFERS,
   MOCK_PAYEE_NAME,
   MOCK_TRANSFER_ACCOUNTS,
   MOCK_TRANSFER_LIMITS,
@@ -27,18 +26,6 @@ const INITIAL_FORM: AutoTransferForm = {
   endDate: "",
   payeeMemo: "",
   myMemo: "",
-}
-
-/** AutoTransferScreen의 중복 등록 검증(REQ-AUTO-008)을 그대로 가져온 것. */
-const isDuplicate = (form: AutoTransferForm): boolean => {
-  if (!form.toConfirmed) return false
-  return MOCK_AUTO_TRANSFERS.some(
-    (a) =>
-      a.status === "정상" &&
-      a.fromAccountNo === form.fromAccount &&
-      a.toAccountNo === form.toAccount &&
-      a.dayOfMonth === form.dayOfMonth,
-  )
 }
 
 /** 화면 조립 컴포넌트(AutoTransferScreen)가 하던 상태 관리를 스토리에서 재현한다. */
@@ -66,7 +53,6 @@ const AutoTransferStep1Demo = () => {
     endSpan != null &&
     endSpan > 0 &&
     form.endDate <= addMonths(form.startDate, 60)
-  const duplicate = isDuplicate(form)
   const canSubmit =
     form.password.length === 4 &&
     form.toConfirmed &&
@@ -74,8 +60,7 @@ const AutoTransferStep1Demo = () => {
     form.amount > 0 &&
     form.amount <= perTransferLimit &&
     startValid &&
-    endValid &&
-    !duplicate
+    endValid
 
   return (
     <AutoTransferStep1
@@ -86,7 +71,6 @@ const AutoTransferStep1Demo = () => {
       today={getToday()}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
-      duplicate={duplicate}
       canSubmit={canSubmit}
       onNext={() => {}}
     />

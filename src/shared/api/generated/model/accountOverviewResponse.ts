@@ -8,7 +8,10 @@
 import type { GroupResponse } from './groupResponse';
 
 export interface AccountOverviewResponse {
+  /** 조회 기준 시각 */
   asOf?: string;
+  /** 보유 계좌 총 자산 금액(원) */
   totalAssets?: number;
+  /** 계좌 유형별 그룹 목록 */
   items?: GroupResponse[];
 }

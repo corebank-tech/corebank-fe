@@ -19,12 +19,30 @@ import type {
 } from 'msw';
 
 import type {
+  ApiResponseProductSubscriptionExecuteResponse,
+  ApiResponseProductSubscriptionResultResponse,
   ApiResponseProductSubscriptionValidationResponse
 } from '../model';
 
 
-export const getValidateResponseMock = (overrideResponse: Partial<Extract<ApiResponseProductSubscriptionValidationResponse, object>> = {}): ApiResponseProductSubscriptionValidationResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{valid: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]), violations: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({field: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), reason: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])})), undefined]), productGroup: faker.helpers.arrayElement([faker.helpers.arrayElement(['SAVINGS','DEPOSIT'] as const), undefined]), baseRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), preferentialRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), appliedRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), maturityDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), expectedPrincipal: faker.helpers.arrayElement([faker.number.int(), undefined]), expectedInterest: faker.helpers.arrayElement([faker.number.int(), undefined]), expectedMaturityAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), withdrawalAccountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), withdrawalAccountBalance: faker.helpers.arrayElement([faker.number.int(), undefined])}, undefined]), ...overrideResponse})
+export const getExecute1ResponseMock = (overrideResponse: Partial<Extract<ApiResponseProductSubscriptionExecuteResponse, object>> = {}): ApiResponseProductSubscriptionExecuteResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{subscriptionId: faker.helpers.arrayElement([faker.number.int(), undefined]), accountId: faker.helpers.arrayElement([faker.number.int(), undefined]), accountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), productName: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), productGroup: faker.helpers.arrayElement([faker.helpers.arrayElement(['SAVINGS','DEPOSIT'] as const), undefined]), subscriptionAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), termMonths: faker.helpers.arrayElement([faker.number.int(), undefined]), appliedRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), openedDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), maturityDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), expectedMaturityAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), status: faker.helpers.arrayElement([faker.helpers.arrayElement(['SUCCESS','ERROR','PROCESSING'] as const), undefined]), transactionNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), subscribedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined])}, undefined]), ...overrideResponse})
 
+export const getValidateResponseMock = (overrideResponse: Partial<Extract<ApiResponseProductSubscriptionValidationResponse, object>> = {}): ApiResponseProductSubscriptionValidationResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{valid: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]), violations: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({field: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), reason: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])})), undefined]), productGroup: faker.helpers.arrayElement([faker.helpers.arrayElement(['SAVINGS','DEPOSIT'] as const), undefined]), baseRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), preferentialRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), appliedRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), maturityDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), expectedPrincipal: faker.helpers.arrayElement([faker.number.int(), undefined]), expectedInterest: faker.helpers.arrayElement([faker.number.int(), undefined]), expectedMaturityAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), withdrawalAccountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), withdrawalAccountBalance: faker.helpers.arrayElement([faker.number.int(), undefined])}, undefined]), ...overrideResponse})
+
+export const getGetProductSubscriptionsResponseMock = (overrideResponse: Partial<Extract<ApiResponseProductSubscriptionResultResponse, object>> = {}): ApiResponseProductSubscriptionResultResponse => ({code: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), message: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), data: faker.helpers.arrayElement([{subscriptionId: faker.helpers.arrayElement([faker.number.int(), undefined]), accountId: faker.helpers.arrayElement([faker.number.int(), undefined]), accountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), productId: faker.helpers.arrayElement([faker.number.int(), undefined]), productName: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), productGroup: faker.helpers.arrayElement([faker.helpers.arrayElement(['SAVINGS','DEPOSIT'] as const), undefined]), subscriptionAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), termMonths: faker.helpers.arrayElement([faker.number.int(), undefined]), appliedRate: faker.helpers.arrayElement([faker.number.float({fractionDigits: 2}), undefined]), openedDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), maturityDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined]), expectedMaturityAmount: faker.helpers.arrayElement([faker.number.int(), undefined]), status: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), transactionNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), subscribedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', undefined]), autoTransferPrefill: faker.helpers.arrayElement([{withdrawalAccountId: faker.helpers.arrayElement([faker.number.int(), undefined]), depositAccountNumber: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined]), amount: faker.helpers.arrayElement([faker.number.int(), undefined]), cycleMonths: faker.helpers.arrayElement([faker.number.int(), undefined]), endDate: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 10), undefined])}, undefined])}, undefined]), ...overrideResponse})
+
+
+export const getExecute1MockHandler = (overrideResponse?: ApiResponseProductSubscriptionExecuteResponse | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<ApiResponseProductSubscriptionExecuteResponse> | ApiResponseProductSubscriptionExecuteResponse), options?: RequestHandlerOptions) => {
+  return http.post('*/product-subscriptions', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {await delay(300);
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getExecute1ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 
 export const getValidateMockHandler = (overrideResponse?: ApiResponseProductSubscriptionValidationResponse | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<ApiResponseProductSubscriptionValidationResponse> | ApiResponseProductSubscriptionValidationResponse), options?: RequestHandlerOptions) => {
   return http.post('*/product-subscriptions/validation', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {await delay(300);
@@ -37,6 +55,20 @@ export const getValidateMockHandler = (overrideResponse?: ApiResponseProductSubs
       })
   }, options)
 }
+
+export const getGetProductSubscriptionsMockHandler = (overrideResponse?: ApiResponseProductSubscriptionResultResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ApiResponseProductSubscriptionResultResponse> | ApiResponseProductSubscriptionResultResponse), options?: RequestHandlerOptions) => {
+  return http.get('*/product-subscriptions/:subscriptionId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {await delay(300);
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetProductSubscriptionsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getProductSubscriptionControllerMock = () => [
-  getValidateMockHandler()
+  getExecute1MockHandler(),
+  getValidateMockHandler(),
+  getGetProductSubscriptionsMockHandler()
 ]

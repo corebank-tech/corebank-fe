@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
-export type CancelParams = {
-customerId: number;
-};
+export interface TransferHistorySummaryResponse {
+  successCount?: number;
+  successAmount?: number;
+  failureCount?: number;
+  failureAmount?: number;
+}

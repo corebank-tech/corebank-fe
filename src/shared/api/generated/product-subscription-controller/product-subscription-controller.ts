@@ -6,17 +6,29 @@
  * OpenAPI spec version: v1.0.0
  */
 import {
-  useMutation
+  useMutation,
+  useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
-  UseMutationResult
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  ApiResponseProductSubscriptionExecuteResponse,
+  ApiResponseProductSubscriptionResultResponse,
   ApiResponseProductSubscriptionValidationResponse,
+  ProductSubscriptionExecuteRequest,
   ProductSubscriptionValidationRequest
 } from '../model';
 
@@ -27,7 +39,86 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
-export const getValidateUrl = () => {
+const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+  const result = { queryKey } as T & { queryKey: K };
+  for (const key of Object.keys(query)) {
+    // The explicit queryKey always wins, matching the previous
+    // `{ ...query, queryKey }` spread where it was set last.
+    if (key === 'queryKey') continue;
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => (query as Record<string, unknown>)[key],
+    });
+  }
+  return result;
+};
+
+export const getExecute1Url = () => {
+
+
+
+
+  return `/product-subscriptions`
+}
+
+export const execute1 = async (productSubscriptionExecuteRequest: ProductSubscriptionExecuteRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseProductSubscriptionExecuteResponse> => {
+
+  return customFetch<ApiResponseProductSubscriptionExecuteResponse>(getExecute1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(productSubscriptionExecuteRequest)
+  }
+);}
+
+
+
+
+
+export const getExecute1MutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext> => {
+
+const mutationKey = ['execute1'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof execute1>>, {data: ProductSubscriptionExecuteRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  execute1(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type Execute1MutationResult = NonNullable<Awaited<ReturnType<typeof execute1>>>
+    export type Execute1MutationBody = ProductSubscriptionExecuteRequest
+    export type Execute1MutationError = unknown
+
+    export const useExecute1 = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof execute1>>,
+        TError,
+        {data: ProductSubscriptionExecuteRequest},
+        TContext
+      > => {
+      return useMutation(getExecute1MutationOptions(options), queryClient);
+    }
+    export const getValidateUrl = () => {
 
 
 
@@ -91,3 +182,97 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getValidateMutationOptions(options), queryClient);
     }
+    export const getGetProductSubscriptionsUrl = (subscriptionId: number,) => {
+
+
+
+
+  return `/product-subscriptions/${subscriptionId}`
+}
+
+export const getProductSubscriptions = async (subscriptionId: number, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseProductSubscriptionResultResponse> => {
+
+  return customFetch<ApiResponseProductSubscriptionResultResponse>(getGetProductSubscriptionsUrl(subscriptionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProductSubscriptionsQueryKey = (subscriptionId: number,) => {
+    return [
+    `/product-subscriptions/${subscriptionId}`
+    ] as const;
+    }
+
+
+export const getGetProductSubscriptionsQueryOptions = <TData = Awaited<ReturnType<typeof getProductSubscriptions>>, TError = unknown>(subscriptionId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProductSubscriptionsQueryKey(subscriptionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProductSubscriptions>>> = ({ signal }) => getProductSubscriptions(subscriptionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: subscriptionId !== null && subscriptionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetProductSubscriptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getProductSubscriptions>>>
+export type GetProductSubscriptionsQueryError = unknown
+
+
+export function useGetProductSubscriptions<TData = Awaited<ReturnType<typeof getProductSubscriptions>>, TError = unknown>(
+ subscriptionId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProductSubscriptions>>,
+          TError,
+          Awaited<ReturnType<typeof getProductSubscriptions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetProductSubscriptions<TData = Awaited<ReturnType<typeof getProductSubscriptions>>, TError = unknown>(
+ subscriptionId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProductSubscriptions>>,
+          TError,
+          Awaited<ReturnType<typeof getProductSubscriptions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetProductSubscriptions<TData = Awaited<ReturnType<typeof getProductSubscriptions>>, TError = unknown>(
+ subscriptionId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetProductSubscriptions<TData = Awaited<ReturnType<typeof getProductSubscriptions>>, TError = unknown>(
+ subscriptionId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProductSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetProductSubscriptionsQueryOptions(subscriptionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

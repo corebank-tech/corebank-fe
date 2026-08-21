@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 계좌 상태
+ */
 export type AccountItemResponseStatus = typeof AccountItemResponseStatus[keyof typeof AccountItemResponseStatus];
 
 

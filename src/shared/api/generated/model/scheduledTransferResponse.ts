@@ -8,13 +8,22 @@
 import type { ScheduledTransferResponseStatus } from './scheduledTransferResponseStatus';
 
 export interface ScheduledTransferResponse {
+  /** 예약이체 ID */
   scheduledTransferId?: number;
+  /** 출금계좌 ID (내 계좌) */
   withdrawalAccountId?: number;
+  /** 입금계좌번호 */
   depositAccountNumber?: string;
+  /** 예금주명 */
   payeeName?: string;
+  /** 이체금액 */
   amount?: number;
+  /** 예약 실행일 */
   scheduledDate?: string;
+  /** 내 통장 표시내용 */
   myPassbookMemo?: string;
+  /** 상대 통장 표시내용 */
   recipientPassbookMemo?: string;
+  /** 예약이체 상태 */
   status?: ScheduledTransferResponseStatus;
 }

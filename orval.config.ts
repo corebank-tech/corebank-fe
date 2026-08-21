@@ -4,7 +4,11 @@ export default defineConfig({
   corebank: {
     // REQ-NFR-013: 스펙 우선. 이 파일이 단일 계약 출처다.
     // openapi.yaml 이 저장소에 도착하기 전까지 `pnpm codegen` 은 의도적으로 실패한다.
-    input: { target: "./openapi.yaml" },
+    input: {
+      target: "./openapi.yaml",
+      // 서버 스냅샷의 한글 태그·불안정한 operationId 를 정리한다.
+      override: { transformer: "./openapi-transformer.ts" },
+    },
     output: {
       mode: "tags-split",
       target: "./src/shared/api/generated/api.ts",

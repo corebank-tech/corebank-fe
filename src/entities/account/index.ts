@@ -19,3 +19,4 @@ export {
   MOCK_ORDER_ACCOUNTS,
   sortByOpenedDateAsc,
 } from "@/entities/account/api/b07-account-order"
+export { useWithdrawAccounts } from "@/entities/account/api/use-withdraw-accounts"

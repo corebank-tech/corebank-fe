@@ -7,10 +7,28 @@
  */
 
 export type SearchScheduledTransfersParams = {
+/**
+ * 예약이체 상태 필터. 미전달 또는 ALL이면 전체 조회
+ */
 status?: string;
+/**
+ * 출금계좌 ID (내 계좌). 미전달 시 전체 계좌 대상
+ */
 withdrawalAccountId?: number;
+/**
+ * 조회기간 시작일. fromDate/toDate 둘 다 미전달 시 기간 제한 없이 조회(기본값 없음)
+ */
 fromDate?: string;
+/**
+ * 조회기간 종료일. fromDate/toDate 둘 다 미전달 시 기간 제한 없이 조회(기본값 없음)
+ */
 toDate?: string;
+/**
+ * 페이지 번호(0부터 시작)
+ */
 page?: number;
+/**
+ * 페이지 크기. 5/10/20/30/50 중 하나만 허용
+ */
 size?: number;
 };

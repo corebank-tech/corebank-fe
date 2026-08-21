@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 예약이체 상태
+ */
 export type ScheduledTransferCancelResponseStatus = typeof ScheduledTransferCancelResponseStatus[keyof typeof ScheduledTransferCancelResponseStatus];
 
 

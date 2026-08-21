@@ -6,6 +6,9 @@
  * OpenAPI spec version: v1.0.0
  */
 
+/**
+ * 계좌 유형
+ */
 export type AccountItemResponseAccountType = typeof AccountItemResponseAccountType[keyof typeof AccountItemResponseAccountType];
 
 

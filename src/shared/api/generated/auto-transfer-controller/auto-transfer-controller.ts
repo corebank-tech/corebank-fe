@@ -25,13 +25,15 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiResponseAutoTransferExecutionHistoryPageResponse,
   ApiResponseAutoTransferResponse,
   ApiResponsePageResponseAutoTransferListItemResponse,
   ApiResponseVoid,
   AutoTransferChangeRequest,
   AutoTransferRegisterRequest,
-  CancelParams,
-  SearchParams
+  ErrorResponse,
+  SearchAutoTransferExecutionsParams,
+  SearchAutoTransfersParams
 } from '../model';
 
 import { customFetch } from '../../custom-fetch';
@@ -56,7 +58,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const getSearchUrl = (params: SearchParams,) => {
+export const getSearchAutoTransfersUrl = (params: SearchAutoTransfersParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -71,9 +73,13 @@ export const getSearchUrl = (params: SearchParams,) => {
   return stringifiedParams.length > 0 ? `/auto-transfers?${stringifiedParams}` : `/auto-transfers`
 }
 
-export const search = async (params: SearchParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponsePageResponseAutoTransferListItemResponse> => {
+/**
+ * 내 출금계좌 기준으로 등록된 자동이체 목록을 상태별로 조회한다.
+ * @summary 자동이체 목록조회
+ */
+export const searchAutoTransfers = async (params: SearchAutoTransfersParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponsePageResponseAutoTransferListItemResponse> => {
 
-  return customFetch<ApiResponsePageResponseAutoTransferListItemResponse>(getSearchUrl(params),
+  return customFetch<ApiResponsePageResponseAutoTransferListItemResponse>(getSearchAutoTransfersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -86,66 +92,69 @@ export const search = async (params: SearchParams, options?: Parameters<typeof c
 
 
 
-export const getSearchQueryKey = (params?: SearchParams,) => {
+export const getSearchAutoTransfersQueryKey = (params?: SearchAutoTransfersParams,) => {
     return [
     `/auto-transfers`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getSearchQueryOptions = <TData = Awaited<ReturnType<typeof search>>, TError = unknown>(params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getSearchAutoTransfersQueryOptions = <TData = Awaited<ReturnType<typeof searchAutoTransfers>>, TError = ErrorResponse>(params: SearchAutoTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getSearchQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getSearchAutoTransfersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof search>>> = ({ signal }) => search(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAutoTransfers>>> = ({ signal }) => searchAutoTransfers(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type SearchQueryResult = NonNullable<Awaited<ReturnType<typeof search>>>
-export type SearchQueryError = unknown
+export type SearchAutoTransfersQueryResult = NonNullable<Awaited<ReturnType<typeof searchAutoTransfers>>>
+export type SearchAutoTransfersQueryError = ErrorResponse
 
 
-export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = unknown>(
- params: SearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+export function useSearchAutoTransfers<TData = Awaited<ReturnType<typeof searchAutoTransfers>>, TError = ErrorResponse>(
+ params: SearchAutoTransfersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof search>>,
+          Awaited<ReturnType<typeof searchAutoTransfers>>,
           TError,
-          Awaited<ReturnType<typeof search>>
+          Awaited<ReturnType<typeof searchAutoTransfers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = unknown>(
- params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>> & Pick<
+export function useSearchAutoTransfers<TData = Awaited<ReturnType<typeof searchAutoTransfers>>, TError = ErrorResponse>(
+ params: SearchAutoTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof search>>,
+          Awaited<ReturnType<typeof searchAutoTransfers>>,
           TError,
-          Awaited<ReturnType<typeof search>>
+          Awaited<ReturnType<typeof searchAutoTransfers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = unknown>(
- params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useSearchAutoTransfers<TData = Awaited<ReturnType<typeof searchAutoTransfers>>, TError = ErrorResponse>(
+ params: SearchAutoTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 자동이체 목록조회
+ */
 
-export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = unknown>(
- params: SearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useSearchAutoTransfers<TData = Awaited<ReturnType<typeof searchAutoTransfers>>, TError = ErrorResponse>(
+ params: SearchAutoTransfersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransfers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getSearchQueryOptions(params,options)
+  const queryOptions = getSearchAutoTransfersQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -157,7 +166,7 @@ export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = u
 
 
 
-export const getRegisterUrl = () => {
+export const getRegisterAutoTransferUrl = () => {
 
 
 
@@ -165,9 +174,13 @@ export const getRegisterUrl = () => {
   return `/auto-transfers`
 }
 
-export const register = async (autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseAutoTransferResponse> => {
+/**
+ * 지정한 출금계좌에서 주기적으로 자동이체를 실행하도록 등록한다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.
+ * @summary 자동이체 등록
+ */
+export const registerAutoTransfer = async (autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseAutoTransferResponse> => {
 
-  return customFetch<ApiResponseAutoTransferResponse>(getRegisterUrl(),
+  return customFetch<ApiResponseAutoTransferResponse>(getRegisterAutoTransferUrl(),
   {
     ...options,
     method: 'POST',
@@ -180,11 +193,11 @@ export const register = async (autoTransferRegisterRequest: AutoTransferRegister
 
 
 
-export const getRegisterMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext> => {
+export const getRegisterAutoTransferMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerAutoTransfer>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerAutoTransfer>>, TError,{data: AutoTransferRegisterRequest}, TContext> => {
 
-const mutationKey = ['register'];
+const mutationKey = ['registerAutoTransfer'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -194,10 +207,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof register>>, {data: AutoTransferRegisterRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerAutoTransfer>>, {data: AutoTransferRegisterRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  register(data,requestOptions)
+          return  registerAutoTransfer(data,requestOptions)
         }
 
 
@@ -207,40 +220,38 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type RegisterMutationResult = NonNullable<Awaited<ReturnType<typeof register>>>
-    export type RegisterMutationBody = AutoTransferRegisterRequest
-    export type RegisterMutationError = unknown
+    export type RegisterAutoTransferMutationResult = NonNullable<Awaited<ReturnType<typeof registerAutoTransfer>>>
+    export type RegisterAutoTransferMutationBody = AutoTransferRegisterRequest
+    export type RegisterAutoTransferMutationError = ErrorResponse
 
-    export const useRegister = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+    /**
+ * @summary 자동이체 등록
+ */
+export const useRegisterAutoTransfer = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerAutoTransfer>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof register>>,
+        Awaited<ReturnType<typeof registerAutoTransfer>>,
         TError,
         {data: AutoTransferRegisterRequest},
         TContext
       > => {
-      return useMutation(getRegisterMutationOptions(options), queryClient);
+      return useMutation(getRegisterAutoTransferMutationOptions(options), queryClient);
     }
-    export const getCancelUrl = (autoTransferId: number,
-    params: CancelParams,) => {
-  const normalizedParams = new URLSearchParams();
+    export const getCancelAutoTransferUrl = (autoTransferId: number,) => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/auto-transfers/${autoTransferId}?${stringifiedParams}` : `/auto-transfers/${autoTransferId}`
+  return `/auto-transfers/${autoTransferId}`
 }
 
-export const cancel = async (autoTransferId: number,
-    params: CancelParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseVoid> => {
+/**
+ * 등록된 자동이체를 해지한다. 다음 실행 예정일 당일에는 해지할 수 없다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.
+ * @summary 자동이체 해지
+ */
+export const cancelAutoTransfer = async (autoTransferId: number, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseVoid> => {
 
-  return customFetch<ApiResponseVoid>(getCancelUrl(autoTransferId,params),
+  return customFetch<ApiResponseVoid>(getCancelAutoTransferUrl(autoTransferId),
   {
     ...options,
     method: 'DELETE'
@@ -253,11 +264,11 @@ export const cancel = async (autoTransferId: number,
 
 
 
-export const getCancelMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext> => {
+export const getCancelAutoTransferMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAutoTransfer>>, TError,{autoTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelAutoTransfer>>, TError,{autoTransferId: number}, TContext> => {
 
-const mutationKey = ['cancel'];
+const mutationKey = ['cancelAutoTransfer'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -267,10 +278,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancel>>, {autoTransferId: number;params: CancelParams}> = (props) => {
-          const {autoTransferId,params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelAutoTransfer>>, {autoTransferId: number}> = (props) => {
+          const {autoTransferId} = props ?? {};
 
-          return  cancel(autoTransferId,params,requestOptions)
+          return  cancelAutoTransfer(autoTransferId,requestOptions)
         }
 
 
@@ -280,21 +291,24 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CancelMutationResult = NonNullable<Awaited<ReturnType<typeof cancel>>>
+    export type CancelAutoTransferMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAutoTransfer>>>
 
-    export type CancelMutationError = unknown
+    export type CancelAutoTransferMutationError = ErrorResponse
 
-    export const useCancel = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+    /**
+ * @summary 자동이체 해지
+ */
+export const useCancelAutoTransfer = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAutoTransfer>>, TError,{autoTransferId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof cancel>>,
+        Awaited<ReturnType<typeof cancelAutoTransfer>>,
         TError,
-        {autoTransferId: number;params: CancelParams},
+        {autoTransferId: number},
         TContext
       > => {
-      return useMutation(getCancelMutationOptions(options), queryClient);
+      return useMutation(getCancelAutoTransferMutationOptions(options), queryClient);
     }
-    export const getChangeUrl = (autoTransferId: number,) => {
+    export const getChangeAutoTransferUrl = (autoTransferId: number,) => {
 
 
 
@@ -302,10 +316,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return `/auto-transfers/${autoTransferId}`
 }
 
-export const change = async (autoTransferId: number,
+/**
+ * 등록된 자동이체의 금액·이체주기·종료일·통장 표시내용을 변경한다. 출금계좌·입금계좌·이체지정일은 변경할 수 없다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.
+ * @summary 자동이체 변경
+ */
+export const changeAutoTransfer = async (autoTransferId: number,
     autoTransferChangeRequest: AutoTransferChangeRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseAutoTransferResponse> => {
 
-  return customFetch<ApiResponseAutoTransferResponse>(getChangeUrl(autoTransferId),
+  return customFetch<ApiResponseAutoTransferResponse>(getChangeAutoTransferUrl(autoTransferId),
   {
     ...options,
     method: 'PATCH',
@@ -318,11 +336,11 @@ export const change = async (autoTransferId: number,
 
 
 
-export const getChangeMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext> => {
+export const getChangeAutoTransferMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeAutoTransfer>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changeAutoTransfer>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext> => {
 
-const mutationKey = ['change'];
+const mutationKey = ['changeAutoTransfer'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -332,10 +350,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof change>>, {autoTransferId: number;data: AutoTransferChangeRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changeAutoTransfer>>, {autoTransferId: number;data: AutoTransferChangeRequest}> = (props) => {
           const {autoTransferId,data} = props ?? {};
 
-          return  change(autoTransferId,data,requestOptions)
+          return  changeAutoTransfer(autoTransferId,data,requestOptions)
         }
 
 
@@ -345,17 +363,128 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ChangeMutationResult = NonNullable<Awaited<ReturnType<typeof change>>>
-    export type ChangeMutationBody = AutoTransferChangeRequest
-    export type ChangeMutationError = unknown
+    export type ChangeAutoTransferMutationResult = NonNullable<Awaited<ReturnType<typeof changeAutoTransfer>>>
+    export type ChangeAutoTransferMutationBody = AutoTransferChangeRequest
+    export type ChangeAutoTransferMutationError = ErrorResponse
 
-    export const useChange = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+    /**
+ * @summary 자동이체 변경
+ */
+export const useChangeAutoTransfer = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeAutoTransfer>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof change>>,
+        Awaited<ReturnType<typeof changeAutoTransfer>>,
         TError,
         {autoTransferId: number;data: AutoTransferChangeRequest},
         TContext
       > => {
-      return useMutation(getChangeMutationOptions(options), queryClient);
+      return useMutation(getChangeAutoTransferMutationOptions(options), queryClient);
     }
+    export const getSearchAutoTransferExecutionsUrl = (params: SearchAutoTransferExecutionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auto-transfers/executions?${stringifiedParams}` : `/auto-transfers/executions`
+}
+
+/**
+ * 내 출금계좌 기준으로 자동이체 실행 이력을 조회기간별로 조회한다. 조회기간을 지정하지 않으면 최근 1개월(오늘 기준)을 기본값으로 조회한다.
+ * @summary 자동이체 처리결과 조회
+ */
+export const searchAutoTransferExecutions = async (params: SearchAutoTransferExecutionsParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseAutoTransferExecutionHistoryPageResponse> => {
+
+  return customFetch<ApiResponseAutoTransferExecutionHistoryPageResponse>(getSearchAutoTransferExecutionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchAutoTransferExecutionsQueryKey = (params?: SearchAutoTransferExecutionsParams,) => {
+    return [
+    `/auto-transfers/executions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchAutoTransferExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError = ErrorResponse>(params: SearchAutoTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchAutoTransferExecutionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAutoTransferExecutions>>> = ({ signal }) => searchAutoTransferExecutions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchAutoTransferExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof searchAutoTransferExecutions>>>
+export type SearchAutoTransferExecutionsQueryError = ErrorResponse
+
+
+export function useSearchAutoTransferExecutions<TData = Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError = ErrorResponse>(
+ params: SearchAutoTransferExecutionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAutoTransferExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof searchAutoTransferExecutions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAutoTransferExecutions<TData = Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError = ErrorResponse>(
+ params: SearchAutoTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAutoTransferExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof searchAutoTransferExecutions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAutoTransferExecutions<TData = Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError = ErrorResponse>(
+ params: SearchAutoTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 자동이체 처리결과 조회
+ */
+
+export function useSearchAutoTransferExecutions<TData = Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError = ErrorResponse>(
+ params: SearchAutoTransferExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAutoTransferExecutions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchAutoTransferExecutionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

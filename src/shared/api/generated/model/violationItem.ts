@@ -8,5 +8,6 @@
 
 export interface ViolationItem {
   field?: string;
+  code?: string;
   reason?: string;
 }

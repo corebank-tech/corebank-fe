@@ -19,8 +19,11 @@ export const useBaseTime = (): string => React.useState(getNow)[0]
  * `조회`를 누른 시점에 다시 캡처할 수 있다 — 실 API 화면의 `dataUpdatedAt`과
  * 같은 의미(데이터를 받은 시점)를 mock 화면에서도 유지하기 위함이다.
  */
-export function useCapturedBaseTime(): [string, () => void] {
+export function useCapturedBaseTime(): {
+  time: string
+  capture: () => void
+} {
   const [time, setTime] = React.useState(getNow)
   const capture = React.useCallback(() => setTime(getNow()), [])
-  return [time, capture]
+  return { time, capture }
 }

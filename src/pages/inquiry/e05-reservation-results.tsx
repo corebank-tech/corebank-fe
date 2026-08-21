@@ -44,7 +44,7 @@ const ORDER_OPTIONS = [
 ]
 
 export const E05ReservationResults = () => {
-  const [BASE_TIME, captureBaseTime] = useCapturedBaseTime()
+  const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   const [period, setPeriod] = React.useState(defaultPeriod)
   const [order, setOrder] = React.useState("recent")

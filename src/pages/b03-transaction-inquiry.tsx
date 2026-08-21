@@ -103,7 +103,7 @@ const InfoRow = ({
 }
 
 export const B03TransactionInquiry = () => {
-  const [BASE_TIME, captureBaseTime] = useCapturedBaseTime()
+  const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
   const [account, setAccount] = React.useState(() => {

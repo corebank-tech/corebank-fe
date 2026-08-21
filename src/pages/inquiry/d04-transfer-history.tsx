@@ -73,7 +73,7 @@ const SEARCH_FIELDS: GridSearchField[] = [
 ]
 
 export const D04TransferHistory = () => {
-  const [BASE_TIME, captureBaseTime] = useCapturedBaseTime()
+  const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   const [period, setPeriod] = React.useState(defaultPeriod)
   const [status, setStatus] = React.useState("all")

@@ -23,7 +23,7 @@ export type {
   ReservationResult,
   ReservationResultRow,
 } from "@/entities/transfer/api/e05-reservation-results"
-export { MOCK_RESERVATION_RESULTS } from "@/entities/transfer/api/e05-reservation-results"
+export { toReservationResultRow } from "@/entities/transfer/lib/mappers"
 
 export type {
   AutoTransferStatus,

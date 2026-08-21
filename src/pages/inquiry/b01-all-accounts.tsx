@@ -25,7 +25,8 @@ import {
   type AccountGroupId,
   type OverviewAccount,
 } from "@/entities/account"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const GROUP_LABELS: Record<AccountGroupId, string> = {
   checking: "입출금계좌",
@@ -107,7 +108,7 @@ const buildColumns = (
 const GROUP_ORDER: AccountGroupId[] = ["checking", "deposit"]
 
 export const B01AllAccounts = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const navigate = useNavigate()
   const [pageSize, setPageSize] = React.useState<number | "all">("all")

@@ -16,7 +16,8 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { addMonths, daysBetween, parseISO, toISO } from "@/shared/lib/date"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { AUTO_TRANSFER_START_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import type { TransferCycleMonths } from "@/widgets/transfer"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
@@ -121,7 +122,7 @@ const computeFirstExecDate = (startISO: string, dayOfMonth: number): string => {
  * execution (REQ-AUTO-005, REQ-TRSF-031) is orchestrated here.
  */
 export const AutoTransferScreen = () => {
-  const NOW = getNow()
+  const NOW = useBaseTime()
   const TODAY = getToday()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()

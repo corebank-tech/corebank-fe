@@ -12,11 +12,12 @@ import { formatDateTime } from "@/shared/lib/format"
 import type { NotificationInboxRow } from "@/entities/notification"
 import { useNotifications } from "@/features/notifications"
 import { cn } from "@/shared/lib/utils"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 /** F-02 알림함. REQ-MYPG-004·005. */
 export const F02NotificationInbox = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const { notifications: rows, unreadCount, markRead } = useNotifications()
   const [pageSize, setPageSize] = React.useState<number | "all">(10)

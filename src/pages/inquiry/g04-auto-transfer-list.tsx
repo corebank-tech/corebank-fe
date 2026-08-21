@@ -33,7 +33,8 @@ import {
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferRow,
 } from "@/entities/transfer"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 
 const STATUS_OPTIONS = [
@@ -49,16 +50,16 @@ const FROM_ACCOUNTS = Array.from(
 )
 
 /** REQ-AUTO-011: 다음 실행 예정일 전일까지만 해지 가능, 당일은 해지 불가. */
-const isTerminable = (row: AutoTransferRow): boolean => {
+const isTerminable = (row: AutoTransferRow, today: string): boolean => {
   return (
     row.status === "정상" &&
     row.nextExecDate != null &&
-    row.nextExecDate > getToday()
+    row.nextExecDate > today
   )
 }
 
 export const G04AutoTransferList = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const [rows, setRows] = React.useState(MOCK_AUTO_TRANSFERS)
   const [fromAccount, setFromAccount] = React.useState("all")
@@ -102,7 +103,7 @@ export const G04AutoTransferList = () => {
 
   const handleTerminateClick = () => {
     if (selectedRows.length === 0) return
-    if (selectedRows.some((r) => !isTerminable(r))) {
+    if (selectedRows.some((r) => !isTerminable(r, TODAY))) {
       setBlockedOpen(true)
       return
     }

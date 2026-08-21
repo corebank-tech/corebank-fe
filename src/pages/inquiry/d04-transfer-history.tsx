@@ -38,7 +38,8 @@ import {
   getTransferStatusBadgeVariant,
   type TransferHistoryRow,
 } from "@/entities/transfer"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -66,7 +67,7 @@ const SEARCH_FIELDS: GridSearchField[] = [
 ]
 
 export const D04TransferHistory = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const [period, setPeriod] = React.useState({
     start: "2026-06-23",

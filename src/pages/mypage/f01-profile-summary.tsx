@@ -8,7 +8,7 @@ import {
   maskPhone,
   maskUserId,
 } from "@/shared/lib/format"
-import { getNow } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import type { CustomerProfile } from "@/entities/customer"
 
 type Props = {
@@ -16,7 +16,7 @@ type Props = {
 }
 
 export const F01ProfileSummary = ({ profile }: Props) => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   return (
     <FormSection title="고객정보 조회">
       <div>

@@ -37,7 +37,8 @@ import {
 import { cn } from "@/shared/lib/utils"
 import { daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 
 const defaultPeriod = () => ({ start: "2026-06-23", end: getToday() })
@@ -99,7 +100,7 @@ const InfoRow = ({
 }
 
 export const B03TransactionInquiry = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
   const [account, setAccount] = React.useState(() => {
@@ -109,8 +110,8 @@ export const B03TransactionInquiry = () => {
     return preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo
   })
   // periodDraft는 입력 중인 값, period는 [조회] 통과 후 실제 필터링에 반영되는 값이다(REQ-INQR-010).
-  const [periodDraft, setPeriodDraft] = React.useState(defaultPeriod())
-  const [period, setPeriod] = React.useState(defaultPeriod())
+  const [periodDraft, setPeriodDraft] = React.useState(defaultPeriod)
+  const [period, setPeriod] = React.useState(defaultPeriod)
   const [content, setContent] = React.useState("all")
   const [order, setOrder] = React.useState("recent")
   const [keyword, setKeyword] = React.useState("")

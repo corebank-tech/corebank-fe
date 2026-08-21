@@ -30,7 +30,8 @@ import {
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferResultRow,
 } from "@/entities/transfer"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const FROM_ACCOUNTS = Array.from(
   new Map(
@@ -39,7 +40,7 @@ const FROM_ACCOUNTS = Array.from(
 )
 
 export const G05AutoTransferResults = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const [fromAccount, setFromAccount] = React.useState("all")
   const [period, setPeriod] = React.useState({

@@ -15,7 +15,8 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { daysBetween } from "@/shared/lib/date"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { RESERVATION_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
@@ -61,7 +62,7 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  * execution (REQ-RSV-005, REQ-TRSF-031) is orchestrated here.
  */
 export const ReservedTransferScreen = () => {
-  const NOW = getNow()
+  const NOW = useBaseTime()
   const TODAY = getToday()
   const navigate = useNavigate()
   const [step, setStep] = React.useState(1)

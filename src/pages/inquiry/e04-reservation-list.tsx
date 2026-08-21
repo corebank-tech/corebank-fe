@@ -33,7 +33,8 @@ import {
   toReservationRow,
   type ReservationRow,
 } from "@/entities/transfer"
-import { getNow, getToday } from "@/shared/config/clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
   useCancelScheduledTransfer,
@@ -79,7 +80,7 @@ const DEFAULT_CONDITION = {
 }
 
 export const E04ReservationList = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
   // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.

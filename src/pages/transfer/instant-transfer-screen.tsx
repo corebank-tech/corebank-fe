@@ -37,6 +37,7 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { getNow } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { InstantTransferStep1 } from "@/pages/transfer/instant-transfer/d01-input"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
@@ -107,7 +108,7 @@ const INITIAL_FORM: InstantTransferForm = {
  * (REQ-TRSF-009, REQ-TRSF-031)는 여기서 조립한다.
  */
 export const InstantTransferScreen = () => {
-  const BASE_TIME = getNow()
+  const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { keepPreviousData } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -100,13 +101,18 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const { data, isLoading, isError, refetch } = useSearchScheduledTransfers({
-    status: STATUS_TO_API[applied.status],
-    fromDate: applied.period.start,
-    toDate: applied.period.end,
-    page: page - 1,
-    size: pageSize === "all" ? 1000 : pageSize,
-  })
+  const { data, isLoading, isError, refetch } = useSearchScheduledTransfers(
+    {
+      status: STATUS_TO_API[applied.status],
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      page: page - 1,
+      size: pageSize === "all" ? 1000 : pageSize,
+    },
+    // 페이지·조회조건을 바꾸면 새 쿼리 키라 곧장 로딩으로 빠진다. 결과가 올 때까지
+    // 이전 목록을 유지해서 조회조건 폼이 화면째로 사라졌다 돌아오지 않게 한다.
+    { query: { placeholderData: keepPreviousData } },
+  )
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
@@ -178,20 +184,6 @@ export const E04ReservationList = () => {
       // 일부만 성공했을 수 있으니 최신 상태를 다시 불러온다.
       refetch()
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="py-20 text-center text-ink-muted">
-        예약이체 목록을 불러오지 못했습니다.
-      </div>
-    )
   }
 
   const exportHeaders = [
@@ -414,10 +406,15 @@ export const E04ReservationList = () => {
           key={gridKey}
           columns={columns}
           rows={pageRows}
+          loading={isLoading}
           rowKey={(r) => r.id}
           selectable
           onSelectionChange={setSelectedIds}
-          emptyMessage="조회된 예약이체가 없습니다."
+          emptyMessage={
+            isError
+              ? "예약이체 목록을 불러오지 못했습니다."
+              : "조회된 예약이체가 없습니다."
+          }
         />
 
         <Pagination

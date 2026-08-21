@@ -12,10 +12,13 @@ export type ReservationRow = {
   scheduledDate: string
   /** 등록일시 ISO datetime. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */
   registeredAt?: string
+  /** 서버가 마스킹해서 내려준다(예: `110******877`). 화면에서 다시 가공하지 않는다. */
   fromAccountNo: string
   /** 계좌 별칭. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */
   fromAlias?: string
+  /** 서버가 마스킹해서 내려준다. */
   toAccountNo: string
+  /** 서버가 마스킹해서 내려준다(예: `홍*동`). */
   payeeName: string
   amount: number
   /** 표시내용. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */

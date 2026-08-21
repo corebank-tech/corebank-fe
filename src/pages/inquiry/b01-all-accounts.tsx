@@ -35,6 +35,7 @@ type AccountRow = {
   lastTransactionAt: string | null
   maturityDate: string | null
   transferEnabled: boolean
+  status: "ACTIVE" | "SUSPENDED"
 }
 
 const GROUP_LABELS: Record<AccountGroupCode, string> = {
@@ -154,6 +155,10 @@ export const B01AllAccounts = () => {
       return (group.accounts ?? []).flatMap((account) => {
         if (account.accountId == null) return []
 
+        if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
+          return []
+        }
+
         return [
           {
             accountId: account.accountId,
@@ -165,6 +170,7 @@ export const B01AllAccounts = () => {
             lastTransactionAt: account.lastTransactionAt ?? null,
             maturityDate: account.maturityDate ?? null,
             transferEnabled: account.transferEnabled ?? false,
+            status: account.status,
           },
         ]
       })
@@ -308,6 +314,9 @@ export const B01AllAccounts = () => {
               columns={buildColumns(group, handleInquire, handleTransfer)}
               rows={rows}
               rowKey={(r) => String(r.accountId)}
+              rowClassName={(r) =>
+                r.status === "SUSPENDED" ? "bg-surface opacity-60" : undefined
+              }
               emptyMessage="보유한 계좌가 없습니다."
             />
 

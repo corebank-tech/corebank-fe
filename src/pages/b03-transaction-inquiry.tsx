@@ -10,6 +10,7 @@ import {
   KeywordField,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
@@ -35,13 +36,12 @@ import {
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { daysBetween } from "@/shared/lib/date"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 
-const DEFAULT_PERIOD = { start: "2026-06-23", end: TODAY }
+const defaultPeriod = () => ({ start: "2026-06-23", end: getToday() })
 
 const CONTENT_OPTIONS = [
   { label: "전체", value: "all" },
@@ -62,7 +62,6 @@ const amountCell = (value: number, color: string) => {
 type InfoItem = {
   term: string
   desc: React.ReactNode
-  numeric?: boolean
   dominant?: boolean
 }
 
@@ -78,11 +77,10 @@ const InfoRow = ({
       {items.map((item) => (
         <div key={item.term} className="flex flex-col gap-1 px-4 py-3">
           <dt
-            className={
-              item.dominant
-                ? "text-xs text-ink-faint"
-                : "text-base text-ink-muted"
-            }
+            className={cn(
+              "text-xs",
+              item.dominant ? "text-ink-faint" : "text-ink-muted",
+            )}
           >
             {item.term}
           </dt>
@@ -91,7 +89,6 @@ const InfoRow = ({
               item.dominant
                 ? "text-h2 font-bold text-primary"
                 : "text-base font-bold text-ink",
-              item.numeric && "tabular-nums",
             )}
           >
             {item.desc}
@@ -103,6 +100,8 @@ const InfoRow = ({
 }
 
 export const B03TransactionInquiry = () => {
+  const BASE_TIME = useBaseTime()
+  const TODAY = getToday()
   const [searchParams] = useSearchParams()
   const [account, setAccount] = React.useState(() => {
     /** REQ-INQR-005: 계좌목록의 [조회] 진입 시 해당 계좌가 선택된 상태로 시작한다. */
@@ -111,14 +110,15 @@ export const B03TransactionInquiry = () => {
     return preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo
   })
   // periodDraft는 입력 중인 값, period는 [조회] 통과 후 실제 필터링에 반영되는 값이다(REQ-INQR-010).
-  const [periodDraft, setPeriodDraft] = React.useState(DEFAULT_PERIOD)
-  const [period, setPeriod] = React.useState(DEFAULT_PERIOD)
+  const [periodDraft, setPeriodDraft] = React.useState(defaultPeriod)
+  const [period, setPeriod] = React.useState(defaultPeriod)
   const [content, setContent] = React.useState("all")
   const [order, setOrder] = React.useState("recent")
   const [keyword, setKeyword] = React.useState("")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
     string | null
@@ -169,14 +169,14 @@ export const B03TransactionInquiry = () => {
       width: 110,
       sortable: true,
       sortValue: (r) => `${r.date}T${r.time}`,
-      render: (r) => <span className="tabular-nums">{formatDate(r.date)}</span>,
+      render: (r) => <span>{formatDate(r.date)}</span>,
     },
     {
       key: "time",
       header: "거래시각",
       align: "center",
       width: 90,
-      render: (r) => <span className="tabular-nums">{r.time}</span>,
+      render: (r) => <span>{r.time}</span>,
     },
     { key: "description", header: "적요", align: "left", width: 100 },
     {
@@ -233,15 +233,19 @@ export const B03TransactionInquiry = () => {
 
   const handleReset = () => {
     setAccount(MOCK_ACCOUNTS[0].accountNo)
-    setPeriodDraft(DEFAULT_PERIOD)
-    setPeriod(DEFAULT_PERIOD)
+    setPeriodDraft(defaultPeriod())
+    setPeriod(defaultPeriod())
     setContent("all")
     setOrder("recent")
     setKeyword("")
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const handleSearch = () => {
+    savedCondition.clear()
+    downloadComplete.clear()
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
     if (periodReversed) {
       setPeriodAlertMessage(
@@ -265,7 +269,7 @@ export const B03TransactionInquiry = () => {
         <SearchPanel
           onReset={handleReset}
           onSearch={handleSearch}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회계좌번호" htmlFor="inq-account">
             <AccountSelectField
@@ -323,7 +327,6 @@ export const B03TransactionInquiry = () => {
               {
                 term: "계좌번호",
                 desc: formatAccountNo(selectedAccount.accountNo),
-                numeric: true,
               },
               {
                 term: "계좌상태",
@@ -346,18 +349,15 @@ export const B03TransactionInquiry = () => {
                 {
                   term: "계좌잔액",
                   desc: formatAmount(selectedAccount.balance),
-                  numeric: true,
                   dominant: true,
                 },
                 {
                   term: "출금가능금액",
                   desc: formatAmount(selectedAccount.withdrawable),
-                  numeric: true,
                 },
                 {
                   term: "신규일자",
                   desc: formatDate(selectedAccount.openedDate),
-                  numeric: true,
                 },
               ]}
             />
@@ -407,9 +407,11 @@ export const B03TransactionInquiry = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="거래내역조회"
         />
 
         <DataGrid
@@ -424,6 +426,13 @@ export const B03TransactionInquiry = () => {
           totalPages={totalPages}
           onPageChange={setPage}
         />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
+        />
       </FormSection>
 
       <NoticeBoxFooter
@@ -434,12 +443,6 @@ export const B03TransactionInquiry = () => {
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
           "조회 결과는 CSV 파일로 저장할 수 있으며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}
-      />
-
-      <AlertDialog
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        messages={["조회조건이 저장되었습니다."]}
       />
 
       <AlertDialog

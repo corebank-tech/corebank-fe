@@ -12,18 +12,14 @@ const columns: DataGridColumn<OverviewAccount>[] = [
     key: "accountNo",
     header: "계좌번호",
     width: 160,
-    render: (row) => (
-      <span className="tabular-nums">{formatAccountNo(row.accountNo)}</span>
-    ),
+    render: (row) => <span>{formatAccountNo(row.accountNo)}</span>,
   },
   {
     key: "openedDate",
     header: "신규일",
     align: "center",
     width: 110,
-    render: (row) => (
-      <span className="tabular-nums">{formatDate(row.openedDate)}</span>
-    ),
+    render: (row) => <span>{formatDate(row.openedDate)}</span>,
   },
   {
     key: "balance",

@@ -10,7 +10,11 @@ import { WithAuthenticatedPage } from "../../../.storybook/decorators/page-provi
 const meta = {
   title: "pages/C04 상품가입 2단계",
   decorators: [WithAuthenticatedPage],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    route: "/product/1/join/2",
+    routePattern: "/product/:productId/join/2",
+  },
   render: () => (
     <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
       <C04InputInfo />

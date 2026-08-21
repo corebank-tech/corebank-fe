@@ -8,7 +8,7 @@ import {
   maskPhone,
   maskUserId,
 } from "@/shared/lib/format"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import type { CustomerProfile } from "@/entities/customer"
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
 }
 
 export const F01ProfileSummary = ({ profile }: Props) => {
+  const BASE_TIME = useBaseTime()
   return (
     <FormSection title="고객정보 조회">
       <div>
@@ -23,25 +24,19 @@ export const F01ProfileSummary = ({ profile }: Props) => {
           <span className="text-ink">{maskName(profile.name)}</span>
         </FormRow>
         <FormRow label="아이디" labelWidth={180}>
-          <span className="text-ink tabular-nums">
-            {maskUserId(profile.userId)}
-          </span>
+          <span className="text-ink">{maskUserId(profile.userId)}</span>
         </FormRow>
         <FormRow label="생년월일" labelWidth={180}>
-          <span className="text-ink tabular-nums">
-            {maskBirthDate(profile.dob)}
-          </span>
+          <span className="text-ink">{maskBirthDate(profile.dob)}</span>
         </FormRow>
         <FormRow label="휴대폰번호" labelWidth={180}>
-          <span className="text-ink tabular-nums">
-            {maskPhone(profile.phone)}
-          </span>
+          <span className="text-ink">{maskPhone(profile.phone)}</span>
         </FormRow>
         <FormRow label="이메일" labelWidth={180}>
           <span className="text-ink">{maskEmail(profile.email)}</span>
         </FormRow>
       </div>
-      <p className="mt-2 text-right text-2xs text-ink-muted tabular-nums">
+      <p className="mt-2 text-right text-2xs text-ink-muted">
         기준일시 : {formatDateTime(BASE_TIME)}
       </p>
     </FormSection>

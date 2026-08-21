@@ -54,14 +54,12 @@ export const A05Confirm = ({ data, onEdit, onComplete }: A05ConfirmProps) => {
             <span className="text-base text-ink">{data.userId}</span>
           </FormRow>
           <FormRow label="생년월일" labelWidth={180}>
-            <span className="text-base text-ink tabular-nums">
+            <span className="text-base text-ink">
               {birthToDisplay(data.birth)}
             </span>
           </FormRow>
           <FormRow label="휴대폰번호" labelWidth={180}>
-            <span className="text-base text-ink tabular-nums">
-              {maskPhone(data.phone)}
-            </span>
+            <span className="text-base text-ink">{maskPhone(data.phone)}</span>
           </FormRow>
           <FormRow label="이메일" labelWidth={180}>
             <span className="text-base text-ink">{maskEmail(data.email)}</span>

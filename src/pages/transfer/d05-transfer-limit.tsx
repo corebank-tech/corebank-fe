@@ -15,9 +15,7 @@ import {
   TRANSFER_LIMIT_PER_DAY_MAX as PER_DAY_MAX,
   TRANSFER_LIMIT_PER_TRANSFER_MAX as PER_TRANSFER_MAX,
 } from "@/shared/config/policy"
-import { MOCK_NOW } from "@/shared/config/mock-clock"
-
-const BASE_TIME = MOCK_NOW
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const onlyDigits = (value: string): string => {
   return onlyDigitsBase(value, 15)
@@ -33,6 +31,7 @@ const formatDraft = (value: string): string => {
  * 제공한다. 보안매체 등급 개념 없이 OTP 단일 수단으로 변경을 인증한다(EX-010).
  */
 export const D05TransferLimit = () => {
+  const BASE_TIME = useBaseTime()
   const [limit, setLimit] = React.useState(MOCK_TRANSFER_LIMIT)
   const [perTransferDraft, setPerTransferDraft] = React.useState(
     String(limit.perTransferLimit),
@@ -164,11 +163,11 @@ export const D05TransferLimit = () => {
           <span className="font-normal text-ink-muted">
             당일 잔여 이체가능금액
           </span>
-          <span className="text-page font-bold text-primary tabular-nums">
+          <span className="text-page font-bold text-primary">
             {formatAmount(dailyRemaining)}
           </span>
         </div>
-        <p className="mt-2 text-right text-2xs text-ink-muted tabular-nums">
+        <p className="mt-2 text-right text-2xs text-ink-muted">
           기준일시 : {formatDateTime(BASE_TIME)}
         </p>
       </FormSection>
@@ -186,7 +185,7 @@ export const D05TransferLimit = () => {
               inputMode="numeric"
               value={formatDraft(perTransferDraft)}
               onChange={(e) => setPerTransferDraft(onlyDigits(e.target.value))}
-              className="max-w-[220px] text-right tabular-nums"
+              className="max-w-[220px] text-right"
             />
             <span className="shrink-0 text-base text-ink-muted">원</span>
           </FormRow>
@@ -201,7 +200,7 @@ export const D05TransferLimit = () => {
               inputMode="numeric"
               value={formatDraft(perDayDraft)}
               onChange={(e) => setPerDayDraft(onlyDigits(e.target.value))}
-              className="max-w-[220px] text-right tabular-nums"
+              className="max-w-[220px] text-right"
             />
             <span className="shrink-0 text-base text-ink-muted">원</span>
           </FormRow>

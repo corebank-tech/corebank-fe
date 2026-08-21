@@ -1,19 +1,25 @@
 import * as React from "react"
+import { keepPreviousData } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
 import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
-import { GridToolbar, RadioRowField, SearchPanel } from "@/widgets/query"
+import {
+  GridToolbar,
+  RadioRowField,
+  SavedConditionAlert,
+  SearchPanel,
+} from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -23,16 +29,22 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import {
-  MOCK_AUTO_TRANSFERS,
   getAutoTransferStatusBadgeVariant,
+  toAutoTransferRow,
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
+import {
+  useSearchAutoTransfers,
+  cancelAutoTransfer,
+  changeAutoTransfer,
+} from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
+import { useWithdrawAccounts } from "@/entities/account"
+import type { PageResponseAutoTransferListItemResponse } from "@/shared/api/generated/model"
+import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -40,61 +52,128 @@ const STATUS_OPTIONS = [
   { label: "해지", value: "해지" },
 ]
 
-const FROM_ACCOUNTS = Array.from(
-  new Map(
-    MOCK_AUTO_TRANSFERS.map((r) => [r.fromAccountNo, r.fromAlias]),
-  ).entries(),
-)
-
-/** REQ-AUTO-011: 다음 실행 예정일 전일까지만 해지 가능, 당일은 해지 불가. */
-const isTerminable = (row: AutoTransferRow): boolean => {
-  return (
-    row.status === "정상" &&
-    row.nextExecDate != null &&
-    row.nextExecDate > TODAY
-  )
+const STATUS_TO_API: Record<string, string | undefined> = {
+  all: undefined,
+  정상: "NORMAL",
+  해지: "TERMINATED",
 }
 
+// TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. autotransfer
+// 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+const TEMP_AUTH_TOKEN = "temp-auth-token"
+
+/**
+ * REQ-AUTO-011: 실행 예정일 당일에는 해지할 수 없다. 다만 목록 응답에 다음 실행
+ * 예정일도 해지 가능 여부도 없어서(corebank-server#264) 화면에서 사전 판정할 수
+ * 없다. 상태만 보고 열어 두고, 당일 건은 서버가 거부하는 사유를 그대로 띄운다.
+ */
+const isTerminable = (row: AutoTransferRow): boolean => row.status === "정상"
+
 export const G04AutoTransferList = () => {
-  const [rows, setRows] = React.useState(MOCK_AUTO_TRANSFERS)
-  const [fromAccount, setFromAccount] = React.useState("all")
+  const BASE_TIME = useBaseTime()
+  const TODAY = getToday()
+  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
+  // 바로 물려 있으면 계좌·조회구분을 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
+  const [applied, setApplied] = React.useState<{
+    accountId: number | null
+    status: string
+  }>({ accountId: null, status: "all" })
+  const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [status, setStatus] = React.useState("all")
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
-  const [gridKey, setGridKey] = React.useState(0)
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
   const [terminateOtpOpen, setTerminateOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
+  const [actionErrorMessage, setActionErrorMessage] = React.useState<
+    string | null
+  >(null)
   const [editTarget, setEditTarget] = React.useState<AutoTransferRow | null>(
     null,
   )
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const filtered = React.useMemo(() => {
-    return rows.filter((r) => {
-      if (fromAccount !== "all" && r.fromAccountNo !== fromAccount) return false
-      if (status !== "all" && r.status !== status) return false
-      return true
-    })
-  }, [rows, fromAccount, status])
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
-  const size = pageSize === "all" ? filtered.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(filtered.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice((safePage - 1) * size, safePage * size)
+  // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
+  // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const defaultAccountId = withdrawAccounts[0]?.accountId ?? null
+  const selectedAccountId = fromAccountId ?? defaultAccountId
+  const appliedAccountId = applied.accountId ?? defaultAccountId
+  const appliedAccount = withdrawAccounts.find(
+    (a) => a.accountId === appliedAccountId,
+  )
 
-  const selectedRows = rows.filter((r) => selectedIds.includes(r.id))
+  const size = pageSize === "all" ? 1000 : pageSize
+  const { data, isFetching, isError, refetch } = useSearchAutoTransfers(
+    {
+      // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
+      // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
+      withdrawalAccountId: appliedAccountId ?? 0,
+      status: STATUS_TO_API[applied.status],
+      page: page - 1,
+      size,
+    },
+    {
+      query: {
+        enabled: appliedAccountId != null,
+        // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
+        // 올 때까지 이전 응답을 유지해서 조회조건 폼과 페이지네이션이 화면째로
+        // 사라졌다 돌아오지 않게 한다.
+        placeholderData: keepPreviousData,
+      },
+    },
+  )
+
+  const pageData = data as unknown as
+    PageResponseAutoTransferListItemResponse | undefined
+  // 출금계좌번호는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
+  const pageRows = (pageData?.items ?? []).map((item) =>
+    toAutoTransferRow(item, appliedAccount?.accountNumber ?? ""),
+  )
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
+
+  // 해지·재조회로 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
+
+  // 페이지를 넘기면 화면에서 사라진 건은 선택에서도 빠져야 한다(#28).
+  const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
+
+  const clearSelection = () => setSelectedIds([])
 
   const handleReset = () => {
-    setFromAccount("all")
+    clearSelection()
+    setFromAccountId(null)
     setStatus("all")
+    setApplied({ accountId: null, status: "all" })
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    clearSelection()
+    const sameCondition =
+      appliedAccountId === selectedAccountId && applied.status === status
+    setApplied({ accountId: selectedAccountId, status })
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const handleTerminateClick = () => {
     if (selectedRows.length === 0) return
+    // 상태로 걸러지는 건(종료·해지)은 서버에 묻지 않고 여기서 막는다. 실행 예정일
+    // 당일 여부는 판정할 값이 없어 서버가 거부하는 쪽에 맡긴다.
     if (selectedRows.some((r) => !isTerminable(r))) {
       setBlockedOpen(true)
       return
@@ -108,27 +187,78 @@ export const G04AutoTransferList = () => {
     setTerminateOtpOpen(true)
   }
 
-  const handleTerminateOtpConfirm = () => {
-    setRows((prev) =>
-      prev.map((r) =>
-        selectedIds.includes(r.id)
-          ? { ...r, status: "해지" as const, nextExecDate: undefined }
-          : r,
+  const handleTerminateOtpConfirm = async () => {
+    setTerminateOtpOpen(false)
+    // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
+    // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
+    // 성공한 건이 반영되기 전의 목록을 받는다.
+    const results = await Promise.allSettled(
+      selectedRows.map((r) =>
+        // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
+        cancelAutoTransfer(Number(r.id), {
+          headers: { "Account-Password-Auth-Token": TEMP_AUTH_TOKEN },
+        }),
       ),
     )
-    setTerminateOtpOpen(false)
-    setSelectedIds([])
-    setGridKey((k) => k + 1)
+    clearSelection()
+
+    const failed = results.find((r) => r.status === "rejected")
+    const refreshed = await refetch()
+
+    // 해지 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+    // 응답을 그대로 들고 있어서 방금 해지한 건이 여전히 "정상"으로 보이는데,
+    // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
+    if (failed) {
+      const reason = failed.reason
+      setActionErrorMessage(
+        reason instanceof ApiError
+          ? reason.message
+          : "자동이체 해지에 실패했습니다.",
+      )
+    } else if (refreshed.isError) {
+      setActionErrorMessage(
+        "해지 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+      )
+    }
   }
 
   const openEdit = (row: AutoTransferRow) => {
     setEditTarget(row)
   }
 
-  const handleEditSave = (updatedRow: AutoTransferRow) => {
-    setRows((prev) =>
-      prev.map((row) => (row.id === updatedRow.id ? updatedRow : row)),
-    )
+  /**
+   * REQ-AUTO-010: 변경 가능한 항목은 이체금액·이체주기·종료일·표시내용뿐이다.
+   * 출금계좌·입금계좌·이체지정일은 보내지 않는다 — 서버도 변경 요청을 거부한다.
+   *
+   * 성공 여부를 돌려준다. 변경 모달은 이 값이 true일 때만 닫는다.
+   */
+  const handleEditSave = async (
+    updatedRow: AutoTransferRow,
+  ): Promise<boolean> => {
+    try {
+      await changeAutoTransfer(Number(updatedRow.id), {
+        amount: updatedRow.amount,
+        cycleMonths: updatedRow.cycleMonths,
+        endDate: updatedRow.endDate,
+        myPassbookMemo: updatedRow.memo,
+        accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+      })
+    } catch (error) {
+      setActionErrorMessage(
+        error instanceof ApiError
+          ? error.message
+          : "자동이체 변경에 실패했습니다.",
+      )
+      return false
+    }
+
+    const refreshed = await refetch()
+    if (refreshed.isError) {
+      setActionErrorMessage(
+        "변경 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+      )
+    }
+    return true
   }
 
   const exportHeaders = [
@@ -142,7 +272,7 @@ export const G04AutoTransferList = () => {
     "표시내용",
     "상태",
   ]
-  const exportRows = filtered.map((r) => [
+  const exportRows = pageRows.map((r) => [
     `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
@@ -159,9 +289,7 @@ export const G04AutoTransferList = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -182,7 +310,7 @@ export const G04AutoTransferList = () => {
       header: "이체기간",
       width: 200,
       render: (r) => (
-        <span className="tabular-nums">
+        <span>
           {formatDate(r.startDate)} ~ {formatDate(r.endDate)}
         </span>
       ),
@@ -264,9 +392,16 @@ export const G04AutoTransferList = () => {
             onClose={() => setBlockedOpen(false)}
             title="해지 불가"
             messages={[
-              "정상 상태이고 다음 실행 예정일 전일까지인 건만 해지할 수 있습니다.",
-              "실행 예정일 당일이거나 이미 종료·해지된 건은 선택에서 제외하세요.",
+              "정상 상태인 건만 해지할 수 있습니다.",
+              "이미 종료되었거나 해지된 건은 선택에서 제외하세요.",
             ]}
+          />
+
+          <ErrorDialog
+            open={actionErrorMessage != null}
+            onClose={() => setActionErrorMessage(null)}
+            title="처리 실패"
+            messages={actionErrorMessage ? [actionErrorMessage] : []}
           />
 
           {editTarget && (
@@ -285,12 +420,6 @@ export const G04AutoTransferList = () => {
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -304,20 +433,21 @@ export const G04AutoTransferList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={handleSearch}
+          onSaveCondition={savedCondition.save}
         >
+          {/* REQ-AUTO-009: 출금계좌는 조회조건이라 "전체"가 없다. 조회구분 쪽의
+              "전체"와 혼동하지 말 것. */}
           <FormRow label="출금계좌번호" htmlFor="g04-from">
             <Select
               id="g04-from"
               className="max-w-md"
-              value={fromAccount}
-              onChange={(e) => setFromAccount(e.target.value)}
+              value={selectedAccountId ?? ""}
+              onChange={(e) => setFromAccountId(Number(e.target.value))}
             >
-              <option value="all">전체</option>
-              {FROM_ACCOUNTS.map(([accountNo, alias]) => (
-                <option key={accountNo} value={accountNo}>
-                  {`${alias} / ${formatAccountNo(accountNo)}`}
+              {withdrawAccounts.map((a) => (
+                <option key={a.accountId} value={a.accountId}>
+                  {`${a.accountName ?? ""} / ${formatAccountNo(a.accountNumber ?? "")}`}
                 </option>
               ))}
             </Select>
@@ -348,34 +478,52 @@ export const G04AutoTransferList = () => {
         }
       >
         <GridToolbar
-          totalCount={filtered.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
+            clearSelection()
             setPageSize(s)
             setPage(1)
           }}
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`자동이체조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="자동이체조회"
         />
 
         <DataGrid
-          key={gridKey}
           columns={columns}
           rows={pageRows}
+          loading={isFetching}
           rowKey={(r) => r.id}
           selectable
+          selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
-          emptyMessage="조회된 자동이체가 없습니다."
+          emptyMessage={
+            isError
+              ? "자동이체 목록을 불러오지 못했습니다."
+              : "조회된 자동이체가 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
-          onPageChange={setPage}
+          onPageChange={(p) => {
+            clearSelection()
+            setPage(p)
+          }}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

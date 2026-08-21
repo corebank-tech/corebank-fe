@@ -5,7 +5,8 @@ import { FormSection } from "@/shared/ui/form-section"
 import { Button } from "@/shared/ui/button"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { SummaryRow } from "@/shared/ui/summary-row"
-import { GridToolbar } from "@/widgets/query"
+import { GridToolbar, SavedConditionAlert } from "@/widgets/query"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import {
   GridSearchModal,
@@ -19,8 +20,8 @@ import {
   formatDateTime,
   maskAccountNo,
 } from "@/shared/lib/format"
-
 import { useAccountOverviewQuery } from "@/entities/account"
+import { getToday } from "@/shared/config/clock"
 
 type AccountGroupCode = "DEMAND_DEPOSIT" | "DEPOSIT_SAVINGS"
 
@@ -64,18 +65,14 @@ const buildColumns = (
       key: "accountNumber",
       header: "계좌번호",
       width: 160,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNumber)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNumber)}</span>,
     },
     {
       key: "openedDate",
       header: "신규일",
       align: "center",
       width: 120,
-      render: (r) => (
-        <span className="tabular-nums">{formatDate(r.openedDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
       key: "lastActivityDate",
@@ -86,9 +83,7 @@ const buildColumns = (
         const date =
           group === "DEPOSIT_SAVINGS" ? r.maturityDate : r.lastTransactionAt
 
-        return (
-          <span className="tabular-nums">{date ? formatDate(date) : "-"}</span>
-        )
+        return <span>{date ? formatDate(date) : "-"}</span>
       },
     },
     {
@@ -133,10 +128,10 @@ const buildColumns = (
 const GROUP_ORDER: AccountGroupCode[] = ["DEMAND_DEPOSIT", "DEPOSIT_SAVINGS"]
 
 export const B01AllAccounts = () => {
+  const TODAY = getToday()
   const navigate = useNavigate()
 
   const { data: overview, isLoading, isError } = useAccountOverviewQuery()
-
   const [pageSize, setPageSize] = React.useState<number | "all">("all")
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -144,15 +139,15 @@ export const B01AllAccounts = () => {
     field: string
     keyword: string
   } | null>(null)
+  const downloadComplete = useSavedConditionAlert()
 
   const allAccounts = React.useMemo<AccountRow[]>(() => {
     if (!overview) return []
 
     return (overview.items ?? []).flatMap((group) => {
-      if (
-        group.groupCode !== "DEMAND_DEPOSIT" &&
-        group.groupCode !== "DEPOSIT_SAVINGS"
-      ) {
+      const groupCode = group.groupCode
+
+      if (groupCode !== "DEMAND_DEPOSIT" && groupCode !== "DEPOSIT_SAVINGS") {
         return []
       }
 
@@ -162,7 +157,7 @@ export const B01AllAccounts = () => {
         return [
           {
             accountId: account.accountId,
-            groupCode: group.groupCode,
+            groupCode,
             accountName: account.accountName ?? "",
             accountNumber: account.accountNumber ?? "",
             balance: account.balance ?? 0,
@@ -241,7 +236,6 @@ export const B01AllAccounts = () => {
       </div>
     )
   }
-
   return (
     <QueryPageLayout
       noticeItems={[
@@ -269,9 +263,10 @@ export const B01AllAccounts = () => {
             open={searchOpen}
             onClose={() => setSearchOpen(false)}
             fields={SEARCH_FIELDS}
-            onApply={(field, keyword) =>
+            onApply={(field, keyword) => {
               setSearch(keyword ? { field, keyword } : null)
-            }
+              downloadComplete.clear()
+            }}
           />
         </>
       }
@@ -283,38 +278,44 @@ export const B01AllAccounts = () => {
         baseTimeLabel={overview.asOf ? formatDateTime(overview.asOf) : "-"}
         onPrint={() => window.print()}
         onBrailleView={() => setBrailleOpen(true)}
-        onSaveFile={() =>
-          downloadCsv(
-            `전체계좌조회_${overview.asOf?.slice(0, 10) ?? "unknown"}.csv`,
-            exportHeaders,
-            exportRows,
-          )
-        }
+        onSaveFile={() => {
+          downloadCsv(`전체계좌조회_${TODAY}.csv`, exportHeaders, exportRows)
+          downloadComplete.save()
+        }}
+        resultLabel="전체계좌조회"
         onSearch={() => setSearchOpen(true)}
       />
 
       {GROUP_ORDER.map((group) => {
+        const apiGroup = overview.items?.find(
+          (item) => item.groupCode === group,
+        )
+
         const rows = filteredAccounts.filter(
           (account) => account.groupCode === group,
         )
-        const groupTotal = rows.reduce(
-          (sum, account) => sum + account.balance,
-          0,
-        )
+
+        const groupLabel = apiGroup?.groupName ?? GROUP_LABELS[group]
+
+        const groupTotal =
+          search == null
+            ? (apiGroup?.groupTotalBalance ?? 0)
+            : rows.reduce((sum, account) => sum + account.balance, 0)
 
         return (
-          <FormSection key={group} title={GROUP_LABELS[group]} className="mb-0">
+          <FormSection key={group} title={groupLabel} className="mb-0">
             <DataGrid
               columns={buildColumns(group, handleInquire, handleTransfer)}
               rows={rows}
-              //rowKey={(r) => r.accountId}
+              rowKey={(r) => String(r.accountId)}
               emptyMessage="보유한 계좌가 없습니다."
             />
+
             <SummaryRow
               className="mt-3"
               items={[
                 {
-                  label: `${GROUP_LABELS[group]} 총잔액`,
+                  label: `${groupLabel} 총잔액`,
                   value: formatAmount(groupTotal),
                 },
               ]}
@@ -322,6 +323,12 @@ export const B01AllAccounts = () => {
           </FormSection>
         )
       })}
+
+      <SavedConditionAlert
+        open={downloadComplete.saved}
+        message="파일이 저장되었습니다."
+        className="mb-3"
+      />
 
       <div>
         <SummaryRow

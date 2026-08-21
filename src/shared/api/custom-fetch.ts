@@ -17,11 +17,21 @@ const SESSION_EXPIRED_STATUS = 401
 const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
 const CONTENT_TYPE_HEADER = "Content-Type"
 const JSON_CONTENT_TYPE = "application/json"
+const CSRF_COOKIE_NAME = "XSRF-TOKEN"
+const CSRF_HEADER = "X-XSRF-TOKEN"
 /** REQ-CMN-014: 상태를 바꾸지 않는 메서드만 멱등키를 생략한다. */
 const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
 const buildRequestUrl = (url: string): string =>
   url.startsWith("http") ? url : `${API_BASE_URL}${url}`
+
+/** 서버가 로그인 시 내려주는 XSRF-TOKEN 쿠키 값을 읽는다(CookieCsrfTokenRepository, httpOnly=false). */
+const readCsrfCookie = (): string | undefined => {
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${CSRF_COOKIE_NAME}=`))
+  return match?.split("=")[1]
+}
 
 const buildHeaders = (method: string, init: RequestInit): Headers => {
   const headers = new Headers(init.headers)
@@ -34,6 +44,11 @@ const buildHeaders = (method: string, init: RequestInit): Headers => {
   // 호출자가 이미 키를 넣었다면 존중한다 — 재시도 시 같은 키를 써야 하기 때문이다.
   if (!READ_ONLY_METHODS.has(method) && !headers.has(IDEMPOTENCY_KEY_HEADER)) {
     headers.set(IDEMPOTENCY_KEY_HEADER, crypto.randomUUID())
+  }
+  // 상태변경 요청은 CookieCsrfTokenRepository가 요구하는 CSRF 헤더가 없으면 403(CMN0102)으로 거부된다.
+  if (!READ_ONLY_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
+    const csrfToken = readCsrfCookie()
+    if (csrfToken) headers.set(CSRF_HEADER, csrfToken)
   }
   return headers
 }

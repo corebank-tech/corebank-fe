@@ -41,6 +41,8 @@ type ResultPanelProps<Row> = {
   actions?: React.ReactNode
   /** Small footnote under the summary grid, e.g. status-specific guidance. */
   footnote?: React.ReactNode
+  /** Toggle hoverable on grid */
+  gridHoverable?: boolean
 }
 
 /**
@@ -59,6 +61,7 @@ export const ResultPanel = <Row,>({
   row,
   actions,
   footnote,
+  gridHoverable = true,
 }: ResultPanelProps<Row>) => {
   const Icon = VARIANT_ICON[variant]
 
@@ -89,17 +92,15 @@ export const ResultPanel = <Row,>({
         {highlightValue != null && (
           <div className="mt-4 flex flex-col items-center gap-1">
             <span className="text-ink-muted">{highlightLabel}</span>
-            <span className="text-page font-bold text-primary tabular-nums">
+            <span className="text-page font-bold text-primary">
               {highlightValue}
             </span>
           </div>
         )}
       </div>
-
       <div className="mt-4">
-        <DataGrid columns={columns} rows={[row]} />
+        <DataGrid columns={columns} rows={[row]} hoverable={gridHoverable} />
       </div>
-
       {footnote != null && (
         <p className="mt-3 text-center text-2xs text-ink-muted">{footnote}</p>
       )}

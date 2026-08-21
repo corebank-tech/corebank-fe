@@ -23,7 +23,7 @@ export const LabelValueRow = ({
       >
         {label}
       </div>
-      <div className="flex min-w-0 flex-1 items-center border-l border-border px-3 py-2.5 text-base whitespace-nowrap text-ink-muted tabular-nums">
+      <div className="flex min-w-0 flex-1 items-center border-l border-border px-3 py-2.5 text-base whitespace-nowrap text-ink-muted">
         {value}
       </div>
     </div>

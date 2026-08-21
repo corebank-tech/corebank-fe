@@ -5,7 +5,7 @@ import { MOCK_PRODUCT_DETAILS } from "@/entities/product"
 const meta = {
   title: "pages/product/ProductDetail",
   component: ProductDetail,
-  args: { product: MOCK_PRODUCT_DETAILS.P001 },
+  args: { product: MOCK_PRODUCT_DETAILS[1] },
   parameters: { layout: "padded" },
 } satisfies Meta<typeof ProductDetail>
 

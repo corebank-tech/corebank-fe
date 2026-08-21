@@ -23,20 +23,14 @@ const resultColumns: DataGridColumn<JoinResultRow>[] = [
     key: "newAccountNo",
     header: "신규계좌번호",
     align: "center",
-    render: (r) => (
-      <span className="tabular-nums">{formatAccountNo(r.newAccountNo)}</span>
-    ),
+    render: (r) => <span>{formatAccountNo(r.newAccountNo)}</span>,
   },
   { key: "productName", header: "상품명", align: "center" },
   {
     key: "amount",
     header: "가입금액(원)",
     align: "right",
-    render: (r) => (
-      <span className="tabular-nums">
-        {formatAmount(r.amount, { suffix: false })}
-      </span>
-    ),
+    render: (r) => <span>{formatAmount(r.amount, { suffix: false })}</span>,
   },
   {
     key: "termMonths",
@@ -105,6 +99,7 @@ export const C06Complete = () => {
         highlightValue={formatAmount(result.amount)}
         columns={resultColumns}
         row={row}
+        gridHoverable={false}
         footnote="※ 예적금 계좌는 계좌비밀번호를 별도로 부여하지 않습니다."
         actions={
           <>

@@ -34,7 +34,7 @@ const meta = {
         row={{
           scheduledDate: formatDate(SCHEDULED_DATE),
           fromAccount: (
-            <span className="tabular-nums">
+            <span>
               {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
             </span>
           ),

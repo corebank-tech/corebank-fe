@@ -17,10 +17,11 @@ import {
 } from "@/entities/account"
 import { cn } from "@/shared/lib/utils"
 import { useDisclosure } from "@/shared/lib/hooks/use-disclosure"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 /** REQ-INQR-001·004: 예금/적금 계좌만 대상으로 한 전체계좌조회(B-01)의 부분 화면. */
 export const B02DepositAccounts = () => {
+  const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const { open, toggle } = useDisclosure(true)
 
@@ -38,9 +39,7 @@ export const B02DepositAccounts = () => {
       key: "accountNo",
       header: "계좌번호",
       width: 160,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "openedDate",
@@ -48,9 +47,7 @@ export const B02DepositAccounts = () => {
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="text-ink-muted tabular-nums">
-          {formatDate(r.openedDate)}
-        </span>
+        <span className="text-ink-muted">{formatDate(r.openedDate)}</span>
       ),
     },
     {
@@ -59,9 +56,7 @@ export const B02DepositAccounts = () => {
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="text-ink-muted tabular-nums">
-          {formatDate(r.lastActivityDate)}
-        </span>
+        <span className="text-ink-muted">{formatDate(r.lastActivityDate)}</span>
       ),
     },
     {
@@ -127,7 +122,7 @@ export const B02DepositAccounts = () => {
       >
         {open && (
           <>
-            <p className="mb-2 text-right text-2xs text-ink-muted tabular-nums">
+            <p className="mb-2 text-right text-2xs text-ink-muted">
               기준일시 : {formatDateTime(BASE_TIME)}
             </p>
             <DataGrid

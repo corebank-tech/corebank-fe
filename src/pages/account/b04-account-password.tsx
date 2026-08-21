@@ -172,7 +172,7 @@ export const B04AccountPassword = () => {
             <dl className="flex flex-col gap-2 text-base text-ink">
               <div className="flex justify-between">
                 <dt className="font-bold">대상계좌</dt>
-                <dd className="tabular-nums">
+                <dd>
                   {account
                     ? `${account.alias} / ${formatAccountNo(account.accountNo)}`
                     : "-"}
@@ -180,13 +180,13 @@ export const B04AccountPassword = () => {
               </div>
               <div className="flex justify-between">
                 <dt className="font-bold">현재 누적 오류 횟수</dt>
-                <dd className="font-bold text-primary tabular-nums">
+                <dd className="font-bold text-primary">
                   {account?.errorCount ?? 0}회
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="font-bold">제한 정책</dt>
-                <dd className="tabular-nums">5회 도달 시 거래정지</dd>
+                <dd>5회 도달 시 거래정지</dd>
               </div>
             </dl>
           </Modal>

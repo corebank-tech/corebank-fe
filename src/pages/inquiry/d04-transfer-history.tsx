@@ -7,11 +7,11 @@ import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Modal } from "@/shared/ui/modal"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
 import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
@@ -23,6 +23,7 @@ import {
   type GridSearchField,
 } from "@/shared/ui/grid-search-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -37,10 +38,8 @@ import {
   getTransferStatusBadgeVariant,
   type TransferHistoryRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -68,6 +67,8 @@ const SEARCH_FIELDS: GridSearchField[] = [
 ]
 
 export const D04TransferHistory = () => {
+  const BASE_TIME = useBaseTime()
+  const TODAY = getToday()
   const [period, setPeriod] = React.useState({
     start: "2026-06-23",
     end: TODAY,
@@ -78,7 +79,8 @@ export const D04TransferHistory = () => {
   const [page, setPage] = React.useState(1)
   const [detail, setDetail] = React.useState<TransferHistoryRow | null>(null)
   const [statsOpen, setStatsOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [search, setSearch] = React.useState<{
@@ -120,6 +122,8 @@ export const D04TransferHistory = () => {
     setFromAccount("all")
     setSearch(null)
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
   }
 
   const exportHeaders = [
@@ -148,9 +152,7 @@ export const D04TransferHistory = () => {
       width: 150,
       sortable: true,
       sortValue: (r) => r.datetime,
-      render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.datetime)}</span>
-      ),
+      render: (r) => <span>{formatDateTime(r.datetime)}</span>,
     },
     {
       key: "fromAccountNo",
@@ -159,9 +161,7 @@ export const D04TransferHistory = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
-            {formatAccountNo(r.fromAccountNo)}
-          </span>
+          <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),
     },
@@ -169,9 +169,7 @@ export const D04TransferHistory = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -208,7 +206,7 @@ export const D04TransferHistory = () => {
         <button
           type="button"
           onClick={() => setDetail(r)}
-          className="text-base text-link tabular-nums hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="text-base text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {r.txId}
         </button>
@@ -302,8 +300,8 @@ export const D04TransferHistory = () => {
                     <dd
                       className={
                         item.dominant
-                          ? "min-w-0 flex-1 text-h2 font-bold text-primary tabular-nums"
-                          : "min-w-0 flex-1 text-base font-bold text-ink tabular-nums"
+                          ? "min-w-0 flex-1 text-h2 font-bold text-primary"
+                          : "min-w-0 flex-1 text-base font-bold text-ink"
                       }
                     >
                       {item.value}
@@ -361,12 +359,6 @@ export const D04TransferHistory = () => {
             />
           </Modal>
 
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -390,8 +382,12 @@ export const D04TransferHistory = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={() => {
+            setPage(1)
+            savedCondition.clear()
+            downloadComplete.clear()
+          }}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회기간">
             <PeriodField
@@ -481,9 +477,11 @@ export const D04TransferHistory = () => {
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`이체결과조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="이체결과조회"
           onSearch={() => setSearchOpen(true)}
         />
 
@@ -498,6 +496,13 @@ export const D04TransferHistory = () => {
           page={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

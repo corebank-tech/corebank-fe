@@ -8,19 +8,30 @@ import { WithdrawAccountField } from "@/widgets/transfer"
 import { TermMonthsField, JoinAmountField } from "@/pages/product/fields"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { formatKoreanAmount } from "@/shared/lib/format"
-import { estimateMaturityAmount } from "@/entities/product"
-import { MOCK_JOIN_ACCOUNTS, MOCK_JOIN_PRODUCTS } from "@/entities/product"
+import {
+  estimateMaturityAmount,
+  getAppliedRateForTerm,
+  getProductTermRange,
+  toProductDetailData,
+} from "@/entities/product"
+import { MOCK_JOIN_ACCOUNTS } from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
 } from "@/pages/product/join-shared"
+import { EmptyState } from "@/shared/ui/empty-state"
+import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
+import type { ProductDetailResponse } from "@/shared/api/generated/model"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
 export const C04InputInfo = () => {
-  const { productId = "P001" } = useParams()
+  const { productId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const product = MOCK_JOIN_PRODUCTS[productId] ?? MOCK_JOIN_PRODUCTS.P001
+  const id = Number(productId)
+  const { data, isLoading, isError } = useGetProductDetail(id, {
+    query: { enabled: Number.isFinite(id) },
+  })
   const prev = location.state as ProductJoinFormState | null
 
   const [termMonths, setTermMonths] = React.useState<number | null>(
@@ -33,6 +44,28 @@ export const C04InputInfo = () => {
     prev?.amount ?? null,
   )
 
+  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
+  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const detail = data as unknown as ProductDetailResponse | undefined
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
+
+  if (isError || !detail) {
+    return (
+      <EmptyState
+        message="상품을 찾을 수 없습니다."
+        description={`상품ID: ${productId}`}
+      />
+    )
+  }
+
+  const product = toProductDetailData(detail)
+  const { minTermMonths, maxTermMonths } = getProductTermRange(detail)
+
   const selectedAccount = MOCK_JOIN_ACCOUNTS.find(
     (a) => a.accountNo === fromAccount,
   )
@@ -43,8 +76,8 @@ export const C04InputInfo = () => {
 
   const termValid =
     termMonths != null &&
-    termMonths >= product.minTermMonths &&
-    termMonths <= product.maxTermMonths
+    termMonths >= minTermMonths &&
+    termMonths <= maxTermMonths
   const amountValid =
     amount != null &&
     amount >= product.minAmount &&
@@ -61,7 +94,7 @@ export const C04InputInfo = () => {
           category: product.category,
           amount,
           termMonths,
-          annualRatePercent: product.rate,
+          annualRatePercent: getAppliedRateForTerm(detail, termMonths),
         })
       : null
 
@@ -104,8 +137,8 @@ export const C04InputInfo = () => {
                 id="c04-term"
                 value={termMonths}
                 onChange={setTermMonths}
-                min={product.minTermMonths}
-                max={product.maxTermMonths}
+                min={minTermMonths}
+                max={maxTermMonths}
               />
             </FormRow>
             <FormRow
@@ -156,7 +189,7 @@ export const C04InputInfo = () => {
         <FormSection title="예상 만기금액(참고)">
           <div className="border border-border bg-surface px-5 py-4">
             <p className="text-2xs text-ink-faint">세전 단리 기준 참고값</p>
-            <p className="mt-1 text-page font-bold text-primary tabular-nums">
+            <p className="mt-1 text-page font-bold text-primary">
               {expectedMaturity != null
                 ? formatKoreanAmount(expectedMaturity)
                 : "-"}

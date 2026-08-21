@@ -287,13 +287,13 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                 {emailIssued != null && !emailVerified && (
                   <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
                     <span
-                      className={`text-lg font-bold tracking-2 tabular-nums ${emailExpired ? "text-ink-faint line-through" : "text-primary"}`}
+                      className={`text-lg font-bold tracking-2 ${emailExpired ? "text-ink-faint line-through" : "text-primary"}`}
                       aria-label="발송된 이메일 인증번호"
                     >
                       {emailIssued}
                     </span>
                     <span
-                      className={`text-base font-bold tabular-nums ${emailExpired ? "text-ink-faint" : "text-ink"}`}
+                      className={`text-base font-bold ${emailExpired ? "text-ink-faint" : "text-ink"}`}
                     >
                       {formatClock(emailRemaining)}
                     </span>

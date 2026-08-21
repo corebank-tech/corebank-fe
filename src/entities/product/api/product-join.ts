@@ -3,12 +3,16 @@ import type {
   ProductJoinMaster,
 } from "@/entities/product/model/types"
 import type { TermItem } from "@/shared/types/term"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
 
-/** 취급 상품은 정기예금·정기적금 2종뿐이다(POL-029). */
-export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
-  P001: {
-    id: "P001",
+/**
+ * 취급 상품은 정기예금·정기적금 2종뿐이다(POL-029).
+ * 키는 실제 서버 productId(entities/product/api/products.ts의 MOCK_PRODUCTS와 동일 id·순서)와
+ * 맞춘 숫자다 — 문자열 키(P001 등)를 쓰면 C-01/C-02에서 넘어오는 숫자 productId와
+ * 어긋나 모든 상품이 첫 상품으로 폴백되는 버그가 생긴다.
+ */
+export const MOCK_JOIN_PRODUCTS: Record<number, ProductJoinMaster> = {
+  1: {
+    id: 1,
     category: "정기예금",
     name: "코어 정기예금",
     rate: 3.85,
@@ -18,8 +22,8 @@ export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
     maxAmount: 500_000_000,
     mockNewAccountNo: "110774213980",
   },
-  P002: {
-    id: "P002",
+  2: {
+    id: 2,
     category: "정기적금",
     name: "코어 자유적금",
     rate: 4.2,
@@ -29,8 +33,8 @@ export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
     maxAmount: 3_000_000,
     mockNewAccountNo: "110774298452",
   },
-  P003: {
-    id: "P003",
+  3: {
+    id: 3,
     category: "정기예금",
     name: "코어 목돈예금",
     rate: 4.05,
@@ -40,8 +44,8 @@ export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
     maxAmount: 1_000_000_000,
     mockNewAccountNo: "110774355612",
   },
-  P004: {
-    id: "P004",
+  4: {
+    id: 4,
     category: "정기적금",
     name: "코어 정기적금",
     rate: 4.35,
@@ -51,8 +55,8 @@ export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
     maxAmount: 2_000_000,
     mockNewAccountNo: "110774412789",
   },
-  P005: {
-    id: "P005",
+  5: {
+    id: 5,
     category: "정기예금",
     name: "코어 단기예금",
     rate: 3.4,
@@ -62,8 +66,8 @@ export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
     maxAmount: 300_000_000,
     mockNewAccountNo: "110774467031",
   },
-  P006: {
-    id: "P006",
+  6: {
+    id: 6,
     category: "정기적금",
     name: "코어 목표적금",
     rate: 4.5,
@@ -92,9 +96,6 @@ export const MOCK_JOIN_ACCOUNTS: JoinWithdrawAccount[] = [
     mockPassword: "1234",
   },
 ]
-
-/** 가입일 앵커. 다른 화면(BASE_TIME 등)과 같은 mock 기준시각을 공유한다. */
-export const JOIN_DATE = MOCK_TODAY
 
 /** 상품가입·회원가입 약관동의 항목. required=true 인 항목이 모두 체크되어야 다음 단계로 진행할 수 있다. */
 export const MOCK_JOIN_TERMS: TermItem[] = [

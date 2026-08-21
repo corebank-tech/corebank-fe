@@ -1,4 +1,4 @@
-import { useGetAccounts } from "@/shared/api/generated/계좌/계좌"
+import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
 import type { AccountOverviewResponse } from "@/shared/api/generated/model"
 
 export const useAccountOverviewQuery = () => {

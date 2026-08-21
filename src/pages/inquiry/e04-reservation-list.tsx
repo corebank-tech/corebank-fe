@@ -1,4 +1,5 @@
 import * as React from "react"
+import { keepPreviousData } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -8,6 +9,7 @@ import {
   GridToolbar,
   PeriodField,
   RadioRowField,
+  SavedConditionAlert,
   SearchPanel,
 } from "@/widgets/query"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
@@ -18,6 +20,7 @@ import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -27,14 +30,21 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import {
-  MOCK_RESERVATIONS,
   getReservationStatusBadgeVariant,
+  toReservationRow,
   type ReservationRow,
 } from "@/entities/transfer"
+import { getToday } from "@/shared/config/clock"
+import { addMonths } from "@/shared/lib/date"
+import { checkPeriodRange } from "@/entities/transaction"
+import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+  useSearchScheduledTransfers,
+  useCancelScheduledTransfer,
+} from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
+import type { PageResponseScheduledTransferListItemResponse } from "@/shared/api/generated/model"
+import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -44,60 +54,166 @@ const STATUS_OPTIONS = [
   { label: "취소", value: "취소" },
 ]
 
-/** REQ-RSV-008: 이체 예정일 전일 23:59:59까지 취소 가능, 당일은 취소 불가. */
-const isCancelable = (row: ReservationRow): boolean => {
-  return row.status === "대기" && row.scheduledDate > TODAY
+const STATUS_TO_API: Record<string, string | undefined> = {
+  all: undefined,
+  대기: "WAITING",
+  완료: "SUCCESS",
+  실패: "FAILED",
+  취소: "CANCELED",
+}
+
+/** 서버가 정렬 파라미터를 제공하지 않아, 현재 페이지 안에서만 대기 건을 우선 정렬한다. */
+const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
+  const waiting = rows
+    .filter((r) => r.status === "대기")
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+  const others = rows
+    .filter((r) => r.status !== "대기")
+    .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate))
+  return [...waiting, ...others]
+}
+
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify)·OTP(POST /otp/issue, /otp/verify)
+// 실제 발급 API가 연동되면 그 결과 토큰으로 교체한다. scheduledtransfer 도메인의 토큰
+// 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+const TEMP_AUTH_TOKEN = "temp-auth-token"
+
+/**
+ * 예약이체는 미래 일자 건이라 형제 조회화면처럼 종료일을 오늘로 둘 수 없다.
+ * 오늘을 가운데 두고 앞뒤 2개월을 기본 창으로 잡는다 — 최근 처리된 건과
+ * 등록해 둔 예정 건이 같이 보인다.
+ */
+const DEFAULT_PERIOD_MONTHS = 2
+
+const defaultCondition = () => {
+  const today = getToday()
+  return {
+    status: "all",
+    period: {
+      start: addMonths(today, -DEFAULT_PERIOD_MONTHS),
+      end: addMonths(today, DEFAULT_PERIOD_MONTHS),
+    },
+  }
 }
 
 export const E04ReservationList = () => {
-  const [rows, setRows] = React.useState(MOCK_RESERVATIONS)
-  const [status, setStatus] = React.useState("all")
-  const [period, setPeriod] = React.useState({
-    start: "2026-06-23",
-    end: "2026-08-23",
-  })
+  const BASE_TIME = useBaseTime()
+  const TODAY = getToday()
+  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
+  // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
+  const [applied, setApplied] = React.useState(defaultCondition)
+  const [status, setStatus] = React.useState(applied.status)
+  const [period, setPeriod] = React.useState(applied.period)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
-  const [gridKey, setGridKey] = React.useState(0)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const [cancelErrorMessage, setCancelErrorMessage] = React.useState<
+    string | null
+  >(null)
+  const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
+    string | null
+  >(null)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const filtered = React.useMemo(() => {
-    const next = rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false
-      if (r.scheduledDate < period.start || r.scheduledDate > period.end)
-        return false
-      return true
-    })
-    const waiting = next
-      .filter((r) => r.status === "대기")
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
-    const others = next
-      .filter((r) => r.status !== "대기")
-      .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate))
-    return [...waiting, ...others]
-  }, [rows, status, period])
+  const { data, isFetching, isError, refetch } = useSearchScheduledTransfers(
+    {
+      status: STATUS_TO_API[applied.status],
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      page: page - 1,
+      size: pageSize === "all" ? 1000 : pageSize,
+    },
+    // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
+    // 올 때까지 이전 응답을 유지해서 조회조건 폼과 페이지네이션이 화면째로
+    // 사라졌다 돌아오지 않게 한다.
+    { query: { placeholderData: keepPreviousData } },
+  )
 
-  const size = pageSize === "all" ? filtered.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(filtered.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice((safePage - 1) * size, safePage * size)
+  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
+  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const pageData = data as unknown as
+    PageResponseScheduledTransferListItemResponse | undefined
+  const pageRows = sortWaitingFirst(
+    (pageData?.items ?? []).map(toReservationRow),
+  )
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
 
-  const selectedRows = rows.filter((r) => selectedIds.includes(r.id))
+  // 취소·재조회로 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
+
+  const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
+
+  const cancelMutation = useCancelScheduledTransfer({
+    request: {
+      headers: {
+        "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+        "Otp-Auth-Token": TEMP_AUTH_TOKEN,
+      },
+    },
+  })
+
+  const clearSelection = () => setSelectedIds([])
 
   const handleReset = () => {
-    setStatus("all")
-    setPeriod({ start: "2026-06-23", end: "2026-08-23" })
+    clearSelection()
+    const next = defaultCondition()
+    setStatus(next.status)
+    setPeriod(next.period)
+    setApplied(next)
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    // date 입력을 비우면 값이 ""로 들어오고 daysBetween이 NaN을 낸다. NaN은 어떤
+    // 비교에도 false라 checkPeriodRange를 그대로 통과해 fromDate= 로 요청이 나간다.
+    if (!period.start || !period.end) {
+      setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
+      return
+    }
+    /** REQ-INQR-009: 종료일이 시작일보다 빠르거나 기간이 1년을 넘으면 조회를 거부한다. */
+    const { reversed, overLimit } = checkPeriodRange(
+      period.start,
+      period.end,
+      MAX_RANGE_DAYS,
+    )
+    if (reversed) {
+      setPeriodAlertMessage(
+        "종료일이 시작일보다 빠릅니다. 조회기간을 다시 지정하세요.",
+      )
+      return
+    }
+    if (overLimit) {
+      setPeriodAlertMessage("조회기간은 최대 1년 이내로 지정할 수 있습니다.")
+      return
+    }
+
+    clearSelection()
+    const sameCondition =
+      applied.status === status &&
+      applied.period.start === period.start &&
+      applied.period.end === period.end
+    setApplied({ status, period })
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const handleCancelClick = () => {
     if (selectedRows.length === 0) return
-    if (selectedRows.some((r) => !isCancelable(r))) {
+    if (selectedRows.some((r) => !r.cancelable)) {
       setBlockedOpen(true)
       return
     }
@@ -110,15 +226,37 @@ export const E04ReservationList = () => {
     setOtpOpen(true)
   }
 
-  const handleOtpConfirm = () => {
-    setRows((prev) =>
-      prev.map((r) =>
-        selectedIds.includes(r.id) ? { ...r, status: "취소" as const } : r,
+  const handleOtpConfirm = async () => {
+    setOtpOpen(false)
+    // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
+    // 응답을 기다리는 취소 요청이 남은 채로 재조회가 나간다. 그러면 나중에
+    // 성공한 건이 반영되기 전의 목록을 받아 "일부만 성공했을 수 있으니 최신
+    // 상태를 다시 불러온다"는 의도가 그대로 깨진다.
+    const results = await Promise.allSettled(
+      selectedRows.map((r) =>
+        cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
       ),
     )
-    setOtpOpen(false)
-    setSelectedIds([])
-    setGridKey((k) => k + 1)
+    clearSelection()
+
+    const failed = results.find((r) => r.status === "rejected")
+    const refreshed = await refetch()
+
+    // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+    // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
+    // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
+    if (failed) {
+      const reason = failed.reason
+      setCancelErrorMessage(
+        reason instanceof ApiError
+          ? reason.message
+          : "예약이체 취소에 실패했습니다.",
+      )
+    } else if (refreshed.isError) {
+      setCancelErrorMessage(
+        "취소 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+      )
+    }
   }
 
   const exportHeaders = [
@@ -131,15 +269,16 @@ export const E04ReservationList = () => {
     "표시내용",
     "등록일시",
   ]
-  const exportRows = filtered.map((r) => [
+  // 서버 페이지네이션이라 현재 페이지에 보이는 건만 내보낸다.
+  const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
+    `${r.fromAlias ?? ""} ${maskAccountNo(r.fromAccountNo)}`,
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
     formatAmount(r.amount),
-    r.memo,
-    formatDateTime(r.registeredAt),
+    r.memo ?? "-",
+    r.registeredAt ? formatDateTime(r.registeredAt) : "-",
   ])
 
   const columns: DataGridColumn<ReservationRow>[] = [
@@ -161,9 +300,7 @@ export const E04ReservationList = () => {
       width: 120,
       sortable: true,
       sortValue: (r) => r.scheduledDate,
-      render: (r) => (
-        <span className="tabular-nums">{formatDate(r.scheduledDate)}</span>
-      ),
+      render: (r) => <span>{formatDate(r.scheduledDate)}</span>,
     },
     {
       key: "fromAccountNo",
@@ -171,10 +308,8 @@ export const E04ReservationList = () => {
       width: 170,
       render: (r) => (
         <span className="whitespace-nowrap">
-          {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
-            {formatAccountNo(r.fromAccountNo)}
-          </span>
+          {r.fromAlias ?? ""} <span className="text-ink-faint">/</span>{" "}
+          <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),
     },
@@ -182,9 +317,7 @@ export const E04ReservationList = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -200,13 +333,18 @@ export const E04ReservationList = () => {
       width: 120,
       render: (r) => formatAmount(r.amount),
     },
-    { key: "memo", header: "표시내용", align: "left" },
+    {
+      key: "memo",
+      header: "표시내용",
+      align: "left",
+      render: (r) => <span>{r.memo ?? "-"}</span>,
+    },
     {
       key: "registeredAt",
       header: "등록일시",
       width: 150,
       render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.registeredAt)}</span>
+        <span>{r.registeredAt ? formatDateTime(r.registeredAt) : "-"}</span>
       ),
     },
   ]
@@ -237,7 +375,7 @@ export const E04ReservationList = () => {
             cancelLabel="닫기"
             items={selectedRows.map((r) => ({
               label: formatDate(r.scheduledDate),
-              value: `${r.fromAlias} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
+              value: `${r.fromAlias ?? formatAccountNo(r.fromAccountNo)} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
             }))}
           />
 
@@ -259,9 +397,16 @@ export const E04ReservationList = () => {
           />
 
           <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
+            open={periodAlertMessage != null}
+            onClose={() => setPeriodAlertMessage(null)}
+            messages={periodAlertMessage ? [periodAlertMessage] : []}
+          />
+
+          <ErrorDialog
+            open={cancelErrorMessage != null}
+            onClose={() => setCancelErrorMessage(null)}
+            title="예약이체 취소 실패"
+            messages={cancelErrorMessage ? [cancelErrorMessage] : []}
           />
 
           <TextViewModal
@@ -277,8 +422,8 @@ export const E04ReservationList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={handleSearch}
+          onSaveCondition={savedCondition.save}
         >
           <FormRow label="상태">
             <RadioRowField
@@ -306,7 +451,7 @@ export const E04ReservationList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedIds.length === 0}
+            disabled={selectedRows.length === 0 || cancelMutation.isPending}
             onClick={handleCancelClick}
           >
             선택 취소
@@ -317,35 +462,55 @@ export const E04ReservationList = () => {
           ※ 대기 상태이고 이체 예정일 전일까지인 건만 선택할 수 있습니다.
         </p>
 
+        {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
+            동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
-          totalCount={filtered.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
+            clearSelection()
             setPageSize(s)
             setPage(1)
           }}
           baseTimeLabel={formatDateTime(BASE_TIME)}
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(`예약이체조회_${TODAY}.csv`, exportHeaders, exportRows)
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="예약이체조회"
         />
 
         <DataGrid
-          key={gridKey}
           columns={columns}
           rows={pageRows}
+          loading={isFetching}
           rowKey={(r) => r.id}
           selectable
+          selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
-          emptyMessage="조회된 예약이체가 없습니다."
+          emptyMessage={
+            isError
+              ? "예약이체 목록을 불러오지 못했습니다."
+              : "조회된 예약이체가 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
-          onPageChange={setPage}
+          onPageChange={(p) => {
+            clearSelection()
+            setPage(p)
+          }}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

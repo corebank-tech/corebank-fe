@@ -14,14 +14,15 @@ import {
   getProductTermRange,
   toProductDetailData,
 } from "@/entities/product"
-import { MOCK_JOIN_ACCOUNTS } from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
+import { useWithdrawAccounts } from "@/entities/account"
 import type { ProductDetailResponse } from "@/shared/api/generated/model"
+import type { AccountOption } from "@/shared/types/account"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
 export const C04InputInfo = () => {
@@ -37,12 +38,14 @@ export const C04InputInfo = () => {
   const [termMonths, setTermMonths] = React.useState<number | null>(
     prev?.termMonths ?? null,
   )
-  const [fromAccount, setFromAccount] = React.useState(
-    prev?.fromAccount ?? MOCK_JOIN_ACCOUNTS[0].accountNo,
+  const [fromAccountNo, setFromAccountNo] = React.useState(
+    prev?.fromAccountNo ?? "",
   )
   const [amount, setAmount] = React.useState<number | null>(
     prev?.amount ?? null,
   )
+
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
@@ -66,9 +69,22 @@ export const C04InputInfo = () => {
   const product = toProductDetailData(detail)
   const { minTermMonths, maxTermMonths } = getProductTermRange(detail)
 
-  const selectedAccount = MOCK_JOIN_ACCOUNTS.find(
+  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
+    alias: a.accountName ?? "",
+    accountNo: a.accountNumber ?? "",
+    balance: a.balance ?? 0,
+    withdrawable: a.balance ?? 0,
+  }))
+
+  // 계좌 목록은 비동기로 도착하므로, 아직 고르지 않았다면 첫 계좌를 렌더링 중에
+  // 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const fromAccount = fromAccountNo || (accountOptions[0]?.accountNo ?? "")
+  const selectedAccount = accountOptions.find(
     (a) => a.accountNo === fromAccount,
   )
+  const selectedAccountId = withdrawAccounts.find(
+    (a) => a.accountNumber === fromAccount,
+  )?.accountId
   const amountLabel =
     product.category === "정기적금"
       ? "가입금액(월납입금액)"
@@ -99,7 +115,15 @@ export const C04InputInfo = () => {
       : null
 
   const handleNext = () => {
-    const next: ProductJoinFormState = { termMonths, fromAccount, amount }
+    const next: ProductJoinFormState = {
+      termMonths,
+      fromAccountNo: fromAccount,
+      // 가입 실행 요청은 계좌번호가 아니라 계좌 ID를 받는다.
+      withdrawalAccountId: selectedAccountId ?? null,
+      amount,
+      // C-03에서 받은 동의 이력을 그대로 실어 나른다.
+      agreedTerms: prev?.agreedTerms ?? [],
+    }
     navigate(`/product/${product.id}/join/3`, { state: next })
   }
 
@@ -149,9 +173,9 @@ export const C04InputInfo = () => {
             >
               <WithdrawAccountField
                 id="c04-account"
-                options={MOCK_JOIN_ACCOUNTS}
+                options={accountOptions}
                 value={fromAccount}
-                onChange={setFromAccount}
+                onChange={setFromAccountNo}
               />
             </FormRow>
             <FormRow

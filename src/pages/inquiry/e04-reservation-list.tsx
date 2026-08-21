@@ -17,6 +17,7 @@ import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { OtpModal } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
+import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
@@ -35,6 +36,8 @@ import {
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
+import { checkPeriodRange } from "@/entities/transaction"
+import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
@@ -110,6 +113,9 @@ export const E04ReservationList = () => {
   const [cancelErrorMessage, setCancelErrorMessage] = React.useState<
     string | null
   >(null)
+  const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
+    string | null
+  >(null)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
@@ -163,6 +169,23 @@ export const E04ReservationList = () => {
   }
 
   const handleSearch = () => {
+    /** REQ-INQR-009: 종료일이 시작일보다 빠르거나 기간이 1년을 넘으면 조회를 거부한다. */
+    const { reversed, overLimit } = checkPeriodRange(
+      period.start,
+      period.end,
+      MAX_RANGE_DAYS,
+    )
+    if (reversed) {
+      setPeriodAlertMessage(
+        "종료일이 시작일보다 빠릅니다. 조회기간을 다시 지정하세요.",
+      )
+      return
+    }
+    if (overLimit) {
+      setPeriodAlertMessage("조회기간은 최대 1년 이내로 지정할 수 있습니다.")
+      return
+    }
+
     clearSelection()
     const sameCondition =
       applied.status === status &&
@@ -361,6 +384,12 @@ export const E04ReservationList = () => {
               "대기 상태이고 이체 예정일 전일까지인 건만 취소할 수 있습니다.",
               "이체 예정일 당일이거나 이미 처리된 건은 선택에서 제외하세요.",
             ]}
+          />
+
+          <AlertDialog
+            open={periodAlertMessage != null}
+            onClose={() => setPeriodAlertMessage(null)}
+            messages={periodAlertMessage ? [periodAlertMessage] : []}
           />
 
           <ErrorDialog

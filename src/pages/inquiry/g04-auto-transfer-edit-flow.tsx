@@ -7,7 +7,7 @@ import {
 } from "@/entities/transfer"
 import { RadioRowField } from "@/widgets/query"
 import { TransferEndDateField } from "@/widgets/transfer"
-import { addMonths, daysBetween, parseISO, toISO } from "@/shared/lib/date"
+import { addMonths, daysBetween } from "@/shared/lib/date"
 import {
   formatAccountNo,
   formatAmount,
@@ -19,23 +19,6 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { FormRow } from "@/shared/ui/form-row"
 import { Input } from "@/shared/ui/input"
 import { Modal } from "@/shared/ui/modal"
-
-/**
- * REQ-AUTO-010: 이체주기를 변경하면 다음 실행 예정일을 직전 실행 예정일 기준으로
- * 다시 계산한다. 대상 월에 이체지정일이 없으면 그 달의 말일로 보정한다(POL-034).
- */
-const recomputeNextExecDate = (
-  previousNextExecDate: string,
-  cycleMonths: TransferCycle,
-  dayOfMonth: number,
-): string => {
-  const previousDate = parseISO(previousNextExecDate)
-  const totalMonthIndex = previousDate.getMonth() + cycleMonths
-  const year = previousDate.getFullYear() + Math.floor(totalMonthIndex / 12)
-  const month = ((totalMonthIndex % 12) + 12) % 12
-  const lastDay = new Date(year, month + 1, 0).getDate()
-  return toISO(new Date(year, month, Math.min(dayOfMonth, lastDay)))
-}
 
 /** 이체종료일은 시작일 이후부터 시작일 기준 최대 60개월 이내여야 한다. */
 const isEndDateValid = (
@@ -80,23 +63,12 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
   }
 
   const handleOtpConfirm = () => {
-    const isCycleChanged = editForm.cycleMonths !== target.cycleMonths
-    const nextExecDate =
-      isCycleChanged && target.nextExecDate != null
-        ? recomputeNextExecDate(
-            target.nextExecDate,
-            editForm.cycleMonths,
-            target.dayOfMonth,
-          )
-        : target.nextExecDate
-
     onSave({
       ...target,
       amount: Number(editForm.amount) || target.amount,
       cycleMonths: editForm.cycleMonths,
       endDate: editForm.endDate,
       memo: editForm.memo,
-      nextExecDate,
     })
     setIsOtpOpen(false)
     onClose()

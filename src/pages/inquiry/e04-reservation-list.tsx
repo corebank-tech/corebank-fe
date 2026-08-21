@@ -90,7 +90,6 @@ export const E04ReservationList = () => {
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
-  const [gridKey, setGridKey] = React.useState(0)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
@@ -135,12 +134,7 @@ export const E04ReservationList = () => {
     },
   })
 
-  // DataGrid는 선택 상태를 내부 Set으로 들고 있어서 rows만 바뀌면 부모의
-  // selectedIds가 지난 페이지 id로 남는다. 목록이 갈리는 지점마다 같이 비운다.
-  const clearSelection = () => {
-    setSelectedIds([])
-    setGridKey((k) => k + 1)
-  }
+  const clearSelection = () => setSelectedIds([])
 
   const handleReset = () => {
     clearSelection()
@@ -189,7 +183,8 @@ export const E04ReservationList = () => {
       setCancelErrorMessage(
         e instanceof ApiError ? e.message : "예약이체 취소에 실패했습니다.",
       )
-      // 일부만 성공했을 수 있으니 최신 상태를 다시 불러온다.
+      // 일부만 성공했을 수 있으니 선택을 비우고 최신 상태를 다시 불러온다.
+      clearSelection()
       refetch()
     }
   }
@@ -380,7 +375,7 @@ export const E04ReservationList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedIds.length === 0}
+            disabled={selectedRows.length === 0}
             onClick={handleCancelClick}
           >
             선택 취소
@@ -412,12 +407,12 @@ export const E04ReservationList = () => {
         />
 
         <DataGrid
-          key={gridKey}
           columns={columns}
           rows={pageRows}
           loading={isLoading}
           rowKey={(r) => r.id}
           selectable
+          selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
           emptyMessage={
             isError

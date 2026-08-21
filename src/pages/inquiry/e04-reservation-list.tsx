@@ -34,6 +34,7 @@ import {
   type ReservationRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
+import { addMonths } from "@/shared/lib/date"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
@@ -74,9 +75,22 @@ const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
 // 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
-const DEFAULT_CONDITION = {
-  status: "all",
-  period: { start: "2026-06-23", end: "2026-08-23" },
+/**
+ * 예약이체는 미래 일자 건이라 형제 조회화면처럼 종료일을 오늘로 둘 수 없다.
+ * 오늘을 가운데 두고 앞뒤 2개월을 기본 창으로 잡는다 — 최근 처리된 건과
+ * 등록해 둔 예정 건이 같이 보인다.
+ */
+const DEFAULT_PERIOD_MONTHS = 2
+
+const defaultCondition = () => {
+  const today = getToday()
+  return {
+    status: "all",
+    period: {
+      start: addMonths(today, -DEFAULT_PERIOD_MONTHS),
+      end: addMonths(today, DEFAULT_PERIOD_MONTHS),
+    },
+  }
 }
 
 export const E04ReservationList = () => {
@@ -84,9 +98,9 @@ export const E04ReservationList = () => {
   const TODAY = getToday()
   // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
   // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
-  const [status, setStatus] = React.useState(DEFAULT_CONDITION.status)
-  const [period, setPeriod] = React.useState(DEFAULT_CONDITION.period)
-  const [applied, setApplied] = React.useState(DEFAULT_CONDITION)
+  const [status, setStatus] = React.useState(() => defaultCondition().status)
+  const [period, setPeriod] = React.useState(() => defaultCondition().period)
+  const [applied, setApplied] = React.useState(defaultCondition)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
@@ -139,9 +153,10 @@ export const E04ReservationList = () => {
 
   const handleReset = () => {
     clearSelection()
-    setStatus(DEFAULT_CONDITION.status)
-    setPeriod(DEFAULT_CONDITION.period)
-    setApplied(DEFAULT_CONDITION)
+    const next = defaultCondition()
+    setStatus(next.status)
+    setPeriod(next.period)
+    setApplied(next)
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()

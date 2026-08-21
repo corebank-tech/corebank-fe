@@ -32,6 +32,8 @@ export type {
 } from "@/entities/transfer/api/g04-auto-transfers"
 export { MOCK_AUTO_TRANSFERS } from "@/entities/transfer/api/g04-auto-transfers"
 
+export { toAutoTransferRow } from "@/entities/transfer/lib/mappers"
+
 export type {
   AutoTransferResult,
   AutoTransferResultRow,

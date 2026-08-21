@@ -29,6 +29,7 @@ export const C03Terms = () => {
     query: { enabled: Number.isFinite(id) },
   })
   const [allRequiredAgreed, setAllRequiredAgreed] = React.useState(false)
+  const [agreedIds, setAgreedIds] = React.useState<string[]>([])
   // 전문은 [보기]를 누른 시점에 받아온다. 미리 전부 받아두면 열지도 않은 약관에
   // 열람 이력이 남아, 서버의 전문 미열람 검증(PRD0005)이 무의미해진다.
   const [termBodies, setTermBodies] = React.useState<Record<string, string>>({})
@@ -84,8 +85,10 @@ export const C03Terms = () => {
   }
 
   const handleNext = () => {
+    // 필수만 보내면 고객이 동의한 선택 약관이 이력에서 누락된다. 실제로 체크한
+    // 항목을 그대로 싣는다.
     const agreedTerms: AgreedTerm[] = (detail.terms ?? [])
-      .filter((t) => t.required)
+      .filter((t) => agreedIds.includes(String(t.termsId ?? "")))
       .map((t) => ({ termsId: t.termsId ?? 0, version: t.version ?? "" }))
     const state: ProductJoinTermsState = { agreedTerms }
     navigate(`/product/${product.id}/join/2`, { state })
@@ -118,6 +121,7 @@ export const C03Terms = () => {
             terms={terms}
             onView={handleViewTerm}
             onAllRequiredAgreedChange={setAllRequiredAgreed}
+            onAgreedChange={setAgreedIds}
           />
 
           {allRequiredAgreed && (

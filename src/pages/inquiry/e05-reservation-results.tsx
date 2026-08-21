@@ -39,7 +39,6 @@ const ORDER_OPTIONS = [
   { label: "과거거래순", value: "past" },
 ]
 
-/** 서버가 허용하는 최대 페이지 크기. 5·10·20·30·50 외의 값은 CMN0005로 거부된다. */
 /** 화면의 정렬순서 → 서버 sort 파라미터. */
 const ORDER_TO_SORT: Record<string, "LATEST" | "OLDEST"> = {
   recent: "LATEST",

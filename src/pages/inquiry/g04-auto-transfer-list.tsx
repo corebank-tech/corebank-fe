@@ -62,6 +62,9 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 // 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
+
 export const G04AutoTransferList = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
@@ -73,7 +76,9 @@ export const G04AutoTransferList = () => {
   }>({ accountId: null, status: "all" })
   const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [status, setStatus] = React.useState("all")
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
@@ -100,7 +105,9 @@ export const G04AutoTransferList = () => {
     (a) => a.accountId === appliedAccountId,
   )
 
-  const size = pageSize === "all" ? 1000 : pageSize
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
   const { data, isFetching, isError, refetch } = useSearchAutoTransfers(
     {
       // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
@@ -472,6 +479,8 @@ export const G04AutoTransferList = () => {
         }
       >
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {

@@ -81,6 +81,9 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  */
 const DEFAULT_PERIOD_MONTHS = 2
 
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
+
 const defaultCondition = () => {
   const today = getToday()
   return {
@@ -99,7 +102,9 @@ export const E04ReservationList = () => {
   const [applied, setApplied] = React.useState(defaultCondition)
   const [status, setStatus] = React.useState(applied.status)
   const [period, setPeriod] = React.useState(applied.period)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [confirmOpen, setConfirmOpen] = React.useState(false)
@@ -115,6 +120,9 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
   const {
     data,
     dataUpdatedAt,
@@ -128,7 +136,7 @@ export const E04ReservationList = () => {
       fromDate: applied.period.start,
       toDate: applied.period.end,
       page: page - 1,
-      size: pageSize === "all" ? 1000 : pageSize,
+      size,
     },
     // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
     // 올 때까지 이전 응답을 유지해서 조회조건 폼과 페이지네이션이 화면째로
@@ -468,6 +476,8 @@ export const E04ReservationList = () => {
         {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
             동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {

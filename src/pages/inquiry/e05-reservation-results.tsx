@@ -1,5 +1,4 @@
 import * as React from "react"
-import { keepPreviousData } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -21,13 +20,11 @@ import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import {
   getReservationResultBadgeVariant,
   toReservationResultRow,
+  useScheduledTransferExecutions,
   type ReservationResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
-import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { useSearchScheduledTransferExecutions } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
-import type { ScheduledTransferExecutionResultPageResponse } from "@/shared/api/generated/model"
 
 /**
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-RSV-014).
@@ -69,39 +66,21 @@ export const E05ReservationResults = () => {
   // 400으로 거부돼 목록이 통째로 비므로 허용 최대값으로 자른다.
   const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
   const {
-    data,
-    dataUpdatedAt,
-    isPlaceholderData,
+    page: pageData,
+    baseTime,
     isFetching,
     isError,
     refetch,
-  } = useSearchScheduledTransferExecutions(
-    {
-      // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
-      // 않으면 서버가 내 전체 계좌를 대상으로 조회한다.
-      fromDate: applied.period.start,
-      toDate: applied.period.end,
-      sort: ORDER_TO_SORT[applied.order],
-      page: page - 1,
-      size,
-    },
-    {
-      query: {
-        // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
-        // 올 때까지 이전 응답을 유지해서 조회조건 폼과 요약이 화면째로 사라지지 않게 한다.
-        placeholderData: keepPreviousData,
-      },
-    },
-  )
+  } = useScheduledTransferExecutions({
+    // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
+    // 않으면 서버가 내 전체 계좌를 대상으로 조회한다.
+    fromDate: applied.period.start,
+    toDate: applied.period.end,
+    sort: ORDER_TO_SORT[applied.order],
+    page: page - 1,
+    size,
+  })
 
-  // 기준일시는 지금 화면에 떠 있는 데이터를 받은 시각이다(#44). 마운트 시각을
-  // 쓰면 조회조건을 만지는 동안 라벨만 앞서 나가 실제 결과 시점과 어긋난다.
-  const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const pageData = data as unknown as
-    ScheduledTransferExecutionResultPageResponse | undefined
   const pageRows = (pageData?.items ?? []).map(toReservationResultRow)
   const totalCount = pageData?.totalCount ?? 0
   const totalPages = Math.max(1, pageData?.totalPages ?? 1)

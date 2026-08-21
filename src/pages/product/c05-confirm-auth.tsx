@@ -14,6 +14,11 @@ import {
   formatKoreanAmount,
 } from "@/shared/lib/format"
 import {
+  useProductDetail,
+  useExecuteSubscription,
+  fetchSubscriptionResult,
+  type ProductSubscriptionExecuteResponse,
+  type ProductSubscriptionResultResponse,
   addMonthsWithEomCorrection,
   estimateMaturityAmount,
   getAppliedRateForTerm,
@@ -27,17 +32,7 @@ import {
   type ProductJoinResult,
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
-import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import {
-  useExecuteProductSubscription,
-  getProductSubscriptions,
-} from "@/shared/api/generated/product-subscription-controller/product-subscription-controller"
 import { useWithdrawAccounts } from "@/entities/account"
-import type {
-  ProductDetailResponse,
-  ProductSubscriptionExecuteResponse,
-  ProductSubscriptionResultResponse,
-} from "@/shared/api/generated/model"
 import { ApiError } from "@/shared/api/api-error"
 
 const PASSWORD_LIMIT = 4
@@ -52,9 +47,7 @@ export const C05ConfirmAuth = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const id = Number(productId)
-  const { data, isLoading, isError } = useGetProductDetail(id, {
-    query: { enabled: Number.isFinite(id) },
-  })
+  const { detail, isLoading, isError } = useProductDetail(id)
 
   const [password, setPassword] = React.useState("")
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
@@ -65,11 +58,7 @@ export const C05ConfirmAuth = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
-  const executeMutation = useExecuteProductSubscription()
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const detail = data as unknown as ProductDetailResponse | undefined
+  const executeMutation = useExecuteSubscription()
 
   if (isLoading) {
     return (
@@ -172,13 +161,10 @@ export const C05ConfirmAuth = () => {
       let prefill: ProductSubscriptionResultResponse["autoTransferPrefill"]
       if (executed?.subscriptionId != null) {
         try {
-          const detailResponse = await getProductSubscriptions(
+          const subscription = await fetchSubscriptionResult(
             executed.subscriptionId,
           )
-          prefill = (
-            detailResponse as unknown as
-              ProductSubscriptionResultResponse | undefined
-          )?.autoTransferPrefill
+          prefill = subscription?.autoTransferPrefill
         } catch {
           prefill = undefined
         }

@@ -4,7 +4,11 @@ import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { TermsAgreement } from "@/widgets"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
-import { toProductDetailData } from "@/entities/product"
+import {
+  toProductDetailData,
+  useProductDetail,
+  fetchProductTerms,
+} from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type AgreedTerm,
@@ -12,12 +16,6 @@ import {
 } from "@/pages/product/join-shared"
 import { Alert } from "@/shared/ui/alert"
 import { EmptyState } from "@/shared/ui/empty-state"
-import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import { getProductTerms } from "@/shared/api/generated/product-controller/product-controller"
-import type {
-  ProductDetailResponse,
-  ProductTermsViewResponse,
-} from "@/shared/api/generated/model"
 import type { TermItem } from "@/shared/types/term"
 
 /** C-03 상품가입 1단계 · 약관동의 (REQ-PRDT-005) */
@@ -25,18 +23,12 @@ export const C03Terms = () => {
   const { productId } = useParams()
   const navigate = useNavigate()
   const id = Number(productId)
-  const { data, isLoading, isError } = useGetProductDetail(id, {
-    query: { enabled: Number.isFinite(id) },
-  })
+  const { detail, isLoading, isError } = useProductDetail(id)
   const [allRequiredAgreed, setAllRequiredAgreed] = React.useState(false)
   const [agreedIds, setAgreedIds] = React.useState<string[]>([])
   // 전문은 [보기]를 누른 시점에 받아온다. 미리 전부 받아두면 열지도 않은 약관에
   // 열람 이력이 남아, 서버의 전문 미열람 검증(PRD0005)이 무의미해진다.
   const [termBodies, setTermBodies] = React.useState<Record<string, string>>({})
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const detail = data as unknown as ProductDetailResponse | undefined
 
   if (isLoading) {
     return (
@@ -73,8 +65,7 @@ export const C03Terms = () => {
   const handleViewTerm = async (id: string) => {
     if (termBodies[id]) return
     try {
-      const response = await getProductTerms(product.id, Number(id))
-      const view = response as unknown as ProductTermsViewResponse | undefined
+      const view = await fetchProductTerms(product.id, Number(id))
       setTermBodies((prev) => ({ ...prev, [id]: view?.content ?? "" }))
     } catch {
       setTermBodies((prev) => ({

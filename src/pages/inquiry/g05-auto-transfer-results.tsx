@@ -1,5 +1,4 @@
 import * as React from "react"
-import { keepPreviousData } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -28,15 +27,13 @@ import {
 import {
   getAutoTransferResultBadgeVariant,
   toAutoTransferResultRow,
+  useAutoTransferExecutions,
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
-import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { useSearchAutoTransferExecutions } from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { AutoTransferExecutionHistoryPageResponse } from "@/shared/api/generated/model"
 
 // 서버가 페이지 크기를 5·10·20·30·50 화이트리스트로 막는다. 툴바의 "전체 보기"를
 // 그대로 보내면 CMN0005로 400이 난다. E-05와 같은 임시 대응이고, 툴바에서 옵션을
@@ -72,13 +69,12 @@ export const G05AutoTransferResults = () => {
 
   const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
   const {
-    data,
-    dataUpdatedAt,
-    isPlaceholderData,
+    page: pageData,
+    baseTime,
     isFetching,
     isError,
     refetch,
-  } = useSearchAutoTransferExecutions(
+  } = useAutoTransferExecutions(
     {
       // REQ-AUTO-018: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
       // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
@@ -88,22 +84,9 @@ export const G05AutoTransferResults = () => {
       page: page - 1,
       size,
     },
-    {
-      query: {
-        enabled: appliedAccountId != null,
-        // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
-        // 올 때까지 이전 응답을 유지해서 조회조건 폼과 요약이 화면째로 사라지지 않게 한다.
-        placeholderData: keepPreviousData,
-      },
-    },
+    { enabled: appliedAccountId != null },
   )
 
-  // 기준일시는 지금 화면에 떠 있는 데이터를 받은 시각이다(#44). 마운트 시각을
-  // 쓰면 조회조건을 만지는 동안 라벨만 앞서 나가 실제 결과 시점과 어긋난다.
-  const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
-
-  const pageData = data as unknown as
-    AutoTransferExecutionHistoryPageResponse | undefined
   // 출금계좌 정보는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
   const pageRows = (pageData?.items ?? []).map((item) =>
     toAutoTransferResultRow(item, {

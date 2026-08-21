@@ -122,6 +122,9 @@ export const InstantTransferScreen = () => {
       ? { ...INITIAL_FORM, fromAccount: preselected.accountNo }
       : INITIAL_FORM
   })
+  // 사용자가 확인 다이얼로그에서 승인한 시각. 다이얼로그 표시와 원장 기록에
+  // 같은 값을 써서, 확인한 거래시각과 저장되는 거래시각이 어긋나지 않게 한다.
+  const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [authError, setAuthError] = React.useState<string | null>(null)
@@ -217,6 +220,7 @@ export const InstantTransferScreen = () => {
         return
       }
       setAuthError(null)
+      setTransactionAt(getNow())
       setConfirmOpen(true)
     }
 
@@ -233,8 +237,7 @@ export const InstantTransferScreen = () => {
     }
 
     const handleOtpConfirm = () => {
-      // 한 건의 이체 기록에 같은 시각이 박히도록 실행 시점에 한 번만 읽는다.
-      const executedAt = getNow()
+      const executedAt = transactionAt ?? getNow()
       setOtpOpen(false)
       if (form.executionFails) {
         setResult({
@@ -345,10 +348,13 @@ export const InstantTransferScreen = () => {
           ]}
           confirmLabel="확인"
           items={[
-            { label: "1. 거래일자", value: formatDate(BASE_TIME) },
+            {
+              label: "1. 거래일자",
+              value: formatDate(transactionAt ?? BASE_TIME),
+            },
             {
               label: "2. 거래시각",
-              value: formatDateTime(BASE_TIME).slice(11),
+              value: formatDateTime(transactionAt ?? BASE_TIME).slice(11),
             },
             {
               label: "3. 출금계좌번호",

@@ -18,7 +18,7 @@ import {
   estimateMaturityAmount,
 } from "@/entities/product"
 import {
-  JOIN_DATE,
+  getJoinDate,
   MOCK_JOIN_ACCOUNTS,
   MOCK_JOIN_PRODUCTS,
 } from "@/entities/product"
@@ -50,7 +50,7 @@ export const C05ConfirmAuth = () => {
   const termMonths = form.termMonths ?? product.minTermMonths
   const amount = form.amount ?? product.minAmount
 
-  const maturityDate = addMonthsWithEomCorrection(JOIN_DATE, termMonths)
+  const maturityDate = addMonthsWithEomCorrection(getJoinDate(), termMonths)
   const expectedMaturity = estimateMaturityAmount({
     category: product.category,
     amount,

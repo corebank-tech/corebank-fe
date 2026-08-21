@@ -11,7 +11,7 @@ import {
   MOCK_TRANSFER_LIMITS,
 } from "@/entities/transfer"
 import { addMonths, daysBetween } from "@/shared/lib/date"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
 import { AUTO_TRANSFER_START_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { WithAuthenticatedPage } from "../../../../.storybook/decorators/page-providers"
 
@@ -52,7 +52,7 @@ const AutoTransferStep1Demo = () => {
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
   const startSpan = form.startDate
-    ? daysBetween(MOCK_TODAY, form.startDate)
+    ? daysBetween(getToday(), form.startDate)
     : null
   const startValid =
     startSpan != null &&
@@ -83,7 +83,7 @@ const AutoTransferStep1Demo = () => {
       accounts={MOCK_TRANSFER_ACCOUNTS}
       form={form}
       onChange={setField}
-      today={MOCK_TODAY}
+      today={getToday()}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
       duplicate={duplicate}

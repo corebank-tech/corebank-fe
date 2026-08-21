@@ -15,9 +15,7 @@ import {
   TRANSFER_LIMIT_PER_DAY_MAX as PER_DAY_MAX,
   TRANSFER_LIMIT_PER_TRANSFER_MAX as PER_TRANSFER_MAX,
 } from "@/shared/config/policy"
-import { MOCK_NOW } from "@/shared/config/mock-clock"
-
-const BASE_TIME = MOCK_NOW
+import { getNow } from "@/shared/config/clock"
 
 const onlyDigits = (value: string): string => {
   return onlyDigitsBase(value, 15)
@@ -33,6 +31,7 @@ const formatDraft = (value: string): string => {
  * 제공한다. 보안매체 등급 개념 없이 OTP 단일 수단으로 변경을 인증한다(EX-010).
  */
 export const D05TransferLimit = () => {
+  const BASE_TIME = getNow()
   const [limit, setLimit] = React.useState(MOCK_TRANSFER_LIMIT)
   const [perTransferDraft, setPerTransferDraft] = React.useState(
     String(limit.perTransferLimit),

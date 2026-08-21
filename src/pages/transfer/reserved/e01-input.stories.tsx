@@ -10,7 +10,7 @@ import {
   MOCK_TRANSFER_LIMITS,
 } from "@/entities/transfer"
 import { daysBetween } from "@/shared/lib/date"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
 import { RESERVATION_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { WithAuthenticatedPage } from "../../../../.storybook/decorators/page-providers"
 
@@ -36,7 +36,7 @@ const ReservedTransferStep1Demo = () => {
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
   const dateSpan = form.scheduledDate
-    ? daysBetween(MOCK_TODAY, form.scheduledDate)
+    ? daysBetween(getToday(), form.scheduledDate)
     : null
   const dateValid =
     dateSpan != null && dateSpan >= 1 && dateSpan <= RESERVATION_MAX_RANGE_DAYS
@@ -54,7 +54,7 @@ const ReservedTransferStep1Demo = () => {
       accounts={MOCK_TRANSFER_ACCOUNTS}
       form={form}
       onChange={setField}
-      today={MOCK_TODAY}
+      today={getToday()}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
       canSubmit={canSubmit}

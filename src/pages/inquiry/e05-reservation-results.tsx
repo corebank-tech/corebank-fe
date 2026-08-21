@@ -29,10 +29,7 @@ import {
   getReservationResultBadgeVariant,
   type ReservationResultRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getNow, getToday } from "@/shared/config/clock"
 
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
@@ -40,6 +37,8 @@ const ORDER_OPTIONS = [
 ]
 
 export const E05ReservationResults = () => {
+  const BASE_TIME = getNow()
+  const TODAY = getToday()
   const [period, setPeriod] = React.useState({
     start: "2026-06-23",
     end: TODAY,

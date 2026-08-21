@@ -38,10 +38,7 @@ import {
   getTransferStatusBadgeVariant,
   type TransferHistoryRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getNow, getToday } from "@/shared/config/clock"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -69,6 +66,8 @@ const SEARCH_FIELDS: GridSearchField[] = [
 ]
 
 export const D04TransferHistory = () => {
+  const BASE_TIME = getNow()
+  const TODAY = getToday()
   const [period, setPeriod] = React.useState({
     start: "2026-06-23",
     end: TODAY,

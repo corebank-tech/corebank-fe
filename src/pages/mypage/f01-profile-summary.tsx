@@ -8,7 +8,7 @@ import {
   maskPhone,
   maskUserId,
 } from "@/shared/lib/format"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { getNow } from "@/shared/config/clock"
 import type { CustomerProfile } from "@/entities/customer"
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
 }
 
 export const F01ProfileSummary = ({ profile }: Props) => {
+  const BASE_TIME = getNow()
   return (
     <FormSection title="고객정보 조회">
       <div>

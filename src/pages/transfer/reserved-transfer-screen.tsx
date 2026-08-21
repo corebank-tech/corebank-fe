@@ -15,10 +15,7 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { daysBetween } from "@/shared/lib/date"
-import {
-  MOCK_NOW as NOW,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getNow, getToday } from "@/shared/config/clock"
 import { RESERVATION_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
@@ -64,6 +61,8 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  * execution (REQ-RSV-005, REQ-TRSF-031) is orchestrated here.
  */
 export const ReservedTransferScreen = () => {
+  const NOW = getNow()
+  const TODAY = getToday()
   const navigate = useNavigate()
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<ReservedTransferForm>(INITIAL_FORM)

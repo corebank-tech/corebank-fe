@@ -36,7 +36,7 @@ import {
   formatDateTime,
   maskName,
 } from "@/shared/lib/format"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { getNow } from "@/shared/config/clock"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { InstantTransferStep1 } from "@/pages/transfer/instant-transfer/d01-input"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
@@ -107,6 +107,7 @@ const INITIAL_FORM: InstantTransferForm = {
  * (REQ-TRSF-009, REQ-TRSF-031)는 여기서 조립한다.
  */
 export const InstantTransferScreen = () => {
+  const BASE_TIME = getNow()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)
@@ -231,13 +232,15 @@ export const InstantTransferScreen = () => {
     }
 
     const handleOtpConfirm = () => {
+      // 한 건의 이체 기록에 같은 시각이 박히도록 실행 시점에 한 번만 읽는다.
+      const executedAt = getNow()
       setOtpOpen(false)
       if (form.executionFails) {
         setResult({
           variant: "fail",
           row: {
             transactionId: "-",
-            processedAt: BASE_TIME,
+            processedAt: executedAt,
             fromAccountNo: form.fromAccount,
             toAccountNo: form.toAccount,
             payeeName: form.payeeName,
@@ -251,12 +254,12 @@ export const InstantTransferScreen = () => {
             "일시적인 시스템 오류로 이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
         })
       } else {
-        const transactionId = generateTransactionId(BASE_TIME)
+        const transactionId = generateTransactionId(executedAt)
         setResult({
           variant: "success",
           row: {
             transactionId,
-            processedAt: BASE_TIME,
+            processedAt: executedAt,
             fromAccountNo: form.fromAccount,
             toAccountNo: form.toAccount,
             payeeName: form.payeeName,
@@ -273,7 +276,7 @@ export const InstantTransferScreen = () => {
          */
         MOCK_TRANSFER_HISTORY.unshift({
           id: transactionId,
-          datetime: BASE_TIME,
+          datetime: executedAt,
           fromAccountNo: form.fromAccount,
           fromAlias: selectedAccount?.alias ?? "",
           toAccountNo: form.toAccount,
@@ -285,7 +288,7 @@ export const InstantTransferScreen = () => {
           memo: form.payeeMemo || "-",
         })
         MOCK_TRANSFER_LIMITS.usedToday += amount
-        MOCK_ACCESS_STATUS.lastTransaction = BASE_TIME
+        MOCK_ACCESS_STATUS.lastTransaction = executedAt
         for (const rows of [
           MOCK_TRANSFER_ACCOUNTS,
           MOCK_OVERVIEW_ACCOUNTS,
@@ -296,7 +299,7 @@ export const InstantTransferScreen = () => {
         ]) {
           debitAccount(rows, form.fromAccount, amount)
         }
-        const transferDate = BASE_TIME.slice(0, 10)
+        const transferDate = executedAt.slice(0, 10)
         const overviewRow = MOCK_OVERVIEW_ACCOUNTS.find(
           (a) => a.accountNo === form.fromAccount,
         )

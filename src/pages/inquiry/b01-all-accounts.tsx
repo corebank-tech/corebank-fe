@@ -25,10 +25,7 @@ import {
   type AccountGroupId,
   type OverviewAccount,
 } from "@/entities/account"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getNow, getToday } from "@/shared/config/clock"
 
 const GROUP_LABELS: Record<AccountGroupId, string> = {
   checking: "입출금계좌",
@@ -110,6 +107,8 @@ const buildColumns = (
 const GROUP_ORDER: AccountGroupId[] = ["checking", "deposit"]
 
 export const B01AllAccounts = () => {
+  const BASE_TIME = getNow()
+  const TODAY = getToday()
   const navigate = useNavigate()
   const [pageSize, setPageSize] = React.useState<number | "all">("all")
   const [brailleOpen, setBrailleOpen] = React.useState(false)

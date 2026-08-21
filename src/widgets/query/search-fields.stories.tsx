@@ -9,7 +9,7 @@ import {
 } from "@/widgets/query/search-fields"
 import { FormRow } from "@/shared/ui/form-row"
 import { MOCK_TRANSFER_ACCOUNTS } from "@/entities/transfer"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
 
 const CONTENT_OPTIONS: RadioRowOption[] = [
   { label: "전체", value: "all" },
@@ -34,7 +34,7 @@ const AccountSelectFieldDemo = () => {
 const PeriodFieldDemo = () => {
   const [range, setRange] = React.useState({
     start: "2026-06-23",
-    end: MOCK_TODAY,
+    end: getToday(),
   })
   return (
     <FormRow label="조회기간">
@@ -42,7 +42,7 @@ const PeriodFieldDemo = () => {
         start={range.start}
         end={range.end}
         onChange={setRange}
-        today={MOCK_TODAY}
+        today={getToday()}
       />
     </FormRow>
   )

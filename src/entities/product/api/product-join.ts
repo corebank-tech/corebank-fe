@@ -3,7 +3,7 @@ import type {
   ProductJoinMaster,
 } from "@/entities/product/model/types"
 import type { TermItem } from "@/shared/types/term"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
 
 /** 취급 상품은 정기예금·정기적금 2종뿐이다(POL-029). */
 export const MOCK_JOIN_PRODUCTS: Record<string, ProductJoinMaster> = {
@@ -93,8 +93,8 @@ export const MOCK_JOIN_ACCOUNTS: JoinWithdrawAccount[] = [
   },
 ]
 
-/** 가입일 앵커. 다른 화면(BASE_TIME 등)과 같은 mock 기준시각을 공유한다. */
-export const JOIN_DATE = MOCK_TODAY
+/** 가입일 앵커. 다른 화면(기준일시 등)과 같은 기준시각을 공유한다. */
+export const getJoinDate = (): string => getToday()
 
 /** 상품가입·회원가입 약관동의 항목. required=true 인 항목이 모두 체크되어야 다음 단계로 진행할 수 있다. */
 export const MOCK_JOIN_TERMS: TermItem[] = [

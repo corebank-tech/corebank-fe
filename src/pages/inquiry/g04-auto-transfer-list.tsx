@@ -33,10 +33,7 @@ import {
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getNow, getToday } from "@/shared/config/clock"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 
 const STATUS_OPTIONS = [
@@ -56,11 +53,13 @@ const isTerminable = (row: AutoTransferRow): boolean => {
   return (
     row.status === "정상" &&
     row.nextExecDate != null &&
-    row.nextExecDate > TODAY
+    row.nextExecDate > getToday()
   )
 }
 
 export const G04AutoTransferList = () => {
+  const BASE_TIME = getNow()
+  const TODAY = getToday()
   const [rows, setRows] = React.useState(MOCK_AUTO_TRANSFERS)
   const [fromAccount, setFromAccount] = React.useState("all")
   const [status, setStatus] = React.useState("all")

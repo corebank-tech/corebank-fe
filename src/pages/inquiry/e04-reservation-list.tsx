@@ -194,22 +194,27 @@ export const E04ReservationList = () => {
 
   const handleOtpConfirm = async () => {
     setOtpOpen(false)
-    try {
-      await Promise.all(
-        selectedRows.map((r) =>
-          cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
-        ),
-      )
-      clearSelection()
-      refetch()
-    } catch (e) {
+    // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
+    // 응답을 기다리는 취소 요청이 남은 채로 재조회가 나간다. 그러면 나중에
+    // 성공한 건이 반영되기 전의 목록을 받아 "일부만 성공했을 수 있으니 최신
+    // 상태를 다시 불러온다"는 의도가 그대로 깨진다.
+    const results = await Promise.allSettled(
+      selectedRows.map((r) =>
+        cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
+      ),
+    )
+    clearSelection()
+
+    const failed = results.find((r) => r.status === "rejected")
+    if (failed) {
+      const reason = failed.reason
       setCancelErrorMessage(
-        e instanceof ApiError ? e.message : "예약이체 취소에 실패했습니다.",
+        reason instanceof ApiError
+          ? reason.message
+          : "예약이체 취소에 실패했습니다.",
       )
-      // 일부만 성공했을 수 있으니 선택을 비우고 최신 상태를 다시 불러온다.
-      clearSelection()
-      refetch()
     }
+    await refetch()
   }
 
   const exportHeaders = [

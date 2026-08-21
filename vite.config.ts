@@ -12,6 +12,12 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  server: {
+    // 로컬 백엔드에 CORS 설정이 없어서, 같은 오리진처럼 보이도록 프록시로 우회한다.
+    proxy: {
+      "/api/v1": "http://localhost:8080",
+    },
+  },
   test: {
     environment: "jsdom",
     globals: false,

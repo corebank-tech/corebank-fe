@@ -1,4 +1,3 @@
-import * as React from "react"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Chip } from "@/shared/ui/chip"
@@ -11,37 +10,37 @@ import {
   type ProductCategory,
 } from "@/entities/product"
 
-type CategoryFilter = "전체" | ProductCategory
-type SortKey = "rate" | "latest"
+export type CategoryFilter = "전체" | ProductCategory
+export type SortKey = "rate" | "latest"
 
 type ProductCardGridProps = {
+  /** 서버가 필터·정렬까지 적용해 내려준 목록을 그대로 렌더링한다 (직접 필터링/정렬하지 않는다). */
   products: ProductCard[]
-  onViewDetail?: (id: string) => void
-  onJoin?: (id: string) => void
+  filter?: CategoryFilter
+  onFilterChange?: (filter: CategoryFilter) => void
+  sort?: SortKey
+  onSortChange?: (sort: SortKey) => void
+  onViewDetail?: (id: number) => void
+  onJoin?: (id: number) => void
+  /** 목록 조회 상태. true면 필터·정렬 칩은 그대로 두고 목록 영역만 로딩/에러로 바꾼다. */
+  isLoading?: boolean
+  isError?: boolean
 }
 
 const FILTERS: CategoryFilter[] = ["전체", "정기예금", "정기적금"]
 
-/** 상품목록 화면(C-01). 필터·정렬 상태만 내부에서 관리한다. */
+/** 상품목록 화면(C-01). 필터·정렬은 서버 파라미터로 나가므로 여기서는 선택 상태만 표시한다. */
 export const ProductCardGrid = ({
   products,
+  filter = "전체",
+  onFilterChange,
+  sort = "rate",
+  onSortChange,
   onViewDetail,
   onJoin,
+  isLoading = false,
+  isError = false,
 }: ProductCardGridProps) => {
-  const [filter, setFilter] = React.useState<CategoryFilter>("전체")
-  const [sort, setSort] = React.useState<SortKey>("rate")
-
-  const visible = React.useMemo(() => {
-    const filtered =
-      filter === "전체"
-        ? products
-        : products.filter((p) => p.category === filter)
-    return [...filtered].sort((a, b) => {
-      if (sort === "rate") return b.maxRate - a.maxRate
-      return b.updatedAt.localeCompare(a.updatedAt)
-    })
-  }, [products, filter, sort])
-
   return (
     <div>
       {/* 필터 칩 + 정렬 */}
@@ -54,7 +53,7 @@ export const ProductCardGrid = ({
                 key={f}
                 size="lg"
                 tone={active ? "primary" : "default"}
-                onClick={() => setFilter(f)}
+                onClick={() => onFilterChange?.(f)}
                 aria-pressed={active}
                 className={active ? undefined : "text-ink-muted"}
               >
@@ -66,7 +65,7 @@ export const ProductCardGrid = ({
         <div className="w-40">
           <Select
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
+            onChange={(e) => onSortChange?.(e.target.value as SortKey)}
             aria-label="정렬 기준"
           >
             <option value="rate">금리순</option>
@@ -75,14 +74,21 @@ export const ProductCardGrid = ({
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      {isLoading ? (
+        <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+      ) : isError ? (
+        <EmptyState
+          message="상품 목록을 불러오지 못했습니다."
+          description="잠시 후 다시 시도해 주세요."
+        />
+      ) : products.length === 0 ? (
         <EmptyState
           message="조회된 상품이 없습니다."
           description="다른 상품 유형을 선택해 다시 확인해 주세요."
         />
       ) : (
         <div className="grid grid-cols-3 gap-4">
-          {visible.map((p) => (
+          {products.map((p) => (
             <article
               key={p.id}
               className="flex flex-col overflow-hidden rounded-lg bg-surface-elevated p-5 shadow-card"

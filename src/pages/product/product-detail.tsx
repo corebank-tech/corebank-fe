@@ -12,7 +12,7 @@ import {
 
 type ProductDetailProps = {
   product: ProductDetailData
-  onJoin?: (id: string) => void
+  onJoin?: (id: number) => void
 }
 
 type TabKey = "guide" | "rate" | "notice"
@@ -85,20 +85,27 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
                 {formatAmount(product.maxAmount)}
               </dd>
             </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-ink-muted">이자지급방식</dt>
-              <dd className="font-bold text-ink">{product.interestMethod}</dd>
-            </div>
           </dl>
 
-          <Button
-            fullWidth
-            size="lg"
-            className="mt-6"
-            onClick={() => onJoin?.(product.id)}
-          >
-            가입하기
-          </Button>
+          {product.saleStatus === "SUSPENDED" ? (
+            <>
+              <Button fullWidth size="lg" className="mt-6" disabled>
+                판매중지
+              </Button>
+              <p className="mt-2 text-xs text-ink-faint">
+                ※ 현재 판매가 중지되어 신규 가입할 수 없습니다.
+              </p>
+            </>
+          ) : (
+            <Button
+              fullWidth
+              size="lg"
+              className="mt-6"
+              onClick={() => onJoin?.(product.id)}
+            >
+              가입하기
+            </Button>
+          )}
         </div>
       </aside>
 

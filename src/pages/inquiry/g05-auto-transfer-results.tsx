@@ -35,10 +35,8 @@ import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
 import { useWithdrawAccounts } from "@/entities/account"
 
-// 서버가 페이지 크기를 5·10·20·30·50 화이트리스트로 막는다. 툴바의 "전체 보기"를
-// 그대로 보내면 CMN0005로 400이 난다. E-05와 같은 임시 대응이고, 툴바에서 옵션을
-// 없애는 근본 수정은 #46에서 공용 위젯과 함께 정리한다.
-const MAX_PAGE_SIZE = 50
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
 
 export const G05AutoTransferResults = () => {
   const TODAY = getToday()
@@ -50,7 +48,9 @@ export const G05AutoTransferResults = () => {
   }>(() => ({ accountId: null, period: recentPeriod() }))
   const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [period, setPeriod] = React.useState(recentPeriod)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
@@ -67,7 +67,9 @@ export const G05AutoTransferResults = () => {
     (a) => a.accountId === appliedAccountId,
   )
 
-  const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
   const {
     page: pageData,
     baseTime,
@@ -310,6 +312,8 @@ export const G05AutoTransferResults = () => {
         </p>
 
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
           totalCount={totalCount}
           pageSize={pageSize}

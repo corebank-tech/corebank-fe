@@ -40,13 +40,14 @@ const ORDER_OPTIONS = [
 ]
 
 /** 서버가 허용하는 최대 페이지 크기. 5·10·20·30·50 외의 값은 CMN0005로 거부된다. */
-const MAX_PAGE_SIZE = 50
-
 /** 화면의 정렬순서 → 서버 sort 파라미터. */
 const ORDER_TO_SORT: Record<string, "LATEST" | "OLDEST"> = {
   recent: "LATEST",
   past: "OLDEST",
 }
+
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
 
 export const E05ReservationResults = () => {
   const TODAY = getToday()
@@ -56,15 +57,17 @@ export const E05ReservationResults = () => {
   const [applied, setApplied] = React.useState(defaultCondition)
   const [period, setPeriod] = React.useState(applied.period)
   const [order, setOrder] = React.useState(applied.order)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  // 서버는 5·10·20·30·50만 허용한다(CMN0005). "전체 보기"를 그대로 큰 수로 보내면
-  // 400으로 거부돼 목록이 통째로 비므로 허용 최대값으로 자른다.
-  const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
   const {
     page: pageData,
     baseTime,
@@ -300,6 +303,8 @@ export const E05ReservationResults = () => {
         </p>
 
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
           totalCount={totalCount}
           pageSize={pageSize}

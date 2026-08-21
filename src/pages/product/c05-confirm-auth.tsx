@@ -41,6 +41,23 @@ const PASSWORD_LIMIT = 4
 // subscription 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
+/**
+ * 신규 계좌 비밀번호. REQ-PRDT-006은 예적금 계좌가 비밀번호를 보유하지 않는다고
+ * 정의해 입력받지 않는데, 서버는 이 값을 @NotNull로 받아 저장한다
+ * (corebank-tech/corebank-server#275).
+ *
+ * 출금계좌 비밀번호를 재사용하면 고객이 모르는 사이 인증 수단이 다른 계좌로
+ * 복제된다. 고정값은 모든 신규 계좌가 같은 비밀번호를 갖게 된다. 요구사항대로
+ * 이 값이 쓰이지 않는다면 무엇을 넣든 상관없고, 쓰이게 된다면 그때는 정식 입력
+ * 흐름이 필요하므로 어느 쪽이든 요청마다 새로 만든 값이 손해가 아니다.
+ *
+ * 모듈로 편향이 있지만 인증 강도를 기대하는 값이 아니라 그대로 둔다.
+ */
+const generateNewAccountPassword = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(4)), (n) =>
+    String(n % 10),
+  ).join("")
+
 /** C-05 상품가입 3단계 · 확인 및 인증 (REQ-PRDT-010, REQ-ACCT-007) */
 export const C05ConfirmAuth = () => {
   const { productId } = useParams()
@@ -129,6 +146,10 @@ export const C05ConfirmAuth = () => {
       return
     }
 
+    // 요청마다 새로 만든다. 재시도 시 값이 달라지지만 서버가 두 필드의 일치만
+    // 검증하므로 문제되지 않는다.
+    const newAccountPassword = generateNewAccountPassword()
+
     setIsSubmitting(true)
     try {
       const response = await executeMutation.mutateAsync({
@@ -137,15 +158,8 @@ export const C05ConfirmAuth = () => {
           subscriptionAmount: amount,
           termMonths,
           withdrawalAccountId: form.withdrawalAccountId,
-          // REQ-PRDT-006은 "예적금 계좌는 계좌비밀번호를 보유하지 않으므로 신규
-          // 비밀번호를 입력받지 않는다"인데, 서버는 두 필드를 @NotNull로 받아
-          // 실제로 신규 계좌에 저장한다. 채울 값이 없어 출금계좌 비밀번호를 싣고
-          // 있고, 그 결과 고객이 모르는 사이 비밀번호가 복제된다.
-          // 고정값은 모든 계좌가 같은 비밀번호를 갖게 되어 더 나쁘고, 입력 화면
-          // 추가는 요구사항 위반이라 서버 계약이 정리되기 전까지의 임시 처리다.
-          // corebank-tech/corebank-server#275
-          newAccountPassword: password,
-          newAccountPasswordConfirm: password,
+          newAccountPassword: newAccountPassword,
+          newAccountPasswordConfirm: newAccountPassword,
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,
           otpAuthToken: TEMP_AUTH_TOKEN,
           agreedTerms: form.agreedTerms,

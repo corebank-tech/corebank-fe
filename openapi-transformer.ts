@@ -16,6 +16,7 @@ import type { OpenAPIObject, OperationObject } from "openapi3-ts/oas31"
 const TAG_SLUG: Record<string, string> = {
   자동이체: "auto-transfer-controller",
   예약이체: "scheduled-transfer-controller",
+  이체한도: "limit-controller",
   계좌: "account-controller",
   "계좌 설정": "account-preference-controller",
   이체: "transfer-controller",

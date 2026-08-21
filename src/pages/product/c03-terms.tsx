@@ -119,7 +119,7 @@ export const C03Terms = () => {
         <div className="flex flex-col gap-4">
           <TermsAgreement
             terms={terms}
-            onView={handleViewTerm}
+            onView={(id) => void handleViewTerm(id)}
             onAllRequiredAgreedChange={setAllRequiredAgreed}
             onAgreedChange={setAgreedIds}
           />

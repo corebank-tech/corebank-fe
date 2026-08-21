@@ -41,7 +41,6 @@ export type {
   AutoTransferResult,
   AutoTransferResultRow,
 } from "@/entities/transfer/api/g05-auto-transfer-results"
-export { MOCK_AUTO_TRANSFER_RESULTS } from "@/entities/transfer/api/g05-auto-transfer-results"
 
 export type {
   PayeeAccountStatus,

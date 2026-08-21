@@ -464,7 +464,7 @@ export const G04AutoTransferList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedIds.length === 0}
+            disabled={selectedRows.length === 0}
             onClick={handleTerminateClick}
           >
             선택 해지

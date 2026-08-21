@@ -244,9 +244,10 @@ export type TransferResultRow = {
   balanceAfter: number
 }
 
+/** 방금 처리된 이체 결과다(D-03 완료 화면). 처리일시는 오늘이어야 한다. */
 export const MOCK_TRANSFER_RESULT: TransferResultRow = {
-  transactionId: `${compactDate(daysAgo(6))}019876543210`,
-  processedAt: `${daysAgo(6)}T08:57:34`,
+  transactionId: `${compactDate(daysAgo(0))}019876543210`,
+  processedAt: `${daysAgo(0)}T08:57:34`,
   fromAccountNo: "110632892336",
   toAccountNo: "333330730135",
   payeeName: MOCK_PAYEE_NAME,

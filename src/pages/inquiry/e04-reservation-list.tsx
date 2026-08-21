@@ -100,7 +100,7 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const { data, isLoading, isError, refetch } = useSearchScheduledTransfers(
+  const { data, isFetching, isError, refetch } = useSearchScheduledTransfers(
     {
       status: STATUS_TO_API[applied.status],
       fromDate: applied.period.start,
@@ -108,8 +108,9 @@ export const E04ReservationList = () => {
       page: page - 1,
       size: pageSize === "all" ? 1000 : pageSize,
     },
-    // 페이지·조회조건을 바꾸면 새 쿼리 키라 곧장 로딩으로 빠진다. 결과가 올 때까지
-    // 이전 목록을 유지해서 조회조건 폼이 화면째로 사라졌다 돌아오지 않게 한다.
+    // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
+    // 올 때까지 이전 응답을 유지해서 조회조건 폼과 페이지네이션이 화면째로
+    // 사라졌다 돌아오지 않게 한다.
     { query: { placeholderData: keepPreviousData } },
   )
 
@@ -416,7 +417,7 @@ export const E04ReservationList = () => {
         <DataGrid
           columns={columns}
           rows={pageRows}
-          loading={isLoading}
+          loading={isFetching}
           rowKey={(r) => r.id}
           selectable
           selectedKeys={selectedIds}

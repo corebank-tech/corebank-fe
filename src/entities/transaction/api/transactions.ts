@@ -1,4 +1,5 @@
 import type { AccountOption } from "@/shared/types/account"
+import { daysAgo } from "@/shared/lib/mock-date"
 
 /** 계좌상태. 정상 계좌만 출금가능금액이 계좌잔액과 동일하다(REQ-INQR-008). */
 export type AccountStatus = "정상" | "거래정지" | "해지"
@@ -66,7 +67,7 @@ export const MOCK_ACCOUNTS: TransactionAccount[] = [
 export const MOCK_TRANSACTIONS: Transaction[] = [
   {
     id: "t12",
-    date: "2026-07-23",
+    date: daysAgo(0),
     time: "08:41:02",
     description: "급여이체",
     content: "㈜코어테크",
@@ -77,7 +78,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t11",
-    date: "2026-07-22",
+    date: daysAgo(1),
     time: "19:12:47",
     description: "카드출금",
     content: "BC카드",
@@ -88,7 +89,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t10",
-    date: "2026-07-21",
+    date: daysAgo(2),
     time: "13:05:33",
     description: "자동이체",
     content: "한아름아파트관리",
@@ -99,7 +100,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t09",
-    date: "2026-07-20",
+    date: daysAgo(3),
     time: "11:48:10",
     description: "이자",
     content: "예금이자",
@@ -110,7 +111,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t08",
-    date: "2026-07-18",
+    date: daysAgo(5),
     time: "09:26:55",
     description: "ATM출금",
     content: "ATM 현금인출",
@@ -121,7 +122,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t07",
-    date: "2026-07-16",
+    date: daysAgo(7),
     time: "20:02:14",
     description: "자동이체",
     content: "SK텔레콤",
@@ -132,7 +133,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t06",
-    date: "2026-07-14",
+    date: daysAgo(9),
     time: "15:33:41",
     description: "이체입금",
     content: "김민수",
@@ -143,7 +144,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t05",
-    date: "2026-07-11",
+    date: daysAgo(12),
     time: "10:17:08",
     description: "자동이체",
     content: "한화생명보험",
@@ -154,7 +155,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t04",
-    date: "2026-07-08",
+    date: daysAgo(15),
     time: "18:44:29",
     description: "카드출금",
     content: "쿠팡",
@@ -165,7 +166,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t03",
-    date: "2026-07-05",
+    date: daysAgo(18),
     time: "12:00:00",
     description: "자동이체",
     content: "내집마련적금",
@@ -176,7 +177,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t02",
-    date: "2026-07-02",
+    date: daysAgo(21),
     time: "09:10:52",
     description: "이체입금",
     content: "이서연",
@@ -187,7 +188,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "t01",
-    date: "2026-06-30",
+    date: daysAgo(23),
     time: "08:05:00",
     description: "이자",
     content: "예금이자",

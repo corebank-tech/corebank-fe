@@ -1,4 +1,5 @@
 import type { AccountOption } from "@/shared/types/account"
+import { compactDate, daysAgo } from "@/shared/lib/mock-date"
 
 /** Withdrawal accounts available to the signed-in customer. */
 export const MOCK_TRANSFER_ACCOUNTS: AccountOption[] = [
@@ -185,27 +186,27 @@ export const MOCK_RECENT_TRANSFER_ACCOUNTS: RecentTransferAccount[] = [
   {
     accountNo: "333330730135",
     payeeName: "김민수",
-    lastUsedAt: "2026-07-29T10:12:00",
+    lastUsedAt: `${daysAgo(0)}T10:12:00`,
   },
   {
     accountNo: "441205567890",
     payeeName: "이서연",
-    lastUsedAt: "2026-07-27T15:40:00",
+    lastUsedAt: `${daysAgo(2)}T15:40:00`,
   },
   {
     accountNo: "219934482201",
     payeeName: "오수빈",
-    lastUsedAt: "2026-07-24T09:05:00",
+    lastUsedAt: `${daysAgo(5)}T09:05:00`,
   },
   {
     accountNo: "128877234455",
     payeeName: "장하늘",
-    lastUsedAt: "2026-07-20T18:22:00",
+    lastUsedAt: `${daysAgo(9)}T18:22:00`,
   },
   {
     accountNo: "305566778899",
     payeeName: "배도윤",
-    lastUsedAt: "2026-07-18T11:47:00",
+    lastUsedAt: `${daysAgo(11)}T11:47:00`,
   },
 ]
 
@@ -244,8 +245,8 @@ export type TransferResultRow = {
 }
 
 export const MOCK_TRANSFER_RESULT: TransferResultRow = {
-  transactionId: "20260723019876543210",
-  processedAt: "2026-07-23T08:57:34",
+  transactionId: `${compactDate(daysAgo(6))}019876543210`,
+  processedAt: `${daysAgo(6)}T08:57:34`,
   fromAccountNo: "110632892336",
   toAccountNo: "333330730135",
   payeeName: MOCK_PAYEE_NAME,

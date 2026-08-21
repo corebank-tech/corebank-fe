@@ -73,8 +73,8 @@ const toTransferCycle = (cycleMonths: number | undefined): TransferCycle => {
  * 출금계좌번호는 응답에 없다 — 조회 조건(withdrawalAccountId)으로 지정한 계좌라
  * 호출부가 이미 알고 있는 값이고, 그대로 넘겨받는다.
  *
- * nextExecDate도 응답에 없어 비워 둔다. 해지 가능 시점(REQ-AUTO-011) 판정에 쓰이는
- * 값이라, 서버가 내려주기 전까지 화면에서 사전 차단할 수 없다.
+ * nextExecDate는 응답에 없어 비워 둔다. 해지 가능 시점(REQ-AUTO-011) 판정은
+ * 서버가 계산해 주는 cancelable을 그대로 쓴다(corebank-server#264).
  */
 export const toAutoTransferRow = (
   item: AutoTransferListItemResponse,
@@ -92,4 +92,5 @@ export const toAutoTransferRow = (
   endDate: item.endDate ?? "",
   memo: item.myPassbookMemo ?? "",
   status: toAutoTransferStatus(item.status),
+  cancelable: item.cancelable ?? false,
 })

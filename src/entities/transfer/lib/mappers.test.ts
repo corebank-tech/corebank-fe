@@ -23,6 +23,7 @@ const BASE_ITEM: AutoTransferListItemResponse = {
   myPassbookMemo: "내집마련적금",
   status: "NORMAL",
   registeredAt: "2025-09-01T10:00:00",
+  cancelable: true,
 }
 
 describe("toAutoTransferRow", () => {
@@ -42,6 +43,7 @@ describe("toAutoTransferRow", () => {
       endDate: "2027-08-05",
       memo: "내집마련적금",
       status: "정상",
+      cancelable: true,
     })
   })
 
@@ -119,6 +121,14 @@ describe("toAutoTransferRow", () => {
   it("nextExecDate는 응답에 없어 비어 있다", () => {
     const row = toAutoTransferRow(BASE_ITEM, FROM_ACCOUNT_NO)
     expect(row.nextExecDate).toBeUndefined()
+  })
+
+  it("cancelable이 없으면 false로 채운다", () => {
+    const row = toAutoTransferRow(
+      { ...BASE_ITEM, cancelable: undefined },
+      FROM_ACCOUNT_NO,
+    )
+    expect(row.cancelable).toBe(false)
   })
 
   it("선택 필드가 비어 있어도 빈 값으로 채운다", () => {

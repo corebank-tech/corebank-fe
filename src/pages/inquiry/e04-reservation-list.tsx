@@ -135,7 +135,15 @@ export const E04ReservationList = () => {
     },
   })
 
+  // DataGrid는 선택 상태를 내부 Set으로 들고 있어서 rows만 바뀌면 부모의
+  // selectedIds가 지난 페이지 id로 남는다. 목록이 갈리는 지점마다 같이 비운다.
+  const clearSelection = () => {
+    setSelectedIds([])
+    setGridKey((k) => k + 1)
+  }
+
   const handleReset = () => {
+    clearSelection()
     setStatus(DEFAULT_CONDITION.status)
     setPeriod(DEFAULT_CONDITION.period)
     setApplied(DEFAULT_CONDITION)
@@ -145,6 +153,7 @@ export const E04ReservationList = () => {
   }
 
   const handleSearch = () => {
+    clearSelection()
     setApplied({ status, period })
     setPage(1)
     savedCondition.clear()
@@ -174,8 +183,7 @@ export const E04ReservationList = () => {
           cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
         ),
       )
-      setSelectedIds([])
-      setGridKey((k) => k + 1)
+      clearSelection()
       refetch()
     } catch (e) {
       setCancelErrorMessage(
@@ -389,6 +397,7 @@ export const E04ReservationList = () => {
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
+            clearSelection()
             setPageSize(s)
             setPage(1)
           }}
@@ -420,7 +429,10 @@ export const E04ReservationList = () => {
         <Pagination
           page={Math.min(page, totalPages)}
           totalPages={totalPages}
-          onPageChange={setPage}
+          onPageChange={(p) => {
+            clearSelection()
+            setPage(p)
+          }}
         />
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />

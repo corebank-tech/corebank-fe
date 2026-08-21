@@ -40,6 +40,7 @@ type DataGridProps<Row> = {
   /** Number of skeleton rows while loading. */
   skeletonRows?: number
   hoverable?: boolean
+  rowClassName?: (row: Row, index: number) => string | undefined
 }
 
 const SELECT_COLUMN_WIDTH_PX = 44
@@ -59,6 +60,7 @@ export const DataGrid = <Row,>({
   selectedKeys,
   onSelectionChange,
   rowKey,
+  rowClassName,
   skeletonRows = 6,
   hoverable = true,
 }: DataGridProps<Row>) => {
@@ -245,6 +247,7 @@ export const DataGrid = <Row,>({
                         "bg-primary-tint",
                         hoverable && "hover:bg-primary-tint",
                       ),
+                    rowClassName?.(row, i),
                   )}
                 >
                   {selectable && (

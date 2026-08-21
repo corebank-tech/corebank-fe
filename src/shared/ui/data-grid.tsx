@@ -71,8 +71,8 @@ export const DataGrid = <Row,>({
   >(new Set())
   const controlled = selectedKeys != null
   const selected = React.useMemo(
-    () => (selectedKeys != null ? new Set(selectedKeys) : uncontrolledSelected),
-    [selectedKeys, uncontrolledSelected],
+    () => (controlled ? new Set(selectedKeys) : uncontrolledSelected),
+    [controlled, selectedKeys, uncontrolledSelected],
   )
 
   const keyOf = React.useCallback(

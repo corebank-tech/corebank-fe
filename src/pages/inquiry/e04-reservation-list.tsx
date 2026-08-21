@@ -101,9 +101,9 @@ export const E04ReservationList = () => {
   const TODAY = getToday()
   // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
   // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
-  const [status, setStatus] = React.useState(() => defaultCondition().status)
-  const [period, setPeriod] = React.useState(() => defaultCondition().period)
   const [applied, setApplied] = React.useState(defaultCondition)
+  const [status, setStatus] = React.useState(applied.status)
+  const [period, setPeriod] = React.useState(applied.period)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])

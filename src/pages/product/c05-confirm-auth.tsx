@@ -60,6 +60,9 @@ export const C05ConfirmAuth = () => {
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [executeError, setExecuteError] = React.useState<string | null>(null)
+  // 실행 요청 + 뒤이은 상세 조회까지를 하나의 진행 구간으로 잡는다.
+  // mutation.isPending은 실행 응답이 오는 순간 풀려서 상세 조회 구간이 열린다.
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
   const executeMutation = useExecuteProductSubscription()
@@ -123,7 +126,12 @@ export const C05ConfirmAuth = () => {
     setOtpOpen(true)
   }
 
+  // 실행 요청이 나가는 동안 다시 눌리지 않게 막는다. OtpModal은 onConfirm만
+  // 호출하고 스스로 닫지 않아서(otp-modal.tsx), 확인 버튼을 빠르게 두 번 누르면
+  // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
+  // 서버 멱등성으로도 걸러지지 않는다.
   const handleOtpConfirm = async () => {
+    if (isSubmitting) return
     setOtpOpen(false)
     if (form.withdrawalAccountId == null) {
       setExecuteError(
@@ -132,6 +140,7 @@ export const C05ConfirmAuth = () => {
       return
     }
 
+    setIsSubmitting(true)
     try {
       const response = await executeMutation.mutateAsync({
         data: {
@@ -198,6 +207,8 @@ export const C05ConfirmAuth = () => {
       setExecuteError(
         e instanceof ApiError ? e.message : "상품가입에 실패했습니다.",
       )
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -225,9 +236,10 @@ export const C05ConfirmAuth = () => {
               variant="primary"
               size="lg"
               className="min-w-40"
+              disabled={isSubmitting}
               onClick={handleAuthenticate}
             >
-              인증하고 가입하기
+              {isSubmitting ? "가입 처리 중..." : "인증하고 가입하기"}
             </Button>
           </>
         }

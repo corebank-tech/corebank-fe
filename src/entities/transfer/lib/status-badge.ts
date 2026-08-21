@@ -37,6 +37,7 @@ const RESERVATION_RESULT_BADGE: Record<ReservationResult, BadgeVariant> = {
   정상: "success",
   오류: "danger",
   취소: "neutral",
+  처리중: "warning",
 }
 
 export function getReservationResultBadgeVariant(
@@ -60,6 +61,7 @@ export function getAutoTransferStatusBadgeVariant(
 const AUTO_TRANSFER_RESULT_BADGE: Record<AutoTransferResult, BadgeVariant> = {
   정상: "success",
   오류: "danger",
+  처리중: "warning",
 }
 
 export function getAutoTransferResultBadgeVariant(

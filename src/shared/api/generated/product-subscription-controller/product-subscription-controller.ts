@@ -54,7 +54,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const getExecute1Url = () => {
+export const getExecuteProductSubscriptionUrl = () => {
 
 
 
@@ -62,9 +62,9 @@ export const getExecute1Url = () => {
   return `/product-subscriptions`
 }
 
-export const execute1 = async (productSubscriptionExecuteRequest: ProductSubscriptionExecuteRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseProductSubscriptionExecuteResponse> => {
+export const executeProductSubscription = async (productSubscriptionExecuteRequest: ProductSubscriptionExecuteRequest, options?: Parameters<typeof customFetch>[1]): Promise<ApiResponseProductSubscriptionExecuteResponse> => {
 
-  return customFetch<ApiResponseProductSubscriptionExecuteResponse>(getExecute1Url(),
+  return customFetch<ApiResponseProductSubscriptionExecuteResponse>(getExecuteProductSubscriptionUrl(),
   {
     ...options,
     method: 'POST',
@@ -77,11 +77,11 @@ export const execute1 = async (productSubscriptionExecuteRequest: ProductSubscri
 
 
 
-export const getExecute1MutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext> => {
+export const getExecuteProductSubscriptionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeProductSubscription>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof executeProductSubscription>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext> => {
 
-const mutationKey = ['execute1'];
+const mutationKey = ['executeProductSubscription'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -91,10 +91,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof execute1>>, {data: ProductSubscriptionExecuteRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof executeProductSubscription>>, {data: ProductSubscriptionExecuteRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  execute1(data,requestOptions)
+          return  executeProductSubscription(data,requestOptions)
         }
 
 
@@ -104,19 +104,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type Execute1MutationResult = NonNullable<Awaited<ReturnType<typeof execute1>>>
-    export type Execute1MutationBody = ProductSubscriptionExecuteRequest
-    export type Execute1MutationError = unknown
+    export type ExecuteProductSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof executeProductSubscription>>>
+    export type ExecuteProductSubscriptionMutationBody = ProductSubscriptionExecuteRequest
+    export type ExecuteProductSubscriptionMutationError = unknown
 
-    export const useExecute1 = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof execute1>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+    export const useExecuteProductSubscription = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeProductSubscription>>, TError,{data: ProductSubscriptionExecuteRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof execute1>>,
+        Awaited<ReturnType<typeof executeProductSubscription>>,
         TError,
         {data: ProductSubscriptionExecuteRequest},
         TContext
       > => {
-      return useMutation(getExecute1MutationOptions(options), queryClient);
+      return useMutation(getExecuteProductSubscriptionMutationOptions(options), queryClient);
     }
     export const getValidateUrl = () => {
 

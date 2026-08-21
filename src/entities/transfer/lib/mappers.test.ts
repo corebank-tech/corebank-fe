@@ -22,6 +22,7 @@ const BASE_ITEM: AutoTransferListItemResponse = {
   cycleMonths: 1,
   myPassbookMemo: "내집마련적금",
   status: "NORMAL",
+  cancelable: true,
   registeredAt: "2025-09-01T10:00:00",
 }
 
@@ -42,7 +43,18 @@ describe("toAutoTransferRow", () => {
       endDate: "2027-08-05",
       memo: "내집마련적금",
       status: "정상",
+      cancelable: true,
     })
+  })
+
+  // 해지 가능 여부가 빠진 응답을 '가능'으로 읽으면 해지할 수 없는 건에 해지 버튼이
+  // 열린다. 서버 거부로 끝나긴 하지만 사용자는 인증까지 끝낸 뒤에야 알게 된다.
+  it("해지 가능 여부가 없으면 해지 불가로 읽는다", () => {
+    const row = toAutoTransferRow(
+      { ...BASE_ITEM, cancelable: undefined },
+      FROM_ACCOUNT_NO,
+    )
+    expect(row.cancelable).toBe(false)
   })
 
   it("출금계좌번호는 응답이 아니라 인자로 받은 값을 쓴다", () => {

@@ -24,6 +24,8 @@ export type AutoTransferRow = {
   status: AutoTransferStatus
   /** 상태가 '정상'인 건만 존재. */
   nextExecDate?: string
+  /** REQ-AUTO-011: 서버가 판정한 해지 가능 여부. 다음 실행 예정일 당일이면 false다. */
+  cancelable: boolean
 }
 
 /** 오늘 = 2026-07-23 기준 목업. */
@@ -42,6 +44,7 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     memo: "내집마련적금",
     status: "정상",
     nextExecDate: "2026-08-05",
+    cancelable: true,
   },
   {
     id: "at4",
@@ -57,6 +60,7 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     memo: "관리비",
     status: "정상",
     nextExecDate: "2026-08-21",
+    cancelable: true,
   },
   {
     id: "at3",
@@ -72,6 +76,7 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     memo: "여행적금",
     status: "정상",
     nextExecDate: "2026-08-05",
+    cancelable: true,
   },
   {
     id: "at2",
@@ -86,6 +91,7 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     endDate: "2026-01-15",
     memo: "부모님 용돈",
     status: "종료",
+    cancelable: false,
   },
   {
     id: "at1",
@@ -100,5 +106,6 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     endDate: "2027-06-01",
     memo: "동호회비",
     status: "해지",
+    cancelable: false,
   },
 ]

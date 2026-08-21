@@ -94,6 +94,7 @@ export const toAutoTransferRow = (
   endDate: item.endDate ?? "",
   memo: item.myPassbookMemo ?? "",
   status: toAutoTransferStatus(item.status),
+  cancelable: item.cancelable ?? false,
 })
 
 const AUTO_TRANSFER_RESULT_MAP: Record<string, AutoTransferResult> = {

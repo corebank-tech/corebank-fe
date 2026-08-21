@@ -148,10 +148,17 @@ export const E04ReservationList = () => {
 
   const handleSearch = () => {
     clearSelection()
+    const sameCondition =
+      applied.status === status &&
+      applied.period.start === period.start &&
+      applied.period.end === period.end
     setApplied({ status, period })
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const handleCancelClick = () => {

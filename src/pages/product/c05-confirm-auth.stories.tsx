@@ -10,7 +10,11 @@ import {
 const meta = {
   title: "pages/C05 상품가입 3단계",
   decorators: [WithAuthenticatedPage],
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    route: "/product/1/join/3",
+    routePattern: "/product/:productId/join/3",
+  },
   render: () => (
     <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
       <C05ConfirmAuth />
@@ -25,7 +29,7 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {}
 
 const FILLED_FORM_STATE: RouteWithState = {
-  path: "/product/P001/join/3",
+  path: "/product/1/join/3",
   state: {
     termMonths: 12,
     fromAccount: MOCK_JOIN_ACCOUNTS[0].accountNo,

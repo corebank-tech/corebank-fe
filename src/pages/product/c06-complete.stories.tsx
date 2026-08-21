@@ -21,7 +21,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const JOINED_PRODUCT = MOCK_JOIN_PRODUCTS.P001
+const JOINED_PRODUCT = MOCK_JOIN_PRODUCTS[1]
 
 const JOIN_RESULT_STATE: RouteWithState = {
   path: `/product/${JOINED_PRODUCT.id}/join/4`,

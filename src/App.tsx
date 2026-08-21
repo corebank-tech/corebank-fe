@@ -82,11 +82,11 @@ const DEV_ROUTES: DevRoute[] = [
   { screenId: "B-07", label: "계좌순서 변경", path: "/user/accounts/order" },
 
   { screenId: "C-01", label: "상품목록", path: "/products" },
-  { screenId: "C-02", label: "상품상세", path: "/products/P001" },
-  { screenId: "C-03", label: "상품가입 1단계", path: "/product/P001/join/1" },
-  { screenId: "C-04", label: "상품가입 2단계", path: "/product/P001/join/2" },
-  { screenId: "C-05", label: "상품가입 3단계", path: "/product/P001/join/3" },
-  { screenId: "C-06", label: "상품가입 4단계", path: "/product/P001/join/4" },
+  { screenId: "C-02", label: "상품상세", path: "/products/1" },
+  { screenId: "C-03", label: "상품가입 1단계", path: "/product/1/join/1" },
+  { screenId: "C-04", label: "상품가입 2단계", path: "/product/1/join/2" },
+  { screenId: "C-05", label: "상품가입 3단계", path: "/product/1/join/3" },
+  { screenId: "C-06", label: "상품가입 4단계", path: "/product/1/join/4" },
 
   { screenId: "D-01", label: "즉시이체", path: "/instant-transfer" },
   { screenId: "D-04", label: "이체결과조회", path: "/transfer/history" },

@@ -4,16 +4,43 @@ import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { TermsAgreement } from "@/widgets"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
-import { MOCK_JOIN_PRODUCTS, MOCK_JOIN_TERMS } from "@/entities/product"
+import { MOCK_JOIN_TERMS, toProductDetailData } from "@/entities/product"
 import { PRODUCT_JOIN_STEPS } from "@/pages/product/join-shared"
 import { Alert } from "@/shared/ui/alert"
+import { EmptyState } from "@/shared/ui/empty-state"
+import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
+import type { ProductDetailResponse } from "@/shared/api/generated/model"
 
 /** C-03 상품가입 1단계 · 약관동의 (REQ-PRDT-005) */
 export const C03Terms = () => {
-  const { productId = "P001" } = useParams()
+  const { productId } = useParams()
   const navigate = useNavigate()
-  const product = MOCK_JOIN_PRODUCTS[productId] ?? MOCK_JOIN_PRODUCTS.P001
+  const id = Number(productId)
+  const { data, isLoading, isError } = useGetProductDetail(id, {
+    query: { enabled: Number.isFinite(id) },
+  })
   const [allRequiredAgreed, setAllRequiredAgreed] = React.useState(false)
+
+  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
+  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const detail = data as unknown as ProductDetailResponse | undefined
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
+
+  if (isError || !detail) {
+    return (
+      <EmptyState
+        message="상품을 찾을 수 없습니다."
+        description={`상품ID: ${productId}`}
+      />
+    )
+  }
+
+  const product = toProductDetailData(detail)
 
   return (
     <>

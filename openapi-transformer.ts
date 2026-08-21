@@ -19,6 +19,7 @@ const TAG_SLUG: Record<string, string> = {
   계좌: "account-controller",
   "계좌 설정": "account-preference-controller",
   이체: "transfer-controller",
+  이체한도: "limit-controller",
   "자주 쓰는 계좌": "favorite-account-controller",
   출금계좌: "withdrawal-account-controller",
   "회원가입 식별정보 인증": "signup-identity-controller",

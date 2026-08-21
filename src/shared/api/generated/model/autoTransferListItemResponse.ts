@@ -30,6 +30,8 @@ export interface AutoTransferListItemResponse {
   myPassbookMemo?: string;
   /** 자동이체 상태 */
   status?: AutoTransferListItemResponseStatus;
+  /** 해지 가능 여부 (상태가 NORMAL이고 다음 실행 예정일이 오늘이 아니면 true) */
+  cancelable?: boolean;
   /** 등록일시 */
   registeredAt?: string;
 }

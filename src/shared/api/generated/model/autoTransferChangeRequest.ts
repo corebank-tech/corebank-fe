@@ -43,4 +43,6 @@ export interface AutoTransferChangeRequest {
   transferDay?: number | null;
   /** 계좌 비밀번호 인증 완료 후 발급되는 1회성 인증 토큰 */
   accountPasswordAuthToken?: string;
+  /** OTP 인증 완료 후 발급되는 1회성 인증 토큰 */
+  otpAuthToken?: string;
 }

@@ -117,7 +117,7 @@ export const PeriodField = ({
     [presets, start, end, today],
   )
 
-  const { reversed, overLimit } = checkPeriodRange(
+  const { incomplete, reversed, overLimit } = checkPeriodRange(
     start,
     end,
     today,
@@ -157,7 +157,7 @@ export const PeriodField = ({
             type="date"
             aria-label="조회 시작일"
             value={start}
-            invalid={overLimit || reversed}
+            invalid={incomplete || overLimit || reversed}
             onChange={(e) => onChange({ start: e.target.value, end })}
             className="w-[150px]"
           />
@@ -168,7 +168,7 @@ export const PeriodField = ({
             type="date"
             aria-label="조회 종료일"
             value={end}
-            invalid={overLimit || reversed}
+            invalid={incomplete || overLimit || reversed}
             onChange={(e) => onChange({ start, end: e.target.value })}
             className="w-[150px]"
           />
@@ -220,14 +220,19 @@ export const PeriodField = ({
         </div>
       </div>
 
-      {reversed ? (
+      {incomplete ? (
+        <p className="text-xs font-bold text-danger">
+          조회 시작일과 종료일을 모두 입력하세요.
+        </p>
+      ) : reversed ? (
         <p className="text-xs font-bold text-danger">
           종료일이 시작일보다 빠릅니다. 시작일과 종료일을 다시 선택하세요.
         </p>
       ) : overLimit ? (
         <p className="text-xs font-bold text-danger">
-          조회 시작일은 오늘로부터 최대 {limitLabel} 이내로 지정할 수 있습니다.
-          기간을 다시 선택하세요.
+          조회기간은 최대 {limitLabel} 이내여야 하고, 시작일도 오늘로부터{" "}
+          {limitLabel}
+          이내여야 합니다. 기간을 다시 선택하세요.
         </p>
       ) : null}
     </div>

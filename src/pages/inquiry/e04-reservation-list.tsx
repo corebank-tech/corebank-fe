@@ -205,19 +205,19 @@ export const E04ReservationList = () => {
   }
 
   const handleSearch = () => {
-    // date 입력을 비우면 값이 ""로 들어오고 daysBetween이 NaN을 낸다. NaN은 어떤
-    // 비교에도 false라 checkPeriodRange를 그대로 통과해 fromDate= 로 요청이 나간다.
-    if (!period.start || !period.end) {
-      setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
-      return
-    }
-    /** REQ-INQR-010: 종료일이 시작일보다 빠르거나 시작일이 1년을 넘어 과거면 거부한다. */
-    const { reversed, overLimit } = checkPeriodRange(
+    /** 빈 입력·역전 기간·한도를 넘는 기간은 조회를 거부한다. */
+    const { incomplete, reversed, overLimit } = checkPeriodRange(
       period.start,
       period.end,
       TODAY,
       MAX_RANGE_DAYS,
     )
+    // 비워두면 daysBetween이 NaN을 내고 NaN은 어떤 비교에도 false라, 막지 않으면
+    // fromDate= 로 요청이 나간다.
+    if (incomplete) {
+      setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
+      return
+    }
     if (reversed) {
       setPeriodAlertMessage(
         "종료일이 시작일보다 빠릅니다. 조회기간을 다시 지정하세요.",
@@ -226,7 +226,7 @@ export const E04ReservationList = () => {
     }
     if (overLimit) {
       setPeriodAlertMessage(
-        "조회 시작일은 오늘로부터 최대 1년 이내로 지정할 수 있습니다.",
+        "조회기간은 최대 1년 이내여야 하고, 시작일도 오늘로부터 1년 이내여야 합니다.",
       )
       return
     }

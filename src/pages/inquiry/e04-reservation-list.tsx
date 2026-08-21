@@ -21,14 +21,7 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
-import {
-  formatAccountNo,
-  formatAmount,
-  formatDate,
-  formatDateTime,
-  maskAccountNo,
-  maskName,
-} from "@/shared/lib/format"
+import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import {
   getReservationStatusBadgeVariant,
   toReservationRow,
@@ -283,9 +276,9 @@ export const E04ReservationList = () => {
   const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    `${r.fromAlias ?? ""} ${maskAccountNo(r.fromAccountNo)}`,
-    maskAccountNo(r.toAccountNo),
-    maskName(r.payeeName),
+    `${r.fromAlias ?? ""} ${r.fromAccountNo}`,
+    r.toAccountNo,
+    r.payeeName,
     formatAmount(r.amount),
     r.memo ?? "-",
     r.registeredAt ? formatDateTime(r.registeredAt) : "-",
@@ -319,7 +312,7 @@ export const E04ReservationList = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias ?? ""} <span className="text-ink-faint">/</span>{" "}
-          <span>{formatAccountNo(r.fromAccountNo)}</span>
+          <span>{r.fromAccountNo}</span>
         </span>
       ),
     },
@@ -327,14 +320,14 @@ export const E04ReservationList = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
+      render: (r) => <span>{r.toAccountNo}</span>,
     },
     {
       key: "payeeName",
       header: "예금주",
       align: "center",
       width: 90,
-      render: (r) => maskName(r.payeeName),
+      render: (r) => r.payeeName,
     },
     {
       key: "amount",
@@ -385,7 +378,7 @@ export const E04ReservationList = () => {
             cancelLabel="닫기"
             items={selectedRows.map((r) => ({
               label: formatDate(r.scheduledDate),
-              value: `${r.fromAlias ?? formatAccountNo(r.fromAccountNo)} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
+              value: `${r.fromAlias ?? r.fromAccountNo} → ${r.payeeName} / ${formatAmount(r.amount)}`,
             }))}
           />
 

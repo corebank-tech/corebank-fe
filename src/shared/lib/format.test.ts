@@ -38,4 +38,9 @@ describe("계좌번호 표시 (REQ-CMN-017 / REQ-INQR-015)", () => {
   it("CSV 저장 전용 마스킹만 뒷자리를 가린다", () => {
     expect(maskAccountNo("110632892336")).toBe("110-632-89****")
   })
+
+  it("서버가 이미 마스킹해 내려준 값은 다시 가공하지 않는다", () => {
+    expect(formatAccountNo("110******877")).toBe("110******877")
+    expect(maskAccountNo("110******877")).toBe("110******877")
+  })
 })

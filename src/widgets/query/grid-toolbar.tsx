@@ -16,6 +16,15 @@ type GridToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   /** Current page size. Use "all" for 전체. */
   pageSize: number | "all"
   onPageSizeChange?: (size: number | "all") => void
+  /**
+   * "전체 보기" 선택지를 노출할지. 기본값은 노출이라 기존 화면은 그대로다.
+   *
+   * 서버 페이징 화면에서는 꺼야 한다 — 서버가 페이지 크기를 5·10·20·30·50
+   * 화이트리스트로 막아서(CMN0005) 전체를 요청할 방법이 없고, 큰 수를 잘라
+   * 보내면 사용자는 전체를 골랐다고 믿는 채 일부만 보게 된다. 클라이언트가 전체
+   * 목록을 들고 있는 mock 화면에서만 성립하는 선택지다.
+   */
+  showAllOption?: boolean
   /** Reference timestamp label, e.g. "2026.07.23 08:57:34". */
   baseTimeLabel?: React.ReactNode
   onPrint?: () => void
@@ -33,6 +42,7 @@ export const GridToolbar = ({
   totalCount,
   pageSize,
   onPageSizeChange,
+  showAllOption = true,
   baseTimeLabel,
   onPrint,
   onBrailleView,
@@ -116,7 +126,7 @@ export const GridToolbar = ({
                 {n}개 보기
               </option>
             ))}
-            <option value="all">전체 보기</option>
+            {showAllOption && <option value="all">전체 보기</option>}
           </Select>
         </div>
       </div>

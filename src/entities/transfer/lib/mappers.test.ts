@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
   toAutoTransferRow,
+  toReservationRow,
   toAutoTransferResultRow,
   toReservationResultRow,
 } from "@/entities/transfer/lib/mappers"
@@ -8,6 +9,7 @@ import type {
   AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
+  ScheduledTransferListItemResponse,
 } from "@/shared/api/generated/model"
 
 const FROM_ACCOUNT_NO = "110632892336"
@@ -152,6 +154,35 @@ describe("toAutoTransferRow", () => {
       memo: "",
     })
     spy.mockRestore()
+  })
+})
+
+const RESERVATION_ITEM: ScheduledTransferListItemResponse = {
+  scheduledTransferId: 7,
+  status: "WAITING",
+  scheduledDate: "2026-08-24",
+  withdrawalAccountNumber: "110******877",
+  accountNumber: "333******135",
+  payeeName: "김*수",
+  amount: 300_000,
+  cancelable: true,
+}
+
+describe("toReservationRow", () => {
+  it("서버가 마스킹해서 내려준 계좌번호·예금주명을 다시 가공하지 않고 그대로 옮긴다(#47)", () => {
+    const row = toReservationRow(RESERVATION_ITEM)
+
+    expect(row.fromAccountNo).toBe("110******877")
+    expect(row.toAccountNo).toBe("333******135")
+    expect(row.payeeName).toBe("김*수")
+  })
+
+  it("PROCESSING 상태는 대기로 옮긴다", () => {
+    const row = toReservationRow({
+      ...RESERVATION_ITEM,
+      status: "PROCESSING",
+    })
+    expect(row.status).toBe("대기")
   })
 })
 

@@ -174,6 +174,12 @@ export const E04ReservationList = () => {
   }
 
   const handleSearch = () => {
+    // date 입력을 비우면 값이 ""로 들어오고 daysBetween이 NaN을 낸다. NaN은 어떤
+    // 비교에도 false라 checkPeriodRange를 그대로 통과해 fromDate= 로 요청이 나간다.
+    if (!period.start || !period.end) {
+      setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
+      return
+    }
     /** REQ-INQR-009: 종료일이 시작일보다 빠르거나 기간이 1년을 넘으면 조회를 거부한다. */
     const { reversed, overLimit } = checkPeriodRange(
       period.start,

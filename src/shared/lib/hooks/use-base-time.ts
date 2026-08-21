@@ -27,3 +27,30 @@ export function useCapturedBaseTime(): {
   const capture = React.useCallback(() => setTime(getNow()), [])
   return { time, capture }
 }
+
+/**
+ * 실 API 조회화면의 "기준일시" — 지금 화면에 떠 있는 데이터를 받은 시각(ms).
+ * 받은 적이 없으면 0이라 호출부에서 라벨을 감출 수 있다.
+ *
+ * react-query 결과를 그대로 쓰면 안 된다. placeholderData 분기는 `status`와
+ * `data`만 덮어쓰고 `dataUpdatedAt`은 쿼리 자신의 state를 내보내는데, 새 쿼리
+ * 키의 캐시 엔트리는 `dataUpdatedAt: 0`으로 시작한다. 그래서 조회조건·페이지를
+ * 바꾸는 순간 목록은 keepPreviousData로 남아 있는데 기준일시만 0이 되어
+ * 라벨이 깜빡인다. placeholder 구간에는 직전 유효값을 그대로 유지한다.
+ */
+export function useQueryBaseTime(result: {
+  dataUpdatedAt: number
+  isPlaceholderData: boolean
+}): number {
+  // 렌더 중 setState — React가 커밋 전에 곧바로 다시 렌더하므로 effect처럼 한 프레임
+  // 늦지 않는다(https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+  const [shown, setShown] = React.useState(0)
+  if (
+    !result.isPlaceholderData &&
+    result.dataUpdatedAt &&
+    result.dataUpdatedAt !== shown
+  ) {
+    setShown(result.dataUpdatedAt)
+  }
+  return shown
+}

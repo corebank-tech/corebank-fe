@@ -16,22 +16,15 @@ import { Pagination } from "@/shared/ui/pagination"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
+import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import {
-  formatAccountNo,
-  formatAmount,
-  formatDate,
-  formatDateTime,
-  maskAccountNo,
-  maskName,
-} from "@/shared/lib/format"
-import {
-  MOCK_RESERVATION_RESULTS,
   getReservationResultBadgeVariant,
+  toReservationResultRow,
+  useScheduledTransferExecutions,
   type ReservationResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
-import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 /**
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-RSV-014).
@@ -46,44 +39,63 @@ const ORDER_OPTIONS = [
   { label: "과거거래순", value: "past" },
 ]
 
+/** 서버가 허용하는 최대 페이지 크기. 5·10·20·30·50 외의 값은 CMN0005로 거부된다. */
+/** 화면의 정렬순서 → 서버 sort 파라미터. */
+const ORDER_TO_SORT: Record<string, "LATEST" | "OLDEST"> = {
+  recent: "LATEST",
+  past: "OLDEST",
+}
+
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
+
 export const E05ReservationResults = () => {
-  const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
-  // 분리하지 않으면 조건을 건드리는 즉시 목록·집계가 바뀌는데 기준일시는 [조회]
-  // 시점에 머물러, 화면이 언제 받은 데이터인지 알 수 없게 된다.
+  // 쿼리 키가 입력 state에 바로 물려 있으면 조건을 건드릴 때마다 요청이 나가고
+  // "조회" 버튼이 무의미해진다.
   const [applied, setApplied] = React.useState(defaultCondition)
   const [period, setPeriod] = React.useState(applied.period)
   const [order, setOrder] = React.useState(applied.order)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const rows = React.useMemo(() => {
-    const next = MOCK_RESERVATION_RESULTS.filter(
-      (r) =>
-        r.transferDate >= applied.period.start &&
-        r.transferDate <= applied.period.end,
-    )
-    return [...next].sort((a, b) =>
-      applied.order === "recent"
-        ? b.transferDate.localeCompare(a.transferDate)
-        : a.transferDate.localeCompare(b.transferDate),
-    )
-  }, [applied])
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
+  const {
+    page: pageData,
+    baseTime,
+    isFetching,
+    isError,
+    refetch,
+  } = useScheduledTransferExecutions({
+    // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
+    // 않으면 서버가 내 전체 계좌를 대상으로 조회한다.
+    fromDate: applied.period.start,
+    toDate: applied.period.end,
+    sort: ORDER_TO_SORT[applied.order],
+    page: page - 1,
+    size,
+  })
 
-  const normal = rows.filter((r) => r.result === "정상")
-  const error = rows.filter((r) => r.result === "오류")
-  const canceled = rows.filter((r) => r.result === "취소")
-  const sum = (list: ReservationResultRow[]) =>
-    list.reduce((s, r) => s + r.amount, 0)
+  const pageRows = (pageData?.items ?? []).map(toReservationResultRow)
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
 
-  const size = pageSize === "all" ? rows.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(rows.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * size, safePage * size)
+  // REQ-RSV-014: 집계는 페이징과 무관한 조회조건 전체 기준이라 서버가 계산해 준다.
+  // 현재 페이지만 더하면 페이지를 넘길 때마다 값이 달라진다.
+  const summary = pageData?.summary
+
+  // 조회조건이 바뀌어 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
 
   const handleReset = () => {
     const next = defaultCondition()
@@ -93,6 +105,20 @@ export const E05ReservationResults = () => {
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    const sameCondition =
+      applied.period.start === period.start &&
+      applied.period.end === period.end &&
+      applied.order === order
+    setApplied({ period, order })
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const exportHeaders = [
@@ -105,12 +131,13 @@ export const E05ReservationResults = () => {
     "거래번호",
     "실패사유",
   ]
-  const exportRows = rows.map((r) => [
+  // 계좌번호·예금주명은 서버가 이미 마스킹해서 내려준다(REQ-INQR-015).
+  const exportRows = pageRows.map((r) => [
     r.result,
     formatDate(r.transferDate),
-    `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
-    maskAccountNo(r.toAccountNo),
-    maskName(r.payeeName),
+    r.fromAccountNo,
+    r.toAccountNo,
+    r.payeeName,
     formatAmount(r.amount),
     r.txId ?? "-",
     r.failReason ?? "-",
@@ -142,24 +169,21 @@ export const E05ReservationResults = () => {
       header: "출금계좌",
       width: 170,
       render: (r) => (
-        <span className="whitespace-nowrap">
-          {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span>{formatAccountNo(r.fromAccountNo)}</span>
-        </span>
+        <span className="whitespace-nowrap">{r.fromAccountNo}</span>
       ),
     },
     {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
+      render: (r) => <span>{r.toAccountNo}</span>,
     },
     {
       key: "payeeName",
       header: "예금주",
       align: "center",
       width: 90,
-      render: (r) => maskName(r.payeeName),
+      render: (r) => r.payeeName,
     },
     {
       key: "amount",
@@ -211,13 +235,7 @@ export const E05ReservationResults = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => {
-            setApplied({ period, order })
-            setPage(1)
-            savedCondition.clear()
-            downloadComplete.clear()
-            captureBaseTime()
-          }}
+          onSearch={handleSearch}
           onSaveCondition={savedCondition.save}
         >
           <FormRow label="조회기간">
@@ -247,9 +265,9 @@ export const E05ReservationResults = () => {
               label: "정상처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(normal))}{" "}
+                  {formatAmount(summary?.successAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({normal.length}건)
+                    ({summary?.successCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -259,9 +277,9 @@ export const E05ReservationResults = () => {
               label: "오류처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(error))}{" "}
+                  {formatAmount(summary?.failureAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({error.length}건)
+                    ({summary?.failureCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -271,9 +289,9 @@ export const E05ReservationResults = () => {
               label: "취소처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(canceled))}{" "}
+                  {formatAmount(summary?.canceledAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({canceled.length}건)
+                    ({summary?.canceledCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -285,14 +303,18 @@ export const E05ReservationResults = () => {
         </p>
 
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
-          totalCount={rows.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
           onSaveFile={() => {
@@ -309,12 +331,17 @@ export const E05ReservationResults = () => {
         <DataGrid
           columns={columns}
           rows={pageRows}
+          loading={isFetching}
           rowKey={(r) => r.id}
-          emptyMessage="조회 결과가 없습니다."
+          emptyMessage={
+            isError
+              ? "예약이체 처리결과를 불러오지 못했습니다."
+              : "조회 결과가 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           onPageChange={setPage}
         />

@@ -25,57 +25,111 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import {
-  MOCK_AUTO_TRANSFER_RESULTS,
   getAutoTransferResultBadgeVariant,
+  toAutoTransferResultRow,
+  useAutoTransferExecutions,
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { useWithdrawAccounts } from "@/entities/account"
 
-const FROM_ACCOUNTS = Array.from(
-  new Map(
-    MOCK_AUTO_TRANSFER_RESULTS.map((r) => [r.fromAccountNo, r.fromAlias]),
-  ).entries(),
-)
+/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
+const DEFAULT_PAGE_SIZE = 10
 
 export const G05AutoTransferResults = () => {
-  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
-  const [fromAccount, setFromAccount] = React.useState("all")
+  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
+  // 바로 물려 있으면 계좌·기간을 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
+  const [applied, setApplied] = React.useState<{
+    accountId: number | null
+    period: { start: string; end: string }
+  }>(() => ({ accountId: null, period: recentPeriod() }))
+  const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [period, setPeriod] = React.useState(recentPeriod)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const rows = React.useMemo(() => {
-    return MOCK_AUTO_TRANSFER_RESULTS.filter((r) => {
-      const d = r.processedAt.slice(0, 10)
-      if (d < period.start || d > period.end) return false
-      if (fromAccount !== "all" && r.fromAccountNo !== fromAccount) return false
-      return true
-    }).sort((a, b) => b.processedAt.localeCompare(a.processedAt))
-  }, [fromAccount, period])
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
-  const normal = rows.filter((r) => r.result === "정상")
-  const error = rows.filter((r) => r.result === "오류")
-  const sum = (list: AutoTransferResultRow[]) =>
-    list.reduce((s, r) => s + r.amount, 0)
+  // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
+  // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const defaultAccountId = withdrawAccounts[0]?.accountId ?? null
+  const selectedAccountId = fromAccountId ?? defaultAccountId
+  const appliedAccountId = applied.accountId ?? defaultAccountId
+  const appliedAccount = withdrawAccounts.find(
+    (a) => a.accountId === appliedAccountId,
+  )
 
-  const size = pageSize === "all" ? rows.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(rows.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * size, safePage * size)
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
+  const {
+    page: pageData,
+    baseTime,
+    isFetching,
+    isError,
+    refetch,
+  } = useAutoTransferExecutions(
+    {
+      // REQ-AUTO-018: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
+      // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
+      withdrawalAccountId: appliedAccountId ?? 0,
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      page: page - 1,
+      size,
+    },
+    { enabled: appliedAccountId != null },
+  )
+
+  // 출금계좌 정보는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
+  const pageRows = (pageData?.items ?? []).map((item) =>
+    toAutoTransferResultRow(item, {
+      accountNo: appliedAccount?.accountNumber ?? "",
+      alias: appliedAccount?.accountName ?? "",
+    }),
+  )
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
+
+  // REQ-AUTO-019: 집계는 페이징과 무관한 조회조건 전체 기준이라 서버가 계산해 준다.
+  // 현재 페이지만 더하면 페이지를 넘길 때마다 값이 달라진다.
+  const summary = pageData?.summary
+
+  // 조회조건이 바뀌어 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
 
   const handleReset = () => {
-    setFromAccount("all")
-    setPeriod(recentPeriod())
+    const next = recentPeriod()
+    setFromAccountId(null)
+    setPeriod(next)
+    setApplied({ accountId: null, period: next })
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    const sameCondition =
+      appliedAccountId === selectedAccountId &&
+      applied.period.start === period.start &&
+      applied.period.end === period.end
+    setApplied({ accountId: selectedAccountId, period })
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const exportHeaders = [
@@ -89,7 +143,7 @@ export const G05AutoTransferResults = () => {
     "표시내용",
     "실패사유",
   ]
-  const exportRows = rows.map((r) => [
+  const exportRows = pageRows.map((r) => [
     r.result,
     formatDateTime(r.processedAt),
     `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
@@ -193,24 +247,20 @@ export const G05AutoTransferResults = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => {
-            setPage(1)
-            savedCondition.clear()
-            downloadComplete.clear()
-          }}
+          onSearch={handleSearch}
           onSaveCondition={savedCondition.save}
         >
+          {/* REQ-AUTO-018: 출금계좌는 조회조건이라 "전체"가 없다. */}
           <FormRow label="출금계좌번호" htmlFor="g05-from">
             <Select
               id="g05-from"
               className="max-w-md"
-              value={fromAccount}
-              onChange={(e) => setFromAccount(e.target.value)}
+              value={selectedAccountId ?? ""}
+              onChange={(e) => setFromAccountId(Number(e.target.value))}
             >
-              <option value="all">전체</option>
-              {FROM_ACCOUNTS.map(([accountNo, alias]) => (
-                <option key={accountNo} value={accountNo}>
-                  {`${alias} / ${formatAccountNo(accountNo)}`}
+              {withdrawAccounts.map((a) => (
+                <option key={a.accountId} value={a.accountId}>
+                  {`${a.accountName ?? ""} / ${formatAccountNo(a.accountNumber ?? "")}`}
                 </option>
               ))}
             </Select>
@@ -234,9 +284,9 @@ export const G05AutoTransferResults = () => {
               label: "정상처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(normal))}{" "}
+                  {formatAmount(summary?.successAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({normal.length}건)
+                    ({summary?.successCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -246,9 +296,9 @@ export const G05AutoTransferResults = () => {
               label: "오류처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(error))}{" "}
+                  {formatAmount(summary?.errorAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({error.length}건)
+                    ({summary?.errorCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -262,14 +312,18 @@ export const G05AutoTransferResults = () => {
         </p>
 
         <GridToolbar
+          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          showAllOption={false}
           periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
-          totalCount={rows.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
           onSaveFile={() => {
@@ -286,12 +340,17 @@ export const G05AutoTransferResults = () => {
         <DataGrid
           columns={columns}
           rows={pageRows}
+          loading={isFetching}
           rowKey={(r) => r.id}
-          emptyMessage="조회 결과가 없습니다."
+          emptyMessage={
+            isError
+              ? "자동이체 결과를 불러오지 못했습니다."
+              : "조회 결과가 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           onPageChange={setPage}
         />

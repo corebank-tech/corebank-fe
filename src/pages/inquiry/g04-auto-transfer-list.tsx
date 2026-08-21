@@ -62,13 +62,6 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 // 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
-/**
- * REQ-AUTO-011: 실행 예정일 당일에는 해지할 수 없다. 다만 목록 응답에 다음 실행
- * 예정일도 해지 가능 여부도 없어서(corebank-server#264) 화면에서 사전 판정할 수
- * 없다. 상태만 보고 열어 두고, 당일 건은 서버가 거부하는 사유를 그대로 띄운다.
- */
-const isTerminable = (row: AutoTransferRow): boolean => row.status === "정상"
-
 export const G04AutoTransferList = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
@@ -172,9 +165,10 @@ export const G04AutoTransferList = () => {
 
   const handleTerminateClick = () => {
     if (selectedRows.length === 0) return
-    // 상태로 걸러지는 건(종료·해지)은 서버에 묻지 않고 여기서 막는다. 실행 예정일
-    // 당일 여부는 판정할 값이 없어 서버가 거부하는 쪽에 맡긴다.
-    if (selectedRows.some((r) => !isTerminable(r))) {
+    // REQ-AUTO-011: 상태가 '정상'이어도 다음 실행 예정일 당일이면 해지할 수 없다.
+    // 예정일 계산은 이체주기·말일 보정까지 걸려 있어 화면에서 재현하면 서버와
+    // 어긋나므로, 서버가 내려준 판정(cancelable)을 그대로 쓴다.
+    if (selectedRows.some((r) => !r.cancelable)) {
       setBlockedOpen(true)
       return
     }
@@ -392,8 +386,8 @@ export const G04AutoTransferList = () => {
             onClose={() => setBlockedOpen(false)}
             title="해지 불가"
             messages={[
-              "정상 상태인 건만 해지할 수 있습니다.",
-              "이미 종료되었거나 해지된 건은 선택에서 제외하세요.",
+              "정상 상태이고 다음 실행 예정일 전일까지인 건만 해지할 수 있습니다.",
+              "이미 종료·해지되었거나 오늘 실행 예정인 건은 선택에서 제외하세요.",
             ]}
           />
 

@@ -24,6 +24,7 @@
         "name": "자주 쓰는 계좌",
         "description": "즐겨찾기 계좌 등록 및 목록조회 API",
       },
+      { "name": "이체한도", "description": "이체한도 조회·변경 API" },
       { "name": "계좌 설정", "description": "계좌 표시순서 설정 API" },
       {
         "name": "자동이체",
@@ -1288,6 +1289,80 @@
                 },
             },
         },
+      "/otp/verify":
+        {
+          "post":
+            {
+              "tags": ["otp-controller"],
+              "operationId": "verify",
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            { "$ref": "#/components/schemas/VerifyOtpRequest" },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseVerifyOtpResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/otp/issue":
+        {
+          "post":
+            {
+              "tags": ["otp-controller"],
+              "operationId": "issue",
+              "requestBody":
+                {
+                  "content":
+                    {
+                      "application/json":
+                        {
+                          "schema":
+                            { "$ref": "#/components/schemas/IssueOtpRequest" },
+                        },
+                    },
+                  "required": true,
+                },
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "OK",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseIssueOtpResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
       "/auto-transfers":
         {
           "get":
@@ -2203,6 +2278,47 @@
                   "409":
                     {
                       "description": "`TRF0301` 거래정지 또는 해지 상태의 입금계좌",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ErrorResponse",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      "/transfer-limits":
+        {
+          "get":
+            {
+              "tags": ["이체한도"],
+              "summary": "이체한도 조회",
+              "description": "로그인 고객의 1회 이체한도, 1일 이체한도, 당일 사용금액, 당일 잔여 이체가능금액을 조회한다.\n한도는 계좌가 아니라 고객 단위이므로 계좌 ID를 받지 않는다.\n당일 사용금액은 KST 영업일 기준이며, 그날 첫 조회라 사용 이력이 없으면 0으로 응답한다.\n한도를 아직 부여받지 않은 고객에게는 정책 기본값(1회 100만원 · 1일 500만원)으로 응답한다.\n",
+              "operationId": "getTransferLimit",
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "이체한도 조회 성공",
+                      "content":
+                        {
+                          "*/*":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/ApiResponseLimitResponse",
+                                },
+                            },
+                        },
+                    },
+                  "401":
+                    {
+                      "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
                       "content":
                         {
                           "*/*":
@@ -3489,6 +3605,85 @@
                   "reason": { "type": "string" },
                 },
             },
+          "VerifyOtpRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "otpRequestId": { "type": "string", "minLength": 1 },
+                  "otpCode":
+                    { "type": "string", "minLength": 1, "pattern": "^\\d{6}$" },
+                },
+              "required": ["otpCode", "otpRequestId"],
+            },
+          "ApiResponseVerifyOtpResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data": { "$ref": "#/components/schemas/VerifyOtpResponse" },
+                },
+            },
+          "VerifyOtpResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "otpAuthToken": { "type": "string" },
+                  "errorCount": { "type": "integer", "format": "int32" },
+                  "remainingAttempts": { "type": "integer", "format": "int32" },
+                },
+            },
+          "IssueOtpRequest":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "transactionType":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "IMMEDIATE_TRANSFER",
+                          "SCHEDULED_TRANSFER",
+                          "AUTO_TRANSFER",
+                          "PRODUCT_SUBSCRIPTION",
+                          "TRANSFER_LIMIT_CHANGE",
+                          "ACCOUNT_PASSWORD_CHANGE",
+                          "WITHDRAWAL_ACCOUNT_REGISTER",
+                        ],
+                    },
+                  "transactionData":
+                    {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "minProperties": 1,
+                    },
+                },
+              "required": ["transactionData", "transactionType"],
+            },
+          "ApiResponseIssueOtpResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data": { "$ref": "#/components/schemas/IssueOtpResponse" },
+                },
+            },
+          "IssueOtpResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "otpRequestId": { "type": "string" },
+                  "otpCode": { "type": "string" },
+                  "expiresIn": { "type": "integer", "format": "int64" },
+                },
+            },
           "AutoTransferRegisterRequest":
             {
               "type": "object",
@@ -4182,6 +4377,51 @@
                     },
                 },
             },
+          "ApiResponseLimitResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "code": { "type": "string" },
+                  "message": { "type": "string" },
+                  "data": { "$ref": "#/components/schemas/LimitResponse" },
+                },
+            },
+          "LimitResponse":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "oneTimeLimit":
+                    {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "1회 이체한도",
+                      "example": 1000000,
+                    },
+                  "dailyLimit":
+                    {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "1일 이체한도",
+                      "example": 5000000,
+                    },
+                  "dailyUsedAmount":
+                    {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "당일 사용금액. KST 영업일 기준",
+                      "example": 300000,
+                    },
+                  "dailyRemainingAmount":
+                    {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "당일 잔여 이체가능금액. 음수가 되지 않는다",
+                      "example": 4700000,
+                    },
+                },
+            },
           "ApiResponsePageResponseScheduledTransferListItemResponse":
             {
               "type": "object",
@@ -4778,6 +5018,11 @@
                       "type": "string",
                       "description": "자동이체 상태",
                       "enum": ["NORMAL", "EXPIRED", "TERMINATED"],
+                    },
+                  "cancelable":
+                    {
+                      "type": "boolean",
+                      "description": "해지 가능 여부 (상태가 NORMAL이고 다음 실행 예정일이 오늘이 아니면 true)",
                     },
                   "registeredAt":
                     {

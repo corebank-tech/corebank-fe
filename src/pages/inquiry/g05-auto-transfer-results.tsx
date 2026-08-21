@@ -41,6 +41,11 @@ import type { AutoTransferExecutionHistoryPageResponse } from "@/shared/api/gene
 /** REQ-AUTO-018: 조회기간 기본값은 1개월이다. */
 const DEFAULT_PERIOD_MONTHS = 1
 
+// 서버가 페이지 크기를 5·10·20·30·50 화이트리스트로 막는다. 툴바의 "전체 보기"를
+// 그대로 보내면 CMN0005로 400이 난다. E-05와 같은 임시 대응이고, 툴바에서 옵션을
+// 없애는 근본 수정은 #46에서 공용 위젯과 함께 정리한다.
+const MAX_PAGE_SIZE = 50
+
 const defaultPeriod = () => {
   const today = getToday()
   return { start: addMonths(today, -DEFAULT_PERIOD_MONTHS), end: today }
@@ -74,7 +79,7 @@ export const G05AutoTransferResults = () => {
     (a) => a.accountId === appliedAccountId,
   )
 
-  const size = pageSize === "all" ? 1000 : pageSize
+  const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
   const { data, isFetching, isError, refetch } =
     useSearchAutoTransferExecutions(
       {

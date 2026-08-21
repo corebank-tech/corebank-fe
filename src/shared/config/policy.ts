@@ -38,6 +38,9 @@ export const RESERVATION_MAX_RANGE_DAYS = 365
 /** POL-021: 거래내역 조회 가능 기간 최대 1년. */
 export const QUERY_MAX_RANGE_DAYS = 365
 
+/** POL-021: 조회화면 기본 조회기간 1개월(REQ-INQR-009·TRSF-021·RSV-014·AUTO-018). */
+export const QUERY_DEFAULT_PERIOD_MONTHS = 1
+
 /** POL-026: 이메일 인증번호 유효시간 180초 / 숫자 6자리. */
 export const EMAIL_CODE_TTL_SECONDS = 180
 

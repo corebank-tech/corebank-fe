@@ -24,18 +24,18 @@ import {
   type ReservationResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
-import { addMonths } from "@/shared/lib/date"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { recentPeriod } from "@/shared/config/query-period"
+import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { useSearchScheduledTransferExecutions } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
 import type { ScheduledTransferExecutionResultPageResponse } from "@/shared/api/generated/model"
 
-/** REQ-RSV-014: 조회기간 기본값은 1개월이다. */
-const DEFAULT_PERIOD_MONTHS = 1
-
-const defaultPeriod = () => {
-  const today = getToday()
-  return { start: addMonths(today, -DEFAULT_PERIOD_MONTHS), end: today }
-}
+/**
+ * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-RSV-014).
+ */
+const defaultCondition = () => ({
+  period: recentPeriod(),
+  order: "recent",
+})
 
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
@@ -52,16 +52,13 @@ const ORDER_TO_SORT: Record<string, "LATEST" | "OLDEST"> = {
 }
 
 export const E05ReservationResults = () => {
-  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
-  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
-  // 바로 물려 있으면 기간·정렬을 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
-  const [applied, setApplied] = React.useState<{
-    period: { start: string; end: string }
-    order: string
-  }>(() => ({ period: defaultPeriod(), order: "recent" }))
-  const [period, setPeriod] = React.useState(defaultPeriod)
-  const [order, setOrder] = React.useState("recent")
+  // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
+  // 쿼리 키가 입력 state에 바로 물려 있으면 조건을 건드릴 때마다 요청이 나가고
+  // "조회" 버튼이 무의미해진다.
+  const [applied, setApplied] = React.useState(defaultCondition)
+  const [period, setPeriod] = React.useState(applied.period)
+  const [order, setOrder] = React.useState(applied.order)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
@@ -71,25 +68,35 @@ export const E05ReservationResults = () => {
   // 서버는 5·10·20·30·50만 허용한다(CMN0005). "전체 보기"를 그대로 큰 수로 보내면
   // 400으로 거부돼 목록이 통째로 비므로 허용 최대값으로 자른다.
   const size = pageSize === "all" ? MAX_PAGE_SIZE : pageSize
-  const { data, isFetching, isError, refetch } =
-    useSearchScheduledTransferExecutions(
-      {
-        // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
-        // 않으면 서버가 내 전체 계좌를 대상으로 조회한다.
-        fromDate: applied.period.start,
-        toDate: applied.period.end,
-        sort: ORDER_TO_SORT[applied.order],
-        page: page - 1,
-        size,
+  const {
+    data,
+    dataUpdatedAt,
+    isPlaceholderData,
+    isFetching,
+    isError,
+    refetch,
+  } = useSearchScheduledTransferExecutions(
+    {
+      // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
+      // 않으면 서버가 내 전체 계좌를 대상으로 조회한다.
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      sort: ORDER_TO_SORT[applied.order],
+      page: page - 1,
+      size,
+    },
+    {
+      query: {
+        // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
+        // 올 때까지 이전 응답을 유지해서 조회조건 폼과 요약이 화면째로 사라지지 않게 한다.
+        placeholderData: keepPreviousData,
       },
-      {
-        query: {
-          // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
-          // 올 때까지 이전 응답을 유지해서 조회조건 폼과 요약이 화면째로 사라지지 않게 한다.
-          placeholderData: keepPreviousData,
-        },
-      },
-    )
+    },
+  )
+
+  // 기준일시는 지금 화면에 떠 있는 데이터를 받은 시각이다(#44). 마운트 시각을
+  // 쓰면 조회조건을 만지는 동안 라벨만 앞서 나가 실제 결과 시점과 어긋난다.
+  const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
@@ -109,10 +116,10 @@ export const E05ReservationResults = () => {
   if (page > totalPages) setPage(totalPages)
 
   const handleReset = () => {
-    const next = defaultPeriod()
-    setPeriod(next)
-    setOrder("recent")
-    setApplied({ period: next, order: "recent" })
+    const next = defaultCondition()
+    setApplied(next)
+    setPeriod(next.period)
+    setOrder(next.order)
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
@@ -314,14 +321,16 @@ export const E05ReservationResults = () => {
         </p>
 
         <GridToolbar
-          periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
+          periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
           onSaveFile={() => {

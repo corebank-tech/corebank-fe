@@ -36,7 +36,8 @@ import {
   formatDateTime,
   maskName,
 } from "@/shared/lib/format"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { getNow } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { InstantTransferStep1 } from "@/pages/transfer/instant-transfer/d01-input"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
@@ -107,6 +108,7 @@ const INITIAL_FORM: InstantTransferForm = {
  * (REQ-TRSF-009, REQ-TRSF-031)는 여기서 조립한다.
  */
 export const InstantTransferScreen = () => {
+  const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)
@@ -120,6 +122,10 @@ export const InstantTransferScreen = () => {
       ? { ...INITIAL_FORM, fromAccount: preselected.accountNo }
       : INITIAL_FORM
   })
+  // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
+  // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
+  // 어긋나지 않게 한다.
+  const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [authError, setAuthError] = React.useState<string | null>(null)
@@ -215,6 +221,7 @@ export const InstantTransferScreen = () => {
         return
       }
       setAuthError(null)
+      setTransactionAt(getNow())
       setConfirmOpen(true)
     }
 
@@ -231,13 +238,14 @@ export const InstantTransferScreen = () => {
     }
 
     const handleOtpConfirm = () => {
+      const executedAt = transactionAt ?? getNow()
       setOtpOpen(false)
       if (form.executionFails) {
         setResult({
           variant: "fail",
           row: {
             transactionId: "-",
-            processedAt: BASE_TIME,
+            processedAt: executedAt,
             fromAccountNo: form.fromAccount,
             toAccountNo: form.toAccount,
             payeeName: form.payeeName,
@@ -251,12 +259,12 @@ export const InstantTransferScreen = () => {
             "일시적인 시스템 오류로 이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
         })
       } else {
-        const transactionId = generateTransactionId(BASE_TIME)
+        const transactionId = generateTransactionId(executedAt)
         setResult({
           variant: "success",
           row: {
             transactionId,
-            processedAt: BASE_TIME,
+            processedAt: executedAt,
             fromAccountNo: form.fromAccount,
             toAccountNo: form.toAccount,
             payeeName: form.payeeName,
@@ -273,7 +281,7 @@ export const InstantTransferScreen = () => {
          */
         MOCK_TRANSFER_HISTORY.unshift({
           id: transactionId,
-          datetime: BASE_TIME,
+          datetime: executedAt,
           fromAccountNo: form.fromAccount,
           fromAlias: selectedAccount?.alias ?? "",
           toAccountNo: form.toAccount,
@@ -285,7 +293,7 @@ export const InstantTransferScreen = () => {
           memo: form.payeeMemo || "-",
         })
         MOCK_TRANSFER_LIMITS.usedToday += amount
-        MOCK_ACCESS_STATUS.lastTransaction = BASE_TIME
+        MOCK_ACCESS_STATUS.lastTransaction = executedAt
         for (const rows of [
           MOCK_TRANSFER_ACCOUNTS,
           MOCK_OVERVIEW_ACCOUNTS,
@@ -296,7 +304,7 @@ export const InstantTransferScreen = () => {
         ]) {
           debitAccount(rows, form.fromAccount, amount)
         }
-        const transferDate = BASE_TIME.slice(0, 10)
+        const transferDate = executedAt.slice(0, 10)
         const overviewRow = MOCK_OVERVIEW_ACCOUNTS.find(
           (a) => a.accountNo === form.fromAccount,
         )
@@ -313,7 +321,9 @@ export const InstantTransferScreen = () => {
       <>
         <InstantTransferStep2
           steps={STEPS}
-          scheduledAt={<span>{formatDateTime(BASE_TIME)}</span>}
+          scheduledAt={
+            <span>{formatDateTime(transactionAt ?? BASE_TIME)}</span>
+          }
           fromAccount={
             <span>
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
@@ -341,10 +351,13 @@ export const InstantTransferScreen = () => {
           ]}
           confirmLabel="확인"
           items={[
-            { label: "1. 거래일자", value: formatDate(BASE_TIME) },
+            {
+              label: "1. 거래일자",
+              value: formatDate(transactionAt ?? BASE_TIME),
+            },
             {
               label: "2. 거래시각",
-              value: formatDateTime(BASE_TIME).slice(11),
+              value: formatDateTime(transactionAt ?? BASE_TIME).slice(11),
             },
             {
               label: "3. 출금계좌번호",

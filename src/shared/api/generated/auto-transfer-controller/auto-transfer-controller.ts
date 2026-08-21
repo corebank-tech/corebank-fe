@@ -6,16 +6,20 @@
  * OpenAPI spec version: v1.0.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -176,78 +180,48 @@ export const register = async (autoTransferRegisterRequest: AutoTransferRegister
 
 
 
-export const getRegisterQueryKey = (autoTransferRegisterRequest?: AutoTransferRegisterRequest,) => {
-    return [
-    'POST', `/auto-transfers`, autoTransferRegisterRequest
-    ] as const;
+export const getRegisterMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext> => {
+
+const mutationKey = ['register'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof register>>, {data: AutoTransferRegisterRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  register(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterMutationResult = NonNullable<Awaited<ReturnType<typeof register>>>
+    export type RegisterMutationBody = AutoTransferRegisterRequest
+    export type RegisterMutationError = unknown
+
+    export const useRegister = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof register>>, TError,{data: AutoTransferRegisterRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof register>>,
+        TError,
+        {data: AutoTransferRegisterRequest},
+        TContext
+      > => {
+      return useMutation(getRegisterMutationOptions(options), queryClient);
     }
-
-
-export const getRegisterQueryOptions = <TData = Awaited<ReturnType<typeof register>>, TError = unknown>(autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getRegisterQueryKey(autoTransferRegisterRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof register>>> = ({ signal }) => register(autoTransferRegisterRequest, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type RegisterQueryResult = NonNullable<Awaited<ReturnType<typeof register>>>
-export type RegisterQueryError = unknown
-
-
-export function useRegister<TData = Awaited<ReturnType<typeof register>>, TError = unknown>(
- autoTransferRegisterRequest: AutoTransferRegisterRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof register>>,
-          TError,
-          Awaited<ReturnType<typeof register>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRegister<TData = Awaited<ReturnType<typeof register>>, TError = unknown>(
- autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof register>>,
-          TError,
-          Awaited<ReturnType<typeof register>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useRegister<TData = Awaited<ReturnType<typeof register>>, TError = unknown>(
- autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useRegister<TData = Awaited<ReturnType<typeof register>>, TError = unknown>(
- autoTransferRegisterRequest: AutoTransferRegisterRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof register>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getRegisterQueryOptions(autoTransferRegisterRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-export const getCancelUrl = (autoTransferId: number,
+    export const getCancelUrl = (autoTransferId: number,
     params: CancelParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -279,84 +253,48 @@ export const cancel = async (autoTransferId: number,
 
 
 
-export const getCancelQueryKey = (autoTransferId: number,
-    params?: CancelParams,) => {
-    return [
-    'DELETE', `/auto-transfers/${autoTransferId}`, ...(params ? [params] : [])
-    ] as const;
+export const getCancelMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext> => {
+
+const mutationKey = ['cancel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancel>>, {autoTransferId: number;params: CancelParams}> = (props) => {
+          const {autoTransferId,params} = props ?? {};
+
+          return  cancel(autoTransferId,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelMutationResult = NonNullable<Awaited<ReturnType<typeof cancel>>>
+
+    export type CancelMutationError = unknown
+
+    export const useCancel = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancel>>, TError,{autoTransferId: number;params: CancelParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancel>>,
+        TError,
+        {autoTransferId: number;params: CancelParams},
+        TContext
+      > => {
+      return useMutation(getCancelMutationOptions(options), queryClient);
     }
-
-
-export const getCancelQueryOptions = <TData = Awaited<ReturnType<typeof cancel>>, TError = unknown>(autoTransferId: number,
-    params: CancelParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getCancelQueryKey(autoTransferId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof cancel>>> = ({ signal }) => cancel(autoTransferId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: autoTransferId !== null && autoTransferId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type CancelQueryResult = NonNullable<Awaited<ReturnType<typeof cancel>>>
-export type CancelQueryError = unknown
-
-
-export function useCancel<TData = Awaited<ReturnType<typeof cancel>>, TError = unknown>(
- autoTransferId: number,
-    params: CancelParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof cancel>>,
-          TError,
-          Awaited<ReturnType<typeof cancel>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCancel<TData = Awaited<ReturnType<typeof cancel>>, TError = unknown>(
- autoTransferId: number,
-    params: CancelParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof cancel>>,
-          TError,
-          Awaited<ReturnType<typeof cancel>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCancel<TData = Awaited<ReturnType<typeof cancel>>, TError = unknown>(
- autoTransferId: number,
-    params: CancelParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useCancel<TData = Awaited<ReturnType<typeof cancel>>, TError = unknown>(
- autoTransferId: number,
-    params: CancelParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof cancel>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getCancelQueryOptions(autoTransferId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-export const getChangeUrl = (autoTransferId: number,) => {
+    export const getChangeUrl = (autoTransferId: number,) => {
 
 
 
@@ -380,80 +318,44 @@ export const change = async (autoTransferId: number,
 
 
 
-export const getChangeQueryKey = (autoTransferId: number,
-    autoTransferChangeRequest?: AutoTransferChangeRequest,) => {
-    return [
-    'PATCH', `/auto-transfers/${autoTransferId}`, autoTransferChangeRequest
-    ] as const;
+export const getChangeMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext> => {
+
+const mutationKey = ['change'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof change>>, {autoTransferId: number;data: AutoTransferChangeRequest}> = (props) => {
+          const {autoTransferId,data} = props ?? {};
+
+          return  change(autoTransferId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangeMutationResult = NonNullable<Awaited<ReturnType<typeof change>>>
+    export type ChangeMutationBody = AutoTransferChangeRequest
+    export type ChangeMutationError = unknown
+
+    export const useChange = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof change>>, TError,{autoTransferId: number;data: AutoTransferChangeRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof change>>,
+        TError,
+        {autoTransferId: number;data: AutoTransferChangeRequest},
+        TContext
+      > => {
+      return useMutation(getChangeMutationOptions(options), queryClient);
     }
-
-
-export const getChangeQueryOptions = <TData = Awaited<ReturnType<typeof change>>, TError = unknown>(autoTransferId: number,
-    autoTransferChangeRequest: AutoTransferChangeRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getChangeQueryKey(autoTransferId,autoTransferChangeRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof change>>> = ({ signal }) => change(autoTransferId,autoTransferChangeRequest, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: autoTransferId !== null && autoTransferId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ChangeQueryResult = NonNullable<Awaited<ReturnType<typeof change>>>
-export type ChangeQueryError = unknown
-
-
-export function useChange<TData = Awaited<ReturnType<typeof change>>, TError = unknown>(
- autoTransferId: number,
-    autoTransferChangeRequest: AutoTransferChangeRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof change>>,
-          TError,
-          Awaited<ReturnType<typeof change>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useChange<TData = Awaited<ReturnType<typeof change>>, TError = unknown>(
- autoTransferId: number,
-    autoTransferChangeRequest: AutoTransferChangeRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof change>>,
-          TError,
-          Awaited<ReturnType<typeof change>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useChange<TData = Awaited<ReturnType<typeof change>>, TError = unknown>(
- autoTransferId: number,
-    autoTransferChangeRequest: AutoTransferChangeRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useChange<TData = Awaited<ReturnType<typeof change>>, TError = unknown>(
- autoTransferId: number,
-    autoTransferChangeRequest: AutoTransferChangeRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof change>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getChangeQueryOptions(autoTransferId,autoTransferChangeRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-

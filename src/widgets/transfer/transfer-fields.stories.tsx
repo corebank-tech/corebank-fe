@@ -18,7 +18,7 @@ import {
   MOCK_TRANSFER_ACCOUNTS,
   MOCK_TRANSFER_LIMITS,
 } from "@/entities/transfer"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
 
 const WithdrawAccountFieldDemo = () => {
   const [value, setValue] = React.useState(MOCK_TRANSFER_ACCOUNTS[0]?.accountNo)
@@ -99,7 +99,7 @@ const TransferDateFieldDemo = () => {
   const [value, setValue] = React.useState("2026-07-24")
   return (
     <FormRow label="예약일">
-      <TransferDateField value={value} onChange={setValue} today={MOCK_TODAY} />
+      <TransferDateField value={value} onChange={setValue} today={getToday()} />
     </FormRow>
   )
 }

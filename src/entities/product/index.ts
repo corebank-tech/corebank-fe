@@ -14,7 +14,6 @@ export {
 export {
   MOCK_JOIN_PRODUCTS,
   MOCK_JOIN_ACCOUNTS,
-  JOIN_DATE,
   MOCK_JOIN_TERMS,
 } from "@/entities/product/api/product-join"
 export {

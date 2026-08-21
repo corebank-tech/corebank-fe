@@ -37,13 +37,11 @@ import {
 import { cn } from "@/shared/lib/utils"
 import { daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 
-const DEFAULT_PERIOD = { start: "2026-06-23", end: TODAY }
+const defaultPeriod = () => ({ start: "2026-06-23", end: getToday() })
 
 const CONTENT_OPTIONS = [
   { label: "전체", value: "all" },
@@ -102,6 +100,8 @@ const InfoRow = ({
 }
 
 export const B03TransactionInquiry = () => {
+  const BASE_TIME = useBaseTime()
+  const TODAY = getToday()
   const [searchParams] = useSearchParams()
   const [account, setAccount] = React.useState(() => {
     /** REQ-INQR-005: 계좌목록의 [조회] 진입 시 해당 계좌가 선택된 상태로 시작한다. */
@@ -110,8 +110,8 @@ export const B03TransactionInquiry = () => {
     return preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo
   })
   // periodDraft는 입력 중인 값, period는 [조회] 통과 후 실제 필터링에 반영되는 값이다(REQ-INQR-010).
-  const [periodDraft, setPeriodDraft] = React.useState(DEFAULT_PERIOD)
-  const [period, setPeriod] = React.useState(DEFAULT_PERIOD)
+  const [periodDraft, setPeriodDraft] = React.useState(defaultPeriod)
+  const [period, setPeriod] = React.useState(defaultPeriod)
   const [content, setContent] = React.useState("all")
   const [order, setOrder] = React.useState("recent")
   const [keyword, setKeyword] = React.useState("")
@@ -233,8 +233,8 @@ export const B03TransactionInquiry = () => {
 
   const handleReset = () => {
     setAccount(MOCK_ACCOUNTS[0].accountNo)
-    setPeriodDraft(DEFAULT_PERIOD)
-    setPeriod(DEFAULT_PERIOD)
+    setPeriodDraft(defaultPeriod())
+    setPeriod(defaultPeriod())
     setContent("all")
     setOrder("recent")
     setKeyword("")

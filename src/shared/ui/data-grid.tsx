@@ -27,6 +27,13 @@ type DataGridProps<Row> = {
   loading?: boolean
   emptyMessage?: string
   selectable?: boolean
+  /**
+   * 선택 상태를 부모가 소유할 때 넘긴다. 넘기지 않으면 그리드가 내부에서
+   * 관리한다 — rows가 바뀌어도 내부 Set은 그대로라 부모가 들고 있는 선택
+   * 목록과 어긋날 수 있으므로, 서버 페이지네이션처럼 rows가 갈리는 화면은
+   * 이 prop으로 넘기는 쪽을 쓴다.
+   */
+  selectedKeys?: string[]
   onSelectionChange?: (selectedKeys: string[]) => void
   /** Stable row identity. Defaults to the row index. */
   rowKey?: (row: Row, index: number) => string
@@ -49,6 +56,7 @@ export const DataGrid = <Row,>({
   loading = false,
   emptyMessage = "조회 결과가 없습니다.",
   selectable = false,
+  selectedKeys,
   onSelectionChange,
   rowKey,
   skeletonRows = 6,
@@ -58,7 +66,14 @@ export const DataGrid = <Row,>({
     key: string
     dir: "asc" | "desc"
   } | null>(null)
-  const [selected, setSelected] = React.useState<Set<string>>(new Set())
+  const [uncontrolledSelected, setUncontrolledSelected] = React.useState<
+    Set<string>
+  >(new Set())
+  const controlled = selectedKeys != null
+  const selected = React.useMemo(
+    () => (controlled ? new Set(selectedKeys) : uncontrolledSelected),
+    [controlled, selectedKeys, uncontrolledSelected],
+  )
 
   const keyOf = React.useCallback(
     (row: Row, index: number) => rowKey?.(row, index) ?? String(index),
@@ -80,7 +95,7 @@ export const DataGrid = <Row,>({
   }, [rows, sort, columns])
 
   const emitSelection = (next: Set<string>) => {
-    setSelected(next)
+    if (!controlled) setUncontrolledSelected(next)
     onSelectionChange?.(Array.from(next))
   }
 
@@ -88,7 +103,10 @@ export const DataGrid = <Row,>({
   const allSelected =
     allKeys.length > 0 && allKeys.every((k) => selected.has(k))
 
+  // 로딩 중에는 본문이 스켈레톤이지만 rows는 아직 이전 응답이다(keepPreviousData).
+  // 그대로 전체 선택을 허용하면 화면에 보이지 않는 이전 페이지의 행이 선택된다.
   const toggleAll = () => {
+    if (loading) return
     emitSelection(allSelected ? new Set() : new Set(allKeys))
   }
 
@@ -125,7 +143,8 @@ export const DataGrid = <Row,>({
                 <div className="flex items-center justify-center">
                   <Checkbox
                     aria-label="전체 선택"
-                    checked={allSelected}
+                    checked={allSelected && !loading}
+                    disabled={loading}
                     onChange={toggleAll}
                   />
                 </div>

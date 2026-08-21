@@ -23,7 +23,8 @@ export default defineConfig({
           name: "customFetch",
         },
         query: {
-          useQuery: true,
+          // useQuery/useMutation 을 명시하면 모든 HTTP 메서드에 무조건 적용돼버린다.
+          // 비워두면 orval이 verb === GET 일 때만 query, 그 외엔 mutation으로 자동 판별한다.
           useSuspenseQuery: false,
           signal: true,
         },

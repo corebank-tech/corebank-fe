@@ -1,5 +1,5 @@
 /**
- * E-04 예약이체 조회/취소 목업 데이터. REQ-RSV-007·008.
+ * E-04 예약이체 조회/취소. REQ-RSV-007·008.
  * 상태는 대기/완료/실패/취소 4종(POL-025 이체 처리상태와 별개 체계)이다.
  */
 
@@ -10,17 +10,21 @@ export type ReservationRow = {
   status: ReservationStatus
   /** 이체 예정일자 ISO date. */
   scheduledDate: string
-  /** 등록일시 ISO datetime. */
-  registeredAt: string
+  /** 등록일시 ISO datetime. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */
+  registeredAt?: string
   fromAccountNo: string
-  fromAlias: string
+  /** 계좌 별칭. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */
+  fromAlias?: string
   toAccountNo: string
   payeeName: string
   amount: number
-  memo: string
+  /** 표시내용. 서버 응답에 아직 없어 BE 반영 전까지는 비어있다. */
+  memo?: string
+  /** 취소 가능 여부. 서버가 REQ-RSV-008 규칙(예정일 전일까지)을 적용해 계산해 준다. */
+  cancelable: boolean
 }
 
-/** 오늘 = 2026-07-23 기준 목업. */
+/** Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. 오늘 = 2026-07-23 기준. */
 export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv7",
@@ -33,6 +37,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "김민수",
     amount: 300_000,
     memo: "생활비",
+    cancelable: true,
   },
   {
     id: "rsv6",
@@ -45,6 +50,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "박지훈",
     amount: 2_000_000,
     memo: "월세",
+    cancelable: true,
   },
   {
     id: "rsv5",
@@ -57,6 +63,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "이서연",
     amount: 150_000,
     memo: "-",
+    cancelable: true,
   },
   {
     id: "rsv4",
@@ -69,6 +76,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "김민수",
     amount: 500_000,
     memo: "경조사비",
+    cancelable: false,
   },
   {
     id: "rsv3",
@@ -81,6 +89,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "최유진",
     amount: 1_000_000,
     memo: "-",
+    cancelable: false,
   },
   {
     id: "rsv2",
@@ -93,6 +102,7 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "이서연",
     amount: 200_000,
     memo: "-",
+    cancelable: false,
   },
   {
     id: "rsv1",
@@ -105,5 +115,6 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     payeeName: "박지훈",
     amount: 2_000_000,
     memo: "월세",
+    cancelable: false,
   },
 ]

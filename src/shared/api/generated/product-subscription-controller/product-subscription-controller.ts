@@ -6,18 +6,13 @@
  * OpenAPI spec version: v1.0.0
  */
 import {
-  useQuery
+  useMutation
 } from '@tanstack/react-query';
 import type {
-  DataTag,
-  DefinedInitialDataOptions,
-  DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
-  QueryFunction,
-  QueryKey,
-  UndefinedInitialDataOptions,
-  UseQueryOptions,
-  UseQueryResult
+  UseMutationOptions,
+  UseMutationResult
 } from '@tanstack/react-query';
 
 import type {
@@ -31,21 +26,6 @@ import { customFetch } from '../../custom-fetch';
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
-  const result = { queryKey } as T & { queryKey: K };
-  for (const key of Object.keys(query)) {
-    // The explicit queryKey always wins, matching the previous
-    // `{ ...query, queryKey }` spread where it was set last.
-    if (key === 'queryKey') continue;
-    Object.defineProperty(result, key, {
-      enumerable: true,
-      configurable: true,
-      get: () => (query as Record<string, unknown>)[key],
-    });
-  }
-  return result;
-};
 
 export const getValidateUrl = () => {
 
@@ -70,74 +50,44 @@ export const validate = async (productSubscriptionValidationRequest: ProductSubs
 
 
 
-export const getValidateQueryKey = (productSubscriptionValidationRequest?: ProductSubscriptionValidationRequest,) => {
-    return [
-    'POST', `/product-subscriptions/validation`, productSubscriptionValidationRequest
-    ] as const;
+export const getValidateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validate>>, TError,{data: ProductSubscriptionValidationRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validate>>, TError,{data: ProductSubscriptionValidationRequest}, TContext> => {
+
+const mutationKey = ['validate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validate>>, {data: ProductSubscriptionValidationRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  validate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValidateMutationResult = NonNullable<Awaited<ReturnType<typeof validate>>>
+    export type ValidateMutationBody = ProductSubscriptionValidationRequest
+    export type ValidateMutationError = unknown
+
+    export const useValidate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validate>>, TError,{data: ProductSubscriptionValidationRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof validate>>,
+        TError,
+        {data: ProductSubscriptionValidationRequest},
+        TContext
+      > => {
+      return useMutation(getValidateMutationOptions(options), queryClient);
     }
-
-
-export const getValidateQueryOptions = <TData = Awaited<ReturnType<typeof validate>>, TError = unknown>(productSubscriptionValidationRequest: ProductSubscriptionValidationRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getValidateQueryKey(productSubscriptionValidationRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof validate>>> = ({ signal }) => validate(productSubscriptionValidationRequest, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ValidateQueryResult = NonNullable<Awaited<ReturnType<typeof validate>>>
-export type ValidateQueryError = unknown
-
-
-export function useValidate<TData = Awaited<ReturnType<typeof validate>>, TError = unknown>(
- productSubscriptionValidationRequest: ProductSubscriptionValidationRequest, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof validate>>,
-          TError,
-          Awaited<ReturnType<typeof validate>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useValidate<TData = Awaited<ReturnType<typeof validate>>, TError = unknown>(
- productSubscriptionValidationRequest: ProductSubscriptionValidationRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof validate>>,
-          TError,
-          Awaited<ReturnType<typeof validate>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useValidate<TData = Awaited<ReturnType<typeof validate>>, TError = unknown>(
- productSubscriptionValidationRequest: ProductSubscriptionValidationRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useValidate<TData = Awaited<ReturnType<typeof validate>>, TError = unknown>(
- productSubscriptionValidationRequest: ProductSubscriptionValidationRequest, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof validate>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getValidateQueryOptions(productSubscriptionValidationRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-

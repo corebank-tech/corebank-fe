@@ -17,10 +17,11 @@ import {
 } from "@/entities/account"
 import { cn } from "@/shared/lib/utils"
 import { useDisclosure } from "@/shared/lib/hooks/use-disclosure"
-import { MOCK_NOW as BASE_TIME } from "@/shared/config/mock-clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 /** REQ-INQR-001·004: 예금/적금 계좌만 대상으로 한 전체계좌조회(B-01)의 부분 화면. */
 export const B02DepositAccounts = () => {
+  const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const { open, toggle } = useDisclosure(true)
 

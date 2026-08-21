@@ -38,7 +38,7 @@ import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
 import { checkPeriodRange } from "@/entities/transaction"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
   useCancelScheduledTransfer,
@@ -82,6 +82,9 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  * 예약이체는 미래 일자 건이라 형제 조회화면처럼 종료일을 오늘로 둘 수 없다.
  * 오늘을 가운데 두고 앞뒤 2개월을 기본 창으로 잡는다 — 최근 처리된 건과
  * 등록해 둔 예정 건이 같이 보인다.
+ *
+ * 조회화면 4개가 쓰는 POL-021(기본 1개월)과 값도 방향도 다르다. 이 화면의 기본
+ * 기간을 정한 요구사항은 없으므로(REQ-RSV-007) 상수를 공유하지 않고 로컬로 둔다.
  */
 const DEFAULT_PERIOD_MONTHS = 2
 
@@ -97,7 +100,6 @@ const defaultCondition = () => {
 }
 
 export const E04ReservationList = () => {
-  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
   // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
@@ -120,7 +122,14 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const { data, isFetching, isError, refetch } = useSearchScheduledTransfers(
+  const {
+    data,
+    dataUpdatedAt,
+    isPlaceholderData,
+    isFetching,
+    isError,
+    refetch,
+  } = useSearchScheduledTransfers(
     {
       status: STATUS_TO_API[applied.status],
       fromDate: applied.period.start,
@@ -133,6 +142,7 @@ export const E04ReservationList = () => {
     // 사라졌다 돌아오지 않게 한다.
     { query: { placeholderData: keepPreviousData } },
   )
+  const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
@@ -472,7 +482,9 @@ export const E04ReservationList = () => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
           onSaveFile={() => {

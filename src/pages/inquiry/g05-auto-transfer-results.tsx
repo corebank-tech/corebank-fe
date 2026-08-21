@@ -31,6 +31,7 @@ import {
   type AutoTransferResultRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
+import { recentPeriod } from "@/shared/config/query-period"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 const FROM_ACCOUNTS = Array.from(
@@ -43,10 +44,7 @@ export const G05AutoTransferResults = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const [fromAccount, setFromAccount] = React.useState("all")
-  const [period, setPeriod] = React.useState({
-    start: "2026-06-23",
-    end: TODAY,
-  })
+  const [period, setPeriod] = React.useState(recentPeriod)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
@@ -74,7 +72,7 @@ export const G05AutoTransferResults = () => {
 
   const handleReset = () => {
     setFromAccount("all")
-    setPeriod({ start: "2026-06-23", end: TODAY })
+    setPeriod(recentPeriod())
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()

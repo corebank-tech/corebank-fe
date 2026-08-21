@@ -103,7 +103,10 @@ export const DataGrid = <Row,>({
   const allSelected =
     allKeys.length > 0 && allKeys.every((k) => selected.has(k))
 
+  // 로딩 중에는 본문이 스켈레톤이지만 rows는 아직 이전 응답이다(keepPreviousData).
+  // 그대로 전체 선택을 허용하면 화면에 보이지 않는 이전 페이지의 행이 선택된다.
   const toggleAll = () => {
+    if (loading) return
     emitSelection(allSelected ? new Set() : new Set(allKeys))
   }
 
@@ -140,7 +143,8 @@ export const DataGrid = <Row,>({
                 <div className="flex items-center justify-center">
                   <Checkbox
                     aria-label="전체 선택"
-                    checked={allSelected}
+                    checked={allSelected && !loading}
+                    disabled={loading}
                     onChange={toggleAll}
                   />
                 </div>

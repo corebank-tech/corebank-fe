@@ -1,0 +1,4 @@
+# checkout 시점에도 줄바꿈을 LF로 고정한다. pre-push의 `prettier --check .`가
+# 저장소 전체를 endOfLine: "lf" 기준으로 보므로, core.autocrlf=true 환경에서
+# 건드리지도 않은 파일의 CRLF 때문에 push가 막히는 것을 막는다.
+* text=auto eol=lf

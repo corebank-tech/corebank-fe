@@ -168,4 +168,16 @@ describe("toReservationRow", () => {
     })
     expect(row.status).toBe("대기")
   })
+
+  it("별칭·표시내용·등록일시를 옮긴다", () => {
+    const row = toReservationRow({
+      ...RESERVATION_ITEM,
+      fromAlias: "자유입출금",
+      myPassbookMemo: "생활비",
+      registeredAt: "2026-08-20T10:12:00",
+    })
+    expect(row.fromAlias).toBe("자유입출금")
+    expect(row.memo).toBe("생활비")
+    expect(row.registeredAt).toBe("2026-08-20T10:12:00")
+  })
 })

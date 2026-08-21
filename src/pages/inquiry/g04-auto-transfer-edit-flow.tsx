@@ -44,7 +44,8 @@ type EditForm = {
 type Props = {
   target: AutoTransferRow
   onClose: () => void
-  onSave: (updatedRow: AutoTransferRow) => void
+  /** 변경 요청의 성공 여부를 돌려준다. 실패하면 모달을 닫지 않는다. */
+  onSave: (updatedRow: AutoTransferRow) => Promise<boolean>
 }
 
 export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
@@ -56,22 +57,29 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
   })
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false)
   const [isOtpOpen, setIsOtpOpen] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
 
   const handleConfirm = () => {
     setIsConfirmOpen(false)
     setIsOtpOpen(true)
   }
 
-  const handleOtpConfirm = () => {
-    onSave({
+  // 결과를 기다린 뒤 성공했을 때만 닫는다. 먼저 닫으면 PATCH가 실패했을 때
+  // 입력값이 이미 사라진 뒤에 에러만 뜨고, 사용자는 처음부터 다시 입력해야 한다.
+  const handleOtpConfirm = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    const saved = await onSave({
       ...target,
       amount: Number(editForm.amount) || target.amount,
       cycleMonths: editForm.cycleMonths,
       endDate: editForm.endDate,
       memo: editForm.memo,
     })
+    setIsSaving(false)
+    // OTP는 이미 소진됐으므로 실패해도 OTP 모달은 닫고, 재시도는 새로 발급받는다.
     setIsOtpOpen(false)
-    onClose()
+    if (saved) onClose()
   }
 
   return (
@@ -96,6 +104,7 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
               size="lg"
               className="min-w-30"
               disabled={
+                isSaving ||
                 !(Number(editForm.amount) > 0) ||
                 !isEndDateValid(target.startDate, editForm.endDate)
               }

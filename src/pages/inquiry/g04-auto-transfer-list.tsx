@@ -229,8 +229,12 @@ export const G04AutoTransferList = () => {
   /**
    * REQ-AUTO-010: 변경 가능한 항목은 이체금액·이체주기·종료일·표시내용뿐이다.
    * 출금계좌·입금계좌·이체지정일은 보내지 않는다 — 서버도 변경 요청을 거부한다.
+   *
+   * 성공 여부를 돌려준다. 변경 모달은 이 값이 true일 때만 닫는다.
    */
-  const handleEditSave = async (updatedRow: AutoTransferRow) => {
+  const handleEditSave = async (
+    updatedRow: AutoTransferRow,
+  ): Promise<boolean> => {
     try {
       await changeAutoTransfer(Number(updatedRow.id), {
         amount: updatedRow.amount,
@@ -245,7 +249,7 @@ export const G04AutoTransferList = () => {
           ? error.message
           : "자동이체 변경에 실패했습니다.",
       )
-      return
+      return false
     }
 
     const refreshed = await refetch()
@@ -254,6 +258,7 @@ export const G04AutoTransferList = () => {
         "변경 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
       )
     }
+    return true
   }
 
   const exportHeaders = [

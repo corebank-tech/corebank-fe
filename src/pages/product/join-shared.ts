@@ -30,14 +30,28 @@ export type ProductJoinFormState = ProductJoinTermsState & {
 }
 
 /**
- * C-05 가입 실행 후 C-06 으로 넘기는 결과. 계좌번호·만기일·예상만기금액·적용금리는
- * 전부 서버 응답값이다 — 화면에서 다시 계산하면 서버 산출과 어긋난다.
+ * C-05 가입 실행 후 C-06 으로 넘기는 결과. 계좌번호·만기일·적용금리는 전부 서버
+ * 응답값이다 — 화면에서 다시 계산하면 서버 산출과 어긋난다.
  */
 export type ProductJoinResult = {
   productId: number
   productName: string
   category: ProductCategory
+  /**
+   * 표시용 신규계좌번호. 서버가 마스킹해서 내려주므로(088******002) 화면에서
+   * 다시 포맷하지 않는다 — 자릿수 가공을 거치면 마스킹 문자가 지워진다.
+   */
   newAccountNo: string
+  /**
+   * 자동이체 등록(G-01) 프리필용 원본 값. 표시용 계좌번호는 마스킹돼 있어
+   * 그대로 넘기면 입금계좌가 성립하지 않는다. 서버가 이 값을 따로 내려준다.
+   */
+  autoTransferPrefill?: {
+    depositAccountNumber: string
+    amount: number
+    cycleMonths: number
+    endDate: string
+  }
   amount: number
   termMonths: number
   maturityDate: string

@@ -28,12 +28,16 @@ import {
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import { useExecuteProductSubscription } from "@/shared/api/generated/product-subscription-controller/product-subscription-controller"
+import {
+  useExecuteProductSubscription,
+  getProductSubscriptions,
+} from "@/shared/api/generated/product-subscription-controller/product-subscription-controller"
 import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
 import type {
   AccountOverviewResponse,
   ProductDetailResponse,
   ProductSubscriptionExecuteResponse,
+  ProductSubscriptionResultResponse,
 } from "@/shared/api/generated/model"
 import { ApiError } from "@/shared/api/api-error"
 
@@ -154,6 +158,24 @@ export const C05ConfirmAuth = () => {
       const executed = response as unknown as
         ProductSubscriptionExecuteResponse | undefined
 
+      // 실행 응답의 계좌번호는 마스킹돼 있고(088******002) 자동이체 프리필도 없다.
+      // 원본 계좌번호는 가입 상세 조회에만 담겨 오므로 이어서 한 번 더 부른다.
+      // 실패해도 가입 자체는 끝난 상태라 완료 화면 진입을 막지 않는다.
+      let prefill: ProductSubscriptionResultResponse["autoTransferPrefill"]
+      if (executed?.subscriptionId != null) {
+        try {
+          const detailResponse = await getProductSubscriptions(
+            executed.subscriptionId,
+          )
+          prefill = (
+            detailResponse as unknown as
+              ProductSubscriptionResultResponse | undefined
+          )?.autoTransferPrefill
+        } catch {
+          prefill = undefined
+        }
+      }
+
       // 계좌번호·만기일·예상만기금액·적용금리는 서버 산출값을 그대로 쓴다.
       // 화면에서 다시 계산하면 이자 계산 규칙이 갈린다.
       const result: ProductJoinResult = {
@@ -165,6 +187,12 @@ export const C05ConfirmAuth = () => {
         termMonths: executed?.termMonths ?? termMonths,
         maturityDate: executed?.maturityDate ?? maturityDate,
         rate: executed?.appliedRate ?? appliedRate,
+        autoTransferPrefill: prefill && {
+          depositAccountNumber: prefill.depositAccountNumber ?? "",
+          amount: prefill.amount ?? amount,
+          cycleMonths: prefill.cycleMonths ?? 1,
+          endDate: prefill.endDate ?? executed?.maturityDate ?? maturityDate,
+        },
       }
       navigate(`/product/${product.id}/join/4`, { state: result })
     } catch (e) {

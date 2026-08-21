@@ -17,6 +17,7 @@ import {
 } from "@/shared/lib/format"
 import { addMonths, daysBetween, parseISO, toISO } from "@/shared/lib/date"
 import { getToday } from "@/shared/config/clock"
+import { getNow } from "@/shared/config/clock"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { AUTO_TRANSFER_START_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import type { TransferCycleMonths } from "@/widgets/transfer"
@@ -130,6 +131,9 @@ export const AutoTransferScreen = () => {
   const [form, setForm] = React.useState<AutoTransferForm>(() =>
     buildInitialForm(searchParams),
   )
+  // 확인 다이얼로그를 여는 시점의 시각. 다이얼로그에 표시하는 거래일자·거래시각이
+  // 화면 진입 시각으로 고정되지 않게 한다.
+  const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
 
@@ -197,7 +201,10 @@ export const AutoTransferScreen = () => {
           period={<span>{periodLabel}</span>}
           payeeMemo={form.payeeMemo || "-"}
           onPrev={() => setStep(1)}
-          onSubmit={() => setConfirmOpen(true)}
+          onSubmit={() => {
+            setTransactionAt(getNow())
+            setConfirmOpen(true)
+          }}
         />
 
         <ConfirmDialog
@@ -213,8 +220,11 @@ export const AutoTransferScreen = () => {
           ]}
           confirmLabel="확인"
           items={[
-            { label: "1. 거래일자", value: formatDate(NOW) },
-            { label: "2. 거래시각", value: formatDateTime(NOW).slice(11) },
+            { label: "1. 거래일자", value: formatDate(transactionAt ?? NOW) },
+            {
+              label: "2. 거래시각",
+              value: formatDateTime(transactionAt ?? NOW).slice(11),
+            },
             {
               label: "3. 출금계좌번호",
               value: formatAccountNo(form.fromAccount),

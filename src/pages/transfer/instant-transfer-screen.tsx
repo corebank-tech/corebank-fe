@@ -122,8 +122,9 @@ export const InstantTransferScreen = () => {
       ? { ...INITIAL_FORM, fromAccount: preselected.accountNo }
       : INITIAL_FORM
   })
-  // 사용자가 확인 다이얼로그에서 승인한 시각. 다이얼로그 표시와 원장 기록에
-  // 같은 값을 써서, 확인한 거래시각과 저장되는 거래시각이 어긋나지 않게 한다.
+  // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
+  // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
+  // 어긋나지 않게 한다.
   const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
@@ -320,7 +321,9 @@ export const InstantTransferScreen = () => {
       <>
         <InstantTransferStep2
           steps={STEPS}
-          scheduledAt={<span>{formatDateTime(BASE_TIME)}</span>}
+          scheduledAt={
+            <span>{formatDateTime(transactionAt ?? BASE_TIME)}</span>
+          }
           fromAccount={
             <span>
               {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}

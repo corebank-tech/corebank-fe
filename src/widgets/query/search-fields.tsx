@@ -5,8 +5,8 @@ import { Select } from "@/shared/ui/select"
 import { Radio } from "@/shared/ui/radio"
 import { Chip } from "@/shared/ui/chip"
 import { formatAccountNo, formatAmount } from "@/shared/lib/format"
-import { daysBetween, parseISO, toISO } from "@/shared/lib/date"
-import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import { addDays, parseISO, toISO } from "@/shared/lib/date"
+import { QUERY_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import type { AccountOption } from "@/shared/types/account"
 import { checkPeriodRange } from "@/entities/transaction"
 
@@ -47,15 +47,27 @@ export const AccountSelectField = ({
 /* PeriodField                                                         */
 /* ------------------------------------------------------------------ */
 
-/** REQ-INQR-009: 조회기간 프리셋(오늘·1주일·1개월·3개월·6개월·1년). */
-const PERIOD_CHIPS = [
-  { id: "today", label: "오늘", days: 0 },
-  { id: "1w", label: "1주일", days: 7 },
-  { id: "1m", label: "1개월", days: 30 },
-  { id: "3m", label: "3개월", days: 90 },
-  { id: "6m", label: "6개월", days: 182 },
-  { id: "1y", label: "1년", days: MAX_RANGE_DAYS },
-] as const
+/**
+ * 기간 프리셋 칩 하나. 오프셋은 `today` 기준 일수이고 음수가 과거다.
+ * 방향을 오프셋으로 들고 있어야 미래 건을 다루는 화면(E-04 예약이체 조회)이
+ * 자기 프리셋을 넘길 수 있다.
+ */
+export type PeriodPreset = {
+  id: string
+  label: string
+  startOffset: number
+  endOffset: number
+}
+
+/** REQ-INQR-009: 조회기간 프리셋(오늘·1주일·1개월·3개월·6개월·1년). 전부 과거 방향이다. */
+const PAST_PERIOD_PRESETS: PeriodPreset[] = [
+  { id: "today", label: "오늘", startOffset: 0, endOffset: 0 },
+  { id: "1w", label: "1주일", startOffset: -7, endOffset: 0 },
+  { id: "1m", label: "1개월", startOffset: -30, endOffset: 0 },
+  { id: "3m", label: "3개월", startOffset: -90, endOffset: 0 },
+  { id: "6m", label: "6개월", startOffset: -182, endOffset: 0 },
+  { id: "1y", label: "1년", startOffset: -QUERY_MAX_RANGE_DAYS, endOffset: 0 },
+]
 
 type PeriodFieldProps = {
   start: string
@@ -63,6 +75,14 @@ type PeriodFieldProps = {
   onChange: (range: { start: string; end: string }) => void
   /** Anchor "today" for chip presets, ISO yyyy-mm-dd. */
   today: string
+  /** 기본은 REQ-INQR-009의 과거 방향 프리셋. 미래 건을 다루는 화면은 직접 넘긴다. */
+  presets?: PeriodPreset[]
+  /**
+   * 시작일 소급 한도(일). 기본은 POL-021(거래내역 조회 최대 1년).
+   * 다른 규칙을 따르는 화면은 자기 상수를 넘긴다 — 여기서 고정하면 화면의 조회 차단
+   * 기준과 입력칸 표시가 갈라진다.
+   */
+  maxRangeDays?: number
 }
 
 export const PeriodField = ({
@@ -70,12 +90,14 @@ export const PeriodField = ({
   end,
   onChange,
   today,
+  presets = PAST_PERIOD_PRESETS,
+  maxRangeDays = QUERY_MAX_RANGE_DAYS,
 }: PeriodFieldProps) => {
-  const applyChip = (days: number) => {
-    const endDate = parseISO(today)
-    const startDate = parseISO(today)
-    startDate.setDate(startDate.getDate() - days)
-    onChange({ start: toISO(startDate), end: toISO(endDate) })
+  const applyPreset = (preset: PeriodPreset) => {
+    onChange({
+      start: addDays(today, preset.startOffset),
+      end: addDays(today, preset.endOffset),
+    })
   }
 
   const stepEnd = (unit: "year" | "month", delta: number) => {
@@ -85,13 +107,25 @@ export const PeriodField = ({
     onChange({ start, end: toISO(d) })
   }
 
-  const activeChip = React.useMemo(() => {
-    if (end !== today) return null
-    const span = daysBetween(start, end)
-    return PERIOD_CHIPS.find((c) => c.days === span)?.id ?? null
-  }, [start, end, today])
+  const activePreset = React.useMemo(
+    () =>
+      presets.find(
+        (p) =>
+          addDays(today, p.startOffset) === start &&
+          addDays(today, p.endOffset) === end,
+      )?.id ?? null,
+    [presets, start, end, today],
+  )
 
-  const { reversed, overLimit } = checkPeriodRange(start, end, MAX_RANGE_DAYS)
+  const { reversed, overLimit } = checkPeriodRange(
+    start,
+    end,
+    today,
+    maxRangeDays,
+  )
+  // 한도는 화면마다 다를 수 있으므로 안내 문구도 넘겨받은 값에서 만든다.
+  const limitLabel =
+    maxRangeDays % 365 === 0 ? `${maxRangeDays / 365}년` : `${maxRangeDays}일`
 
   const stepperGroup =
     "inline-flex items-stretch overflow-hidden rounded-md border border-border-strong"
@@ -102,17 +136,17 @@ export const PeriodField = ({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-1">
-          {PERIOD_CHIPS.map((chip) => {
-            const active = activeChip === chip.id
+          {presets.map((preset) => {
+            const active = activePreset === preset.id
             return (
               <Chip
-                key={chip.id}
+                key={preset.id}
                 tone={active ? "active" : "default"}
-                onClick={() => applyChip(chip.days)}
+                onClick={() => applyPreset(preset)}
                 aria-pressed={active}
                 className="text-base leading-[1.5]"
               >
-                {chip.label}
+                {preset.label}
               </Chip>
             )
           })}
@@ -192,7 +226,8 @@ export const PeriodField = ({
         </p>
       ) : overLimit ? (
         <p className="text-xs font-bold text-danger">
-          조회 기간은 최대 1년까지 선택할 수 있습니다. 기간을 다시 선택하세요.
+          조회 시작일은 오늘로부터 최대 {limitLabel} 이내로 지정할 수 있습니다.
+          기간을 다시 선택하세요.
         </p>
       ) : null}
     </div>

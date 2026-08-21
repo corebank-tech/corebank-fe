@@ -35,11 +35,11 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
-import { daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
 
 /**
@@ -143,8 +143,9 @@ export const B03TransactionInquiry = () => {
     MOCK_ACCOUNTS.find((a) => a.accountNo === applied.account) ??
     MOCK_ACCOUNTS[0]
 
-  const periodReversed = daysBetween(period.start, period.end) < 0
-  const periodOverLimit = daysBetween(period.start, TODAY) > MAX_RANGE_DAYS
+  /** REQ-INQR-010: 역전 기간과 1년을 넘어 과거인 시작일은 조회를 거부한다. */
+  const { reversed: periodReversed, overLimit: periodOverLimit } =
+    checkPeriodRange(period.start, period.end, TODAY, MAX_RANGE_DAYS)
 
   // Presentation-only filtering/ordering over the mock rows.
   const rows = React.useMemo(() => {

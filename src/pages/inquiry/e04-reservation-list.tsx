@@ -8,6 +8,7 @@ import { Badge } from "@/shared/ui/badge"
 import {
   GridToolbar,
   PeriodField,
+  type PeriodPreset,
   RadioRowField,
   SavedConditionAlert,
   SearchPanel,
@@ -37,7 +38,6 @@ import {
 import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
 import { checkPeriodRange } from "@/entities/transaction"
-import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
@@ -87,6 +87,27 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  * 기간을 정한 요구사항은 없으므로(REQ-RSV-007) 상수를 공유하지 않고 로컬로 둔다.
  */
 const DEFAULT_PERIOD_MONTHS = 2
+
+/**
+ * 조회 시작일 소급 한도. 값은 POL-021(거래내역 조회 최대 1년)과 같지만 별개 규칙이라
+ * 상수를 공유하지 않는다 — 예약이체 조회 기간을 정한 POL·REQ가 없고(REQ-RSV-007),
+ * `policy.ts`는 POL 수치의 단일 출처라 번호 없는 값을 넣지 않는다.
+ */
+const MAX_RANGE_DAYS = 365
+
+/**
+ * 이 화면의 조회 대상은 미래 일자 예약건이다. 공용 프리셋은 전부 종료일을 오늘로
+ * 맞추는 과거 방향이라, 아무 칩이나 누르면 대기 건이 통째로 사라진다. 과거 방향
+ * 셋(완료·실패·취소 건 확인)과 미래 방향 셋(대기 건 확인)을 함께 둔다.
+ */
+const PERIOD_PRESETS: PeriodPreset[] = [
+  { id: "today", label: "오늘", startOffset: 0, endOffset: 0 },
+  { id: "1m", label: "1개월", startOffset: -30, endOffset: 0 },
+  { id: "3m", label: "3개월", startOffset: -90, endOffset: 0 },
+  { id: "1m-ahead", label: "1개월 후", startOffset: 0, endOffset: 30 },
+  { id: "3m-ahead", label: "3개월 후", startOffset: 0, endOffset: 90 },
+  { id: "6m-ahead", label: "6개월 후", startOffset: 0, endOffset: 182 },
+]
 
 const defaultCondition = () => {
   const today = getToday()
@@ -190,10 +211,11 @@ export const E04ReservationList = () => {
       setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
       return
     }
-    /** REQ-INQR-009: 종료일이 시작일보다 빠르거나 기간이 1년을 넘으면 조회를 거부한다. */
+    /** REQ-INQR-010: 종료일이 시작일보다 빠르거나 시작일이 1년을 넘어 과거면 거부한다. */
     const { reversed, overLimit } = checkPeriodRange(
       period.start,
       period.end,
+      TODAY,
       MAX_RANGE_DAYS,
     )
     if (reversed) {
@@ -203,7 +225,9 @@ export const E04ReservationList = () => {
       return
     }
     if (overLimit) {
-      setPeriodAlertMessage("조회기간은 최대 1년 이내로 지정할 수 있습니다.")
+      setPeriodAlertMessage(
+        "조회 시작일은 오늘로부터 최대 1년 이내로 지정할 수 있습니다.",
+      )
       return
     }
 
@@ -449,6 +473,8 @@ export const E04ReservationList = () => {
               end={period.end}
               onChange={setPeriod}
               today={TODAY}
+              presets={PERIOD_PRESETS}
+              maxRangeDays={MAX_RANGE_DAYS}
             />
           </FormRow>
         </SearchPanel>

@@ -13,6 +13,12 @@ type TermsAgreementProps = {
    * 부모는 이 값으로 onNext 버튼의 활성화를 제어한다.
    */
   onAllRequiredAgreedChange?: (allRequiredAgreed: boolean) => void
+  /**
+   * [보기] 를 눌러 전문을 열 때 호출된다. 전문을 서버에서 받아오는 화면(C-03)이
+   * 이 시점에 조회를 걸고, 서버는 그 요청으로 열람 이력을 남긴다.
+   * 전달한 `terms` 의 body 가 갱신되면 열려 있는 모달에도 그대로 반영된다.
+   */
+  onView?: (id: string) => void
 }
 
 export type TermsAgreementHandle = {
@@ -32,10 +38,14 @@ export type TermsAgreementHandle = {
 export const TermsAgreement = React.forwardRef<
   TermsAgreementHandle,
   TermsAgreementProps
->(({ terms, onAllRequiredAgreedChange }, ref) => {
+>(({ terms, onAllRequiredAgreedChange, onView }, ref) => {
   const [checked, setChecked] = React.useState<Record<string, boolean>>({})
   const [viewed, setViewed] = React.useState<Record<string, boolean>>({})
-  const [viewing, setViewing] = React.useState<TermItem | null>(null)
+  // 열람 중인 약관은 객체가 아니라 id 로 들고 terms 에서 찾는다. 전문을 나중에
+  // 받아오는 화면에서 body 가 도착했을 때 열려 있는 모달이 옛 객체를 계속
+  // 가리키지 않게 하기 위해서다.
+  const [viewingId, setViewingId] = React.useState<string | null>(null)
+  const viewing = terms.find((t) => t.id === viewingId) ?? null
   const [blocked, setBlocked] = React.useState<{
     message: string
     openTerm?: TermItem
@@ -51,7 +61,8 @@ export const TermsAgreement = React.forwardRef<
 
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))
-    setViewing(term)
+    setViewingId(term.id)
+    onView?.(term.id)
   }
 
   const toggleOne = (id: string) => {
@@ -61,7 +72,7 @@ export const TermsAgreement = React.forwardRef<
 
   const agreeFromModal = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: true }))
-    setViewing(null)
+    setViewingId(null)
   }
 
   React.useImperativeHandle(ref, () => ({
@@ -130,13 +141,13 @@ export const TermsAgreement = React.forwardRef<
 
       <Modal
         open={viewing !== null}
-        onClose={() => setViewing(null)}
+        onClose={() => setViewingId(null)}
         title={viewing?.title ?? ""}
         size="lg"
         footer={
           viewing && (
             <>
-              <Button variant="secondary" onClick={() => setViewing(null)}>
+              <Button variant="secondary" onClick={() => setViewingId(null)}>
                 닫기
               </Button>
               <Button onClick={() => agreeFromModal(viewing.id)}>동의</Button>

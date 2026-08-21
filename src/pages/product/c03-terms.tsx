@@ -4,12 +4,21 @@ import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { TermsAgreement } from "@/widgets"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
-import { MOCK_JOIN_TERMS, toProductDetailData } from "@/entities/product"
-import { PRODUCT_JOIN_STEPS } from "@/pages/product/join-shared"
+import { toProductDetailData } from "@/entities/product"
+import {
+  PRODUCT_JOIN_STEPS,
+  type AgreedTerm,
+  type ProductJoinTermsState,
+} from "@/pages/product/join-shared"
 import { Alert } from "@/shared/ui/alert"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import type { ProductDetailResponse } from "@/shared/api/generated/model"
+import { getProductTerms } from "@/shared/api/generated/product-controller/product-controller"
+import type {
+  ProductDetailResponse,
+  ProductTermsViewResponse,
+} from "@/shared/api/generated/model"
+import type { TermItem } from "@/shared/types/term"
 
 /** C-03 상품가입 1단계 · 약관동의 (REQ-PRDT-005) */
 export const C03Terms = () => {
@@ -20,6 +29,9 @@ export const C03Terms = () => {
     query: { enabled: Number.isFinite(id) },
   })
   const [allRequiredAgreed, setAllRequiredAgreed] = React.useState(false)
+  // 전문은 [보기]를 누른 시점에 받아온다. 미리 전부 받아두면 열지도 않은 약관에
+  // 열람 이력이 남아, 서버의 전문 미열람 검증(PRD0005)이 무의미해진다.
+  const [termBodies, setTermBodies] = React.useState<Record<string, string>>({})
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
@@ -42,6 +54,43 @@ export const C03Terms = () => {
 
   const product = toProductDetailData(detail)
 
+  // 상품 상세가 실어 보내는 약관 목록을 그대로 쓴다. 동의 이력은 termsId·version
+  // 쌍으로 저장되므로 화면 id도 termsId를 문자열로 쓴다.
+  const terms: TermItem[] = (detail.terms ?? [])
+    .slice()
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+    .map((t) => ({
+      id: String(t.termsId ?? ""),
+      required: t.required ?? false,
+      title: t.termsName ?? "",
+      question: `${t.termsName ?? ""}을(를) 확인하였으며 이에 동의합니다.`,
+      body:
+        termBodies[String(t.termsId ?? "")] ??
+        "약관 전문을 불러오는 중입니다...",
+    }))
+
+  const handleViewTerm = async (id: string) => {
+    if (termBodies[id]) return
+    try {
+      const response = await getProductTerms(product.id, Number(id))
+      const view = response as unknown as ProductTermsViewResponse | undefined
+      setTermBodies((prev) => ({ ...prev, [id]: view?.content ?? "" }))
+    } catch {
+      setTermBodies((prev) => ({
+        ...prev,
+        [id]: "약관 전문을 불러오지 못했습니다. [보기]를 다시 눌러주세요.",
+      }))
+    }
+  }
+
+  const handleNext = () => {
+    const agreedTerms: AgreedTerm[] = (detail.terms ?? [])
+      .filter((t) => t.required)
+      .map((t) => ({ termsId: t.termsId ?? 0, version: t.version ?? "" }))
+    const state: ProductJoinTermsState = { agreedTerms }
+    navigate(`/product/${product.id}/join/2`, { state })
+  }
+
   return (
     <>
       <StepLayout
@@ -58,7 +107,7 @@ export const C03Terms = () => {
             size="lg"
             className="min-w-40"
             disabled={!allRequiredAgreed}
-            onClick={() => navigate(`/product/${product.id}/join/2`)}
+            onClick={handleNext}
           >
             다음
           </Button>
@@ -66,7 +115,8 @@ export const C03Terms = () => {
       >
         <div className="flex flex-col gap-4">
           <TermsAgreement
-            terms={MOCK_JOIN_TERMS}
+            terms={terms}
+            onView={handleViewTerm}
             onAllRequiredAgreedChange={setAllRequiredAgreed}
           />
 

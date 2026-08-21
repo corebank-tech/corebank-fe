@@ -35,13 +35,16 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
-import { daysBetween } from "@/shared/lib/date"
+import { addMonths, daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
 
-const defaultPeriod = () => ({ start: "2026-06-23", end: getToday() })
+const defaultPeriod = () => {
+  const today = getToday()
+  return { start: addMonths(today, -2), end: today }
+}
 
 const CONTENT_OPTIONS = [
   { label: "전체", value: "all" },

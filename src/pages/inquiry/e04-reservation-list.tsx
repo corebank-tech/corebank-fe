@@ -75,12 +75,17 @@ const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
 // 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
+const DEFAULT_CONDITION = {
+  status: "all",
+  period: { start: "2026-06-23", end: "2026-08-23" },
+}
+
 export const E04ReservationList = () => {
-  const [status, setStatus] = React.useState("all")
-  const [period, setPeriod] = React.useState({
-    start: "2026-06-23",
-    end: "2026-08-23",
-  })
+  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
+  // 바로 물려 있으면 라디오·날짜를 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
+  const [status, setStatus] = React.useState(DEFAULT_CONDITION.status)
+  const [period, setPeriod] = React.useState(DEFAULT_CONDITION.period)
+  const [applied, setApplied] = React.useState(DEFAULT_CONDITION)
   const [pageSize, setPageSize] = React.useState<number | "all">(10)
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
@@ -96,9 +101,9 @@ export const E04ReservationList = () => {
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const { data, isLoading, isError, refetch } = useSearchScheduledTransfers({
-    status: STATUS_TO_API[status],
-    fromDate: period.start,
-    toDate: period.end,
+    status: STATUS_TO_API[applied.status],
+    fromDate: applied.period.start,
+    toDate: applied.period.end,
     page: page - 1,
     size: pageSize === "all" ? 1000 : pageSize,
   })
@@ -125,8 +130,16 @@ export const E04ReservationList = () => {
   })
 
   const handleReset = () => {
-    setStatus("all")
-    setPeriod({ start: "2026-06-23", end: "2026-08-23" })
+    setStatus(DEFAULT_CONDITION.status)
+    setPeriod(DEFAULT_CONDITION.period)
+    setApplied(DEFAULT_CONDITION)
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    setApplied({ status, period })
     setPage(1)
     savedCondition.clear()
     downloadComplete.clear()
@@ -338,11 +351,7 @@ export const E04ReservationList = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => {
-            setPage(1)
-            savedCondition.clear()
-            downloadComplete.clear()
-          }}
+          onSearch={handleSearch}
           onSaveCondition={savedCondition.save}
         >
           <FormRow label="상태">

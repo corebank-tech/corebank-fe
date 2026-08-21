@@ -105,7 +105,10 @@ export const C06Complete = () => {
         columns={resultColumns}
         row={row}
         gridHoverable={false}
-        footnote="※ 예적금 계좌는 계좌비밀번호를 별도로 부여하지 않습니다."
+        // REQ-PRDT-006은 예적금 계좌가 비밀번호를 보유하지 않는다고 정의하지만
+        // 서버는 가입 시 비밀번호를 저장한다(corebank-tech/corebank-server#275).
+        // 어느 쪽이 맞는지 정해지기 전까지 사실이 아닐 수 있는 안내는 내리지 않는다.
+        footnote="※ 가입 내용은 계좌조회에서 다시 확인할 수 있습니다."
         actions={
           <>
             <Button

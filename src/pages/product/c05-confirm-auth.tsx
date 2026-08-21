@@ -139,8 +139,13 @@ export const C05ConfirmAuth = () => {
           subscriptionAmount: amount,
           termMonths,
           withdrawalAccountId: form.withdrawalAccountId,
-          // 예적금 계좌는 별도 비밀번호를 쓰지 않지만 요청 스펙이 요구한다.
-          // 출금계좌 비밀번호를 그대로 싣는다.
+          // REQ-PRDT-006은 "예적금 계좌는 계좌비밀번호를 보유하지 않으므로 신규
+          // 비밀번호를 입력받지 않는다"인데, 서버는 두 필드를 @NotNull로 받아
+          // 실제로 신규 계좌에 저장한다. 채울 값이 없어 출금계좌 비밀번호를 싣고
+          // 있고, 그 결과 고객이 모르는 사이 비밀번호가 복제된다.
+          // 고정값은 모든 계좌가 같은 비밀번호를 갖게 되어 더 나쁘고, 입력 화면
+          // 추가는 요구사항 위반이라 서버 계약이 정리되기 전까지의 임시 처리다.
+          // corebank-tech/corebank-server#275
           newAccountPassword: password,
           newAccountPasswordConfirm: password,
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,

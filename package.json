@@ -12,6 +12,8 @@
     "dev": "vite",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
+    "cf:preview": "pnpm build && wrangler pages dev dist",
+    "cf:deploy": "pnpm build && wrangler pages deploy --branch=main --commit-dirty=false",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -88,7 +90,8 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",
     "vite": "^8.1.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.124.0"
   },
   "msw": {
     "workerDirectory": [

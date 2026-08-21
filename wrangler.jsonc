@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "corebank",
+  "compatibility_date": "2026-08-20",
+  // Pages 프로젝트다. Vite 산출물을 그대로 올리며 Functions 는 쓰지 않는다.
+  // 최상위 404.html 이 없으면 Pages 가 SPA 로 판정해 미매칭 경로를
+  // index.html 200 으로 응답한다. _redirects 는 필요 없다.
+  // Workers 전용 키(assets, not_found_handling, main)는 Pages 에 적용되지 않는다.
+  "pages_build_output_dir": "./dist",
+}

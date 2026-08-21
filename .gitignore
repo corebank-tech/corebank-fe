@@ -23,6 +23,9 @@ coverage/
 *storybook.log
 storybook-static
 
+# Cloudflare Wrangler 로컬 상태·캐시
+.wrangler/
+
 
 # 로컬 전용 문서
 *.xlsx

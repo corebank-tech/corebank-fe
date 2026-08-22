@@ -49,6 +49,8 @@ export const B02DepositAccounts = () => {
         return []
       }
 
+      // BE는 CLOSED 계좌를 overview에서 제외하지만,
+      // 화면 모델은 ACTIVE/SUSPENDED만 허용하도록 방어적으로 좁힌다.
       if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
         return []
       }
@@ -67,10 +69,7 @@ export const B02DepositAccounts = () => {
     })
   }, [depositGroup])
 
-  const groupTotal =
-    depositGroup?.groupTotalBalance ??
-    rows.reduce((sum, account) => sum + account.balance, 0)
-
+  const groupTotal = rows.reduce((sum, account) => sum + account.balance, 0)
   const columns: DataGridColumn<DepositAccountRow>[] = [
     {
       key: "accountName",

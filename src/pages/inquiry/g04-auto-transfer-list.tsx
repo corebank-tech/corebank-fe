@@ -35,6 +35,7 @@ import {
   type AutoTransferRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 import {
@@ -62,9 +63,6 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 // 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
-/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
-const DEFAULT_PAGE_SIZE = 10
-
 export const G04AutoTransferList = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
@@ -77,7 +75,7 @@ export const G04AutoTransferList = () => {
   const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [status, setStatus] = React.useState("all")
   const [pageSize, setPageSize] = React.useState<number | "all">(
-    DEFAULT_PAGE_SIZE,
+    QUERY_DEFAULT_PAGE_SIZE,
   )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
@@ -107,7 +105,7 @@ export const G04AutoTransferList = () => {
 
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
   // 않는다. 타입을 좁히기 위한 분기다.
-  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
   const { data, isFetching, isError, refetch } = useSearchAutoTransfers(
     {
       // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
@@ -479,7 +477,8 @@ export const G04AutoTransferList = () => {
         }
       >
         <GridToolbar
-          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
           showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}

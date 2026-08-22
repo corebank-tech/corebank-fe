@@ -30,7 +30,10 @@ import {
 import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
 import { checkPeriodRange } from "@/entities/transaction"
-import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import {
+  QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS,
+  QUERY_DEFAULT_PAGE_SIZE,
+} from "@/shared/config/policy"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useSearchScheduledTransfers,
@@ -81,9 +84,6 @@ const TEMP_AUTH_TOKEN = "temp-auth-token"
  */
 const DEFAULT_PERIOD_MONTHS = 2
 
-/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
-const DEFAULT_PAGE_SIZE = 10
-
 const defaultCondition = () => {
   const today = getToday()
   return {
@@ -103,7 +103,7 @@ export const E04ReservationList = () => {
   const [status, setStatus] = React.useState(applied.status)
   const [period, setPeriod] = React.useState(applied.period)
   const [pageSize, setPageSize] = React.useState<number | "all">(
-    DEFAULT_PAGE_SIZE,
+    QUERY_DEFAULT_PAGE_SIZE,
   )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
@@ -122,7 +122,7 @@ export const E04ReservationList = () => {
 
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
   // 않는다. 타입을 좁히기 위한 분기다.
-  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
   const {
     data,
     dataUpdatedAt,
@@ -476,7 +476,8 @@ export const E04ReservationList = () => {
         {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
             동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
-          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
           showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}

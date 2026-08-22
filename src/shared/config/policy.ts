@@ -41,6 +41,19 @@ export const QUERY_MAX_RANGE_DAYS = 365
 /** POL-021: 조회화면 기본 조회기간 1개월(REQ-INQR-009·TRSF-021·RSV-014·AUTO-018). */
 export const QUERY_DEFAULT_PERIOD_MONTHS = 1
 
+/**
+ * POL-022: 목록 페이징 기본 건수 10건(REQ-CMN-019).
+ * 조회화면과 GridToolbar가 같은 값을 봐야 하므로 여기서만 정의한다.
+ */
+export const QUERY_DEFAULT_PAGE_SIZE = 10
+
+/**
+ * POL-022: 목록 페이징 건수 선택지. 규정은 `5·10·20·30·50·전체` 6종이고,
+ * 여기 담는 것은 숫자 5종이다 — "전체"는 값이 아니라 별도 선택지라
+ * GridToolbar가 `showAllOption`으로 따로 렌더한다.
+ */
+export const QUERY_PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50] as const
+
 /** POL-026: 이메일 인증번호 유효시간 180초 / 숫자 6자리. */
 export const EMAIL_CODE_TTL_SECONDS = 180
 

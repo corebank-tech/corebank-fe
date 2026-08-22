@@ -1,3 +1,5 @@
+import { daysAgo, daysAhead } from "@/shared/lib/mock-date"
+
 /**
  * E-04 예약이체 조회/취소. REQ-RSV-007·008.
  * 상태는 대기/완료/실패/취소 4종(POL-025 이체 처리상태와 별개 체계)이다.
@@ -32,8 +34,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv7",
     status: "대기",
-    scheduledDate: "2026-07-24",
-    registeredAt: "2026-07-20T10:12:00",
+    scheduledDate: daysAhead(3),
+    registeredAt: `${daysAgo(1)}T10:12:00`,
     fromAccountNo: "110632892336",
     fromAlias: "자유입출금",
     toAccountNo: "333330730135",
@@ -45,8 +47,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv6",
     status: "대기",
-    scheduledDate: "2026-07-25",
-    registeredAt: "2026-07-19T09:30:00",
+    scheduledDate: daysAhead(4),
+    registeredAt: `${daysAgo(2)}T09:30:00`,
     fromAccountNo: "302998112233",
     fromAlias: "급여통장",
     toAccountNo: "110550098213",
@@ -58,8 +60,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv5",
     status: "대기",
-    scheduledDate: "2026-08-01",
-    registeredAt: "2026-07-18T14:05:00",
+    scheduledDate: daysAhead(11),
+    registeredAt: `${daysAgo(3)}T14:05:00`,
     fromAccountNo: "110632892336",
     fromAlias: "자유입출금",
     toAccountNo: "444401122938",
@@ -71,8 +73,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv4",
     status: "완료",
-    scheduledDate: "2026-07-15",
-    registeredAt: "2026-07-10T11:00:00",
+    scheduledDate: daysAgo(6),
+    registeredAt: `${daysAgo(11)}T11:00:00`,
     fromAccountNo: "110632892336",
     fromAlias: "자유입출금",
     toAccountNo: "333330730135",
@@ -84,8 +86,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv3",
     status: "실패",
-    scheduledDate: "2026-07-12",
-    registeredAt: "2026-07-05T16:22:00",
+    scheduledDate: daysAgo(9),
+    registeredAt: `${daysAgo(16)}T16:22:00`,
     fromAccountNo: "255104778910",
     fromAlias: "비상금통장",
     toAccountNo: "999911223344",
@@ -97,8 +99,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv2",
     status: "취소",
-    scheduledDate: "2026-07-10",
-    registeredAt: "2026-07-01T08:45:00",
+    scheduledDate: daysAgo(11),
+    registeredAt: `${daysAgo(20)}T08:45:00`,
     fromAccountNo: "110632892336",
     fromAlias: "자유입출금",
     toAccountNo: "444401122938",
@@ -110,8 +112,8 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv1",
     status: "완료",
-    scheduledDate: "2026-06-30",
-    registeredAt: "2026-06-25T13:10:00",
+    scheduledDate: daysAgo(21),
+    registeredAt: `${daysAgo(26)}T13:10:00`,
     fromAccountNo: "302998112233",
     fromAlias: "급여통장",
     toAccountNo: "110550098213",

@@ -1,3 +1,6 @@
+import { getToday } from "@/shared/config/clock"
+import { addMonths } from "@/shared/lib/date"
+
 /**
  * G-04 자동이체 조회/변경/해지 목업 데이터. REQ-AUTO-009·010·011.
  * 등록 상태는 POL-036의 3종(정상/종료/해지)만 사용한다 — POL-025 이체 처리상태와 혼동하지 말 것.
@@ -28,7 +31,29 @@ export type AutoTransferRow = {
   cancelable: boolean
 }
 
-/** 오늘 = 2026-07-23 기준 목업. */
+/**
+ * 이체지정일이 `dayOfMonth`인 달을 `monthOffset`만큼 옮긴 날짜.
+ *
+ * 자동이체는 시작일·종료일·다음 실행일의 '일'이 모두 이체지정일과 같아야 한다.
+ * `daysAgo()`처럼 일 단위로 밀면 세 날짜의 일이 제각각이 되어 이체지정일과
+ * 어긋나므로, 달만 옮기고 일은 고정한다.
+ *
+ * `dayOfMonth`는 1~28만 쓴다 — 29~31은 짧은 달에서 말일로 보정되어 이체지정일과
+ * 벌어진다(POL-034의 보정 규칙은 실제 실행일에만 적용되는 것이고, 목업의 정합을
+ * 흐리는 데 쓸 이유가 없다).
+ */
+const onDayOfMonth = (dayOfMonth: number, monthOffset: number): string =>
+  addMonths(
+    `${getToday().slice(0, 7)}-${String(dayOfMonth).padStart(2, "0")}`,
+    monthOffset,
+  )
+
+/** 오늘 이후 처음 돌아오는 이체지정일. 매월(주기 1개월) 자동이체 기준이다. */
+const nextExecDateOn = (dayOfMonth: number): string => {
+  const thisMonth = onDayOfMonth(dayOfMonth, 0)
+  return thisMonth > getToday() ? thisMonth : onDayOfMonth(dayOfMonth, 1)
+}
+
 export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
   {
     id: "at5",
@@ -39,11 +64,11 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     amount: 500_000,
     cycleMonths: 1,
     dayOfMonth: 5,
-    startDate: "2025-09-05",
-    endDate: "2027-08-05",
+    startDate: onDayOfMonth(5, -10),
+    endDate: onDayOfMonth(5, 13),
     memo: "내집마련적금",
     status: "정상",
-    nextExecDate: "2026-08-05",
+    nextExecDate: nextExecDateOn(5),
     cancelable: true,
   },
   {
@@ -55,11 +80,11 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     amount: 187_400,
     cycleMonths: 1,
     dayOfMonth: 21,
-    startDate: "2024-01-21",
-    endDate: "2028-01-21",
+    startDate: onDayOfMonth(21, -30),
+    endDate: onDayOfMonth(21, 18),
     memo: "관리비",
     status: "정상",
-    nextExecDate: "2026-08-21",
+    nextExecDate: nextExecDateOn(21),
     cancelable: true,
   },
   {
@@ -71,11 +96,11 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     amount: 300_000,
     cycleMonths: 1,
     dayOfMonth: 5,
-    startDate: "2026-04-05",
-    endDate: "2026-10-05",
+    startDate: onDayOfMonth(5, -3),
+    endDate: onDayOfMonth(5, 3),
     memo: "여행적금",
     status: "정상",
-    nextExecDate: "2026-08-05",
+    nextExecDate: nextExecDateOn(5),
     cancelable: true,
   },
   {
@@ -87,8 +112,8 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     amount: 100_000,
     cycleMonths: 3,
     dayOfMonth: 15,
-    startDate: "2023-01-15",
-    endDate: "2026-01-15",
+    startDate: onDayOfMonth(15, -42),
+    endDate: onDayOfMonth(15, -6),
     memo: "부모님 용돈",
     status: "종료",
     cancelable: false,
@@ -102,8 +127,8 @@ export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
     amount: 50_000,
     cycleMonths: 6,
     dayOfMonth: 1,
-    startDate: "2024-06-01",
-    endDate: "2027-06-01",
+    startDate: onDayOfMonth(1, -25),
+    endDate: onDayOfMonth(1, 11),
     memo: "동호회비",
     status: "해지",
     cancelable: false,

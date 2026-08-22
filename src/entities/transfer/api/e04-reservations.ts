@@ -29,7 +29,7 @@ export type ReservationRow = {
   cancelable: boolean
 }
 
-/** Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. 오늘 = 2026-07-23 기준. */
+/** Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. 날짜는 오늘 기준 상대값이다. */
 export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv7",

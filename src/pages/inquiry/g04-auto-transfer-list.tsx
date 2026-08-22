@@ -78,6 +78,12 @@ export const G04AutoTransferList = () => {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
   const [terminateOtpOpen, setTerminateOtpOpen] = React.useState(false)
+  // 해지 요청이 도는 동안 OTP 모달은 이미 닫혀 있고 선택도 응답 뒤에야 비워져서,
+  // 목록과 "선택 해지" 버튼이 활성인 채로 노출된다. 이 플래그가 없으면 같은 건에
+  // 두 번째 해지 요청이 나간다 — 멱등키는 요청마다 새로 붙어 막아주지 않는다.
+  // 해지 요청 + 뒤이은 재조회까지를 하나의 진행 구간으로 잡는다(c05-confirm-auth
+  // 와 같은 형태). 선택이 비워져 버튼이 어차피 비활성이 되는 것에 기대지 않는다.
+  const [isTerminating, setIsTerminating] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
@@ -182,37 +188,43 @@ export const G04AutoTransferList = () => {
   }
 
   const handleTerminateOtpConfirm = async () => {
+    if (isTerminating) return
     setTerminateOtpOpen(false)
-    // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
-    // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
-    // 성공한 건이 반영되기 전의 목록을 받는다.
-    const results = await Promise.allSettled(
-      selectedRows.map((r) =>
-        // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
-        cancelAutoTransfer(Number(r.id), {
-          headers: { "Account-Password-Auth-Token": TEMP_AUTH_TOKEN },
-        }),
-      ),
-    )
-    clearSelection()
-
-    const failed = results.find((r) => r.status === "rejected")
-    const refreshed = await refetch()
-
-    // 해지 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
-    // 응답을 그대로 들고 있어서 방금 해지한 건이 여전히 "정상"으로 보이는데,
-    // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
-    if (failed) {
-      const reason = failed.reason
-      setActionErrorMessage(
-        reason instanceof ApiError
-          ? reason.message
-          : "자동이체 해지에 실패했습니다.",
+    setIsTerminating(true)
+    try {
+      // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
+      // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
+      // 성공한 건이 반영되기 전의 목록을 받는다.
+      const results = await Promise.allSettled(
+        selectedRows.map((r) =>
+          // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
+          cancelAutoTransfer(Number(r.id), {
+            headers: { "Account-Password-Auth-Token": TEMP_AUTH_TOKEN },
+          }),
+        ),
       )
-    } else if (refreshed.isError) {
-      setActionErrorMessage(
-        "해지 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
-      )
+      clearSelection()
+
+      const failed = results.find((r) => r.status === "rejected")
+      const refreshed = await refetch()
+
+      // 해지 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+      // 응답을 그대로 들고 있어서 방금 해지한 건이 여전히 "정상"으로 보이는데,
+      // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
+      if (failed) {
+        const reason = failed.reason
+        setActionErrorMessage(
+          reason instanceof ApiError
+            ? reason.message
+            : "자동이체 해지에 실패했습니다.",
+        )
+      } else if (refreshed.isError) {
+        setActionErrorMessage(
+          "해지 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+        )
+      }
+    } finally {
+      setIsTerminating(false)
     }
   }
 
@@ -461,13 +473,15 @@ export const G04AutoTransferList = () => {
         title="자동이체 목록"
         className="mb-0"
         action={
+          // 레이블이 "해지 처리 중..."으로 길어져도 버튼 폭이 튀지 않게 잡아둔다.
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedIds.length === 0}
+            className="min-w-30"
+            disabled={selectedRows.length === 0 || isTerminating}
             onClick={handleTerminateClick}
           >
-            선택 해지
+            {isTerminating ? "해지 처리 중..." : "선택 해지"}
           </Button>
         }
       >

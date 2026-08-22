@@ -11,3 +11,4 @@ export { getAccountStatusBadgeVariant } from "@/entities/transaction/lib/status-
 
 export type { PeriodRangeCheck } from "@/entities/transaction/lib/validate-period"
 export { checkPeriodRange } from "@/entities/transaction/lib/validate-period"
+export { useAccountTransactionQuery } from "@/entities/transaction/api/account-transaction-query"

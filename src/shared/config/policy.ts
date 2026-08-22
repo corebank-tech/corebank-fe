@@ -42,17 +42,21 @@ export const QUERY_MAX_RANGE_DAYS = 365
 export const QUERY_DEFAULT_PERIOD_MONTHS = 1
 
 /**
- * POL-022: 목록 페이징 기본 건수 10건(REQ-CMN-019).
- * 조회화면과 GridToolbar가 같은 값을 봐야 하므로 여기서만 정의한다.
- */
-export const QUERY_DEFAULT_PAGE_SIZE = 10
-
-/**
  * POL-022: 목록 페이징 건수 선택지. 규정은 `5·10·20·30·50·전체` 6종이고,
  * 여기 담는 것은 숫자 5종이다 — "전체"는 값이 아니라 별도 선택지라
  * GridToolbar가 `showAllOption`으로 따로 렌더한다.
  */
 export const QUERY_PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50] as const
+
+/**
+ * POL-022: 목록 페이징 기본 건수 10건(REQ-CMN-019).
+ * 조회화면과 GridToolbar가 같은 값을 봐야 하므로 여기서만 정의한다.
+ *
+ * 타입으로 선택지 포함을 강제한다 — 선택지에 없는 값이 기본값이 되면 `<Select>`가
+ * 매칭되는 `<option>`을 못 찾아 첫 항목을 표시하고, 화면에 보이는 건수와 실제
+ * 요청 `size`가 조용히 어긋난다.
+ */
+export const QUERY_DEFAULT_PAGE_SIZE: (typeof QUERY_PAGE_SIZE_OPTIONS)[number] = 10
 
 /** POL-026: 이메일 인증번호 유효시간 180초 / 숫자 6자리. */
 export const EMAIL_CODE_TTL_SECONDS = 180

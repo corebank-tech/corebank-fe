@@ -78,6 +78,10 @@ export const G04AutoTransferList = () => {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
   const [terminateOtpOpen, setTerminateOtpOpen] = React.useState(false)
+  // 해지 요청이 도는 동안 OTP 모달은 이미 닫혀 있고 선택도 응답 뒤에야 비워져서,
+  // 목록과 "선택 해지" 버튼이 활성인 채로 노출된다. 이 플래그가 없으면 같은 건에
+  // 두 번째 해지 요청이 나간다 — 멱등키는 요청마다 새로 붙어 막아주지 않는다.
+  const [isTerminating, setIsTerminating] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
@@ -182,7 +186,9 @@ export const G04AutoTransferList = () => {
   }
 
   const handleTerminateOtpConfirm = async () => {
+    if (isTerminating) return
     setTerminateOtpOpen(false)
+    setIsTerminating(true)
     // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
     // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
     // 성공한 건이 반영되기 전의 목록을 받는다.
@@ -194,6 +200,8 @@ export const G04AutoTransferList = () => {
         }),
       ),
     )
+    // allSettled는 reject하지 않아 위 await가 예외로 빠져나가는 경로가 없다.
+    setIsTerminating(false)
     clearSelection()
 
     const failed = results.find((r) => r.status === "rejected")
@@ -464,7 +472,7 @@ export const G04AutoTransferList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedRows.length === 0}
+            disabled={selectedRows.length === 0 || isTerminating}
             onClick={handleTerminateClick}
           >
             선택 해지

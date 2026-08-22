@@ -2,7 +2,7 @@ import * as React from "react"
 import { useNavigate } from "react-router"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 // TODO: 실시간 예금주 조회(GET /transfers/payee, 즉시이체 영역)가 연동되면
 // 입금계좌번호 확인 시 실제 예금주명을 조회해서 MOCK_PAYEE_NAME 대신 써야 한다.
 // 지금은 입력한 계좌번호와 무관하게 항상 이 값이 표시된다.
@@ -50,9 +50,8 @@ const INITIAL_FORM: ReservedTransferForm = {
   myMemo: "",
 }
 
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify)·OTP(POST /otp/issue, /otp/verify)
-// 실제 발급 API가 연동되면 그 결과 토큰으로 교체한다. scheduledtransfer 도메인의 토큰
-// 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 /**
@@ -120,7 +119,7 @@ export const ReservedTransferScreen = () => {
     setStep(1)
   }
 
-  const handleRegisterConfirm = async () => {
+  const handleRegisterConfirm = async (otpAuthToken: string) => {
     setOtpOpen(false)
     if (!selectedAccount) return
     try {
@@ -134,7 +133,7 @@ export const ReservedTransferScreen = () => {
           myPassbookMemo: form.myMemo || undefined,
           recipientPassbookMemo: form.payeeMemo || undefined,
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,
-          otpAuthToken: TEMP_AUTH_TOKEN,
+          otpAuthToken,
         },
       })
       setStep(3)
@@ -210,6 +209,13 @@ export const ReservedTransferScreen = () => {
           onClose={() => setOtpOpen(false)}
           onConfirm={handleRegisterConfirm}
           guide="예약이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+          transactionType={OtpTransactionType.SCHEDULED_TRANSFER}
+          transactionData={{
+            withdrawalAccountId: selectedAccount?.accountId ?? 0,
+            depositAccountNumber: form.toAccount,
+            amount: form.amount ?? 0,
+            scheduledDate: form.scheduledDate,
+          }}
         />
 
         <ErrorDialog

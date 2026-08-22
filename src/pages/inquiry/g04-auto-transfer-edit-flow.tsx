@@ -1,5 +1,5 @@
 import * as React from "react"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import {
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferRow,
@@ -45,7 +45,10 @@ type Props = {
   target: AutoTransferRow
   onClose: () => void
   /** 변경 요청의 성공 여부를 돌려준다. 실패하면 모달을 닫지 않는다. */
-  onSave: (updatedRow: AutoTransferRow) => Promise<boolean>
+  onSave: (
+    updatedRow: AutoTransferRow,
+    otpAuthToken: string,
+  ) => Promise<boolean>
 }
 
 export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
@@ -66,16 +69,19 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
 
   // 결과를 기다린 뒤 성공했을 때만 닫는다. 먼저 닫으면 PATCH가 실패했을 때
   // 입력값이 이미 사라진 뒤에 에러만 뜨고, 사용자는 처음부터 다시 입력해야 한다.
-  const handleOtpConfirm = async () => {
+  const handleOtpConfirm = async (otpAuthToken: string) => {
     if (isSaving) return
     setIsSaving(true)
-    const saved = await onSave({
-      ...target,
-      amount: Number(editForm.amount) || target.amount,
-      cycleMonths: editForm.cycleMonths,
-      endDate: editForm.endDate,
-      memo: editForm.memo,
-    })
+    const saved = await onSave(
+      {
+        ...target,
+        amount: Number(editForm.amount) || target.amount,
+        cycleMonths: editForm.cycleMonths,
+        endDate: editForm.endDate,
+        memo: editForm.memo,
+      },
+      otpAuthToken,
+    )
     setIsSaving(false)
     // OTP는 이미 소진됐으므로 실패해도 OTP 모달은 닫고, 재시도는 새로 발급받는다.
     setIsOtpOpen(false)
@@ -210,6 +216,12 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
         onClose={() => setIsOtpOpen(false)}
         onConfirm={handleOtpConfirm}
         guide="자동이체 변경을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+        transactionType={OtpTransactionType.AUTO_TRANSFER}
+        transactionData={{
+          autoTransferId: Number(target.id),
+          amount: Number(editForm.amount) || target.amount,
+          endDate: editForm.endDate,
+        }}
       />
     </>
   )

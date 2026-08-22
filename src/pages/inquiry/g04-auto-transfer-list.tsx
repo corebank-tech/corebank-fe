@@ -15,7 +15,7 @@ import {
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
@@ -58,8 +58,8 @@ const STATUS_TO_API: Record<string, string | undefined> = {
   해지: "TERMINATED",
 }
 
-// TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. autotransfer
-// 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+// TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. OTP는
+// 실제 토큰으로 교체했다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export const G04AutoTransferList = () => {
@@ -78,6 +78,7 @@ export const G04AutoTransferList = () => {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
   const [terminateOtpOpen, setTerminateOtpOpen] = React.useState(false)
+  const [isTerminating, setIsTerminating] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
@@ -178,8 +179,9 @@ export const G04AutoTransferList = () => {
     setTerminateOtpOpen(true)
   }
 
-  const handleTerminateOtpConfirm = async () => {
+  const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
     setTerminateOtpOpen(false)
+    setIsTerminating(true)
     // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
     // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
     // 성공한 건이 반영되기 전의 목록을 받는다.
@@ -187,11 +189,15 @@ export const G04AutoTransferList = () => {
       selectedRows.map((r) =>
         // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
         cancelAutoTransfer(Number(r.id), {
-          headers: { "Account-Password-Auth-Token": TEMP_AUTH_TOKEN },
+          headers: {
+            "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+            "Otp-Auth-Token": otpAuthToken,
+          },
         }),
       ),
     )
     clearSelection()
+    setIsTerminating(false)
 
     const failed = results.find((r) => r.status === "rejected")
     const refreshed = await refetch()
@@ -225,6 +231,7 @@ export const G04AutoTransferList = () => {
    */
   const handleEditSave = async (
     updatedRow: AutoTransferRow,
+    otpAuthToken: string,
   ): Promise<boolean> => {
     try {
       await changeAutoTransfer(Number(updatedRow.id), {
@@ -233,6 +240,7 @@ export const G04AutoTransferList = () => {
         endDate: updatedRow.endDate,
         myPassbookMemo: updatedRow.memo,
         accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+        otpAuthToken,
       })
     } catch (error) {
       setActionErrorMessage(
@@ -409,6 +417,14 @@ export const G04AutoTransferList = () => {
             onClose={() => setTerminateOtpOpen(false)}
             onConfirm={handleTerminateOtpConfirm}
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            transactionType={OtpTransactionType.AUTO_TRANSFER}
+            // otp_integration_guide.md의 해지 계약은 건당 autoTransferId
+            // 하나다. 여러 건을 동시에 선택해도 OTP는 한 번만 인증하므로 첫
+            // 건 기준으로 발급한다 — 다건 해지·단건 인증 불일치는 BE의 실제
+            // 검증 연동 시 재확인이 필요하다.
+            transactionData={{
+              autoTransferId: Number(selectedRows[0]?.id ?? 0),
+            }}
           />
 
           <TextViewModal
@@ -461,7 +477,7 @@ export const G04AutoTransferList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedIds.length === 0}
+            disabled={selectedIds.length === 0 || isTerminating}
             onClick={handleTerminateClick}
           >
             선택 해지

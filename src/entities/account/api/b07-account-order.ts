@@ -5,6 +5,7 @@
  */
 
 import type { AccountGroupId } from "@/entities/account/api/b01-accounts"
+import { daysAgo } from "@/shared/lib/mock-date"
 
 export type OrderAccount = {
   id: string
@@ -37,7 +38,7 @@ export const MOCK_ORDER_ACCOUNTS: OrderAccount[] = [
     group: "deposit",
     accountNo: "110550051877",
     alias: "정기예금 1년",
-    openedDate: "2026-01-10",
+    openedDate: daysAgo(223),
     balance: 10_000_000,
   },
   {
@@ -53,7 +54,7 @@ export const MOCK_ORDER_ACCOUNTS: OrderAccount[] = [
     group: "deposit",
     accountNo: "110220093412",
     alias: "내집마련적금",
-    openedDate: "2025-09-01",
+    openedDate: daysAgo(354),
     balance: 3_600_000,
   },
   {
@@ -61,7 +62,7 @@ export const MOCK_ORDER_ACCOUNTS: OrderAccount[] = [
     group: "deposit",
     accountNo: "110770164529",
     alias: "여행적금",
-    openedDate: "2026-04-05",
+    openedDate: daysAgo(138),
     balance: 900_000,
   },
 ]

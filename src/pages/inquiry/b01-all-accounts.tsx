@@ -20,38 +20,53 @@ import {
   formatDateTime,
   maskAccountNo,
 } from "@/shared/lib/format"
-import {
-  MOCK_OVERVIEW_ACCOUNTS,
-  type AccountGroupId,
-  type OverviewAccount,
-} from "@/entities/account"
+import { useAccountOverviewQuery } from "@/entities/account"
 import { getToday } from "@/shared/config/clock"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
-const GROUP_LABELS: Record<AccountGroupId, string> = {
-  checking: "입출금계좌",
-  deposit: "예금·적금계좌",
+type AccountGroupCode = "DEMAND_DEPOSIT" | "DEPOSIT_SAVINGS"
+
+type AccountRow = {
+  accountId: number
+  groupCode: AccountGroupCode
+  accountName: string
+  accountNumber: string
+  balance: number
+  openedDate: string
+  lastTransactionAt: string | null
+  maturityDate: string | null
+  transferEnabled: boolean
+  status: "ACTIVE" | "SUSPENDED"
+}
+
+const GROUP_LABELS: Record<AccountGroupCode, string> = {
+  DEMAND_DEPOSIT: "입출금계좌",
+  DEPOSIT_SAVINGS: "예금·적금계좌",
 }
 
 /** REQ-CMN-020: 그리드가 보유한 컬럼 중 검색 대상 목록. */
 const SEARCH_FIELDS: GridSearchField[] = [
-  { key: "alias", label: "계좌명" },
-  { key: "accountNo", label: "계좌번호" },
+  { key: "accountName", label: "계좌명" },
+  { key: "accountNumber", label: "계좌번호" },
 ]
 
 /** REQ-INQR-004: 계좌명, 계좌번호, 신규일, 최근거래일(예적금은 만기일), 잔액, 업무. */
 const buildColumns = (
-  group: AccountGroupId,
-  onInquire: (accountNo: string) => void,
-  onTransfer: (accountNo: string) => void,
-): DataGridColumn<OverviewAccount>[] => {
+  group: AccountGroupCode,
+  onInquire: (accountId: number) => void,
+  onTransfer: (accountNumber: string) => void,
+): DataGridColumn<AccountRow>[] => {
   return [
-    { key: "alias", header: "계좌명", width: 180 },
     {
-      key: "accountNo",
+      key: "accountName",
+      header: "계좌명",
+      width: 180,
+      render: (r) => r.accountName,
+    },
+    {
+      key: "accountNumber",
       header: "계좌번호",
       width: 160,
-      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
+      render: (r) => <span>{formatAccountNo(r.accountNumber)}</span>,
     },
     {
       key: "openedDate",
@@ -62,10 +77,15 @@ const buildColumns = (
     },
     {
       key: "lastActivityDate",
-      header: group === "deposit" ? "만기일" : "최근거래일",
+      header: group === "DEPOSIT_SAVINGS" ? "만기일" : "최근거래일",
       align: "center",
       width: 120,
-      render: (r) => <span>{formatDate(r.lastActivityDate)}</span>,
+      render: (r) => {
+        const date =
+          group === "DEPOSIT_SAVINGS" ? r.maturityDate : r.lastTransactionAt
+
+        return <span>{date ? formatDate(date) : "-"}</span>
+      },
     },
     {
       key: "balance",
@@ -86,15 +106,16 @@ const buildColumns = (
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => onInquire(r.accountNo)}
+            onClick={() => onInquire(r.accountId)}
           >
             조회
           </Button>
-          {r.isWithdrawalAccount && (
+
+          {r.transferEnabled && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onTransfer(r.accountNo)}
+              onClick={() => onTransfer(r.accountNumber)}
             >
               이체
             </Button>
@@ -105,12 +126,13 @@ const buildColumns = (
   ]
 }
 
-const GROUP_ORDER: AccountGroupId[] = ["checking", "deposit"]
+const GROUP_ORDER: AccountGroupCode[] = ["DEMAND_DEPOSIT", "DEPOSIT_SAVINGS"]
 
 export const B01AllAccounts = () => {
-  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   const navigate = useNavigate()
+
+  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
   const [pageSize, setPageSize] = React.useState<number | "all">("all")
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -120,23 +142,66 @@ export const B01AllAccounts = () => {
   } | null>(null)
   const downloadComplete = useSavedConditionAlert()
 
-  const handleInquire = (accountNo: string) => {
-    navigate(`/inquiry?account=${accountNo}`)
+  const allAccounts = React.useMemo<AccountRow[]>(() => {
+    if (!overview) return []
+
+    return (overview.items ?? []).flatMap((group) => {
+      const groupCode = group.groupCode
+
+      if (groupCode !== "DEMAND_DEPOSIT" && groupCode !== "DEPOSIT_SAVINGS") {
+        return []
+      }
+
+      return (group.accounts ?? []).flatMap((account) => {
+        if (account.accountId == null) return []
+
+        if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
+          return []
+        }
+
+        return [
+          {
+            accountId: account.accountId,
+            groupCode,
+            accountName: account.accountName ?? "",
+            accountNumber: account.accountNumber ?? "",
+            balance: account.balance ?? 0,
+            openedDate: account.openedDate ?? "",
+            lastTransactionAt: account.lastTransactionAt ?? null,
+            maturityDate: account.maturityDate ?? null,
+            transferEnabled: account.transferEnabled ?? false,
+            status: account.status,
+          },
+        ]
+      })
+    })
+  }, [overview])
+
+  const handleInquire = (accountId: number) => {
+    navigate(`/inquiry?accountId=${accountId}`)
   }
-  const handleTransfer = (accountNo: string) => {
-    navigate(`/instant-transfer?from=${accountNo}`)
+
+  const handleTransfer = (accountNumber: string) => {
+    navigate(`/instant-transfer?from=${accountNumber}`)
   }
 
   const filteredAccounts = React.useMemo(() => {
-    if (!search || !search.keyword) return MOCK_OVERVIEW_ACCOUNTS
-    return MOCK_OVERVIEW_ACCOUNTS.filter((a) => {
+    if (!search || !search.keyword) return allAccounts
+
+    return allAccounts.filter((account) => {
       const value =
-        search.field === "accountNo" ? formatAccountNo(a.accountNo) : a.alias
+        search.field === "accountNumber"
+          ? formatAccountNo(account.accountNumber)
+          : account.accountName
+
       return value.includes(search.keyword)
     })
-  }, [search])
+  }, [allAccounts, search])
 
-  const grandTotal = filteredAccounts.reduce((sum, a) => sum + a.balance, 0)
+  const grandTotal =
+    search == null
+      ? (overview?.totalAssets ?? 0)
+      : filteredAccounts.reduce((sum, account) => sum + account.balance, 0)
 
   /** REQ-INQR-015: CSV 저장 시에만 계좌번호를 마스킹한다(화면 표시는 마스킹하지 않음, REQ-CMN-017). */
   const exportHeaders = [
@@ -147,15 +212,36 @@ export const B01AllAccounts = () => {
     "최근거래일/만기일",
     "잔액",
   ]
-  const exportRows = filteredAccounts.map((a) => [
-    GROUP_LABELS[a.group],
-    a.alias,
-    maskAccountNo(a.accountNo),
-    formatDate(a.openedDate),
-    formatDate(a.lastActivityDate),
-    formatAmount(a.balance),
-  ])
+  const exportRows = filteredAccounts.map((account) => {
+    const activityDate =
+      account.groupCode === "DEPOSIT_SAVINGS"
+        ? account.maturityDate
+        : account.lastTransactionAt
 
+    return [
+      GROUP_LABELS[account.groupCode],
+      account.accountName,
+      maskAccountNo(account.accountNumber),
+      formatDate(account.openedDate),
+      activityDate ? formatDate(activityDate) : "-",
+      formatAmount(account.balance),
+    ]
+  })
+  if (isLoading) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        계좌 정보를 불러오는 중입니다.
+      </div>
+    )
+  }
+
+  if (isError || !overview) {
+    return (
+      <div className="p-6 text-base text-danger">
+        계좌 정보를 불러오지 못했습니다.
+      </div>
+    )
+  }
   return (
     <QueryPageLayout
       noticeItems={[
@@ -195,7 +281,7 @@ export const B01AllAccounts = () => {
         totalCount={filteredAccounts.length}
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
-        baseTimeLabel={formatDateTime(BASE_TIME)}
+        baseTimeLabel={overview.asOf ? formatDateTime(overview.asOf) : "-"}
         onPrint={() => window.print()}
         onBrailleView={() => setBrailleOpen(true)}
         onSaveFile={() => {
@@ -207,21 +293,38 @@ export const B01AllAccounts = () => {
       />
 
       {GROUP_ORDER.map((group) => {
-        const rows = filteredAccounts.filter((a) => a.group === group)
-        const groupTotal = rows.reduce((sum, a) => sum + a.balance, 0)
+        const apiGroup = overview.items?.find(
+          (item) => item.groupCode === group,
+        )
+
+        const rows = filteredAccounts.filter(
+          (account) => account.groupCode === group,
+        )
+
+        const groupLabel = apiGroup?.groupName ?? GROUP_LABELS[group]
+
+        const groupTotal =
+          search == null
+            ? (apiGroup?.groupTotalBalance ?? 0)
+            : rows.reduce((sum, account) => sum + account.balance, 0)
+
         return (
-          <FormSection key={group} title={GROUP_LABELS[group]} className="mb-0">
+          <FormSection key={group} title={groupLabel} className="mb-0">
             <DataGrid
               columns={buildColumns(group, handleInquire, handleTransfer)}
               rows={rows}
-              rowKey={(r) => r.id}
+              rowKey={(r) => String(r.accountId)}
+              rowClassName={(r) =>
+                r.status === "SUSPENDED" ? "bg-surface opacity-60" : undefined
+              }
               emptyMessage="보유한 계좌가 없습니다."
             />
+
             <SummaryRow
               className="mt-3"
               items={[
                 {
-                  label: `${GROUP_LABELS[group]} 총잔액`,
+                  label: `${groupLabel} 총잔액`,
                   value: formatAmount(groupTotal),
                 },
               ]}

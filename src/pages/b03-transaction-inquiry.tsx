@@ -35,11 +35,11 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
-import { daysBetween } from "@/shared/lib/date"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { QUERY_MAX_RANGE_DAYS as MAX_RANGE_DAYS } from "@/shared/config/policy"
+import { QUERY_MAX_RANGE_DAYS as MAX_PERIOD_DAYS } from "@/shared/config/policy"
+import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
 
 /**
@@ -143,8 +143,12 @@ export const B03TransactionInquiry = () => {
     MOCK_ACCOUNTS.find((a) => a.accountNo === applied.account) ??
     MOCK_ACCOUNTS[0]
 
-  const periodReversed = daysBetween(period.start, period.end) < 0
-  const periodOverLimit = daysBetween(period.start, TODAY) > MAX_RANGE_DAYS
+  /** REQ-INQR-010: 빈 입력·역전 기간·1년을 넘는 기간은 조회를 거부한다. */
+  const {
+    incomplete: periodIncomplete,
+    reversed: periodReversed,
+    overLimit: periodOverLimit,
+  } = checkPeriodRange(period.start, period.end, TODAY, MAX_PERIOD_DAYS)
 
   // Presentation-only filtering/ordering over the mock rows.
   const rows = React.useMemo(() => {
@@ -265,6 +269,10 @@ export const B03TransactionInquiry = () => {
     savedCondition.clear()
     downloadComplete.clear()
     /** REQ-INQR-010: 시작일이 1년을 초과하거나 종료일보다 늦으면 조회를 거부한다. */
+    if (periodIncomplete) {
+      setPeriodAlertMessage("조회 시작일과 종료일을 모두 입력하세요.")
+      return
+    }
     if (periodReversed) {
       setPeriodAlertMessage(
         "종료일이 시작일보다 빠릅니다. 조회기간을 다시 지정하세요.",
@@ -273,7 +281,7 @@ export const B03TransactionInquiry = () => {
     }
     if (periodOverLimit) {
       setPeriodAlertMessage(
-        "조회 시작일은 조회 시점으로부터 최대 1년 이내로 지정할 수 있습니다.",
+        "조회기간은 최대 1년 이내여야 하고, 시작일도 조회 시점으로부터 1년 이내여야 합니다.",
       )
       return
     }

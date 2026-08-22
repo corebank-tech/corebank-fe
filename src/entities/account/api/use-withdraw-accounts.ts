@@ -1,9 +1,6 @@
 import * as React from "react"
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
-import type {
-  AccountItemResponse,
-  AccountOverviewResponse,
-} from "@/shared/api/generated/model"
+import { useAccountOverviewQuery } from "@/entities/account/api/account-overview-query"
+import type { AccountItemResponse } from "@/shared/api/generated/model"
 
 /**
  * 출금계좌로 쓸 수 있는 보유 계좌 목록.
@@ -15,11 +12,7 @@ export const useWithdrawAccounts = (): {
   accounts: AccountItemResponse[]
   isLoading: boolean
 } => {
-  const { data, isLoading } = useGetAccounts()
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const overview = data as unknown as AccountOverviewResponse | undefined
+  const { data: overview, isLoading } = useAccountOverviewQuery()
 
   const accounts = React.useMemo(() => {
     const items = (overview?.items ?? []).flatMap((g) => g.accounts ?? [])

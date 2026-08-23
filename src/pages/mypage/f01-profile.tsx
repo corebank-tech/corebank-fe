@@ -1,5 +1,5 @@
 import * as React from "react"
-import { MOCK_PROFILE } from "@/entities/customer"
+import { MOCK_PROFILE, useCustomerProfileQuery } from "@/entities/customer"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { F01ProfileContactForm } from "@/pages/mypage/f01-profile-contact-form"
 import { F01ProfilePasswordForm } from "@/pages/mypage/f01-profile-password-form"
@@ -10,7 +10,14 @@ import { F01ProfileSummary } from "@/pages/mypage/f01-profile-summary"
  * 조립하고 저장된 고객정보 상태만 공유한다.
  */
 export const F01Profile = () => {
-  const [profile, setProfile] = React.useState(MOCK_PROFILE)
+  const {
+    data: customerInfo,
+    isPending: isProfilePending,
+    isError: isProfileError,
+  } = useCustomerProfileQuery()
+
+  // 연락처/비밀번호 API 연동 전까지만 유지하는 임시 mock 상태
+  const [mockProfile, setMockProfile] = React.useState(MOCK_PROFILE)
 
   return (
     <QueryPageLayout
@@ -25,9 +32,25 @@ export const F01Profile = () => {
         "로그인 비밀번호는 8~15자, 4종 중 3종 이상 조합이며 직전 비밀번호와 동일한 값은 사용할 수 없습니다(REQ-AUTH-011·012·034).",
       ]}
     >
-      <F01ProfileSummary profile={profile} />
-      <F01ProfileContactForm profile={profile} onProfileChange={setProfile} />
-      <F01ProfilePasswordForm profile={profile} onProfileChange={setProfile} />
+      {isProfilePending && (
+        <p className="py-8 text-center text-base text-ink-muted">
+          고객정보를 불러오는 중입니다.
+        </p>
+      )}
+
+      {isProfileError && (
+        <p className="py-8 text-center text-base text-danger">
+          고객정보를 불러오지 못했습니다.
+        </p>
+      )}
+
+      {customerInfo && <F01ProfileSummary profile={customerInfo} />}
+
+      {customerInfo && <F01ProfileContactForm profile={customerInfo} />}
+      <F01ProfilePasswordForm
+        profile={mockProfile}
+        onProfileChange={setMockProfile}
+      />
     </QueryPageLayout>
   )
 }

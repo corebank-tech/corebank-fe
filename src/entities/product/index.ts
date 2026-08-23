@@ -38,9 +38,12 @@ export {
   fetchProductTerms,
   fetchSubscriptionResult,
   useExecuteSubscription,
+  useValidateSubscription,
 } from "@/entities/product/api/product-subscription"
 export type {
   ProductSubscriptionExecuteResponse,
   ProductSubscriptionResultResponse,
+  ProductSubscriptionValidationResponse,
   ProductTermsViewResponse,
+  ViolationItem,
 } from "@/entities/product/api/product-subscription"

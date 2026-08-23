@@ -10,7 +10,7 @@ import type {
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 
 const FROM_ACCOUNT_NO = "110632892336"
 

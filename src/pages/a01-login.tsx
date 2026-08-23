@@ -8,6 +8,7 @@ import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { useSession } from "@/features/session"
 import {
   resolveLoginFailure,
+  resolveRemainingAttempts,
   useLoginMutation,
   type LoginFailureReason,
 } from "@/entities/auth"
@@ -47,6 +48,13 @@ export const A01Login = () => {
 
   const toFailureMessage = (error: unknown): string => {
     const reason = resolveLoginFailure(error)
+    if (reason === "MISMATCH") {
+      const remaining = resolveRemainingAttempts(error)
+      // 서버가 값을 안 주면(REQ-AUTH-024 선행조건 미충족) 횟수 없이 기존 문구만 보여준다.
+      return remaining === undefined
+        ? FAILURE_MESSAGE.MISMATCH
+        : `${FAILURE_MESSAGE.MISMATCH} (잔여 시도 ${remaining}회)`
+    }
     if (reason !== "UNKNOWN") return FAILURE_MESSAGE[reason]
     // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
     return isApiError(error)

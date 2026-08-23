@@ -15,6 +15,7 @@ export type {
 } from "@/entities/auth/api/login"
 export {
   resolveLoginFailure,
+  resolveRemainingAttempts,
   useLoginMutation,
 } from "@/entities/auth/api/login"
 export { logout } from "@/entities/auth/api/logout"

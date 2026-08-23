@@ -23,6 +23,23 @@ export const resolveLoginFailure = (error: unknown): LoginFailureReason => {
   return "UNKNOWN"
 }
 
+type LoginFailureData = { errorCount: number; remainingAttempts: number }
+
+const isLoginFailureData = (data: unknown): data is LoginFailureData =>
+  typeof data === "object" &&
+  data !== null &&
+  typeof (data as LoginFailureData).remainingAttempts === "number"
+
+/** REQ-AUTH-024. MISMATCH 응답에만 실려 온다 — 서버가 값을 안 주면(다른 실패 사유 포함) undefined. */
+export const resolveRemainingAttempts = (
+  error: unknown,
+): number | undefined => {
+  if (!isApiError(error)) return undefined
+  return isLoginFailureData(error.data)
+    ? error.data.remainingAttempts
+    : undefined
+}
+
 /** A-01 로그인(REQ-AUTH-024). 성공 시 서버가 JSESSIONID·XSRF-TOKEN 쿠키를 발급한다. */
 export const useLoginMutation = () =>
   useMutation({

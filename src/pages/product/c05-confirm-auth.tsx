@@ -94,12 +94,19 @@ export const C05ConfirmAuth = () => {
   const product = toProductDetailData(detail)
   const { minTermMonths } = getProductTermRange(detail)
 
-  const form = (location.state as ProductJoinFormState | null) ?? {
-    termMonths: minTermMonths,
-    fromAccountNo: "",
-    withdrawalAccountId: null,
-    amount: product.minAmount,
-    agreedTerms: [],
+  // 라우터 state는 새로고침으로 사라진다. 상품 최솟값으로 채우면 고객이 입력한 적
+  // 없는 가입기간·금액이 "가입내용 확인"으로 표시되고, 그 값으로 적용금리·만기예정일·
+  // 예상 만기금액까지 다시 계산된다(REQ-PRDT-010은 "입력 내용을 요약 표시"를 요구한다).
+  // C-06이 같은 상황에서 쓰는 안내로 끊는다.
+  const form = location.state as ProductJoinFormState | null
+  if (form == null) {
+    return (
+      <StepLayout steps={PRODUCT_JOIN_STEPS} currentStep={3} title="상품가입">
+        <p className="py-10 text-center text-base text-ink-muted">
+          가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
+        </p>
+      </StepLayout>
+    )
   }
 
   const account = withdrawAccounts.find(

@@ -21,7 +21,6 @@ import {
   addMonthsWithEomCorrection,
   estimateMaturityAmount,
   getAppliedRateForTerm,
-  getProductTermRange,
   toProductDetailData,
 } from "@/entities/product"
 import { getToday } from "@/shared/config/clock"
@@ -92,19 +91,30 @@ export const C05ConfirmAuth = () => {
   }
 
   const product = toProductDetailData(detail)
-  const { minTermMonths } = getProductTermRange(detail)
-
   // 라우터 state는 새로고침으로 사라진다. 상품 최솟값으로 채우면 고객이 입력한 적
   // 없는 가입기간·금액이 "가입내용 확인"으로 표시되고, 그 값으로 적용금리·만기예정일·
   // 예상 만기금액까지 다시 계산된다(REQ-PRDT-010은 "입력 내용을 요약 표시"를 요구한다).
   // C-06이 같은 상황에서 쓰는 안내로 끊는다.
+  //
+  // 필수값까지 함께 본다. state가 있어도 가입기간·가입금액이 비어 있으면 요약할
+  // 내용이 없는 것은 마찬가지다.
   const form = location.state as ProductJoinFormState | null
-  if (form == null) {
+  if (form == null || form.termMonths == null || form.amount == null) {
     return (
       <StepLayout steps={PRODUCT_JOIN_STEPS} currentStep={3} title="상품가입">
-        <p className="py-10 text-center text-base text-ink-muted">
-          가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
-        </p>
+        <div className="flex flex-col items-center gap-4 py-10">
+          <p className="text-base text-ink-muted">
+            가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
+          </p>
+          <Button
+            variant="primary"
+            size="lg"
+            className="min-w-40"
+            onClick={() => navigate("/products")}
+          >
+            상품몰로 이동
+          </Button>
+        </div>
       </StepLayout>
     )
   }
@@ -112,8 +122,8 @@ export const C05ConfirmAuth = () => {
   const account = withdrawAccounts.find(
     (a) => a.accountNumber === form.fromAccountNo,
   )
-  const termMonths = form.termMonths ?? minTermMonths
-  const amount = form.amount ?? product.minAmount
+  const termMonths = form.termMonths
+  const amount = form.amount
   const appliedRate = getAppliedRateForTerm(detail, termMonths)
 
   const maturityDate = addMonthsWithEomCorrection(getToday(), termMonths)

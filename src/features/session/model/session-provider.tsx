@@ -118,9 +118,11 @@ export const SessionProvider = ({
   /** 고객정보를 다시 읽어 세션을 세운다. 조회 실패는 로그인 실패와 구분해 돌려준다. */
   const refreshProfile = React.useCallback(async (): Promise<boolean> => {
     const queryKey = getCustomerProfileQueryKey()
-    // refetchQueries 는 쿼리가 에러여도 reject 하지 않는다. 성공 여부는 캐시로 판정한다.
+    // refetchQueries 는 쿼리가 에러여도 reject 하지 않는다. 성공 여부는 쿼리 상태로
+    // 판정한다 — 실패한 재조회는 직전 데이터를 캐시에 그대로 두므로 data 유무로 보면
+    // 이미 끝난 세션을 살아 있다고 읽는다.
     await queryClient.refetchQueries({ queryKey })
-    return queryClient.getQueryData(queryKey) != null
+    return queryClient.getQueryState(queryKey)?.status === "success"
   }, [queryClient])
 
   const setSession = React.useCallback(async () => {

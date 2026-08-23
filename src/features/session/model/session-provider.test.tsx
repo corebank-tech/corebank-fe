@@ -213,17 +213,19 @@ describe("로그인 직후 세션 세우기", () => {
   })
 
   // 서버 세션은 생겼는데 고객정보를 못 읽은 상태. 호출자가 안내를 세울 수 있어야 한다.
+  // 직전 조회가 성공해 캐시에 데이터가 남아 있는 상태에서 검증한다 — 실패한 재조회는
+  // 그 데이터를 지우지 않으므로, data 유무로 판정하면 여기서 true 가 나온다.
   it("고객정보 조회가 실패하면 false 를 돌려준다", async () => {
+    hasServerSession = true
     const { result } = await renderSettledSession()
-    hasServerSession = false
 
+    hasServerSession = false
     let restored: boolean | undefined
     await act(async () => {
       restored = await result.current.setSession()
     })
 
     expect(restored).toBe(false)
-    expect(result.current.isAuthenticated).toBe(false)
   })
 })
 

@@ -8,9 +8,13 @@ import { NotificationsProvider } from "@/features/notifications"
 import { SessionProvider, useSession } from "@/features/session"
 
 /**
- * 스토리에 인증 상태를 만든다. 로그인은 서버 API 라 스토리북에서 태울 수 없으므로,
- * 로그인 성공 직후와 같은 경로(setSession)로 세션만 세운다. 고객명 조회는 실패하고
- * 헤더 이름이 비지만, 화면 렌더 검증에는 영향이 없다.
+ * 스토리에 인증 상태를 만든다.
+ *
+ * 세션 보유 여부의 출처가 서버 응답(GET /customers/me)으로 바뀌어서, API 가 없는
+ * 스토리북에서는 이 훅이 세션을 세우지 못한다 — 즉 **RequireAuth 를 쓰는 화면
+ * 스토리는 빈 화면으로 렌더된다.** 스토리 갱신은 2026-08-23 부터 중단됐고 화면
+ * 확인은 Preview URL 로 하므로(CLAUDE.md §2-2) 그대로 둔다. 스토리로 화면을
+ * 확인해야 한다면 스토리북에 mock API 를 붙이는 별도 작업이 필요하다.
  */
 function AutoLogin({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isBootstrapping, setSession } = useSession()

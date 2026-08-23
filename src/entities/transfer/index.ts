@@ -61,7 +61,6 @@ export {
   MOCK_RECENT_TRANSFER_ACCOUNTS,
   MOCK_FREQUENT_ACCOUNTS_MAX,
   MOCK_FREQUENT_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_RESULT,
   generateTransactionId,
 } from "@/entities/transfer/api/transfer"
 

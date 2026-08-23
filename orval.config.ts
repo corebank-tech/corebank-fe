@@ -24,9 +24,6 @@ export default defineConfig({
       client: "react-query",
       httpClient: "fetch",
       clean: true,
-      // 목업 핸들러도 스펙에서 생성한다 (src/mocks/handlers 의 수작업 예시는
-      // 스펙 도착 시 대체된다)
-      mock: { generators: [{ type: "msw", delay: 300 }] },
       override: {
         // 프로젝트 규약이 interface 대신 type 이다
         useTypeOverInterfaces: true,

@@ -1,5 +1,5 @@
 import type { AccountOption } from "@/shared/types/account"
-import { compactDate, daysAgo } from "@/shared/lib/mock-date"
+import { daysAgo } from "@/shared/lib/mock-date"
 
 /** Withdrawal accounts available to the signed-in customer. */
 export const MOCK_TRANSFER_ACCOUNTS: AccountOption[] = [
@@ -242,19 +242,6 @@ export type TransferResultRow = {
   memo: string
   /** 이체 후 출금계좌 예상잔액. 실패 건은 처리 전 잔액과 동일하다. */
   balanceAfter: number
-}
-
-/** 방금 처리된 이체 결과다(D-03 완료 화면). 처리일시는 오늘이어야 한다. */
-export const MOCK_TRANSFER_RESULT: TransferResultRow = {
-  transactionId: `${compactDate(daysAgo(0))}019876543210`,
-  processedAt: `${daysAgo(0)}T08:57:34`,
-  fromAccountNo: "110632892336",
-  toAccountNo: "333330730135",
-  payeeName: MOCK_PAYEE_NAME,
-  amount: 500_000,
-  fee: 0,
-  memo: "-",
-  balanceAfter: 11_500_000,
 }
 
 const CHANNEL_CODE = "01" // 인터넷뱅킹

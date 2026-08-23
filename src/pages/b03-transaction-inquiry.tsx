@@ -22,10 +22,11 @@ import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
   getAccountStatusBadgeVariant,
+  toTransactionRows,
   useAccountTransactionQuery,
   type Transaction,
 } from "@/entities/transaction"
-import { useAccountOverviewQuery } from "@/entities/account"
+import { useInquirableAccounts } from "@/entities/account"
 import {
   formatAccountNo,
   formatAmount,
@@ -58,6 +59,17 @@ const CONTENT_OPTIONS = [
   { label: "입금만", value: "deposit" },
   { label: "출금만", value: "withdraw" },
 ]
+
+const DIRECTION_BY_CONTENT: Record<string, "ALL" | "DEPOSIT" | "WITHDRAWAL"> = {
+  all: "ALL",
+  deposit: "DEPOSIT",
+  withdraw: "WITHDRAWAL",
+}
+
+const SORT_BY_ORDER: Record<string, "LATEST" | "OLDEST"> = {
+  recent: "LATEST",
+  past: "OLDEST",
+}
 
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
@@ -114,60 +126,70 @@ export const B03TransactionInquiry = () => {
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
 
-  const accountIdParam = React.useMemo(() => {
-    const raw = searchParams.get("accountId")
-    if (!raw) return null
+  const rawAccountIdParam = searchParams.get("accountId")
+  const legacyAccountParam = searchParams.get("account")
 
-    const parsed = Number(raw)
+  const accountIdParam = React.useMemo(() => {
+    if (!rawAccountIdParam) return null
+
+    const parsed = Number(rawAccountIdParam)
+
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-  }, [searchParams])
+  }, [rawAccountIdParam])
 
   const {
-    data: overview,
+    overview,
+    accounts,
     isLoading: isAccountsLoading,
     isError: isAccountsError,
-  } = useAccountOverviewQuery()
+  } = useInquirableAccounts()
 
-  const accounts = React.useMemo(() => {
-    return (overview?.items ?? []).flatMap((group) =>
-      (group.accounts ?? []).flatMap((item) => {
-        if (item.accountId == null) return []
+  const hasRequestedAccountParam =
+    rawAccountIdParam !== null || legacyAccountParam !== null
 
-        if (item.status !== "ACTIVE" && item.status !== "SUSPENDED") {
-          return []
-        }
+  const requestedAccountId = React.useMemo(() => {
+    if (rawAccountIdParam !== null) {
+      if (accountIdParam == null) {
+        return null
+      }
 
-        return [
-          {
-            accountId: item.accountId,
-            accountName: item.accountName ?? "",
-            accountNumber: item.accountNumber ?? "",
-            balance: item.balance ?? 0,
-            openedDate: item.openedDate ?? "",
-            status: item.status,
-          },
-        ]
-      }),
-    )
-  }, [overview])
+      return accounts.some((account) => account.accountId === accountIdParam)
+        ? accountIdParam
+        : null
+    }
 
-  const [applied, setApplied] = React.useState(() =>
-    defaultCondition(accountIdParam),
-  )
+    if (legacyAccountParam !== null) {
+      return (
+        accounts.find((account) => account.accountNumber === legacyAccountParam)
+          ?.accountId ?? null
+      )
+    }
 
-  const [accountId, setAccountId] = React.useState<number | null>(
-    accountIdParam,
-  )
+    return null
+  }, [rawAccountIdParam, legacyAccountParam, accountIdParam, accounts])
+
+  const initialAccountId = hasRequestedAccountParam
+    ? requestedAccountId
+    : (accounts[0]?.accountId ?? null)
+
+  const [applied, setApplied] = React.useState(() => defaultCondition(null))
+
+  const [accountId, setAccountId] = React.useState<number | null>(null)
+
   const effectiveAccountId =
-    accountId != null && accounts.some((item) => item.accountId === accountId)
-      ? accountId
-      : (accounts[0]?.accountId ?? null)
+    accountId != null
+      ? accounts.some((item) => item.accountId === accountId)
+        ? accountId
+        : null
+      : initialAccountId
 
   const effectiveAppliedAccountId =
-    applied.accountId != null &&
-    accounts.some((item) => item.accountId === applied.accountId)
-      ? applied.accountId
-      : (accounts[0]?.accountId ?? null)
+    applied.accountId != null
+      ? accounts.some((item) => item.accountId === applied.accountId)
+        ? applied.accountId
+        : null
+      : initialAccountId
+
   const [period, setPeriod] = React.useState(applied.period)
   const [content, setContent] = React.useState(applied.content)
   const [order, setOrder] = React.useState(applied.order)
@@ -183,15 +205,9 @@ export const B03TransactionInquiry = () => {
     () => ({
       fromDate: applied.period.start,
       toDate: applied.period.end,
-      direction:
-        applied.content === "deposit"
-          ? ("DEPOSIT" as const)
-          : applied.content === "withdraw"
-            ? ("WITHDRAWAL" as const)
-            : ("ALL" as const),
+      direction: DIRECTION_BY_CONTENT[applied.content] ?? "ALL",
       keyword: applied.keyword.trim() || undefined,
-      sort:
-        applied.order === "past" ? ("OLDEST" as const) : ("LATEST" as const),
+      sort: SORT_BY_ORDER[applied.order] ?? "LATEST",
       page,
       size: pageSize,
     }),
@@ -201,7 +217,6 @@ export const B03TransactionInquiry = () => {
   const {
     data: transactionData,
     isLoading: isTransactionsLoading,
-    isFetching: isTransactionsFetching,
     isError: isTransactionsError,
   } = useAccountTransactionQuery(effectiveAppliedAccountId, transactionParams)
   const savedCondition = useSavedConditionAlert()
@@ -226,44 +241,11 @@ export const B03TransactionInquiry = () => {
   const selectedInputAccountNo =
     accounts.find((item) => item.accountId === effectiveAccountId)
       ?.accountNumber ?? ""
-  const rows = React.useMemo<Transaction[]>(() => {
-    return (transactionData?.items ?? []).map((item) => {
-      const occurredAt = item.occurredAt ?? ""
-      const [date = "", rawTime = ""] = occurredAt.split("T")
 
-      const transactionType =
-        item.transactionType === "IMMEDIATE_TRANSFER"
-          ? "즉시이체"
-          : item.transactionType === "SCHEDULED_TRANSFER"
-            ? "예약이체"
-            : item.transactionType === "AUTO_TRANSFER"
-              ? "자동이체"
-              : (item.transactionType ?? "-")
-
-      const channel =
-        item.channel === "WB"
-          ? "인터넷뱅킹"
-          : item.channel === "BT"
-            ? "배치"
-            : "-"
-
-      return {
-        id: String(
-          item.ledgerEntryId ??
-            item.transactionNumber ??
-            `${occurredAt}-${item.balanceAfter ?? 0}`,
-        ),
-        date,
-        time: rawTime.slice(0, 8),
-        description: transactionType,
-        content: item.transactionContent ?? "-",
-        withdraw: item.withdrawalAmount ?? 0,
-        deposit: item.depositAmount ?? 0,
-        balance: item.balanceAfter ?? 0,
-        channel,
-      }
-    })
-  }, [transactionData?.items])
+  const rows = React.useMemo<Transaction[]>(
+    () => toTransactionRows(transactionData?.items ?? []),
+    [transactionData?.items],
+  )
 
   const depositSum = transactionData?.summary?.depositAmount ?? 0
   const depositCount = transactionData?.summary?.depositCount ?? 0
@@ -324,17 +306,6 @@ export const B03TransactionInquiry = () => {
     "거래후잔액",
     "거래채널",
   ]
-  const exportRows = rows.map((r) => [
-    formatDate(r.date),
-    r.time,
-    selectedAccount ? maskAccountNo(selectedAccount.accountNumber) : "-",
-    r.description,
-    r.content,
-    r.withdraw > 0 ? formatAmount(r.withdraw, { suffix: false }) : "-",
-    r.deposit > 0 ? formatAmount(r.deposit, { suffix: false }) : "-",
-    formatAmount(r.balance, { suffix: false }),
-    r.channel,
-  ])
 
   const handleReset = () => {
     const next = defaultCondition(accounts[0]?.accountId ?? null)
@@ -403,6 +374,34 @@ export const B03TransactionInquiry = () => {
     )
   }
 
+  if (hasRequestedAccountParam && requestedAccountId == null) {
+    return (
+      <div className="p-6 text-base text-danger">
+        요청한 계좌를 찾을 수 없습니다.
+      </div>
+    )
+  }
+
+  if (!selectedAccount) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        조회할 계좌를 선택해 주세요.
+      </div>
+    )
+  }
+
+  const exportRows = rows.map((r) => [
+    formatDate(r.date),
+    r.time,
+    maskAccountNo(selectedAccount.accountNumber),
+    r.description,
+    r.content,
+    r.withdraw > 0 ? formatAmount(r.withdraw, { suffix: false }) : "-",
+    r.deposit > 0 ? formatAmount(r.deposit, { suffix: false }) : "-",
+    formatAmount(r.balance, { suffix: false }),
+    r.channel,
+  ])
+
   return (
     <div className="border border-border bg-surface-elevated p-6">
       <FormSection title="조회조건">
@@ -468,30 +467,24 @@ export const B03TransactionInquiry = () => {
           <InfoRow
             gridCols="grid-cols-4"
             items={[
-              { term: "계좌명", desc: selectedAccount?.accountName ?? "-" },
+              { term: "계좌명", desc: selectedAccount.accountName || "-" },
               { term: "예금주", desc: "-" },
               {
                 term: "계좌번호",
-                desc: selectedAccount
-                  ? formatAccountNo(selectedAccount.accountNumber)
-                  : "-",
+                desc: formatAccountNo(selectedAccount.accountNumber),
               },
               {
                 term: "계좌상태",
-                desc: selectedAccount
-                  ? (() => {
-                      const status =
-                        selectedAccount.status === "SUSPENDED"
-                          ? "거래정지"
-                          : "정상"
+                desc: (() => {
+                  const status =
+                    selectedAccount.status === "SUSPENDED" ? "거래정지" : "정상"
 
-                      return (
-                        <Badge variant={getAccountStatusBadgeVariant(status)}>
-                          {status}
-                        </Badge>
-                      )
-                    })()
-                  : "-",
+                  return (
+                    <Badge variant={getAccountStatusBadgeVariant(status)}>
+                      {status}
+                    </Badge>
+                  )
+                })(),
               },
             ]}
           />
@@ -501,9 +494,7 @@ export const B03TransactionInquiry = () => {
               items={[
                 {
                   term: "계좌잔액",
-                  desc: selectedAccount
-                    ? formatAmount(selectedAccount.balance)
-                    : "-",
+                  desc: formatAmount(selectedAccount.balance),
                   dominant: true,
                 },
                 {
@@ -512,7 +503,7 @@ export const B03TransactionInquiry = () => {
                 },
                 {
                   term: "신규일자",
-                  desc: selectedAccount?.openedDate
+                  desc: selectedAccount.openedDate
                     ? formatDate(selectedAccount.openedDate)
                     : "-",
                 },
@@ -571,10 +562,10 @@ export const B03TransactionInquiry = () => {
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="거래내역조회"
+          resultLabel="현재 페이지 거래내역조회"
         />
 
-        {isTransactionsLoading || isTransactionsFetching ? (
+        {isTransactionsLoading ? (
           <div className="p-6 text-center text-base text-ink-muted">
             거래내역을 불러오는 중입니다.
           </div>
@@ -602,7 +593,7 @@ export const B03TransactionInquiry = () => {
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
         <SavedConditionAlert
           open={downloadComplete.saved}
-          message="파일이 저장되었습니다."
+          message="현재 페이지의 거래내역이 저장되었습니다."
           className="mt-2"
         />
       </FormSection>
@@ -613,7 +604,7 @@ export const B03TransactionInquiry = () => {
           "조회기간은 시작일 기준 최대 1년 이내로 지정할 수 있으며, 시작일이 종료일보다 늦으면 조회되지 않습니다.",
           "거래 후 잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
-          "조회 결과는 CSV 파일로 저장할 수 있으며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
+          "파일저장은 현재 표시 중인 페이지의 거래내역을 CSV로 저장하며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}
       />
 

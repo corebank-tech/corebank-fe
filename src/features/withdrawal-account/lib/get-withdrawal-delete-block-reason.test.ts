@@ -14,7 +14,7 @@ describe("getWithdrawalDeleteBlockReason", () => {
     ).toBe("대기 상태의 예약이체가 등록되어 있어 삭제할 수 없습니다.")
   })
 
-  it("대기 예약이체가 없고 정상 자동이체가 있으면 자동이체 차단 사유를 반환한다", () => {
+  it("급여통장(302998112233)은 대기 예약이체 없이 정상 자동이체만 있어 자동이체 차단 사유를 반환한다", () => {
     expect(
       getWithdrawalDeleteBlockReason(
         "302998112233",

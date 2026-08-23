@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 import { login, type LoginRequest } from "@/shared/api/generated"
 import { isApiError } from "@/shared/api/api-error"
+import { getAttemptFailureData } from "@/shared/api/attempt-failure-data"
 
 /**
  * 서버가 로그인 실패에 쓰는 코드(POST /auth/login 의 401·403).
@@ -23,21 +24,12 @@ export const resolveLoginFailure = (error: unknown): LoginFailureReason => {
   return "UNKNOWN"
 }
 
-type LoginFailureData = { errorCount: number; remainingAttempts: number }
-
-const isLoginFailureData = (data: unknown): data is LoginFailureData =>
-  typeof data === "object" &&
-  data !== null &&
-  typeof (data as LoginFailureData).remainingAttempts === "number"
-
 /** REQ-AUTH-024. MISMATCH 응답에만 실려 온다 — 서버가 값을 안 주면(다른 실패 사유 포함) undefined. */
 export const resolveRemainingAttempts = (
   error: unknown,
 ): number | undefined => {
   if (!isApiError(error)) return undefined
-  return isLoginFailureData(error.data)
-    ? error.data.remainingAttempts
-    : undefined
+  return getAttemptFailureData(error.data)?.remainingAttempts
 }
 
 /** A-01 로그인(REQ-AUTH-024). 성공 시 서버가 JSESSIONID·XSRF-TOKEN 쿠키를 발급한다. */

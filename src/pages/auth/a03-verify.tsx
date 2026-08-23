@@ -9,34 +9,13 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { useVerifySignupAccountMutation } from "@/entities/auth"
 import { isApiError } from "@/shared/api/api-error"
+import { getAttemptFailureData } from "@/shared/api/attempt-failure-data"
 import { onlyDigits } from "@/shared/lib/input-filter"
 import { ACCOUNT_PASSWORD_ERROR_LIMIT as ERROR_LIMIT } from "@/shared/config/policy"
 import { SIGNUP_STEPS } from "@/pages/auth/signup-shared"
 
 type A03VerifyProps = {
   onVerified: (name: string, birth: string, accountAuthToken: string) => void
-}
-
-type AccountVerificationFailureData = {
-  errorCount?: number
-  remainingAttempts?: number
-}
-
-const getFailureData = (
-  data: unknown,
-): AccountVerificationFailureData | null => {
-  if (typeof data !== "object" || data === null) return null
-
-  const value = data as Record<string, unknown>
-
-  return {
-    errorCount:
-      typeof value.errorCount === "number" ? value.errorCount : undefined,
-    remainingAttempts:
-      typeof value.remainingAttempts === "number"
-        ? value.remainingAttempts
-        : undefined,
-  }
 }
 
 /** A-03 회원가입 2단계 · 본인확인(계좌 실명확인). REQ-AUTH-005·006·007. */
@@ -105,7 +84,7 @@ export const A03Verify = ({ onVerified }: A03VerifyProps) => {
         return
       }
 
-      const failureData = getFailureData(error.data)
+      const failureData = getAttemptFailureData(error.data)
 
       if (error.code === "ATH0102") {
         const count = failureData?.errorCount

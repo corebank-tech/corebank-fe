@@ -39,11 +39,17 @@ const formatDraft = (value: string): string => {
 export const D05TransferLimit = () => {
   const BASE_TIME = useBaseTime()
   const queryClient = useQueryClient()
-  const { data: limit } = useTransferLimitQuery()
+  const {
+    data: limit,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useTransferLimitQuery()
   const updateMutation = useUpdateTransferLimitMutation()
 
   const oneTimeLimit = limit?.oneTimeLimit ?? 0
   const dailyLimit = limit?.dailyLimit ?? 0
+  const isLimitUnavailable = isLoading || isError || limit == null
 
   const [perTransferDraft, setPerTransferDraft] = React.useState<string | null>(
     null,
@@ -179,30 +185,48 @@ export const D05TransferLimit = () => {
       {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
       <FormSection title="이체한도 조회">
-        <SummaryRow
-          items={[
-            {
-              label: "1회 이체한도",
-              value: formatAmount(oneTimeLimit),
-            },
-            { label: "1일 이체한도", value: formatAmount(dailyLimit) },
-            {
-              label: "당일 사용금액",
-              value: formatAmount(limit?.dailyUsedAmount ?? 0),
-            },
-          ]}
-        />
-        <div className="mt-4 flex flex-col items-end gap-1 border-t-2 border-t-navy pt-3">
-          <span className="font-normal text-ink-muted">
-            당일 잔여 이체가능금액
-          </span>
-          <span className="text-page font-bold text-primary">
-            {formatAmount(limit?.dailyRemainingAmount ?? 0)}
-          </span>
-        </div>
-        <p className="mt-2 text-right text-2xs text-ink-muted">
-          기준일시 : {formatDateTime(BASE_TIME)}
-        </p>
+        {isLoading && (
+          <p className="py-10 text-center text-base text-ink-muted">
+            불러오는 중...
+          </p>
+        )}
+
+        {!isLoading && (isError || limit == null) && (
+          <Alert variant="danger">
+            {queryError instanceof ApiError
+              ? queryError.message
+              : "이체한도를 조회하지 못했습니다. 잠시 후 다시 시도하세요."}
+          </Alert>
+        )}
+
+        {!isLimitUnavailable && (
+          <>
+            <SummaryRow
+              items={[
+                {
+                  label: "1회 이체한도",
+                  value: formatAmount(oneTimeLimit),
+                },
+                { label: "1일 이체한도", value: formatAmount(dailyLimit) },
+                {
+                  label: "당일 사용금액",
+                  value: formatAmount(limit?.dailyUsedAmount ?? 0),
+                },
+              ]}
+            />
+            <div className="mt-4 flex flex-col items-end gap-1 border-t-2 border-t-navy pt-3">
+              <span className="font-normal text-ink-muted">
+                당일 잔여 이체가능금액
+              </span>
+              <span className="text-page font-bold text-primary">
+                {formatAmount(limit?.dailyRemainingAmount ?? 0)}
+              </span>
+            </div>
+            <p className="mt-2 text-right text-2xs text-ink-muted">
+              기준일시 : {formatDateTime(BASE_TIME)}
+            </p>
+          </>
+        )}
       </FormSection>
 
       <FormSection title="이체한도 변경" className="mb-0">
@@ -216,6 +240,7 @@ export const D05TransferLimit = () => {
             <Input
               id="d05-per-transfer"
               inputMode="numeric"
+              disabled={isLimitUnavailable}
               value={formatDraft(perTransferInput)}
               onChange={(e) => setPerTransferDraft(onlyDigits(e.target.value))}
               className="max-w-[220px] text-right"
@@ -231,6 +256,7 @@ export const D05TransferLimit = () => {
             <Input
               id="d05-per-day"
               inputMode="numeric"
+              disabled={isLimitUnavailable}
               value={formatDraft(perDayInput)}
               onChange={(e) => setPerDayDraft(onlyDigits(e.target.value))}
               className="max-w-[220px] text-right"
@@ -255,6 +281,7 @@ export const D05TransferLimit = () => {
             variant="secondary"
             size="lg"
             className="min-w-30"
+            disabled={isLimitUnavailable}
             onClick={resetDraft}
           >
             초기화
@@ -263,9 +290,10 @@ export const D05TransferLimit = () => {
             variant="primary"
             size="lg"
             className="min-w-30"
+            disabled={isLimitUnavailable || updateMutation.isPending}
             onClick={handleSubmitClick}
           >
-            변경하기
+            {updateMutation.isPending ? "변경 중..." : "변경하기"}
           </Button>
         </div>
       </FormSection>

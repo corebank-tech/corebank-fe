@@ -1,9 +1,7 @@
 import { useNavigate, useParams } from "react-router"
 import { ProductDetail } from "@/pages/product/product-detail"
 import { EmptyState } from "@/shared/ui/empty-state"
-import { toProductDetailData } from "@/entities/product"
-import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
-import type { ProductDetailResponse } from "@/shared/api/generated/model"
+import { toProductDetailData, useProductDetail } from "@/entities/product"
 
 /** C-02 상품 상세. REQ-PRDT-003. */
 export const C02ProductDetail = () => {
@@ -11,13 +9,7 @@ export const C02ProductDetail = () => {
   const navigate = useNavigate()
   const id = Number(productId)
 
-  const { data, isLoading, isError } = useGetProductDetail(id, {
-    query: { enabled: Number.isFinite(id) },
-  })
-
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const detail = data as unknown as ProductDetailResponse | undefined
+  const { detail, isLoading, isError } = useProductDetail(id)
 
   if (isLoading) {
     return (

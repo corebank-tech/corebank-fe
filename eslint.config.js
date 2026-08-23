@@ -89,6 +89,11 @@ export default tseslint.config(
           message:
             "색상 토큰은 @theme에 매핑된 유틸리티 클래스를 쓴다. [var(--color-*)] 대괄호 탈출구를 다시 쓰지 않는다(POL-039).",
         },
+        {
+          selector: 'TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]',
+          message:
+            "`as unknown as`는 타입 검사를 통째로 끈다. 생성 타입과 런타임이 어긋나면 openapi-transformer.ts에서 스펙을 고친다(REQ-CMN-007 봉투는 이미 벗겨진다).",
+        },
       ],
       "no-restricted-imports": [
         "error",

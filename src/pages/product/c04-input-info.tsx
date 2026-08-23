@@ -13,15 +13,14 @@ import {
   getAppliedRateForTerm,
   getProductTermRange,
   toProductDetailData,
+  useProductDetail,
 } from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
-import { useGetProductDetail } from "@/shared/api/generated/product-controller/product-controller"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { ProductDetailResponse } from "@/shared/api/generated/model"
 import type { AccountOption } from "@/shared/types/account"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
@@ -30,9 +29,7 @@ export const C04InputInfo = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const id = Number(productId)
-  const { data, isLoading, isError } = useGetProductDetail(id, {
-    query: { enabled: Number.isFinite(id) },
-  })
+  const { detail, isLoading, isError } = useProductDetail(id)
   const prev = location.state as ProductJoinFormState | null
 
   const [termMonths, setTermMonths] = React.useState<number | null>(
@@ -49,7 +46,6 @@ export const C04InputInfo = () => {
 
   // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
   // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const detail = data as unknown as ProductDetailResponse | undefined
 
   if (isLoading) {
     return (

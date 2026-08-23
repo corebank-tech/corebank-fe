@@ -33,10 +33,9 @@ import { addMonths } from "@/shared/lib/date"
 import { checkPeriodRange } from "@/entities/transaction"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
-  useSearchScheduledTransfers,
-  useCancelScheduledTransfer,
-} from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
-import type { PageResponseScheduledTransferListItemResponse } from "@/shared/api/generated/model"
+  useScheduledTransfers,
+  useCancelScheduledTransferMutation,
+} from "@/entities/transfer"
 import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
@@ -144,7 +143,7 @@ export const E04ReservationList = () => {
     isFetching,
     isError,
     refetch,
-  } = useSearchScheduledTransfers(
+  } = useScheduledTransfers(
     {
       status: STATUS_TO_API[applied.status],
       fromDate: applied.period.start,
@@ -159,10 +158,7 @@ export const E04ReservationList = () => {
   )
   const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
 
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const pageData = data as unknown as
-    PageResponseScheduledTransferListItemResponse | undefined
+  const pageData = data
   const pageRows = sortWaitingFirst(
     (pageData?.items ?? []).map(toReservationRow),
   )
@@ -176,7 +172,7 @@ export const E04ReservationList = () => {
 
   const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
 
-  const cancelMutation = useCancelScheduledTransfer({
+  const cancelMutation = useCancelScheduledTransferMutation({
     request: {
       headers: {
         "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,

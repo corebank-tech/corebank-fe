@@ -23,7 +23,7 @@ import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
 import { ReservedTransferStep2 } from "@/pages/transfer/reserved/e02-confirm"
 import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
-import { useRegisterScheduledTransfer } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
+import { useRegisterScheduledTransferMutation } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 import type { AccountOption } from "@/shared/types/account"
@@ -78,7 +78,7 @@ export const ReservedTransferScreen = () => {
 
   const { accounts: withdrawAccounts, isLoading: accountsLoading } =
     useWithdrawAccounts()
-  const registerMutation = useRegisterScheduledTransfer()
+  const registerMutation = useRegisterScheduledTransferMutation()
 
   const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
     alias: a.accountName ?? "",

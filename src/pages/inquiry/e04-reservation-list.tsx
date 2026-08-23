@@ -31,6 +31,7 @@ import {
 import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
 import { checkPeriodRange } from "@/entities/transaction"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useScheduledTransfers,
@@ -120,7 +121,9 @@ export const E04ReservationList = () => {
   const [applied, setApplied] = React.useState(defaultCondition)
   const [status, setStatus] = React.useState(applied.status)
   const [period, setPeriod] = React.useState(applied.period)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    QUERY_DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [confirmOpen, setConfirmOpen] = React.useState(false)
@@ -136,6 +139,9 @@ export const E04ReservationList = () => {
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
   const {
     data,
     dataUpdatedAt,
@@ -149,7 +155,7 @@ export const E04ReservationList = () => {
       fromDate: applied.period.start,
       toDate: applied.period.end,
       page: page - 1,
-      size: pageSize === "all" ? 1000 : pageSize,
+      size,
     },
     // 페이지·조회조건을 바꾸면 새 쿼리 키라 data가 undefined로 떨어진다. 결과가
     // 올 때까지 이전 응답을 유지해서 조회조건 폼과 페이지네이션이 화면째로
@@ -491,6 +497,9 @@ export const E04ReservationList = () => {
         {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
             동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
+          showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
@@ -507,7 +516,7 @@ export const E04ReservationList = () => {
             downloadCsv(`예약이체조회_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="예약이체조회"
+          resultLabel="현재 페이지 예약이체조회"
         />
 
         <DataGrid

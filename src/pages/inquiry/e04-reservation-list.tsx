@@ -177,8 +177,7 @@ export const E04ReservationList = () => {
 
   const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
 
-  // Otp-Auth-Token은 검증 시점에만 실제 값을 알 수 있어(OtpModal onConfirm),
-  // 매 호출마다 헤더를 새로 만들어야 한다.
+  // 훅이 아닌 raw 함수를 호출하므로 mutation의 isPending을 쓸 수 없어 직접 든다.
   const [isCancelling, setIsCancelling] = React.useState(false)
 
   const clearSelection = () => setSelectedIds([])
@@ -259,6 +258,8 @@ export const E04ReservationList = () => {
       // 응답을 기다리는 취소 요청이 남은 채로 재조회가 나간다. 그러면 나중에
       // 성공한 건이 반영되기 전의 목록을 받아 "일부만 성공했을 수 있으니 최신
       // 상태를 다시 불러온다"는 의도가 그대로 깨진다.
+      // Otp-Auth-Token은 검증 시점에만 실제 값을 알 수 있어(OtpModal onConfirm),
+      // 매 호출마다 헤더를 새로 만들어야 한다.
       const results = await Promise.allSettled(
         selectedRows.map((r) =>
           cancelScheduledTransfer(Number(r.id), {

@@ -14,12 +14,16 @@ import {
   getProductTermRange,
   toProductDetailData,
   useProductDetail,
+  useValidateSubscription,
+  type ViolationItem,
 } from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
 } from "@/pages/product/join-shared"
+import { Alert } from "@/shared/ui/alert"
 import { EmptyState } from "@/shared/ui/empty-state"
+import { ApiError } from "@/shared/api/api-error"
 import { useWithdrawAccounts } from "@/entities/account"
 import type { AccountOption } from "@/shared/types/account"
 
@@ -44,8 +48,11 @@ export const C04InputInfo = () => {
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
+  const validateMutation = useValidateSubscription()
+  const [violations, setViolations] = React.useState<ViolationItem[]>([])
+  const [validationError, setValidationError] = React.useState<string | null>(
+    null,
+  )
 
   if (isLoading) {
     return (
@@ -110,17 +117,58 @@ export const C04InputInfo = () => {
         })
       : null
 
-  const handleNext = () => {
-    const next: ProductJoinFormState = {
-      termMonths,
-      fromAccountNo: fromAccount,
-      // 가입 실행 요청은 계좌번호가 아니라 계좌 ID를 받는다.
-      withdrawalAccountId: selectedAccountId ?? null,
-      amount,
-      // C-03에서 받은 동의 이력을 그대로 실어 나른다.
-      agreedTerms: prev?.agreedTerms ?? [],
+  /**
+   * REQ-PRDT-007 은 서버 재검증을 요구한다. 화면이 막는 범위 검증만으로는 약관 동의
+   * 이력·출금계좌 소유·잔액을 판단할 수 없어, 다음 단계로 넘기기 전에 서버에 묻는다.
+   * 입력할 때마다 부르지 않는 이유는 검증이 조회가 아니라 상태를 남기는 요청이고,
+   * 화면 표시는 이미 클라이언트 계산으로 즉시 갱신되기 때문이다(REQ-PRDT-009).
+   */
+  const handleNext = async () => {
+    if (validateMutation.isPending) return
+    if (termMonths == null || amount == null || selectedAccountId == null) {
+      setValidationError("가입기간·가입금액·출금계좌를 모두 입력하세요.")
+      return
     }
-    navigate(`/product/${product.id}/join/3`, { state: next })
+
+    setViolations([])
+    setValidationError(null)
+
+    const agreedTerms = prev?.agreedTerms ?? []
+
+    try {
+      const validation = await validateMutation.mutateAsync({
+        data: {
+          productId: product.id,
+          subscriptionAmount: amount,
+          termMonths,
+          withdrawalAccountId: selectedAccountId,
+          agreedTerms,
+        },
+      })
+
+      if (validation?.valid !== true) {
+        setViolations(validation?.violations ?? [])
+        if ((validation?.violations ?? []).length === 0) {
+          setValidationError("가입정보를 확인한 뒤 다시 시도하세요.")
+        }
+        return
+      }
+
+      const next: ProductJoinFormState = {
+        termMonths,
+        fromAccountNo: fromAccount,
+        // 가입 실행 요청은 계좌번호가 아니라 계좌 ID를 받는다.
+        withdrawalAccountId: selectedAccountId,
+        amount,
+        // C-03에서 받은 동의 이력을 그대로 실어 나른다.
+        agreedTerms,
+      }
+      navigate(`/product/${product.id}/join/3`, { state: next })
+    } catch (e) {
+      setValidationError(
+        e instanceof ApiError ? e.message : "가입정보 검증에 실패했습니다.",
+      )
+    }
   }
 
   return (
@@ -138,13 +186,31 @@ export const C04InputInfo = () => {
             variant="primary"
             size="lg"
             className="min-w-40"
-            disabled={!canSubmit}
-            onClick={handleNext}
+            disabled={!canSubmit || validateMutation.isPending}
+            onClick={() => void handleNext()}
           >
-            다음
+            {validateMutation.isPending ? "확인 중..." : "다음"}
           </Button>
         }
       >
+        {violations.length > 0 && (
+          <Alert variant="danger">
+            <ul className="flex flex-col gap-1">
+              {/* 서버는 약관 ID마다 violation을 따로 담아서, 필수 약관 여러 건이
+                  미동의면 field·code가 같고 reason의 termsId만 다른 항목이 함께
+                  내려온다. 목록은 검증할 때마다 통째로 교체되고 정렬·필터를 거치지
+                  않으므로 순서를 키로 쓴다. */}
+              {violations.map((violation, index) => (
+                <li key={index}>{violation.reason}</li>
+              ))}
+            </ul>
+          </Alert>
+        )}
+
+        {validationError != null && (
+          <Alert variant="danger">{validationError}</Alert>
+        )}
+
         <FormSection title="가입정보 입력">
           <div>
             <FormRow

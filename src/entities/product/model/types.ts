@@ -1,5 +1,3 @@
-import type { AccountOption } from "@/shared/types/account"
-
 /** 취급 상품은 정기예금·정기적금 2종뿐이다(POL-029). */
 export type ProductCategory = "정기예금" | "정기적금"
 
@@ -53,23 +51,4 @@ export type ProductDetailData = {
   rates: ProductRateRow[]
   notices: string[]
   saleStatus: ProductSaleStatus
-}
-
-export type ProductJoinMaster = {
-  id: number
-  category: ProductCategory
-  name: string
-  /** 적용금리, 연 세전 %. Phase 1 데모용 고정값(POL-030). */
-  rate: number
-  minTermMonths: number
-  maxTermMonths: number
-  minAmount: number
-  maxAmount: number
-  /** 가입 완료 화면에 노출할 신규계좌번호(모의), 12자리. */
-  mockNewAccountNo: string
-}
-
-export type JoinWithdrawAccount = AccountOption & {
-  /** 계좌비밀번호 인증용 모의 값(4자리). */
-  mockPassword: string
 }

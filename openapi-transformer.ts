@@ -33,7 +33,7 @@ const OPERATION_ID: Record<string, string> = {
   "get /products/{productId}": "getProductDetail",
   "get /products/{productId}/terms/{termsId}": "getProductTerms",
   "post /product-subscriptions": "executeProductSubscription",
-  "post /product-subscriptions/validation": "validate",
+  "post /product-subscriptions/validation": "validateProductSubscription",
   "get /product-subscriptions/{subscriptionId}": "getProductSubscriptions",
 
   "get /scheduled-transfers": "searchScheduledTransfers",

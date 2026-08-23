@@ -1,5 +1,6 @@
 import {
   useExecuteProductSubscription,
+  useValidateProductSubscription,
   getProductSubscriptions,
   getProductTerms,
 } from "@/shared/api/generated"
@@ -7,7 +8,10 @@ import type {
   ProductSubscriptionExecuteRequest,
   ProductSubscriptionExecuteResponse,
   ProductSubscriptionResultResponse,
+  ProductSubscriptionValidationRequest,
+  ProductSubscriptionValidationResponse,
   ProductTermsViewResponse,
+  ViolationItem,
 } from "@/shared/api/generated"
 
 /**
@@ -21,6 +25,12 @@ export const fetchProductTerms = async (
 ): Promise<ProductTermsViewResponse | undefined> => {
   return getProductTerms(productId, termsId)
 }
+
+/**
+ * 가입정보 검증(C-04). REQ-PRDT-007 이 요구하는 서버 재검증이다. 화면이 먼저 막는
+ * 범위 검증과 별개로, 약관 동의 이력·출금계좌 소유·잔액까지 서버만 판단할 수 있다.
+ */
+export const useValidateSubscription = () => useValidateProductSubscription()
 
 /** 가입 실행(C-05). */
 export const useExecuteSubscription = () => useExecuteProductSubscription()
@@ -39,5 +49,8 @@ export type {
   ProductSubscriptionExecuteRequest,
   ProductSubscriptionExecuteResponse,
   ProductSubscriptionResultResponse,
+  ProductSubscriptionValidationRequest,
+  ProductSubscriptionValidationResponse,
   ProductTermsViewResponse,
+  ViolationItem,
 }

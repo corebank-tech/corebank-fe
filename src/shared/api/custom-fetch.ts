@@ -25,6 +25,17 @@ const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 const buildRequestUrl = (url: string): string =>
   url.startsWith("http") ? url : `${API_BASE_URL}${url}`
 
+/**
+ * orval 생성 훅이 넘기는 취소 신호와 자체 타임아웃을 함께 건다.
+ * 둘 중 하나라도 중단되면 요청이 끊기므로, 호출자가 신호를 넘겨도
+ * REQUEST_TIMEOUT_MS 상한이 유지된다.
+ */
+const buildAbortSignal = (signal: RequestInit["signal"]): AbortSignal => {
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  if (!signal) return timeoutSignal
+  return AbortSignal.any([signal, timeoutSignal])
+}
+
 /** 서버가 로그인 시 내려주는 XSRF-TOKEN 쿠키 값을 읽는다(CookieCsrfTokenRepository, httpOnly=false). */
 const readCsrfCookie = (): string | undefined => {
   const match = document.cookie
@@ -78,7 +89,7 @@ export const customFetch = async <TData>(
       method,
       credentials: "include", // POL-001: 서버 세션 쿠키
       headers: buildHeaders(method, options),
-      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: buildAbortSignal(options.signal),
     })
   } catch (cause) {
     throw new ApiError({

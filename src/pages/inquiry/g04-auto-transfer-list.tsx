@@ -35,6 +35,7 @@ import {
   type AutoTransferRow,
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 import {
@@ -72,7 +73,9 @@ export const G04AutoTransferList = () => {
   }>({ accountId: null, status: "all" })
   const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [status, setStatus] = React.useState("all")
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    QUERY_DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
@@ -105,7 +108,9 @@ export const G04AutoTransferList = () => {
     (a) => a.accountId === appliedAccountId,
   )
 
-  const size = pageSize === "all" ? 1000 : pageSize
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
   const { data, isFetching, isError, refetch } = useAutoTransfers(
     {
       // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
@@ -484,6 +489,9 @@ export const G04AutoTransferList = () => {
         }
       >
         <GridToolbar
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
+          showAllOption={false}
           totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
@@ -498,7 +506,7 @@ export const G04AutoTransferList = () => {
             downloadCsv(`자동이체조회_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="자동이체조회"
+          resultLabel="현재 페이지 자동이체조회"
         />
 
         <DataGrid

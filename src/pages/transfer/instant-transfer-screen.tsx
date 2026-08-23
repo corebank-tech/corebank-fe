@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearchParams } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
@@ -26,7 +27,7 @@ import {
   MOCK_WITHDRAWAL_ACCOUNTS,
 } from "@/entities/account"
 import {
-  MOCK_ACCESS_STATUS,
+  getLoginStatusQueryKey,
   MOCK_DASHBOARD_ACCOUNTS,
 } from "@/entities/dashboard"
 import {
@@ -108,6 +109,7 @@ const INITIAL_FORM: InstantTransferForm = {
  * (REQ-TRSF-009, REQ-TRSF-031)는 여기서 조립한다.
  */
 export const InstantTransferScreen = () => {
+  const queryClient = useQueryClient()
   const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -293,7 +295,11 @@ export const InstantTransferScreen = () => {
           memo: form.payeeMemo || "-",
         })
         MOCK_TRANSFER_LIMITS.usedToday += amount
-        MOCK_ACCESS_STATUS.lastTransaction = executedAt
+        // A-09 최종접속정보의 최근 거래일시는 서버가 계산한다. 이체가 끝났으니
+        // 다음 조회에서 새로 받도록 캐시만 무효화한다.
+        void queryClient.invalidateQueries({
+          queryKey: getLoginStatusQueryKey(),
+        })
         for (const rows of [
           MOCK_TRANSFER_ACCOUNTS,
           MOCK_OVERVIEW_ACCOUNTS,

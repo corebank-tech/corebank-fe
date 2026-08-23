@@ -15,15 +15,6 @@ export type DashboardAccount = {
   balance: number
 }
 
-export type AccessStatus = {
-  /** 최근 접속일시 ISO datetime. */
-  lastLogin: string
-  /** 현재 접속 IP. */
-  ip: string
-  /** 최근 거래일시 ISO datetime. */
-  lastTransaction: string
-}
-
 export type NotificationCategory = "이체" | "출금" | "안내"
 
 export type NotificationItem = {
@@ -61,12 +52,6 @@ export const MOCK_DASHBOARD_ACCOUNTS: DashboardAccount[] = [
     balance: 1_500_000,
   },
 ]
-
-export const MOCK_ACCESS_STATUS: AccessStatus = {
-  lastLogin: `${daysAgo(0)}T08:57:34`,
-  ip: "203.245.11.87",
-  lastTransaction: `${daysAgo(0)}T08:41:02`,
-}
 
 /** 미읽음 알림 3건. */
 export const MOCK_NOTIFICATIONS: NotificationItem[] = [

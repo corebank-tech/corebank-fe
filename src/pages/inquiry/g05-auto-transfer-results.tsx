@@ -33,10 +33,8 @@ import {
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useWithdrawAccounts } from "@/entities/account"
-
-/** 서버 허용 페이지 크기(5·10·20·30·50) 중 기본값. */
-const DEFAULT_PAGE_SIZE = 10
 
 export const G05AutoTransferResults = () => {
   const TODAY = getToday()
@@ -49,7 +47,7 @@ export const G05AutoTransferResults = () => {
   const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
   const [period, setPeriod] = React.useState(recentPeriod)
   const [pageSize, setPageSize] = React.useState<number | "all">(
-    DEFAULT_PAGE_SIZE,
+    QUERY_DEFAULT_PAGE_SIZE,
   )
   const [page, setPage] = React.useState(1)
   const savedCondition = useSavedConditionAlert()
@@ -69,7 +67,7 @@ export const G05AutoTransferResults = () => {
 
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
   // 않는다. 타입을 좁히기 위한 분기다.
-  const size = pageSize === "all" ? DEFAULT_PAGE_SIZE : pageSize
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
   const {
     page: pageData,
     baseTime,
@@ -312,7 +310,8 @@ export const G05AutoTransferResults = () => {
         </p>
 
         <GridToolbar
-          // 서버가 페이지 크기를 화이트리스트로 막아 전체를 요청할 방법이 없다(#46).
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
           showAllOption={false}
           periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
           totalCount={totalCount}
@@ -334,7 +333,7 @@ export const G05AutoTransferResults = () => {
             )
             downloadComplete.save()
           }}
-          resultLabel="자동이체결과조회"
+          resultLabel="현재 페이지 자동이체결과조회"
         />
 
         <DataGrid

@@ -38,7 +38,10 @@ import { cn } from "@/shared/lib/utils"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { getToday } from "@/shared/config/clock"
 import { useCapturedBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { QUERY_MAX_RANGE_DAYS as MAX_PERIOD_DAYS } from "@/shared/config/policy"
+import {
+  QUERY_MAX_RANGE_DAYS as MAX_PERIOD_DAYS,
+  QUERY_DEFAULT_PAGE_SIZE,
+} from "@/shared/config/policy"
 import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
 
@@ -194,7 +197,9 @@ export const B03TransactionInquiry = () => {
   const [content, setContent] = React.useState(applied.content)
   const [order, setOrder] = React.useState(applied.order)
   const [keyword, setKeyword] = React.useState(applied.keyword)
-  const [pageSize, setPageSize] = React.useState(10)
+  const [pageSize, setPageSize] = React.useState<number>(
+    QUERY_DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const {
     incomplete: periodIncomplete,

@@ -27,6 +27,7 @@ import type {
  */
 const OPERATION_ID: Record<string, string> = {
   "get /accounts": "getAccounts",
+  "get /accounts/{accountId}/transactions": "searchAccountTransactions",
 
   "get /products": "searchProducts",
   "get /products/{productId}": "getProductDetail",

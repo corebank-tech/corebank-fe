@@ -36,7 +36,7 @@ import {
 } from "@/entities/transfer"
 import { getToday } from "@/shared/config/clock"
 import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 import {
   useAutoTransfers,
@@ -63,7 +63,6 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export const G04AutoTransferList = () => {
-  const BASE_TIME = useBaseTime()
   const TODAY = getToday()
   // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
   // 바로 물려 있으면 계좌·조회구분을 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
@@ -111,7 +110,14 @@ export const G04AutoTransferList = () => {
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
   // 않는다. 타입을 좁히기 위한 분기다.
   const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
-  const { data, isFetching, isError, refetch } = useAutoTransfers(
+  const {
+    data,
+    dataUpdatedAt,
+    isPlaceholderData,
+    isFetching,
+    isError,
+    refetch,
+  } = useAutoTransfers(
     {
       // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
       // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
@@ -130,6 +136,8 @@ export const G04AutoTransferList = () => {
       },
     },
   )
+
+  const baseTime = useQueryBaseTime({ dataUpdatedAt, isPlaceholderData })
 
   const pageData = data
   // 출금계좌번호는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
@@ -499,7 +507,9 @@ export const G04AutoTransferList = () => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
           onSaveFile={() => {

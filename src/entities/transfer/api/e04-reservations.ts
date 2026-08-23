@@ -29,7 +29,13 @@ export type ReservationRow = {
   cancelable: boolean
 }
 
-/** Storybook 픽스처 전용 — 실제 화면은 서버 응답을 매핑해서 쓴다. 오늘 = 2026-07-23 기준. */
+/**
+ * **B-05 출금계좌 삭제 차단(REQ-ACCT-011)의 입력**이다. E-04는 서버 응답을 매핑해서 쓰므로
+ * 화면도 스토리도 이 배열을 읽지 않는다 — 계좌번호와 상태 조합을 바꾸면 B-05에서 안내되는
+ * 차단 사유만 달라진다.
+ *
+ * 날짜는 오늘 기준 상대값이다.
+ */
 export const MOCK_RESERVATIONS: ReservationRow[] = [
   {
     id: "rsv7",
@@ -45,12 +51,15 @@ export const MOCK_RESERVATIONS: ReservationRow[] = [
     cancelable: true,
   },
   {
+    // 출금계좌가 자유입출금인 것은 의도다. 급여통장(302998112233)에 대기 예약이체를
+    // 두면 B-05 삭제 차단이 그 계좌에서도 예약이체 사유로 먼저 걸려, 정상 자동이체
+    // 사유(REQ-ACCT-011)가 화면에 한 번도 표시되지 않는다.
     id: "rsv6",
     status: "대기",
     scheduledDate: daysAhead(4),
     registeredAt: `${daysAgo(2)}T09:30:00`,
-    fromAccountNo: "302998112233",
-    fromAlias: "급여통장",
+    fromAccountNo: "110632892336",
+    fromAlias: "자유입출금",
     toAccountNo: "110550098213",
     payeeName: "박지훈",
     amount: 2_000_000,

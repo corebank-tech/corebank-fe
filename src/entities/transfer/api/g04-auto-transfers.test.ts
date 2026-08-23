@@ -4,6 +4,12 @@ import { getToday } from "@/shared/config/clock"
 
 const dayOf = (iso: string): number => Number(iso.slice(8, 10))
 
+const monthsBetween = (from: string, to: string): number => {
+  const [fromYear, fromMonth] = from.split("-").map(Number)
+  const [toYear, toMonth] = to.split("-").map(Number)
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth)
+}
+
 /**
  * 자동이체는 시작일·종료일·다음 실행일·이체지정일이 한 묶음으로 움직인다.
  * 상대값 오프셋을 하나만 고쳐도 짝이 어긋나므로, 기준일을 옮겨가며 같은
@@ -29,20 +35,38 @@ const expectDatesConsistent = (
       id: row.id,
       ordered: true,
     })
+
+    // 이체기간은 이체주기의 정수배여야 한다 — 마지막 회차가 종료일에 정확히 떨어지지
+    // 않으면 화면의 이체기간과 실제 실행 회차가 어긋난다.
+    expect({
+      id: row.id,
+      offCycle: monthsBetween(row.startDate, row.endDate) % row.cycleMonths,
+    }).toEqual({ id: row.id, offCycle: 0 })
   }
 
   const normal = rows.filter((r) => r.status === "정상")
   expect(normal.length).toBeGreaterThan(0)
   for (const row of normal) {
+    const { nextExecDate } = row
+
     // 종료일이 지난 건은 '종료'여야 하고, 다음 실행일은 그 안에 있어야 한다.
     expect({
       id: row.id,
-      next: row.nextExecDate,
+      next: nextExecDate,
       inRange:
-        row.nextExecDate != null &&
-        row.nextExecDate > today &&
-        row.nextExecDate <= row.endDate,
-    }).toEqual({ id: row.id, next: row.nextExecDate, inRange: true })
+        nextExecDate != null &&
+        nextExecDate > today &&
+        nextExecDate <= row.endDate,
+    }).toEqual({ id: row.id, next: nextExecDate, inRange: true })
+
+    // 다음 실행일도 이체주기 위에 놓여야 한다. nextExecDateOn()이 매월 기준이라
+    // 주기가 1이 아닌 '정상' 건이 추가되면 여기서 걸린다.
+    expect({
+      id: row.id,
+      offCycle:
+        nextExecDate != null &&
+        monthsBetween(row.startDate, nextExecDate) % row.cycleMonths !== 0,
+    }).toEqual({ id: row.id, offCycle: false })
   }
 
   const ended = rows.filter((r) => r.status === "종료")

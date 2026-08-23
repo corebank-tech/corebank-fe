@@ -222,7 +222,7 @@ export const A04Info = ({
       setEmailIssuedCode(result.verificationCode ?? null)
       setEmailCode("")
       setEmailError(null)
-      resetEmailCountdown()
+      resetEmailCountdown(result.expiresIn ?? EMAIL_OTP_TTL)
     } catch (error) {
       setAlert(getErrorMessage(error))
     }

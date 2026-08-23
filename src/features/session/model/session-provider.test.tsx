@@ -20,6 +20,7 @@ import { useSession } from "@/features/session/model/use-session"
 /** 이 테스트는 모킹 대신 실제 customFetch·쿼리 경로를 태운다. */
 let hasServerSession = false
 let logoutCallCount = 0
+let profileCallCount = 0
 
 const respondUnauthorized = () =>
   HttpResponse.json(
@@ -29,15 +30,16 @@ const respondUnauthorized = () =>
 
 /** 서버 세션 유무에 따라 응답이 갈리는 최소 페이크. 로그아웃하면 세션이 사라진다. */
 const serverHandlers = [
-  http.get("*/customers/me", () =>
-    hasServerSession
+  http.get("*/customers/me", () => {
+    profileCallCount += 1
+    return hasServerSession
       ? HttpResponse.json({
           code: "0000",
           message: "성공",
           data: { customerId: 1, userName: "홍*동" },
         })
-      : respondUnauthorized(),
-  ),
+      : respondUnauthorized()
+  }),
   // 세션이 없으면 401 CMN0101 을 주면서도 쿠키는 지운다(실측).
   http.post("*/auth/logout", () => {
     logoutCallCount += 1
@@ -53,6 +55,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   logoutCallCount = 0
+  profileCallCount = 0
   hasServerSession = false
   server.use(...serverHandlers)
   vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -159,6 +162,68 @@ describe("세션 만료", () => {
     expect(result.current.expiredReason).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
     expect(logoutCallCount).toBe(0)
+  })
+})
+
+describe("세션 연장 (REQ-AUTH-030)", () => {
+  it("[연장]은 서버에 요청을 보내 서버 세션까지 갱신한다", async () => {
+    hasServerSession = true
+    const { result } = await renderSettledSession()
+    const before = profileCallCount
+
+    act(() => result.current.extend())
+
+    // 지역 타이머만 되돌리면 화면은 10:00 인데 서버는 계속 만료를 향해 간다.
+    await waitFor(() => expect(profileCallCount).toBe(before + 1))
+  })
+
+  it("연장 요청의 응답이 잔여시간을 되돌린다", async () => {
+    hasServerSession = true
+    const { result } = await renderSettledSession()
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+    await waitFor(() =>
+      expect(result.current.remainingSeconds).toBeLessThan(
+        SESSION_TIMEOUT_SECONDS,
+      ),
+    )
+
+    act(() => result.current.extend())
+
+    await waitFor(() =>
+      expect(result.current.remainingSeconds).toBe(SESSION_TIMEOUT_SECONDS),
+    )
+  })
+})
+
+describe("로그인 직후 세션 세우기", () => {
+  it("고객정보 조회가 성공하면 true 를 돌려준다", async () => {
+    const { result } = await renderSettledSession()
+    hasServerSession = true
+
+    let restored: boolean | undefined
+    await act(async () => {
+      restored = await result.current.setSession()
+    })
+
+    expect(restored).toBe(true)
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true))
+  })
+
+  // 서버 세션은 생겼는데 고객정보를 못 읽은 상태. 호출자가 안내를 세울 수 있어야 한다.
+  it("고객정보 조회가 실패하면 false 를 돌려준다", async () => {
+    const { result } = await renderSettledSession()
+    hasServerSession = false
+
+    let restored: boolean | undefined
+    await act(async () => {
+      restored = await result.current.setSession()
+    })
+
+    expect(restored).toBe(false)
+    expect(result.current.isAuthenticated).toBe(false)
   })
 })
 

@@ -26,6 +26,7 @@ export const A01Login = () => {
   const [userId, setUserId] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [failure, setFailure] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
   const { isAuthenticated, setSession } = useSession()
   const loginMutation = useLoginMutation()
   const location = useLocation()
@@ -34,34 +35,53 @@ export const A01Login = () => {
   const redirectTo = from && from !== "/" ? from : "/dashboard"
 
   /** 잠금·불일치 안내는 그 입력에 대한 판정이다. 입력이 바뀌면 더 이상 사실이 아니다. */
-  const changeField = (setter: (value: string) => void) => (value: string) => {
-    setter(value)
+  const handleUserIdChange = (value: string) => {
+    setUserId(value)
     setFailure(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePasswordChange = (value: string) => {
+    setPassword(value)
+    setFailure(null)
+  }
+
+  const toFailureMessage = (error: unknown): string => {
+    const reason = resolveLoginFailure(error)
+    if (reason !== "UNKNOWN") return FAILURE_MESSAGE[reason]
+    // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
+    return isApiError(error)
+      ? error.message
+      : "로그인 처리 중 오류가 발생했습니다."
+  }
+
+  /**
+   * 제출 상태를 mutation 의 isPending 이 아니라 여기서 든다.
+   * mutate 의 per-call onSuccess 는 await 되지 않아(mutationObserver), 이어지는
+   * 고객정보 조회가 끝나기 전에 버튼이 다시 눌리면 로그인 요청이 두 번 나간다.
+   */
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFailure(null)
-    loginMutation.mutate(
-      { userId, password },
-      {
-        onSuccess: () => {
-          // 세션 복원과 같은 경로로 고객명을 읽는다. 이동은 아래 isAuthenticated 분기가 한다.
-          void setSession()
-        },
-        onError: (error) => {
-          const reason = resolveLoginFailure(error)
-          // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
-          setFailure(
-            reason === "UNKNOWN"
-              ? isApiError(error)
-                ? error.message
-                : "로그인 처리 중 오류가 발생했습니다."
-              : FAILURE_MESSAGE[reason],
-          )
-        },
-      },
-    )
+    setIsSubmitting(true)
+
+    try {
+      await loginMutation.mutateAsync({ userId, password })
+    } catch (error) {
+      setFailure(toFailureMessage(error))
+      setIsSubmitting(false)
+      return
+    }
+
+    // 세션 복원과 같은 경로로 고객명을 읽는다. 이동은 아래 isAuthenticated 분기가 한다.
+    const restored = await setSession()
+    if (!restored) {
+      // 서버 세션은 생겼는데 고객정보를 못 읽은 상태다. 조용히 멈추면 사용자에게는
+      // 아무 일도 일어나지 않은 화면으로 보인다.
+      setFailure(
+        "로그인은 처리되었지만 고객정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.",
+      )
+      setIsSubmitting(false)
+    }
   }
 
   // 이미 세션이 있는데 폼을 다시 제출하면 서버가 새 세션을 발급해 상태가 어긋난다.
@@ -91,7 +111,10 @@ export const A01Login = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form
+            onSubmit={(e) => void handleSubmit(e)}
+            className="flex flex-col gap-4"
+          >
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="login-id"
@@ -102,7 +125,7 @@ export const A01Login = () => {
               <Input
                 id="login-id"
                 value={userId}
-                onChange={(e) => changeField(setUserId)(e.target.value)}
+                onChange={(e) => handleUserIdChange(e.target.value)}
                 placeholder="아이디를 입력하세요"
                 autoComplete="username"
                 invalid={!!failure}
@@ -124,7 +147,7 @@ export const A01Login = () => {
                 id="login-pw"
                 type="password"
                 value={password}
-                onChange={(e) => changeField(setPassword)(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
                 placeholder="비밀번호를 입력하세요"
                 autoComplete="current-password"
                 invalid={!!failure}
@@ -142,9 +165,9 @@ export const A01Login = () => {
               size="lg"
               fullWidth
               className="mt-1"
-              disabled={loginMutation.isPending}
+              disabled={isSubmitting}
             >
-              {loginMutation.isPending ? "로그인 중..." : "로그인"}
+              {isSubmitting ? "로그인 중..." : "로그인"}
             </Button>
           </form>
 

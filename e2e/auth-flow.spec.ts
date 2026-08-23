@@ -43,8 +43,10 @@ test("로그인 후 새로고침해도 로그인 상태가 유지된다", async 
   await page.reload()
 
   await expect(page).toHaveURL(/dashboard/)
-  // 헤더 이름은 마스킹된 서버 값(GET /customers/me)을 쓴다.
-  await expect(page.getByText("홍*동")).toBeVisible()
+  // 헤더와 대시보드 인사말은 같은 출처(GET /customers/me)를 쓴다. 인사말이 mock
+  // 이름으로 고정돼 있으면 한 화면에 서로 다른 이름이 남는다(REQ-CMN-024 ①).
+  await expect(page.getByRole("banner").getByText("홍*동")).toBeVisible()
+  await expect(page.getByText("홍*동 고객님, 안녕하세요.")).toBeVisible()
 })
 
 test("보호된 화면은 로그인 후 원래 경로로 되돌아온다", async ({ page }) => {

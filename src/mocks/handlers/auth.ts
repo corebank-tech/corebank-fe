@@ -1,5 +1,6 @@
 import { delay, http } from "msw"
 import { MOCK_MEMBERS } from "@/entities/auth"
+import { maskName } from "@/shared/lib/format"
 import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
@@ -34,12 +35,6 @@ const writeSignedInMemberId = (memberId: string | null): void => {
     // 저장소를 못 쓰는 환경이면 세션 없는 상태로 동작한다.
   }
 }
-
-/** 마스킹 규칙은 서버(CustomerInfoResponse.userName)를 흉내낸 것이다: 홍길동 → 홍*동. */
-const maskName = (name: string) =>
-  name.length <= 2
-    ? name
-    : `${name[0]}${"*".repeat(name.length - 2)}${name.at(-1)}`
 
 const unauthorized = () =>
   fail("CMN0101", "인증정보가 없거나 세션이 만료되었습니다.", 401)
@@ -80,6 +75,7 @@ export const authHandlers = [
 
     return ok({
       customerId: 1,
+      // 서버는 CustomerInfoResponse.userName 을 마스킹해 내려준다(REQ-CMN-018).
       userName: maskName(member.ownerName),
       userId: member.memberId,
       birthDate: member.birth,

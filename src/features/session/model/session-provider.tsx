@@ -115,13 +115,19 @@ export const SessionProvider = ({
     void teardown()
   }, [expiredReason, endServerSession, clearClientSession])
 
+  /** 고객정보를 다시 읽어 세션을 세운다. 조회 실패는 로그인 실패와 구분해 돌려준다. */
+  const refreshProfile = React.useCallback(async (): Promise<boolean> => {
+    const queryKey = getCustomerProfileQueryKey()
+    // refetchQueries 는 쿼리가 에러여도 reject 하지 않는다. 성공 여부는 캐시로 판정한다.
+    await queryClient.refetchQueries({ queryKey })
+    return queryClient.getQueryData(queryKey) != null
+  }, [queryClient])
+
   const setSession = React.useCallback(async () => {
     setExpiredReason(null)
     setRemainingSeconds(SESSION_SECONDS)
-    await queryClient.refetchQueries({
-      queryKey: getCustomerProfileQueryKey(),
-    })
-  }, [queryClient])
+    return refreshProfile()
+  }, [refreshProfile])
 
   const logout = React.useCallback(async () => {
     // 서버 호출 결과와 무관하게 클라이언트 상태는 반드시 정리한다 — 공용 PC 에
@@ -134,8 +140,11 @@ export const SessionProvider = ({
   }, [endServerSession, clearClientSession])
 
   const extend = React.useCallback(() => {
-    setRemainingSeconds(SESSION_SECONDS)
-  }, [])
+    // 지역 타이머를 여기서 되돌리지 않는다. 요청이 서버에 닿아야 서버 세션이 갱신되고
+    // (REQ-AUTH-030 인수기준), 그 응답이 onApiActivity 로 타이머를 리셋한다.
+    // 세션이 이미 죽었으면 이 요청이 401 CMN0101 을 받아 A-11 로 이어진다 — 맞는 결과다.
+    void refreshProfile()
+  }, [refreshProfile])
 
   const acknowledgeExpired = React.useCallback(() => {
     setExpiredReason(null)

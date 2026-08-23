@@ -21,6 +21,7 @@ type ApiErrorInit = {
   code: string
   message: string
   status: number
+  data?: unknown
   cause?: unknown
 }
 
@@ -32,12 +33,14 @@ type ApiErrorInit = {
 export class ApiError extends Error {
   readonly code: string
   readonly status: number
+  readonly data?: unknown
 
-  constructor({ code, message, status, cause }: ApiErrorInit) {
+  constructor({ code, message, status, data, cause }: ApiErrorInit) {
     super(message, { cause })
     this.name = "ApiError"
     this.code = code
     this.status = status
+    this.data = data
   }
 }
 

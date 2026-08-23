@@ -7,19 +7,42 @@ import { FormRow } from "@/shared/ui/form-row"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { MOCK_SIGNUP_ACCOUNTS, type VerifyAccount } from "@/entities/auth"
+import { useVerifySignupAccountMutation } from "@/entities/auth"
+import { isApiError } from "@/shared/api/api-error"
 import { onlyDigits } from "@/shared/lib/input-filter"
 import { ACCOUNT_PASSWORD_ERROR_LIMIT as ERROR_LIMIT } from "@/shared/config/policy"
 import { SIGNUP_STEPS } from "@/pages/auth/signup-shared"
 
 type A03VerifyProps = {
-  onVerified: (name: string, birth: string) => void
+  onVerified: (name: string, birth: string, accountAuthToken: string) => void
+}
+
+type AccountVerificationFailureData = {
+  errorCount?: number
+  remainingAttempts?: number
+}
+
+const getFailureData = (
+  data: unknown,
+): AccountVerificationFailureData | null => {
+  if (typeof data !== "object" || data === null) return null
+
+  const value = data as Record<string, unknown>
+
+  return {
+    errorCount:
+      typeof value.errorCount === "number" ? value.errorCount : undefined,
+    remainingAttempts:
+      typeof value.remainingAttempts === "number"
+        ? value.remainingAttempts
+        : undefined,
+  }
 }
 
 /** A-03 회원가입 2단계 · 본인확인(계좌 실명확인). REQ-AUTH-005·006·007. */
 export const A03Verify = ({ onVerified }: A03VerifyProps) => {
-  const [accounts, setAccounts] =
-    React.useState<VerifyAccount[]>(MOCK_SIGNUP_ACCOUNTS)
+  const verifyMutation = useVerifySignupAccountMutation()
+
   const [name, setName] = React.useState("")
   const [birth, setBirth] = React.useState("")
   const [accountNo, setAccountNo] = React.useState("")
@@ -32,7 +55,7 @@ export const A03Verify = ({ onVerified }: A03VerifyProps) => {
   const accountRef = React.useRef<HTMLInputElement>(null)
   const passwordRef = React.useRef<HTMLInputElement>(null)
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (name.trim().length === 0) {
       setAlert("성명을 입력하세요.")
       nameRef.current?.focus()
@@ -54,53 +77,65 @@ export const A03Verify = ({ onVerified }: A03VerifyProps) => {
       return
     }
 
-    const account = accounts.find((a) => a.accountNo === accountNo)
-    if (!account) {
-      setAlert(
-        "입력하신 계좌번호를 찾을 수 없습니다. 계좌번호를 다시 확인해 주세요.",
-      )
-      return
-    }
-    if (account.status === "거래정지") {
-      setBlocked([
-        "누적 오류로 거래정지된 계좌입니다.",
-        "영업점 또는 고객센터에서 거래정지 해제 후 다시 시도하세요.",
-      ])
-      return
-    }
-    if (account.ownerName !== name.trim() || account.birth !== birth) {
-      setAlert("입력하신 성명·생년월일이 계좌 소유자 정보와 일치하지 않습니다.")
-      return
-    }
-    if (account.accountPassword !== password) {
-      const nextCount = account.errorCount + 1
-      const isBlocked = nextCount >= ERROR_LIMIT
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.accountNo === accountNo
-            ? {
-                ...a,
-                errorCount: Math.min(nextCount, ERROR_LIMIT),
-                status: isBlocked ? "거래정지" : a.status,
-              }
-            : a,
-        ),
-      )
-      setPassword("")
-      if (isBlocked) {
-        setBlocked([
-          "계좌비밀번호를 5회 연속 잘못 입력해 이 계좌가 거래정지 상태로 전환되었습니다.",
-          "영업점 또는 고객센터에서 거래정지 해제 후 다시 시도하세요.",
-        ])
-      } else {
-        setAlert(
-          `계좌비밀번호가 일치하지 않습니다. (누적 오류 ${nextCount}/${ERROR_LIMIT}회)`,
-        )
-      }
-      return
-    }
+    try {
+      const result = await verifyMutation.mutateAsync({
+        userName: name.trim(),
+        birthDate: birth,
+        accountNumber: accountNo,
+        accountPassword: password,
+      })
 
-    onVerified(account.ownerName, account.birth)
+      setPassword("")
+
+      if (!result.accountAuthToken) {
+        setAlert("계좌 인증 토큰을 발급받지 못했습니다.")
+        return
+      }
+
+      onVerified(name.trim(), birth, result.accountAuthToken)
+    } catch (error) {
+      setPassword("")
+
+      if (!isApiError(error)) {
+        setAlert(
+          error instanceof Error
+            ? error.message
+            : "본인확인 중 오류가 발생했습니다.",
+        )
+        return
+      }
+
+      const failureData = getFailureData(error.data)
+
+      if (error.code === "ATH0102") {
+        const count = failureData?.errorCount
+
+        setBlocked([
+          error.message,
+          ...(count !== undefined
+            ? [`누적 오류 ${count}/${ERROR_LIMIT}회`]
+            : []),
+        ])
+        return
+      }
+
+      if (error.code === "ATH0009") {
+        const errorCount = failureData?.errorCount
+        const remainingAttempts = failureData?.remainingAttempts
+
+        if (errorCount !== undefined && remainingAttempts !== undefined) {
+          setAlert(
+            `${error.message} (누적 오류 ${errorCount}/${ERROR_LIMIT}회, 남은 횟수 ${remainingAttempts}회)`,
+          )
+        } else {
+          setAlert(error.message)
+        }
+
+        return
+      }
+
+      setAlert(error.message)
+    }
   }
 
   return (
@@ -118,9 +153,10 @@ export const A03Verify = ({ onVerified }: A03VerifyProps) => {
             variant="primary"
             size="lg"
             className="min-w-40"
+            disabled={verifyMutation.isPending}
             onClick={handleVerify}
           >
-            다음
+            {verifyMutation.isPending ? "확인 중..." : "다음"}
           </Button>
         }
       >

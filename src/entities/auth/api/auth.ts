@@ -14,32 +14,6 @@ export type VerifyAccount = {
   status: "정상" | "거래정지"
 }
 
-/** REQ-AUTH-005·006·007: 회원가입 2단계 본인확인 대상 계좌(미가입 상태). */
-export const MOCK_SIGNUP_ACCOUNTS: VerifyAccount[] = [
-  {
-    accountNo: "110550051877",
-    ownerName: "김민준",
-    birth: "950314",
-    accountPassword: "1234",
-    errorCount: 0,
-    status: "정상",
-  },
-  {
-    accountNo: "302118834021",
-    ownerName: "이서연",
-    birth: "881122",
-    accountPassword: "5678",
-    errorCount: 3,
-    status: "정상",
-  },
-]
-
-/** REQ-AUTH-009: 아이디 중복확인 대상. */
-export const MOCK_EXISTING_USER_IDS = ["corebank1", "hello2024", "testuser01"]
-
-/** REQ-AUTH-016: 이메일 중복 가입 제한 대상. */
-export const MOCK_EXISTING_EMAILS = ["already@corebank.example.com"]
-
 export type Member = VerifyAccount & {
   memberId: string
   email: string

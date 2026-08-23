@@ -13,4 +13,16 @@ export type SignupData = {
   email: string
   userId: string
   password: string
+  passwordConfirm: string
+}
+
+export type SignupAuthState = {
+  termsAuthToken?: string
+  accountAuthToken?: string
+  userIdCheckToken?: string
+  checkedUserId?: string
+  emailVerificationId?: string
+  emailVerificationToken?: string
+  verifiedEmail?: string
+  tempSignupToken?: string
 }

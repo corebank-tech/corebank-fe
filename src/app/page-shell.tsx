@@ -40,12 +40,19 @@ export const PageShell = ({
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [textScaleIndex, setTextScaleIndex] = React.useState(0)
   const navigate = useNavigate()
-  const { isAuthenticated, customerName, remainingSeconds, extend, logout } =
-    useSession()
+  const {
+    isAuthenticated,
+    customerName,
+    remainingSeconds,
+    isLoggingOut,
+    extend,
+    logout,
+  } = useSession()
   const { unreadCount } = useNotifications()
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    // 서버 세션을 끊고 나서 이동한다. logout 은 실패해도 던지지 않고 상태를 정리한다.
+    await logout()
     navigate("/logout", { replace: true })
   }
 
@@ -58,7 +65,8 @@ export const PageShell = ({
         remainingSeconds={remainingSeconds}
         unreadCount={unreadCount}
         onExtend={extend}
-        onLogout={handleLogout}
+        onLogout={() => void handleLogout()}
+        logoutPending={isLoggingOut}
         onOpenFullMenu={() => setMenuOpen(true)}
         onOpenNotifications={() => navigate("/notifications")}
       />

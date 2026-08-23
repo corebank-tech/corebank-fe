@@ -34,6 +34,7 @@ export const A05Confirm = ({
 
   const completeMutation = useCompleteSignupMutation()
 
+  // 같은 가입완료 요청을 재시도할 때도 동일한 멱등키를 사용하도록 마운트 동안 고정한다.
   const idempotencyKeyRef = React.useRef(crypto.randomUUID())
 
   const [alert, setAlert] = React.useState<string | null>(null)

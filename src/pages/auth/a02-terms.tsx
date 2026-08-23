@@ -35,6 +35,14 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
   const [agreedIds, setAgreedIds] = React.useState<string[]>([])
   const [alert, setAlert] = React.useState<string | null>(null)
 
+  const hasInvalidTerms = React.useMemo(
+    () =>
+      (termsQuery.data?.items ?? []).some(
+        (term) => !term.termsId || !term.title || !term.version,
+      ),
+    [termsQuery.data?.items],
+  )
+
   const terms = React.useMemo<TermItem[]>(
     () =>
       (termsQuery.data?.items ?? []).flatMap((term) => {
@@ -54,6 +62,11 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
   )
 
   const handleNext = async () => {
+    if (hasInvalidTerms) {
+      setAlert("약관 정보가 올바르지 않습니다. 잠시 후 다시 시도해 주세요.")
+      return
+    }
+
     if (!termsRef.current?.validateProceed()) return
 
     const agreedTerms = (termsQuery.data?.items ?? []).flatMap((term) => {
@@ -110,6 +123,7 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
             disabled={
               termsQuery.isPending ||
               termsQuery.isError ||
+              hasInvalidTerms ||
               terms.length === 0 ||
               checkTermsMutation.isPending
             }
@@ -120,6 +134,12 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
         }
       >
         <div className="flex flex-col gap-4">
+          {termsQuery.isSuccess && hasInvalidTerms && (
+            <Alert variant="danger">
+              약관 정보가 올바르지 않습니다. 잠시 후 다시 시도해 주세요.
+            </Alert>
+          )}
+
           {termsQuery.isPending && (
             <Alert variant="info">약관을 불러오는 중입니다.</Alert>
           )}
@@ -128,11 +148,11 @@ export const A02Terms = ({ onNext }: A02TermsProps) => {
             <Alert variant="danger">{queryErrorMessage}</Alert>
           )}
 
-          {termsQuery.isSuccess && terms.length === 0 && (
+          {termsQuery.isSuccess && !hasInvalidTerms && terms.length === 0 && (
             <Alert variant="warning">표시할 회원가입 약관이 없습니다.</Alert>
           )}
 
-          {terms.length > 0 && (
+          {!hasInvalidTerms && terms.length > 0 && (
             <TermsAgreement
               ref={termsRef}
               terms={terms}

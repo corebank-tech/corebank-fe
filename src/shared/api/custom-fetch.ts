@@ -141,5 +141,11 @@ export const withIdempotencyKey = (
 ): RequestInit => {
   const headers = new Headers(options.headers)
   headers.set(IDEMPOTENCY_KEY_HEADER, key)
-  return { ...options, headers }
+
+  const plainHeaders: Record<string, string> = {}
+  headers.forEach((value, name) => {
+    plainHeaders[name] = value
+  })
+
+  return { ...options, headers: plainHeaders }
 }

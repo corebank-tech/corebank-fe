@@ -103,6 +103,35 @@ describe("Idempotency-Key (REQ-CMN-014)", () => {
     )
     expect(receivedKey).toBe(fixedKey)
   })
+
+  it("generated 래퍼가 옵션 헤더를 펼쳐도 지정한 멱등키를 유지한다", async () => {
+    let receivedKey: string | null = null
+
+    server.use(
+      http.post("*/api/transfers", ({ request }) => {
+        receivedKey = request.headers.get("Idempotency-Key")
+        return HttpResponse.json({
+          code: "0000",
+          message: "ok",
+          data: null,
+        })
+      }),
+    )
+
+    const fixedKey = "fixed-generated-retry-key"
+    const options = withIdempotencyKey({}, fixedKey)
+
+    await customFetch("/api/transfers", {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+
+    expect(receivedKey).toBe(fixedKey)
+  })
 })
 
 describe("세션 만료 (POL-001)", () => {

@@ -67,6 +67,8 @@ export const SignupFlow = () => {
           onChange={patch}
           onAuthChange={patchAuth}
           onNext={(tempSignupToken) => {
+            // validate 성공으로 1회성 인증 증빙은 서버에서 소비되므로 제거한다.
+            // 정보수정 시 ID·이메일 변경 여부를 판단하는 checkedUserId/verifiedEmail은 유지한다.
             patchAuth({
               tempSignupToken,
               termsAuthToken: undefined,

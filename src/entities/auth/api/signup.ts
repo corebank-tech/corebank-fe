@@ -21,10 +21,7 @@ import {
 } from "@/shared/api/generated"
 import { withIdempotencyKey } from "@/shared/api/custom-fetch"
 
-/**
- * customFetch는 공통 응답의 data를 벗겨서 반환하지만,
- * generated 타입에는 ApiResponse<T>가 남아 있으므로 실제 런타임 타입으로 보정한다.
- */
+/** generated API를 회원가입 화면에서 사용하는 query/mutation 단위로 감싼다. */
 export const useSignupTermsQuery = () =>
   useQuery({
     queryKey: getGetSignupTermsQueryKey(),

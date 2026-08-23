@@ -38,12 +38,11 @@ import { getToday } from "@/shared/config/clock"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 import {
-  useSearchAutoTransfers,
+  useAutoTransfers,
   cancelAutoTransfer,
   changeAutoTransfer,
-} from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
+} from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { PageResponseAutoTransferListItemResponse } from "@/shared/api/generated/model"
 import { ApiError } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
@@ -107,7 +106,7 @@ export const G04AutoTransferList = () => {
   )
 
   const size = pageSize === "all" ? 1000 : pageSize
-  const { data, isFetching, isError, refetch } = useSearchAutoTransfers(
+  const { data, isFetching, isError, refetch } = useAutoTransfers(
     {
       // REQ-AUTO-009: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
       // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
@@ -127,8 +126,7 @@ export const G04AutoTransferList = () => {
     },
   )
 
-  const pageData = data as unknown as
-    PageResponseAutoTransferListItemResponse | undefined
+  const pageData = data
   // 출금계좌번호는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
   const pageRows = (pageData?.items ?? []).map((item) =>
     toAutoTransferRow(item, appliedAccount?.accountNumber ?? ""),

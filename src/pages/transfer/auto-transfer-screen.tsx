@@ -20,9 +20,8 @@ import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { AutoTransferStep1 } from "@/pages/transfer/auto/g01-input"
 import { AutoTransferStep2 } from "@/pages/transfer/auto/g02-confirm"
 import { AutoTransferStep3 } from "@/pages/transfer/auto/g03-complete"
-import { useRegisterAutoTransfer } from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
+import { useRegisterAutoTransferMutation } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { AutoTransferResponse } from "@/shared/api/generated/model"
 import type { AccountOption } from "@/shared/types/account"
 import { ApiError } from "@/shared/api/api-error"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
@@ -117,7 +116,7 @@ export const AutoTransferScreen = () => {
 
   const { accounts: withdrawAccounts, isLoading: accountsLoading } =
     useWithdrawAccounts()
-  const registerMutation = useRegisterAutoTransfer()
+  const registerMutation = useRegisterAutoTransferMutation()
 
   const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
     alias: a.accountName ?? "",
@@ -190,10 +189,7 @@ export const AutoTransferScreen = () => {
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,
         },
       })
-      setNextExecDate(
-        (registered as unknown as AutoTransferResponse | undefined)
-          ?.nextExecutionDate ?? null,
-      )
+      setNextExecDate(registered?.nextExecutionDate ?? null)
       setStep(3)
     } catch (e) {
       setErrorMessage(

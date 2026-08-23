@@ -196,8 +196,12 @@ export const C04InputInfo = () => {
         {violations.length > 0 && (
           <Alert variant="danger">
             <ul className="flex flex-col gap-1">
-              {violations.map((v) => (
-                <li key={`${v.field ?? ""}-${v.code ?? ""}`}>{v.reason}</li>
+              {/* 서버는 약관 ID마다 violation을 따로 담아서, 필수 약관 여러 건이
+                  미동의면 field·code가 같고 reason의 termsId만 다른 항목이 함께
+                  내려온다. 목록은 검증할 때마다 통째로 교체되고 정렬·필터를 거치지
+                  않으므로 순서를 키로 쓴다. */}
+              {violations.map((violation, index) => (
+                <li key={index}>{violation.reason}</li>
               ))}
             </ul>
           </Alert>

@@ -5,7 +5,7 @@ import { FormSection } from "@/shared/ui/form-section"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { ConfirmSummary } from "@/shared/ui/confirm-summary"
 import { AccountPasswordField } from "@/widgets/transfer"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import {
   formatAccountNo,
@@ -36,8 +36,8 @@ import { ApiError } from "@/shared/api/api-error"
 
 const PASSWORD_LIMIT = 4
 
-// TODO: 계좌비밀번호·OTP 인증 토큰 발급 API가 연동되면 그 결과 토큰으로 교체한다.
-// subscription 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 임시 문자열을 쓴다.
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 /**
@@ -129,23 +129,44 @@ export const C05ConfirmAuth = () => {
       setPasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
       return
     }
-    setPasswordError(null)
-    setOtpOpen(true)
-  }
-
-  // 실행 요청이 나가는 동안 다시 눌리지 않게 막는다. OtpModal은 onConfirm만
-  // 호출하고 스스로 닫지 않아서(otp-modal.tsx), 확인 버튼을 빠르게 두 번 누르면
-  // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
-  // 서버 멱등성으로도 걸러지지 않는다.
-  const handleOtpConfirm = async () => {
-    if (isSubmitting) return
-    setOtpOpen(false)
-    if (form.withdrawalAccountId == null) {
+    // 인증을 시작하기 전에 막는다. OTP는 발급·검증이 실제 토큰을 소비하므로,
+    // 인증을 마친 뒤에 걸러내면 사용자가 쓴 토큰이 그대로 버려진다.
+    if (otpTransactionData == null) {
       setExecuteError(
         "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
       )
       return
     }
+    setPasswordError(null)
+    setOtpOpen(true)
+  }
+
+  /**
+   * OTP 발급 시점의 거래정보와 가입 실행 요청을 서버가 정규화해 대조한다(어긋나면
+   * OTP0102). 서버가 재구성하는 항목은 아래 네 개뿐이다
+   * (ProductSubscriptionOtpVerificationAdapter.verifyAndConsume). 실행 요청도 이
+   * 객체를 그대로 펼쳐 쓴다 — 두 곳에 같은 값을 손으로 적으면 한쪽만 고쳐도
+   * 조용히 어긋난다.
+   */
+  const otpTransactionData =
+    form.withdrawalAccountId == null
+      ? null
+      : {
+          productId: product.id,
+          subscriptionAmount: amount,
+          termMonths,
+          withdrawalAccountId: form.withdrawalAccountId,
+        }
+
+  // 실행 요청이 나가는 동안 다시 눌리지 않게 막는다. OtpModal은 onConfirm만
+  // 호출하고 스스로 닫지 않아서(otp-modal.tsx), 확인 버튼을 빠르게 두 번 누르면
+  // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
+  // 서버 멱등성으로도 걸러지지 않는다.
+  const handleOtpConfirm = async (otpAuthToken: string) => {
+    // 출금계좌는 handleAuthenticate 가 인증 전에 걸러낸다. 여기서는 타입을 좁히는
+    // 역할만 한다.
+    if (isSubmitting || otpTransactionData == null) return
+    setOtpOpen(false)
 
     // 요청마다 새로 만든다. 재시도 시 값이 달라지지만 서버가 두 필드의 일치만
     // 검증하므로 문제되지 않는다.
@@ -155,14 +176,11 @@ export const C05ConfirmAuth = () => {
     try {
       const response = await executeMutation.mutateAsync({
         data: {
-          productId: product.id,
-          subscriptionAmount: amount,
-          termMonths,
-          withdrawalAccountId: form.withdrawalAccountId,
+          ...otpTransactionData,
           newAccountPassword: newAccountPassword,
           newAccountPasswordConfirm: newAccountPassword,
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,
-          otpAuthToken: TEMP_AUTH_TOKEN,
+          otpAuthToken,
           agreedTerms: form.agreedTerms,
         },
       })
@@ -291,13 +309,19 @@ export const C05ConfirmAuth = () => {
         </FormSection>
       </StepLayout>
 
-      <OtpModal
-        open={otpOpen}
-        onClose={() => setOtpOpen(false)}
-        onConfirm={handleOtpConfirm}
-        title="상품가입 OTP 인증"
-        guide="OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하면 가입이 실행됩니다."
-      />
+      {otpTransactionData != null && (
+        <OtpModal
+          open={otpOpen}
+          onClose={() => setOtpOpen(false)}
+          onConfirm={handleOtpConfirm}
+          title="상품가입 OTP 인증"
+          guide="OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하면 가입이 실행됩니다."
+          transaction={{
+            type: OtpTransactionType.PRODUCT_SUBSCRIPTION,
+            data: otpTransactionData,
+          }}
+        />
+      )}
 
       {/* REQ-ACCT-007의 5회 오류 거래정지는 서버가 판정한다. 계좌비밀번호 인증
           API가 붙으면 그 응답의 오류 횟수·정지 여부를 여기서 다시 안내한다. */}

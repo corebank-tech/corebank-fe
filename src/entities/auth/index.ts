@@ -9,6 +9,16 @@ export {
   isPasswordValid,
 } from "@/entities/auth/lib/auth-rules"
 
+export type {
+  LoginFailureReason,
+  LoginRequest,
+} from "@/entities/auth/api/login"
+export {
+  resolveLoginFailure,
+  useLoginMutation,
+} from "@/entities/auth/api/login"
+export { logout } from "@/entities/auth/api/logout"
+
 export { OtpModal } from "@/entities/auth/ui/otp-modal"
 export { IssueOtpRequestTransactionType as OtpTransactionType } from "@/shared/api/generated"
 export { SessionExpiredModal } from "@/entities/auth/ui/session-expired-modal"

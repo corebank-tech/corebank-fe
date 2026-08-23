@@ -19,6 +19,8 @@ type AppHeaderProps = {
   loggedIn?: boolean
   onExtend?: () => void
   onLogout?: () => void
+  /** 로그아웃 요청 진행 중. 연타로 CSRF 토큰이 무효화된 뒤의 2차 호출이 나가는 것을 막는다. */
+  logoutPending?: boolean
   onOpenFullMenu?: () => void
   onOpenNotifications?: () => void
 }
@@ -44,6 +46,7 @@ export const AppHeader = ({
   loggedIn = true,
   onExtend,
   onLogout,
+  logoutPending = false,
   onOpenFullMenu,
   onOpenNotifications,
 }: AppHeaderProps) => {
@@ -155,9 +158,10 @@ export const AppHeader = ({
               <button
                 type="button"
                 onClick={onLogout}
-                className="text-base text-ink-muted transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                disabled={logoutPending}
+                className="text-base text-ink-muted transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:text-ink-faint"
               >
-                로그아웃
+                {logoutPending ? "로그아웃 중..." : "로그아웃"}
               </button>
 
               <Button

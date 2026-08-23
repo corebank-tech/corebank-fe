@@ -6,20 +6,24 @@ import type { Decorator } from "@storybook/react-vite"
 import { createQueryClient } from "@/shared/api/query-client"
 import { NotificationsProvider } from "@/features/notifications"
 import { SessionProvider, useSession } from "@/features/session"
-import { MOCK_MEMBERS } from "@/entities/auth"
 
 /**
- * 실제 로그인 흐름(SessionProvider.login)을 그대로 태워 인증 상태를 만든다 —
- * 화면 스토리가 실제 세션 로직과 어긋나지 않게 하기 위해 별도 인증 우회를 두지 않는다.
+ * 스토리에 인증 상태를 만든다.
+ *
+ * 세션 보유 여부의 출처가 서버 응답(GET /customers/me)으로 바뀌어서, API 가 없는
+ * 스토리북에서는 이 훅이 세션을 세우지 못한다 — 즉 **RequireAuth 를 쓰는 화면
+ * 스토리는 빈 화면으로 렌더된다.** 스토리 갱신은 2026-08-23 부터 중단됐고 화면
+ * 확인은 Preview URL 로 하므로(CLAUDE.md §2-2) 그대로 둔다. 스토리로 화면을
+ * 확인해야 한다면 스토리북에 mock API 를 붙이는 별도 작업이 필요하다.
  */
 function AutoLogin({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, login } = useSession()
-  const [demoMember] = MOCK_MEMBERS
+  const { isAuthenticated, isBootstrapping, setSession } = useSession()
 
   React.useEffect(() => {
-    if (isAuthenticated) return
-    login(demoMember.memberId, demoMember.loginPassword)
-  }, [isAuthenticated, login, demoMember])
+    // 부트스트랩이 끝나기 전에 세우면 그 응답이 세션을 다시 지운다.
+    if (isBootstrapping || isAuthenticated) return
+    void setSession()
+  }, [isAuthenticated, isBootstrapping, setSession])
 
   if (!isAuthenticated) return null
   return <>{children}</>

@@ -191,18 +191,23 @@ const DevNav = () => {
  * 위에 비해제형 모달을 띄운다(REQ-AUTH-031).
  */
 const SessionExpiredGate = () => {
-  const { expired, acknowledgeExpired } = useSession()
+  const { expiredReason, acknowledgeExpired } = useSession()
   const navigate = useNavigate()
 
-  if (!expired) return null
+  if (expiredReason == null) return null
 
   const goRelogin = () => {
     acknowledgeExpired()
     navigate("/", { replace: true })
   }
+  // 만료 후에는 대시보드가 RequireAuth 에 막히므로 어차피 로그인 화면으로 튕긴다.
+  // 튕겨서 도착하게 두면 버튼이 먹지 않는 것처럼 보여, 도착지를 명시한다
+  // (REQ-AUTH-031 이 버튼 2개를 요구하므로 버튼 자체는 유지한다).
+  // 그 결과 [다시 로그인]과 동작이 같아졌다 — 라벨이 하는 약속과 어긋나므로
+  // 요구사항 해석을 #95 에서 확정한다.
   const goMain = () => {
     acknowledgeExpired()
-    navigate("/dashboard", { replace: true })
+    navigate("/", { replace: true })
   }
 
   return (

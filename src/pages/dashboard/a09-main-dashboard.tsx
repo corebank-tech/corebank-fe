@@ -12,13 +12,13 @@ import {
 } from "@/pages/dashboard/banking-shortcuts"
 import { NotificationSummary } from "@/pages/dashboard/notification-summary"
 import {
-  MOCK_ACCESS_STATUS,
   MOCK_DASHBOARD_ACCOUNTS,
   MOCK_NOTIFICATIONS,
-  type AccessStatus,
+  useLoginStatusQuery,
   type DashboardAccount,
   type NotificationItem,
 } from "@/entities/dashboard"
+import { useSession } from "@/features/session"
 import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
 
 const ACCOUNT_COLUMN_WIDTHS = {
@@ -39,9 +39,7 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.balance
 
 type A09MainDashboardProps = {
-  customerName?: string
   accounts?: DashboardAccount[]
-  accessStatus?: AccessStatus
   notifications?: NotificationItem[]
   shortcuts?: ShortcutLink[]
   onInquiry?: (accountId: string) => void
@@ -52,9 +50,7 @@ type A09MainDashboardProps = {
 }
 
 export const A09MainDashboard = ({
-  customerName = "홍길동",
   accounts = MOCK_DASHBOARD_ACCOUNTS,
-  accessStatus = MOCK_ACCESS_STATUS,
   notifications = MOCK_NOTIFICATIONS,
   shortcuts,
   onInquiry,
@@ -64,6 +60,9 @@ export const A09MainDashboard = ({
   onOpenInbox,
 }: A09MainDashboardProps) => {
   const navigate = useNavigate()
+  // REQ-CMN-024 ①: 인사말은 로그인한 고객이어야 한다. 헤더와 같은 출처를 쓴다.
+  const { customerName } = useSession()
+  const loginStatus = useLoginStatusQuery()
 
   const totalBalance = React.useMemo(
     () => accounts.reduce((sum, a) => sum + a.balance, 0),
@@ -166,7 +165,12 @@ export const A09MainDashboard = ({
           </p>
         </div>
         <div className="w-1/3">
-          <AccessStatusPanel status={accessStatus} />
+          <AccessStatusPanel
+            status={loginStatus.data}
+            isLoading={loginStatus.isPending}
+            isError={loginStatus.isError}
+            onRetry={() => void loginStatus.refetch()}
+          />
         </div>
       </div>
 

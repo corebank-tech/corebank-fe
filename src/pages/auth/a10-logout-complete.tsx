@@ -26,24 +26,16 @@ export const A10LogoutComplete = () => {
       columns={COLUMNS}
       row={{ loggedOutAt }}
       actions={
-        <>
-          <Button
-            variant="secondary"
-            size="lg"
-            className="min-w-35"
-            onClick={() => navigate("/dashboard")}
-          >
-            메인으로
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            className="min-w-35"
-            onClick={() => navigate("/")}
-          >
-            다시 로그인
-          </Button>
-        </>
+        // 로그아웃 직후 갈 수 있는 곳은 로그인 화면뿐이다. [메인으로]는 인증이
+        // 필요한 /dashboard 로 보내 RequireAuth 에 즉시 튕기므로 두지 않는다.
+        <Button
+          variant="primary"
+          size="lg"
+          className="min-w-35"
+          onClick={() => navigate("/")}
+        >
+          다시 로그인
+        </Button>
       }
     />
   )

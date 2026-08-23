@@ -23,7 +23,10 @@ import { OtpModal } from "@/entities/auth"
 
 const PASSWORD_LIMIT = 4
 
-/** REQ-ACCT-006·007·008: 계좌비밀번호 변경. 보유 계좌의 계좌비밀번호를 변경한다. */
+/**
+ * REQ-ACCT-006·007·008: 계좌비밀번호 변경.
+ * BE 계좌비밀번호 정책에 따라 입출금·예금·적금 계좌 모두 변경 대상이다.
+ */
 export const B04AccountPassword = () => {
   const accountOverviewQuery = useAccountOverviewQuery()
 
@@ -57,6 +60,9 @@ export const B04AccountPassword = () => {
     accountDetailQuery.data?.passwordFailureCount ?? 0
 
   const blocked = accountDetailQuery.data?.passwordLocked ?? false
+
+  const accountDetailLoading =
+    selectedAccountId != null && accountDetailQuery.isLoading
 
   const [currentPw, setCurrentPw] = React.useState("")
   const [newPw, setNewPw] = React.useState("")
@@ -122,8 +128,9 @@ export const B04AccountPassword = () => {
         },
       })
 
-      // 현재 비밀번호 평문은 검증이 끝나는 즉시 제거
+      // 컴포넌트 state와 mutation variables의 평문 비밀번호를 즉시 제거
       setCurrentPw("")
+      verifyPasswordMutation.reset()
 
       if (!response.accountPasswordAuthToken) {
         await accountDetailQuery.refetch()
@@ -141,8 +148,9 @@ export const B04AccountPassword = () => {
 
       setOtpOpen(true)
     } catch (error) {
-      // 실패했어도 입력한 평문 비밀번호는 남겨두지 않는다.
+      // 실패했어도 컴포넌트 state와 mutation variables에 평문을 남기지 않는다.
       setCurrentPw("")
+      verifyPasswordMutation.reset()
 
       // 비밀번호 실패횟수/잠금 상태를 서버 최신 값으로 다시 조회
       await accountDetailQuery.refetch()
@@ -183,7 +191,8 @@ export const B04AccountPassword = () => {
         },
       })
 
-      // 인증 토큰과 신규 비밀번호 평문을 즉시 제거
+      // mutation variables와 컴포넌트 state의 인증정보/평문을 제거
+      updatePasswordMutation.reset()
       resetFields()
 
       // 비밀번호 오류횟수/잠금 상태 및 계좌 목록 최신화
@@ -197,6 +206,7 @@ export const B04AccountPassword = () => {
       )
     } catch (error) {
       // 최종 API에서 토큰이 소비됐을 가능성이 있으므로 재사용하지 않는다.
+      updatePasswordMutation.reset()
       resetFields()
 
       await accountDetailQuery.refetch()
@@ -222,14 +232,14 @@ export const B04AccountPassword = () => {
   return (
     <QueryPageLayout
       noticeItems={[
-        "계좌비밀번호는 숫자 4자리이며 보유 계좌별로 변경할 수 있습니다.",
-        "현재 비밀번호를 5회 연속 잘못 입력하면 해당 계좌의 비밀번호가 잠금 처리됩니다.",
+        "계좌비밀번호는 숫자 4자리이며 입출금·예금·적금 계좌별로 변경할 수 있습니다.",
+        "현재 비밀번호를 ${ERROR_LIMIT}회 연속 잘못 입력하면 해당 계좌의 비밀번호가 잠금 처리됩니다.",
         "비밀번호 변경을 위해 현재 계좌비밀번호 확인과 OTP 인증이 필요합니다.",
       ]}
       footerItems={[
         "누적 오류 횟수는 계좌비밀번호 검증에 성공하면 0회로 초기화됩니다(REQ-ACCT-007).",
         "계좌비밀번호는 단방향 해시로 저장되어 평문으로 조회하거나 복원할 수 없습니다(REQ-ACCT-009).",
-        "[오류횟수 조회] 버튼으로 현재 누적 오류 횟수와 제한 정책(5회)을 확인할 수 있습니다(REQ-ACCT-008).",
+        "[오류횟수 조회] 버튼으로 현재 누적 오류 횟수와 제한 정책(${ERROR_LIMIT}회)을 확인할 수 있습니다(REQ-ACCT-008).",
       ]}
       modals={
         <>
@@ -317,7 +327,7 @@ export const B04AccountPassword = () => {
               </div>
               <div className="flex justify-between">
                 <dt className="font-bold">제한 정책</dt>
-                <dd>{ERROR_LIMIT}회 도달 시 거래정지</dd>
+                <dd>{ERROR_LIMIT}회 도달 시 계좌비밀번호 잠금</dd>
               </div>
             </dl>
           </Modal>
@@ -369,7 +379,7 @@ export const B04AccountPassword = () => {
               autoComplete="off"
               maxLength={PASSWORD_LIMIT}
               value={currentPw}
-              disabled={blocked}
+              disabled={blocked || accountDetailLoading}
               onChange={(e) =>
                 setCurrentPw(onlyDigits(e.target.value, PASSWORD_LIMIT))
               }
@@ -378,6 +388,7 @@ export const B04AccountPassword = () => {
             <Button
               variant="outline"
               size="sm"
+              disabled={accountDetailLoading || selectedAccountId == null}
               onClick={() => setInfoOpen(true)}
             >
               오류횟수 조회
@@ -396,7 +407,7 @@ export const B04AccountPassword = () => {
               autoComplete="off"
               maxLength={PASSWORD_LIMIT}
               value={newPw}
-              disabled={blocked}
+              disabled={blocked || accountDetailLoading}
               onChange={(e) =>
                 setNewPw(onlyDigits(e.target.value, PASSWORD_LIMIT))
               }
@@ -416,7 +427,7 @@ export const B04AccountPassword = () => {
               autoComplete="off"
               maxLength={PASSWORD_LIMIT}
               value={confirmPw}
-              disabled={blocked}
+              disabled={blocked || accountDetailLoading}
               onChange={(e) =>
                 setConfirmPw(onlyDigits(e.target.value, PASSWORD_LIMIT))
               }
@@ -446,6 +457,7 @@ export const B04AccountPassword = () => {
             className="min-w-30"
             disabled={
               blocked ||
+              accountDetailLoading ||
               selectedAccountId == null ||
               verifyPasswordMutation.isPending ||
               updatePasswordMutation.isPending

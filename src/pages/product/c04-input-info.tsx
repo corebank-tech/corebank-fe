@@ -50,7 +50,9 @@ export const C04InputInfo = () => {
 
   const validateMutation = useValidateSubscription()
   const [violations, setViolations] = React.useState<ViolationItem[]>([])
-  const [validateError, setValidateError] = React.useState<string | null>(null)
+  const [validationError, setValidationError] = React.useState<string | null>(
+    null,
+  )
 
   if (isLoading) {
     return (
@@ -124,17 +126,17 @@ export const C04InputInfo = () => {
   const handleNext = async () => {
     if (validateMutation.isPending) return
     if (termMonths == null || amount == null || selectedAccountId == null) {
-      setValidateError("가입기간·가입금액·출금계좌를 모두 입력하세요.")
+      setValidationError("가입기간·가입금액·출금계좌를 모두 입력하세요.")
       return
     }
 
     setViolations([])
-    setValidateError(null)
+    setValidationError(null)
 
     const agreedTerms = prev?.agreedTerms ?? []
 
     try {
-      const result = await validateMutation.mutateAsync({
+      const validation = await validateMutation.mutateAsync({
         data: {
           productId: product.id,
           subscriptionAmount: amount,
@@ -144,10 +146,10 @@ export const C04InputInfo = () => {
         },
       })
 
-      if (result?.valid !== true) {
-        setViolations(result?.violations ?? [])
-        if ((result?.violations ?? []).length === 0) {
-          setValidateError("가입정보를 확인한 뒤 다시 시도하세요.")
+      if (validation?.valid !== true) {
+        setViolations(validation?.violations ?? [])
+        if ((validation?.violations ?? []).length === 0) {
+          setValidationError("가입정보를 확인한 뒤 다시 시도하세요.")
         }
         return
       }
@@ -163,7 +165,7 @@ export const C04InputInfo = () => {
       }
       navigate(`/product/${product.id}/join/3`, { state: next })
     } catch (e) {
-      setValidateError(
+      setValidationError(
         e instanceof ApiError ? e.message : "가입정보 검증에 실패했습니다.",
       )
     }
@@ -201,8 +203,8 @@ export const C04InputInfo = () => {
           </Alert>
         )}
 
-        {validateError != null && (
-          <Alert variant="danger">{validateError}</Alert>
+        {validationError != null && (
+          <Alert variant="danger">{validationError}</Alert>
         )}
 
         <FormSection title="가입정보 입력">

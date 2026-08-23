@@ -1,36 +1,71 @@
 import * as React from "react"
-import { Link, useLocation, useNavigate } from "react-router"
+import { Link, Navigate, useLocation } from "react-router"
 import { AlertCircle } from "lucide-react"
 import { Input } from "@/shared/ui/input"
 import { Checkbox } from "@/shared/ui/checkbox"
 import { Button } from "@/shared/ui/button"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { useSession } from "@/features/session"
+import {
+  resolveLoginFailure,
+  useLoginMutation,
+  type LoginFailureReason,
+} from "@/entities/auth"
+import { isApiError } from "@/shared/api/api-error"
 import { LOGIN_MAX_ATTEMPTS as MAX_ATTEMPTS } from "@/shared/config/policy"
 
-type LoginFailure = {
-  locked: boolean
-  attempts: number
+const FAILURE_MESSAGE: Record<
+  Exclude<LoginFailureReason, "UNKNOWN">,
+  string
+> = {
+  MISMATCH: "아이디 또는 비밀번호가 올바르지 않습니다.",
+  LOCKED: `비밀번호를 ${MAX_ATTEMPTS}회 연속 잘못 입력해 계정이 잠겼습니다. 잠금 해제는 고객센터를 통한 관리자 확인 후에만 가능합니다.`,
 }
 
 export const A01Login = () => {
   const [userId, setUserId] = React.useState("")
   const [password, setPassword] = React.useState("")
-  const [failure, setFailure] = React.useState<LoginFailure | null>(null)
-  const { login } = useSession()
-  const navigate = useNavigate()
+  const [failure, setFailure] = React.useState<string | null>(null)
+  const { isAuthenticated, setSession } = useSession()
+  const loginMutation = useLoginMutation()
   const location = useLocation()
+
+  const from = (location.state as { from?: string } | null)?.from
+  const redirectTo = from && from !== "/" ? from : "/dashboard"
+
+  /** 잠금·불일치 안내는 그 입력에 대한 판정이다. 입력이 바뀌면 더 이상 사실이 아니다. */
+  const changeField = (setter: (value: string) => void) => (value: string) => {
+    setter(value)
+    setFailure(null)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const result = login(userId, password)
-    if (result.ok) {
-      const from = (location.state as { from?: string } | null)?.from
-      navigate(from && from !== "/" ? from : "/dashboard", { replace: true })
-      return
-    }
-    setFailure({ locked: result.locked, attempts: result.attempts })
+    setFailure(null)
+    loginMutation.mutate(
+      { userId, password },
+      {
+        onSuccess: () => {
+          // 세션 복원과 같은 경로로 고객명을 읽는다. 이동은 아래 isAuthenticated 분기가 한다.
+          void setSession()
+        },
+        onError: (error) => {
+          const reason = resolveLoginFailure(error)
+          // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
+          setFailure(
+            reason === "UNKNOWN"
+              ? isApiError(error)
+                ? error.message
+                : "로그인 처리 중 오류가 발생했습니다."
+              : FAILURE_MESSAGE[reason],
+          )
+        },
+      },
+    )
   }
+
+  // 이미 세션이 있는데 폼을 다시 제출하면 서버가 새 세션을 발급해 상태가 어긋난다.
+  if (isAuthenticated) return <Navigate to={redirectTo} replace />
 
   return (
     <div className="flex flex-col items-center py-10">
@@ -52,19 +87,7 @@ export const A01Login = () => {
                 className="mt-0.5 h-4 w-4 shrink-0 text-danger"
                 aria-hidden="true"
               />
-              {failure.locked ? (
-                <p className="text-base text-ink">
-                  비밀번호를 5회 연속 잘못 입력해 계정이 잠겼습니다. 잠금 해제는
-                  고객센터를 통한 관리자 확인 후에만 가능합니다.
-                </p>
-              ) : (
-                <p className="text-base text-ink">
-                  아이디 또는 비밀번호가 올바르지 않습니다.{" "}
-                  <span className="font-bold text-danger">
-                    ({failure.attempts}/{MAX_ATTEMPTS}회)
-                  </span>
-                </p>
-              )}
+              <p className="text-base text-ink">{failure}</p>
             </div>
           )}
 
@@ -79,7 +102,7 @@ export const A01Login = () => {
               <Input
                 id="login-id"
                 value={userId}
-                onChange={(e) => setUserId(e.target.value)}
+                onChange={(e) => changeField(setUserId)(e.target.value)}
                 placeholder="아이디를 입력하세요"
                 autoComplete="username"
                 invalid={!!failure}
@@ -101,7 +124,7 @@ export const A01Login = () => {
                 id="login-pw"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => changeField(setPassword)(e.target.value)}
                 placeholder="비밀번호를 입력하세요"
                 autoComplete="current-password"
                 invalid={!!failure}
@@ -114,8 +137,14 @@ export const A01Login = () => {
 
             <Checkbox label="아이디 저장" />
 
-            <Button type="submit" size="lg" fullWidth className="mt-1">
-              로그인
+            <Button
+              type="submit"
+              size="lg"
+              fullWidth
+              className="mt-1"
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </Button>
           </form>
 
@@ -144,7 +173,7 @@ export const A01Login = () => {
         <NoticeBoxFooter
           className="mt-8"
           items={[
-            "체험용 계정: 아이디 honggildong / 비밀번호 Passw0rd! (Mock 데이터, 실제 인증서버 연동 없음).",
+            "회원가입 시 등록한 아이디와 비밀번호로 로그인합니다.",
             "보안을 위해 로그인 후 10분간 이용이 없으면 자동으로 로그아웃됩니다(헤더의 [연장]으로 세션을 갱신할 수 있습니다).",
             "비밀번호를 5회 연속 잘못 입력하면 계정이 잠기며, 잠금 해제는 고객센터를 통한 관리자 확인 후에만 가능합니다.",
             "인증서·간편인증·보안카드는 제공하지 않으며, 아이디·비밀번호 방식으로만 로그인할 수 있습니다.",

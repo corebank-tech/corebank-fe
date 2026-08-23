@@ -191,10 +191,10 @@ const DevNav = () => {
  * 위에 비해제형 모달을 띄운다(REQ-AUTH-031).
  */
 const SessionExpiredGate = () => {
-  const { expired, acknowledgeExpired } = useSession()
+  const { expiredReason, acknowledgeExpired } = useSession()
   const navigate = useNavigate()
 
-  if (!expired) return null
+  if (expiredReason == null) return null
 
   const goRelogin = () => {
     acknowledgeExpired()

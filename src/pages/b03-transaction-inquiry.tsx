@@ -21,18 +21,18 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
-  MOCK_ACCOUNTS,
-  MOCK_TRANSACTIONS,
   getAccountStatusBadgeVariant,
+  toTransactionRows,
+  useAccountTransactionQuery,
   type Transaction,
 } from "@/entities/transaction"
+import { useInquirableAccounts } from "@/entities/account"
 import {
   formatAccountNo,
   formatAmount,
   formatDate,
   formatDateTime,
   maskAccountNo,
-  maskName,
 } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
@@ -46,8 +46,8 @@ import { recentPeriod } from "@/shared/config/query-period"
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-INQR-009 인수기준:
  * "각 조건 변경 후 재조회 시 결과가 조건에 맞게 필터링·정렬된다").
  */
-const defaultCondition = (accountNo: string) => ({
-  account: accountNo,
+const defaultCondition = (accountId: number | null) => ({
+  accountId,
   period: recentPeriod(),
   content: "all",
   order: "recent",
@@ -59,6 +59,17 @@ const CONTENT_OPTIONS = [
   { label: "입금만", value: "deposit" },
   { label: "출금만", value: "withdraw" },
 ]
+
+const DIRECTION_BY_CONTENT: Record<string, "ALL" | "DEPOSIT" | "WITHDRAWAL"> = {
+  all: "ALL",
+  deposit: "DEPOSIT",
+  withdraw: "WITHDRAWAL",
+}
+
+const SORT_BY_ORDER: Record<string, "LATEST" | "OLDEST"> = {
+  recent: "LATEST",
+  past: "OLDEST",
+}
 
 const ORDER_OPTIONS = [
   { label: "최근거래순", value: "recent" },
@@ -114,82 +125,141 @@ export const B03TransactionInquiry = () => {
   const { time: BASE_TIME, capture: captureBaseTime } = useCapturedBaseTime()
   const TODAY = getToday()
   const [searchParams] = useSearchParams()
-  // applied는 [조회]를 통과해 실제 조회에 쓰인 조건, 나머지는 입력 중인 값이다.
-  // 분리하지 않으면 조건을 건드리는 즉시 목록·집계가 바뀌는데 기준일시는 [조회]
-  // 시점에 머물러, 화면이 언제 받은 데이터인지 알 수 없게 된다(REQ-INQR-014).
-  const [applied, setApplied] = React.useState(() => {
-    /** REQ-INQR-005: 계좌목록의 [조회] 진입 시 해당 계좌가 선택된 상태로 시작한다. */
-    const accountParam = searchParams.get("account")
-    const preselected = MOCK_ACCOUNTS.find((a) => a.accountNo === accountParam)
-    return defaultCondition(
-      preselected?.accountNo ?? MOCK_ACCOUNTS[0].accountNo,
-    )
-  })
-  const [account, setAccount] = React.useState(applied.account)
+
+  const rawAccountIdParam = searchParams.get("accountId")
+  const legacyAccountParam = searchParams.get("account")
+
+  const accountIdParam = React.useMemo(() => {
+    if (!rawAccountIdParam) return null
+
+    const parsed = Number(rawAccountIdParam)
+
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  }, [rawAccountIdParam])
+
+  const {
+    overview,
+    accounts,
+    isLoading: isAccountsLoading,
+    isError: isAccountsError,
+  } = useInquirableAccounts()
+
+  const hasRequestedAccountParam =
+    rawAccountIdParam !== null || legacyAccountParam !== null
+
+  const requestedAccountId = React.useMemo(() => {
+    if (rawAccountIdParam !== null) {
+      if (accountIdParam == null) {
+        return null
+      }
+
+      return accounts.some((account) => account.accountId === accountIdParam)
+        ? accountIdParam
+        : null
+    }
+
+    if (legacyAccountParam !== null) {
+      return (
+        accounts.find((account) => account.accountNumber === legacyAccountParam)
+          ?.accountId ?? null
+      )
+    }
+
+    return null
+  }, [rawAccountIdParam, legacyAccountParam, accountIdParam, accounts])
+
+  const initialAccountId = hasRequestedAccountParam
+    ? requestedAccountId
+    : (accounts[0]?.accountId ?? null)
+
+  const [applied, setApplied] = React.useState(() => defaultCondition(null))
+
+  const [accountId, setAccountId] = React.useState<number | null>(null)
+
+  const effectiveAccountId =
+    accountId != null
+      ? accounts.some((item) => item.accountId === accountId)
+        ? accountId
+        : null
+      : initialAccountId
+
+  const effectiveAppliedAccountId =
+    applied.accountId != null
+      ? accounts.some((item) => item.accountId === applied.accountId)
+        ? applied.accountId
+        : null
+      : initialAccountId
+
   const [period, setPeriod] = React.useState(applied.period)
   const [content, setContent] = React.useState(applied.content)
   const [order, setOrder] = React.useState(applied.order)
   const [keyword, setKeyword] = React.useState(applied.keyword)
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState(10)
   const [page, setPage] = React.useState(1)
+  const {
+    incomplete: periodIncomplete,
+    reversed: periodReversed,
+    overLimit: periodOverLimit,
+  } = checkPeriodRange(period.start, period.end, TODAY, MAX_PERIOD_DAYS)
+  const transactionParams = React.useMemo(
+    () => ({
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      direction: DIRECTION_BY_CONTENT[applied.content] ?? "ALL",
+      keyword: applied.keyword.trim() || undefined,
+      sort: SORT_BY_ORDER[applied.order] ?? "LATEST",
+      page,
+      size: pageSize,
+    }),
+    [applied, page, pageSize],
+  )
+
+  const {
+    data: transactionData,
+    isLoading: isTransactionsLoading,
+    isError: isTransactionsError,
+  } = useAccountTransactionQuery(effectiveAppliedAccountId, transactionParams)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [periodAlertMessage, setPeriodAlertMessage] = React.useState<
     string | null
   >(null)
-
   const selectedAccount =
-    MOCK_ACCOUNTS.find((a) => a.accountNo === applied.account) ??
-    MOCK_ACCOUNTS[0]
+    accounts.find((item) => item.accountId === effectiveAppliedAccountId) ??
+    null
+  const accountOptions = React.useMemo(
+    () =>
+      accounts.map((item) => ({
+        alias: item.accountName,
+        accountNo: item.accountNumber,
+        balance: item.balance,
+      })),
+    [accounts],
+  )
 
-  /** REQ-INQR-010: 빈 입력·역전 기간·1년을 넘는 기간은 조회를 거부한다. */
-  const {
-    incomplete: periodIncomplete,
-    reversed: periodReversed,
-    overLimit: periodOverLimit,
-  } = checkPeriodRange(period.start, period.end, TODAY, MAX_PERIOD_DAYS)
+  const selectedInputAccountNo =
+    accounts.find((item) => item.accountId === effectiveAccountId)
+      ?.accountNumber ?? ""
 
-  // Presentation-only filtering/ordering over the mock rows.
-  const rows = React.useMemo(() => {
-    const trimmedKeyword = applied.keyword.trim()
-    let next = MOCK_TRANSACTIONS.filter((t) => {
-      if (t.date < applied.period.start || t.date > applied.period.end)
-        return false
-      if (applied.content === "deposit" && t.deposit <= 0) return false
-      if (applied.content === "withdraw" && t.withdraw <= 0) return false
-      if (trimmedKeyword && !t.description.includes(trimmedKeyword))
-        return false
-      return true
-    })
-    next = [...next].sort((a, b) => {
-      const aKey = `${a.date}T${a.time}`
-      const bKey = `${b.date}T${b.time}`
-      return applied.order === "recent"
-        ? bKey.localeCompare(aKey)
-        : aKey.localeCompare(bKey)
-    })
-    return next
-  }, [applied])
+  const rows = React.useMemo<Transaction[]>(
+    () => toTransactionRows(transactionData?.items ?? []),
+    [transactionData?.items],
+  )
 
-  const depositSum = rows.reduce((s, t) => s + t.deposit, 0)
-  const depositCount = rows.filter((t) => t.deposit > 0).length
-  const withdrawSum = rows.reduce((s, t) => s + t.withdraw, 0)
-  const withdrawCount = rows.filter((t) => t.withdraw > 0).length
+  const depositSum = transactionData?.summary?.depositAmount ?? 0
+  const depositCount = transactionData?.summary?.depositCount ?? 0
+  const withdrawSum = transactionData?.summary?.withdrawalAmount ?? 0
+  const withdrawCount = transactionData?.summary?.withdrawalCount ?? 0
 
-  const size = pageSize === "all" ? rows.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(rows.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * size, safePage * size)
-
+  const totalCount = transactionData?.totalCount ?? 0
+  const totalPages = transactionData?.totalPages ?? 0
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",
       header: "거래일자",
       align: "center",
       width: 110,
-      sortable: true,
-      sortValue: (r) => `${r.date}T${r.time}`,
       render: (r) => <span>{formatDate(r.date)}</span>,
     },
     {
@@ -205,8 +275,6 @@ export const B03TransactionInquiry = () => {
       header: "출금금액",
       align: "right",
       width: 120,
-      sortable: true,
-      sortValue: (r) => r.withdraw,
       render: (r) => amountCell(r.withdraw, "var(--color-danger)"),
     },
     {
@@ -214,8 +282,6 @@ export const B03TransactionInquiry = () => {
       header: "입금금액",
       align: "right",
       width: 120,
-      sortable: true,
-      sortValue: (r) => r.deposit,
       render: (r) => amountCell(r.deposit, "var(--color-deposit)"),
     },
     { key: "content", header: "거래내용", align: "left" },
@@ -240,22 +306,11 @@ export const B03TransactionInquiry = () => {
     "거래후잔액",
     "거래채널",
   ]
-  const exportRows = rows.map((r) => [
-    formatDate(r.date),
-    r.time,
-    maskAccountNo(selectedAccount.accountNo),
-    r.description,
-    r.content,
-    r.withdraw > 0 ? formatAmount(r.withdraw, { suffix: false }) : "-",
-    r.deposit > 0 ? formatAmount(r.deposit, { suffix: false }) : "-",
-    formatAmount(r.balance, { suffix: false }),
-    r.channel,
-  ])
 
   const handleReset = () => {
-    const next = defaultCondition(MOCK_ACCOUNTS[0].accountNo)
+    const next = defaultCondition(accounts[0]?.accountId ?? null)
     setApplied(next)
-    setAccount(next.account)
+    setAccountId(next.accountId)
     setPeriod(next.period)
     setContent(next.content)
     setOrder(next.order)
@@ -285,10 +340,67 @@ export const B03TransactionInquiry = () => {
       )
       return
     }
-    setApplied({ account, period, content, order, keyword })
+    setApplied({
+      accountId: effectiveAccountId,
+      period,
+      content,
+      order,
+      keyword,
+    })
     setPage(1)
     captureBaseTime()
   }
+  if (isAccountsLoading) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        계좌 정보를 불러오는 중입니다.
+      </div>
+    )
+  }
+
+  if (isAccountsError || !overview) {
+    return (
+      <div className="p-6 text-base text-danger">
+        계좌 정보를 불러오지 못했습니다.
+      </div>
+    )
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        조회할 계좌가 없습니다.
+      </div>
+    )
+  }
+
+  if (hasRequestedAccountParam && requestedAccountId == null) {
+    return (
+      <div className="p-6 text-base text-danger">
+        요청한 계좌를 찾을 수 없습니다.
+      </div>
+    )
+  }
+
+  if (!selectedAccount) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        조회할 계좌를 선택해 주세요.
+      </div>
+    )
+  }
+
+  const exportRows = rows.map((r) => [
+    formatDate(r.date),
+    r.time,
+    maskAccountNo(selectedAccount.accountNumber),
+    r.description,
+    r.content,
+    r.withdraw > 0 ? formatAmount(r.withdraw, { suffix: false }) : "-",
+    r.deposit > 0 ? formatAmount(r.deposit, { suffix: false }) : "-",
+    formatAmount(r.balance, { suffix: false }),
+    r.channel,
+  ])
 
   return (
     <div className="border border-border bg-surface-elevated p-6">
@@ -301,9 +413,15 @@ export const B03TransactionInquiry = () => {
           <FormRow label="조회계좌번호" htmlFor="inq-account">
             <AccountSelectField
               id="inq-account"
-              options={MOCK_ACCOUNTS}
-              value={account}
-              onChange={setAccount}
+              options={accountOptions}
+              value={selectedInputAccountNo}
+              onChange={(accountNumber) => {
+                const nextAccount = accounts.find(
+                  (item) => item.accountNumber === accountNumber,
+                )
+
+                setAccountId(nextAccount?.accountId ?? null)
+              }}
             />
           </FormRow>
           <FormRow label="조회기간">
@@ -326,7 +444,7 @@ export const B03TransactionInquiry = () => {
               onChange={setContent}
             />
           </FormRow>
-          <FormRow label="적요검색" htmlFor="inq-keyword">
+          <FormRow label="거래내용 검색" htmlFor="inq-keyword">
             <KeywordField
               id="inq-keyword"
               value={keyword}
@@ -349,23 +467,24 @@ export const B03TransactionInquiry = () => {
           <InfoRow
             gridCols="grid-cols-4"
             items={[
-              { term: "계좌명", desc: selectedAccount.alias },
-              { term: "예금주", desc: maskName(selectedAccount.ownerName) },
+              { term: "계좌명", desc: selectedAccount.accountName || "-" },
+              { term: "예금주", desc: "-" },
               {
                 term: "계좌번호",
-                desc: formatAccountNo(selectedAccount.accountNo),
+                desc: formatAccountNo(selectedAccount.accountNumber),
               },
               {
                 term: "계좌상태",
-                desc: (
-                  <Badge
-                    variant={getAccountStatusBadgeVariant(
-                      selectedAccount.status,
-                    )}
-                  >
-                    {selectedAccount.status}
-                  </Badge>
-                ),
+                desc: (() => {
+                  const status =
+                    selectedAccount.status === "SUSPENDED" ? "거래정지" : "정상"
+
+                  return (
+                    <Badge variant={getAccountStatusBadgeVariant(status)}>
+                      {status}
+                    </Badge>
+                  )
+                })(),
               },
             ]}
           />
@@ -380,11 +499,13 @@ export const B03TransactionInquiry = () => {
                 },
                 {
                   term: "출금가능금액",
-                  desc: formatAmount(selectedAccount.withdrawable),
+                  desc: "-",
                 },
                 {
                   term: "신규일자",
-                  desc: formatDate(selectedAccount.openedDate),
+                  desc: selectedAccount.openedDate
+                    ? formatDate(selectedAccount.openedDate)
+                    : "-",
                 },
               ]}
             />
@@ -425,10 +546,13 @@ export const B03TransactionInquiry = () => {
 
         <GridToolbar
           periodLabel={`${formatDate(applied.period.start)} ~ ${formatDate(applied.period.end)}`}
-          totalCount={rows.length}
+          totalCount={totalCount}
           pageSize={pageSize}
-          onPageSizeChange={(s) => {
-            setPageSize(s)
+          showAllOption={false}
+          onPageSizeChange={(size) => {
+            if (size === "all") return
+
+            setPageSize(size)
             setPage(1)
           }}
           baseTimeLabel={formatDateTime(BASE_TIME)}
@@ -438,26 +562,38 @@ export const B03TransactionInquiry = () => {
             downloadCsv(`거래내역조회_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="거래내역조회"
+          resultLabel="현재 페이지 거래내역조회"
         />
 
-        <DataGrid
-          columns={columns}
-          rows={pageRows}
-          rowKey={(r) => r.id}
-          emptyMessage="조회 결과가 없습니다."
-        />
+        {isTransactionsLoading ? (
+          <div className="p-6 text-center text-base text-ink-muted">
+            거래내역을 불러오는 중입니다.
+          </div>
+        ) : isTransactionsError ? (
+          <div className="p-6 text-center text-base text-danger">
+            거래내역을 불러오지 못했습니다.
+          </div>
+        ) : (
+          <>
+            <DataGrid
+              columns={columns}
+              rows={rows}
+              rowKey={(r) => r.id}
+              emptyMessage="조회 결과가 없습니다."
+            />
 
-        <Pagination
-          page={safePage}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
+            <Pagination
+              page={transactionData?.page ?? page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
 
         <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
         <SavedConditionAlert
           open={downloadComplete.saved}
-          message="파일이 저장되었습니다."
+          message="현재 페이지의 거래내역이 저장되었습니다."
           className="mt-2"
         />
       </FormSection>
@@ -468,7 +604,7 @@ export const B03TransactionInquiry = () => {
           "조회기간은 시작일 기준 최대 1년 이내로 지정할 수 있으며, 시작일이 종료일보다 늦으면 조회되지 않습니다.",
           "거래 후 잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
-          "조회 결과는 CSV 파일로 저장할 수 있으며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
+          "파일저장은 현재 표시 중인 페이지의 거래내역을 CSV로 저장하며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}
       />
 

@@ -14,9 +14,14 @@ import { checkPeriodRange } from "@/entities/transaction"
 /* AccountSelectField                                                  */
 /* ------------------------------------------------------------------ */
 
+type AccountSelectOption = Pick<
+  AccountOption,
+  "alias" | "accountNo" | "balance"
+>
+
 type AccountSelectFieldProps = {
   id?: string
-  options: AccountOption[]
+  options: AccountSelectOption[]
   value?: string
   onChange?: (accountNo: string) => void
 }

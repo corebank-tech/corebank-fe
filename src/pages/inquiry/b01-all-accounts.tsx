@@ -20,23 +20,14 @@ import {
   formatDateTime,
   maskAccountNo,
 } from "@/shared/lib/format"
-import { useAccountOverviewQuery } from "@/entities/account"
+
 import { getToday } from "@/shared/config/clock"
-
-type AccountGroupCode = "DEMAND_DEPOSIT" | "DEPOSIT_SAVINGS"
-
-type AccountRow = {
-  accountId: number
-  groupCode: AccountGroupCode
-  accountName: string
-  accountNumber: string
-  balance: number
-  openedDate: string
-  lastTransactionAt: string | null
-  maturityDate: string | null
-  transferEnabled: boolean
-  status: "ACTIVE" | "SUSPENDED"
-}
+import {
+  useInquirableAccounts,
+  type InquirableAccount,
+} from "@/entities/account"
+type AccountGroupCode = InquirableAccount["groupCode"]
+type AccountRow = InquirableAccount
 
 const GROUP_LABELS: Record<AccountGroupCode, string> = {
   DEMAND_DEPOSIT: "입출금계좌",
@@ -132,7 +123,12 @@ export const B01AllAccounts = () => {
   const TODAY = getToday()
   const navigate = useNavigate()
 
-  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
+  const {
+    overview,
+    accounts: allAccounts,
+    isLoading,
+    isError,
+  } = useInquirableAccounts()
   const [pageSize, setPageSize] = React.useState<number | "all">("all")
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -141,41 +137,6 @@ export const B01AllAccounts = () => {
     keyword: string
   } | null>(null)
   const downloadComplete = useSavedConditionAlert()
-
-  const allAccounts = React.useMemo<AccountRow[]>(() => {
-    if (!overview) return []
-
-    return (overview.items ?? []).flatMap((group) => {
-      const groupCode = group.groupCode
-
-      if (groupCode !== "DEMAND_DEPOSIT" && groupCode !== "DEPOSIT_SAVINGS") {
-        return []
-      }
-
-      return (group.accounts ?? []).flatMap((account) => {
-        if (account.accountId == null) return []
-
-        if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
-          return []
-        }
-
-        return [
-          {
-            accountId: account.accountId,
-            groupCode,
-            accountName: account.accountName ?? "",
-            accountNumber: account.accountNumber ?? "",
-            balance: account.balance ?? 0,
-            openedDate: account.openedDate ?? "",
-            lastTransactionAt: account.lastTransactionAt ?? null,
-            maturityDate: account.maturityDate ?? null,
-            transferEnabled: account.transferEnabled ?? false,
-            status: account.status,
-          },
-        ]
-      })
-    })
-  }, [overview])
 
   const handleInquire = (accountId: number) => {
     navigate(`/inquiry?accountId=${accountId}`)

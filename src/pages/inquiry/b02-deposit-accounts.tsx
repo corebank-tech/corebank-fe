@@ -1,3 +1,4 @@
+import * as React from "react"
 import { useNavigate } from "react-router"
 import { ChevronDown } from "lucide-react"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
@@ -11,35 +12,78 @@ import {
   formatDate,
   formatDateTime,
 } from "@/shared/lib/format"
-import {
-  MOCK_OVERVIEW_ACCOUNTS,
-  type OverviewAccount,
-} from "@/entities/account"
+import { useAccountOverviewQuery } from "@/entities/account"
 import { cn } from "@/shared/lib/utils"
 import { useDisclosure } from "@/shared/lib/hooks/use-disclosure"
-import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
+
+type DepositAccountRow = {
+  accountId: number
+  accountName: string
+  accountNumber: string
+  balance: number
+  openedDate: string
+  maturityDate: string | null
+  status: "ACTIVE" | "SUSPENDED"
+}
 
 /** REQ-INQR-001·004: 예금/적금 계좌만 대상으로 한 전체계좌조회(B-01)의 부분 화면. */
 export const B02DepositAccounts = () => {
-  const BASE_TIME = useBaseTime()
   const navigate = useNavigate()
   const { open, toggle } = useDisclosure(true)
+  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
 
-  const rows = MOCK_OVERVIEW_ACCOUNTS.filter((a) => a.group === "deposit")
-  const groupTotal = rows.reduce((sum, a) => sum + a.balance, 0)
+  const depositGroup = overview?.items?.find(
+    (group) => group.groupCode === "DEPOSIT_SAVINGS",
+  )
 
-  const columns: DataGridColumn<OverviewAccount>[] = [
+  const rows = React.useMemo<DepositAccountRow[]>(() => {
+    return (depositGroup?.accounts ?? []).flatMap((account) => {
+      if (
+        account.accountType !== "TIME_DEPOSIT" &&
+        account.accountType !== "INSTALLMENT_SAVINGS"
+      ) {
+        return []
+      }
+
+      if (account.accountId == null) {
+        return []
+      }
+
+      // BE는 CLOSED 계좌를 overview에서 제외하지만,
+      // 화면 모델은 ACTIVE/SUSPENDED만 허용하도록 방어적으로 좁힌다.
+      if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
+        return []
+      }
+
+      return [
+        {
+          accountId: account.accountId,
+          accountName: account.accountName ?? "",
+          accountNumber: account.accountNumber ?? "",
+          balance: account.balance ?? 0,
+          openedDate: account.openedDate ?? "",
+          maturityDate: account.maturityDate ?? null,
+          status: account.status,
+        },
+      ]
+    })
+  }, [depositGroup])
+
+  const groupTotal = rows.reduce((sum, account) => sum + account.balance, 0)
+  const columns: DataGridColumn<DepositAccountRow>[] = [
     {
-      key: "alias",
+      key: "accountName",
       header: "계좌명",
       width: 180,
-      render: (r) => <span className="font-bold text-ink">{r.alias}</span>,
+      render: (r) => (
+        <span className="font-bold text-ink">{r.accountName}</span>
+      ),
     },
     {
-      key: "accountNo",
+      key: "accountNumber",
       header: "계좌번호",
       width: 160,
-      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
+      render: (r) => <span>{formatAccountNo(r.accountNumber)}</span>,
     },
     {
       key: "openedDate",
@@ -51,12 +95,14 @@ export const B02DepositAccounts = () => {
       ),
     },
     {
-      key: "lastActivityDate",
+      key: "maturityDate",
       header: "만기일",
       align: "center",
       width: 120,
       render: (r) => (
-        <span className="text-ink-muted">{formatDate(r.lastActivityDate)}</span>
+        <span className="text-ink-muted">
+          {r.maturityDate ? formatDate(r.maturityDate) : "-"}
+        </span>
       ),
     },
     {
@@ -77,13 +123,29 @@ export const B02DepositAccounts = () => {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => navigate(`/inquiry?account=${r.accountNo}`)}
+          onClick={() => navigate(`/inquiry?accountId=${r.accountId}`)}
         >
           조회
         </Button>
       ),
     },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        계좌 정보를 불러오는 중입니다.
+      </div>
+    )
+  }
+
+  if (isError || !overview) {
+    return (
+      <div className="p-6 text-base text-danger">
+        계좌 정보를 불러오지 못했습니다.
+      </div>
+    )
+  }
 
   return (
     <QueryPageLayout
@@ -123,12 +185,15 @@ export const B02DepositAccounts = () => {
         {open && (
           <>
             <p className="mb-2 text-right text-2xs text-ink-muted">
-              기준일시 : {formatDateTime(BASE_TIME)}
+              기준일시 : {overview.asOf ? formatDateTime(overview.asOf) : "-"}
             </p>
             <DataGrid
               columns={columns}
               rows={rows}
-              rowKey={(r) => r.id}
+              rowKey={(r) => String(r.accountId)}
+              rowClassName={(r) =>
+                r.status === "SUSPENDED" ? "bg-surface opacity-60" : ""
+              }
               emptyMessage="보유한 예금·적금 계좌가 없습니다."
             />
           </>

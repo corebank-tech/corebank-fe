@@ -110,6 +110,7 @@ export const customFetch = async <TData>(
       code: envelope?.code ?? NETWORK_ERROR_CODE,
       message: envelope?.message ?? NETWORK_ERROR_MESSAGE,
       status: response.status,
+      data: envelope?.data,
     })
   }
 
@@ -126,6 +127,7 @@ export const customFetch = async <TData>(
       code: envelope.code,
       message: envelope.message,
       status: response.status,
+      data: envelope.data,
     })
   }
 

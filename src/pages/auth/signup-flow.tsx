@@ -5,7 +5,7 @@ import { A03Verify } from "@/pages/auth/a03-verify"
 import { A04Info } from "@/pages/auth/a04-info"
 import { A05Confirm } from "@/pages/auth/a05-confirm"
 import { A06Complete } from "@/pages/auth/a06-complete"
-import type { SignupData } from "@/pages/auth/signup-shared"
+import type { SignupAuthState, SignupData } from "@/pages/auth/signup-shared"
 
 const EMPTY_DATA: SignupData = {
   name: "",
@@ -14,6 +14,7 @@ const EMPTY_DATA: SignupData = {
   email: "",
   userId: "",
   password: "",
+  passwordConfirm: "",
 }
 
 /**
@@ -30,29 +31,68 @@ export const SignupFlow = () => {
   )
   const [data, setData] = React.useState<SignupData>(EMPTY_DATA)
 
+  const [auth, setAuth] = React.useState<SignupAuthState>({})
+
+  const patchAuth = (partial: Partial<SignupAuthState>) =>
+    setAuth((prev) => ({ ...prev, ...partial }))
+
   const patch = (partial: Partial<SignupData>) =>
     setData((prev) => ({ ...prev, ...partial }))
 
   switch (step) {
     case 1:
-      return <A02Terms onNext={() => setStep(2)} />
+      return (
+        <A02Terms
+          onNext={(termsAuthToken) => {
+            patchAuth({ termsAuthToken })
+            setStep(2)
+          }}
+        />
+      )
     case 2:
       return (
         <A03Verify
-          onVerified={(name, birth) => {
+          onVerified={(name, birth, accountAuthToken) => {
             patch({ name, birth })
+            patchAuth({ accountAuthToken })
             setStep(3)
           }}
         />
       )
     case 3:
-      return <A04Info data={data} onChange={patch} onNext={() => setStep(4)} />
+      return (
+        <A04Info
+          data={data}
+          auth={auth}
+          onChange={patch}
+          onAuthChange={patchAuth}
+          onNext={(tempSignupToken) => {
+            patchAuth({
+              tempSignupToken,
+              termsAuthToken: undefined,
+              accountAuthToken: undefined,
+              userIdCheckToken: undefined,
+              emailVerificationId: undefined,
+              emailVerificationToken: undefined,
+            })
+            setStep(4)
+          }}
+        />
+      )
     case 4:
       return (
         <A05Confirm
-          data={data}
+          tempSignupToken={auth.tempSignupToken}
           onEdit={() => setStep(3)}
-          onComplete={() => setStep(5)}
+          onComplete={() => {
+            patch({
+              password: "",
+              passwordConfirm: "",
+            })
+
+            setAuth({})
+            setStep(5)
+          }}
         />
       )
     case 5:

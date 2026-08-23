@@ -13,18 +13,22 @@ import {
   evaluatePasswordRules,
   isIdValid,
   isPasswordValid,
+  useCheckSignupUserIdMutation,
+  useIssueSignupEmailVerificationMutation,
+  useValidateSignupMutation,
+  useVerifySignupEmailMutation,
   type RuleCheck,
 } from "@/entities/auth"
+import { isApiError } from "@/shared/api/api-error"
 import { formatPhone } from "@/shared/lib/format"
 import { onlyDigits } from "@/shared/lib/input-filter"
 import { EMAIL_CODE_TTL_SECONDS as EMAIL_OTP_TTL } from "@/shared/config/policy"
 import { formatClock, useCountdown } from "@/shared/lib/hooks/use-countdown"
-import { MOCK_EXISTING_USER_IDS, MOCK_EXISTING_EMAILS } from "@/entities/auth"
-import { SIGNUP_STEPS, type SignupData } from "@/pages/auth/signup-shared"
-
-const generateCode = (): string => {
-  return String(Math.floor(100000 + Math.random() * 900000))
-}
+import {
+  SIGNUP_STEPS,
+  type SignupAuthState,
+  type SignupData,
+} from "@/pages/auth/signup-shared"
 
 const RuleList = ({ rules }: { rules: RuleCheck[] }) => {
   return (
@@ -54,25 +58,61 @@ const RuleList = ({ rules }: { rules: RuleCheck[] }) => {
   )
 }
 
+const getErrorMessage = (error: unknown): string => {
+  if (isApiError(error)) return error.message
+  if (error instanceof Error) return error.message
+  return "요청 처리 중 오류가 발생했습니다."
+}
+
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
+type PendingIdCheck = {
+  userId: string
+  token: string
+}
+
 type A04InfoProps = {
   data: SignupData
+  auth: SignupAuthState
   onChange: (partial: Partial<SignupData>) => void
-  onNext: () => void
+  onAuthChange: (partial: Partial<SignupAuthState>) => void
+  onNext: (tempSignupToken: string) => void
 }
 
 /** A-04 회원가입 3단계 · 정보입력. REQ-AUTH-008~017. */
-export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
-  const [passwordConfirm, setPasswordConfirm] = React.useState("")
-  const [confirmedId, setConfirmedId] = React.useState<string | null>(null)
+export const A04Info = ({
+  data,
+  auth,
+  onChange,
+  onAuthChange,
+  onNext,
+}: A04InfoProps) => {
+  const checkUserIdMutation = useCheckSignupUserIdMutation()
+  const issueEmailMutation = useIssueSignupEmailVerificationMutation()
+  const verifyEmailMutation = useVerifySignupEmailMutation()
+  const validateSignupMutation = useValidateSignupMutation()
+
   const [dupAlert, setDupAlert] = React.useState<string | null>(null)
   const [dupConfirmOpen, setDupConfirmOpen] = React.useState(false)
+  const [pendingIdCheck, setPendingIdCheck] =
+    React.useState<PendingIdCheck | null>(null)
 
-  const [emailIssued, setEmailIssued] = React.useState<string | null>(null)
-  const { remaining: emailRemaining, reset: resetEmailCountdown } =
-    useCountdown(EMAIL_OTP_TTL, emailIssued != null)
+  const [emailIssuedCode, setEmailIssuedCode] = React.useState<string | null>(
+    null,
+  )
   const [emailCode, setEmailCode] = React.useState("")
   const [emailError, setEmailError] = React.useState<string | null>(null)
-  const [verifiedEmail, setVerifiedEmail] = React.useState<string | null>(null)
+
+  const emailIssued = auth.emailVerificationId != null
+  const emailVerified =
+    auth.verifiedEmail != null && auth.verifiedEmail === data.email
+  const idConfirmed =
+    auth.checkedUserId != null && auth.checkedUserId === data.userId
+
+  const { remaining: emailRemaining, reset: resetEmailCountdown } =
+    useCountdown(EMAIL_OTP_TTL, emailIssued && !emailVerified)
+
+  const emailExpired = emailIssued && emailRemaining <= 0
 
   const [alert, setAlert] = React.useState<string | null>(null)
 
@@ -84,61 +124,152 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
 
   const idRules = evaluateIdRules(data.userId)
   const passwordRules = evaluatePasswordRules(data.password, data.userId)
-  const idConfirmed = confirmedId !== null && confirmedId === data.userId
-  const emailVerified = verifiedEmail !== null && verifiedEmail === data.email
-  const emailExpired = emailIssued != null && emailRemaining <= 0
-  const passwordMismatch =
-    passwordConfirm.length > 0 && passwordConfirm !== data.password
 
-  const handleDupCheck = () => {
+  const passwordMismatch =
+    data.passwordConfirm.length > 0 && data.passwordConfirm !== data.password
+
+  const handleUserIdChange = (value: string) => {
+    const nextUserId = value.replace(/[^a-z0-9]/g, "").slice(0, 16)
+
+    onChange({ userId: nextUserId })
+
+    if (nextUserId !== auth.checkedUserId) {
+      onAuthChange({
+        userIdCheckToken: undefined,
+        checkedUserId: undefined,
+      })
+    }
+  }
+  const handleDupCheck = async () => {
     if (!isIdValid(data.userId)) {
       setDupAlert("아이디 규칙을 먼저 확인하세요.")
       return
     }
-    if (MOCK_EXISTING_USER_IDS.includes(data.userId)) {
-      setDupAlert("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.")
-      return
+    try {
+      const result = await checkUserIdMutation.mutateAsync({
+        userId: data.userId,
+      })
+
+      if (!result.isAvailable || !result.userIdCheckToken) {
+        setDupAlert("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.")
+        return
+      }
+
+      setPendingIdCheck({
+        userId: data.userId,
+        token: result.userIdCheckToken,
+      })
+      setDupConfirmOpen(true)
+    } catch (error) {
+      setDupAlert(getErrorMessage(error))
     }
-    setDupConfirmOpen(true)
   }
 
   const confirmId = () => {
-    setConfirmedId(data.userId)
+    if (!pendingIdCheck) return
+
+    onAuthChange({
+      userIdCheckToken: pendingIdCheck.token,
+      checkedUserId: pendingIdCheck.userId,
+    })
+
+    setPendingIdCheck(null)
     setDupConfirmOpen(false)
   }
 
-  const sendEmailCode = () => {
-    if (data.email.length === 0 || !data.email.includes("@")) {
+  const handleEmailChange = (value: string) => {
+    const nextEmail = value.replace(/\s/g, "")
+
+    onChange({ email: nextEmail })
+
+    if (nextEmail !== auth.verifiedEmail) {
+      onAuthChange({
+        emailVerificationId: undefined,
+        emailVerificationToken: undefined,
+        verifiedEmail: undefined,
+      })
+
+      setEmailIssuedCode(null)
+      setEmailCode("")
+      setEmailError(null)
+    }
+  }
+
+  const sendEmailCode = async () => {
+    if (!isValidEmail(data.email)) {
       setAlert("이메일 주소를 정확히 입력하세요.")
       emailRef.current?.focus()
       return
     }
-    if (MOCK_EXISTING_EMAILS.includes(data.email)) {
-      setAlert("이미 가입된 이메일입니다. 다른 이메일을 입력해 주세요.")
-      return
+
+    try {
+      const result = await issueEmailMutation.mutateAsync({
+        email: data.email,
+        purpose: "SIGN_UP",
+      })
+
+      if (!result.emailVerificationId) {
+        setAlert("이메일 인증 요청을 생성하지 못했습니다.")
+        return
+      }
+
+      onAuthChange({
+        emailVerificationId: result.emailVerificationId,
+        emailVerificationToken: undefined,
+        verifiedEmail: undefined,
+      })
+
+      setEmailIssuedCode(result.verificationCode ?? null)
+      setEmailCode("")
+      setEmailError(null)
+      resetEmailCountdown()
+    } catch (error) {
+      setAlert(getErrorMessage(error))
     }
-    setEmailIssued(generateCode())
-    resetEmailCountdown()
-    setEmailCode("")
-    setEmailError(null)
-    setVerifiedEmail(null)
   }
 
-  const confirmEmailCode = () => {
-    if (emailIssued == null) return
+  const confirmEmailCode = async () => {
+    const emailVerificationId = auth.emailVerificationId
+
+    if (!emailVerificationId) {
+      setEmailError("먼저 인증번호를 발송해 주세요.")
+      return
+    }
+
     if (emailExpired) {
       setEmailError("입력 시간이 초과되었습니다. 인증번호를 재발송해 주세요.")
       return
     }
-    if (emailCode !== emailIssued) {
-      setEmailError("인증번호가 올바르지 않습니다. 다시 입력해 주세요.")
+
+    if (emailCode.length !== 6) {
+      setEmailError("인증번호 6자리를 입력하세요.")
       return
     }
-    setVerifiedEmail(data.email)
-    setEmailError(null)
+
+    try {
+      const result = await verifyEmailMutation.mutateAsync({
+        emailVerificationId,
+        request: {
+          verificationCode: emailCode,
+        },
+      })
+
+      if (!result.emailVerificationToken) {
+        setEmailError("이메일 인증 토큰을 발급받지 못했습니다.")
+        return
+      }
+      onAuthChange({
+        emailVerificationToken: result.emailVerificationToken,
+        verifiedEmail: data.email,
+      })
+
+      setEmailError(null)
+    } catch (error) {
+      setEmailError(getErrorMessage(error))
+    }
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!isIdValid(data.userId)) {
       setAlert("아이디 규칙을 확인하세요.")
       idRef.current?.focus()
@@ -153,7 +284,7 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
       passwordRef.current?.focus()
       return
     }
-    if (data.password !== passwordConfirm) {
+    if (data.password !== data.passwordConfirm) {
       setAlert("비밀번호와 비밀번호 확인이 일치하지 않습니다.")
       passwordConfirmRef.current?.focus()
       return
@@ -167,7 +298,30 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
       phoneRef.current?.focus()
       return
     }
-    onNext()
+    try {
+      const result = await validateSignupMutation.mutateAsync({
+        termsAuthToken: auth.termsAuthToken,
+        accountAuthToken: auth.accountAuthToken,
+        userIdCheckToken: auth.userIdCheckToken,
+        emailVerificationToken: auth.emailVerificationToken,
+        tempSignupToken: auth.tempSignupToken,
+
+        userId: data.userId,
+        userPassword: data.password,
+        userPasswordConfirm: data.passwordConfirm,
+        email: data.email,
+        phoneNumber: data.phone,
+      })
+
+      if (!result.tempSignupToken) {
+        setAlert("회원가입 임시 토큰을 발급받지 못했습니다.")
+        return
+      }
+
+      onNext(result.tempSignupToken)
+    } catch (error) {
+      setAlert(getErrorMessage(error))
+    }
   }
 
   return (
@@ -181,9 +335,10 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
             variant="primary"
             size="lg"
             className="min-w-40"
+            disabled={validateSignupMutation.isPending}
             onClick={handleNext}
           >
-            다음
+            {validateSignupMutation.isPending ? "확인 중..." : "다음"}
           </Button>
         }
       >
@@ -196,18 +351,17 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                     id="signup-id"
                     ref={idRef}
                     value={data.userId}
-                    onChange={(e) => {
-                      onChange({
-                        userId: e.target.value
-                          .replace(/[^a-z0-9]/g, "")
-                          .slice(0, 16),
-                      })
-                    }}
+                    onChange={(e) => handleUserIdChange(e.target.value)}
                     placeholder="영문 소문자로 시작, 영문/숫자 6~16자"
                     className="max-w-xs"
                   />
-                  <Button variant="outline" size="sm" onClick={handleDupCheck}>
-                    중복확인
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={checkUserIdMutation.isPending}
+                    onClick={handleDupCheck}
+                  >
+                    {checkUserIdMutation.isPending ? "확인 중" : "중복확인"}
                   </Button>
                   {idConfirmed && (
                     <span className="text-xs font-bold whitespace-nowrap text-primary">
@@ -240,9 +394,11 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                   id="signup-pw-confirm"
                   ref={passwordConfirmRef}
                   type="password"
-                  value={passwordConfirm}
+                  value={data.passwordConfirm}
                   onChange={(e) =>
-                    setPasswordConfirm(e.target.value.slice(0, 15))
+                    onChange({
+                      passwordConfirm: e.target.value.slice(0, 15),
+                    })
                   }
                   invalid={passwordMismatch}
                   className="max-w-xs"
@@ -268,13 +424,22 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                     type="email"
                     value={data.email}
                     disabled={emailVerified}
-                    onChange={(e) => onChange({ email: e.target.value })}
+                    onChange={(e) => handleEmailChange(e.target.value)}
                     placeholder="example@corebank.com"
                     className="max-w-xs"
                   />
                   {!emailVerified && (
-                    <Button variant="outline" size="sm" onClick={sendEmailCode}>
-                      {emailIssued == null ? "인증번호 발송" : "재발송"}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={issueEmailMutation.isPending}
+                      onClick={sendEmailCode}
+                    >
+                      {issueEmailMutation.isPending
+                        ? "발송 중"
+                        : emailIssued
+                          ? "재발송"
+                          : "인증번호 발송"}
                     </Button>
                   )}
                   {emailVerified && (
@@ -284,19 +449,29 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                   )}
                 </div>
 
-                {emailIssued != null && !emailVerified && (
+                {emailIssued && !emailVerified && (
                   <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+                    {emailIssuedCode && (
+                      <span
+                        className={`text-lg font-bold tracking-2 ${
+                          emailExpired
+                            ? "text-ink-faint line-through"
+                            : "text-primary"
+                        }`}
+                        aria-label="발송된 이메일 인증번호"
+                      >
+                        {emailIssuedCode}
+                      </span>
+                    )}
+
                     <span
-                      className={`text-lg font-bold tracking-2 ${emailExpired ? "text-ink-faint line-through" : "text-primary"}`}
-                      aria-label="발송된 이메일 인증번호"
-                    >
-                      {emailIssued}
-                    </span>
-                    <span
-                      className={`text-base font-bold ${emailExpired ? "text-ink-faint" : "text-ink"}`}
+                      className={`text-base font-bold ${
+                        emailExpired ? "text-ink-faint" : "text-ink"
+                      }`}
                     >
                       {formatClock(emailRemaining)}
                     </span>
+
                     <Input
                       inputMode="numeric"
                       maxLength={6}
@@ -305,30 +480,38 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                         setEmailCode(
                           e.target.value.replace(/\D/g, "").slice(0, 6),
                         )
-                        if (emailError) setEmailError(null)
+
+                        if (emailError) {
+                          setEmailError(null)
+                        }
                       }}
                       placeholder="인증번호 6자리"
                       className="w-32 text-center tracking-3"
                       aria-label="이메일 인증번호 입력"
                     />
+
                     <Button
                       variant="secondary"
                       size="sm"
+                      disabled={verifyEmailMutation.isPending}
                       onClick={confirmEmailCode}
                     >
-                      확인
+                      {verifyEmailMutation.isPending ? "확인 중" : "확인"}
                     </Button>
                   </div>
                 )}
+
                 {emailError && (
                   <p className="text-2xs font-bold text-danger">{emailError}</p>
                 )}
+
                 <p className="text-2xs text-ink-muted">
-                  ※ 이메일 인증은 공동인증서를 대체하는 Mock 인증입니다. 이미
-                  가입된 이메일로는 인증번호를 발송하지 않습니다.
+                  ※ 개발 환경에서는 이메일 발송 대신 발급된 인증번호가 화면에
+                  표시될 수 있습니다.
                 </p>
               </div>
             </FormRow>
+
             <FormRow label="휴대폰번호" required htmlFor="signup-phone">
               <div className="flex w-full flex-col gap-1">
                 <Input
@@ -337,11 +520,14 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
                   inputMode="numeric"
                   value={formatPhone(data.phone)}
                   onChange={(e) =>
-                    onChange({ phone: onlyDigits(e.target.value, 11) })
+                    onChange({
+                      phone: onlyDigits(e.target.value, 11),
+                    })
                   }
                   placeholder="010-0000-0000"
                   className="max-w-xs"
                 />
+
                 <p className="text-2xs text-ink-muted">
                   ※ 별도의 휴대폰 본인인증은 진행하지 않습니다.
                 </p>
@@ -365,15 +551,20 @@ export const A04Info = ({ data, onChange, onNext }: A04InfoProps) => {
         title="정보입력 안내"
         messages={alert ? [alert] : []}
       />
+
       <AlertDialog
         open={dupAlert !== null}
         onClose={() => setDupAlert(null)}
         title="아이디 중복확인"
         messages={dupAlert ? [dupAlert] : []}
       />
+
       <ConfirmDialog
         open={dupConfirmOpen}
-        onClose={() => setDupConfirmOpen(false)}
+        onClose={() => {
+          setDupConfirmOpen(false)
+          setPendingIdCheck(null)
+        }}
         onConfirm={confirmId}
         title="아이디 중복확인"
         messages={["사용가능한 ID입니다. 사용하시겠습니까?"]}

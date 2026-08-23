@@ -323,7 +323,7 @@ export const E05ReservationResults = () => {
             )
             downloadComplete.save()
           }}
-          resultLabel="예약이체처리결과"
+          resultLabel="현재 페이지 예약이체처리결과"
         />
 
         <DataGrid

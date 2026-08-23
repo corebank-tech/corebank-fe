@@ -333,7 +333,7 @@ export const G05AutoTransferResults = () => {
             )
             downloadComplete.save()
           }}
-          resultLabel="자동이체결과조회"
+          resultLabel="현재 페이지 자동이체결과조회"
         />
 
         <DataGrid

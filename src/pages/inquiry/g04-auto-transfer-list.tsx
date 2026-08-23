@@ -506,7 +506,7 @@ export const G04AutoTransferList = () => {
             downloadCsv(`자동이체조회_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="자동이체조회"
+          resultLabel="현재 페이지 자동이체조회"
         />
 
         <DataGrid

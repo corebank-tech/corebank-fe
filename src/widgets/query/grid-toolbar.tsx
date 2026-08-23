@@ -36,7 +36,16 @@ type GridToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   onPrint?: () => void
   onBrailleView?: () => void
   onSaveFile?: () => void
-  /** What onPrint/onSaveFile produces, e.g. "예약이체 조회 결과". Shown in the confirm dialog. */
+  /**
+   * What onPrint/onSaveFile produces, e.g. "예약이체 조회 결과". Shown in the confirm dialog.
+   *
+   * 서버 페이징 화면은 "현재 페이지 …"로 적는다. 인쇄·파일저장·점자보기가 모두
+   * 현재 페이지 행만 담는데, 라벨이 "예약이체조회"면 사용자는 전체가 저장된다고
+   * 믿고 확인을 누른다 — `showAllOption`을 되살리지 않은 이유와 같은 문제다.
+   *
+   * TODO: 서버에 전체 조회 수단이 들어오면(corebank-server#297) 파일저장은 전체를
+   * 담도록 바꾸고 이 라벨도 되돌린다.
+   */
   resultLabel?: string
   onSearch?: () => void
 }

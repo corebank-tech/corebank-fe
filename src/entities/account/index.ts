@@ -21,3 +21,8 @@ export {
 } from "@/entities/account/api/b07-account-order"
 export { useWithdrawAccounts } from "@/entities/account/api/use-withdraw-accounts"
 export { useAccountOverviewQuery } from "@/entities/account/api/account-overview-query"
+export type {
+  InquirableAccount,
+  InquirableAccountGroupCode,
+} from "@/entities/account/api/use-inquirable-accounts"
+export { useInquirableAccounts } from "@/entities/account/api/use-inquirable-accounts"

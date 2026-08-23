@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
+import { ProductJoinRestartNotice } from "@/pages/product/join-restart-notice"
 import { ResultPanel } from "@/widgets/transfer"
 import { type DataGridColumn } from "@/shared/ui/data-grid"
 import { formatAmount, formatDate } from "@/shared/lib/format"
@@ -63,23 +64,7 @@ export const C06Complete = () => {
   const result = location.state as ProductJoinResult | null
 
   if (!result) {
-    return (
-      <StepLayout steps={PRODUCT_JOIN_STEPS} currentStep={4} title="상품가입">
-        <div className="flex flex-col items-center gap-4 py-10">
-          <p className="text-base text-ink-muted">
-            가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
-          </p>
-          <Button
-            variant="primary"
-            size="lg"
-            className="min-w-40"
-            onClick={() => navigate("/products")}
-          >
-            상품몰로 이동
-          </Button>
-        </div>
-      </StepLayout>
-    )
+    return <ProductJoinRestartNotice currentStep={4} />
   }
 
   const title = `${result.productName} 가입`

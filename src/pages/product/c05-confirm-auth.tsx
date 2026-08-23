@@ -30,6 +30,7 @@ import {
   type ProductJoinResult,
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
+import { ProductJoinRestartNotice } from "@/pages/product/join-restart-notice"
 import { useWithdrawAccounts } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 
@@ -100,23 +101,7 @@ export const C05ConfirmAuth = () => {
   // 내용이 없는 것은 마찬가지다.
   const form = location.state as ProductJoinFormState | null
   if (form == null || form.termMonths == null || form.amount == null) {
-    return (
-      <StepLayout steps={PRODUCT_JOIN_STEPS} currentStep={3} title="상품가입">
-        <div className="flex flex-col items-center gap-4 py-10">
-          <p className="text-base text-ink-muted">
-            가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
-          </p>
-          <Button
-            variant="primary"
-            size="lg"
-            className="min-w-40"
-            onClick={() => navigate("/products")}
-          >
-            상품몰로 이동
-          </Button>
-        </div>
-      </StepLayout>
-    )
+    return <ProductJoinRestartNotice currentStep={3} />
   }
 
   const account = withdrawAccounts.find(

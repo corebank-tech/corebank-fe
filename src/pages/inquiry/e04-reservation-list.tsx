@@ -413,13 +413,13 @@ export const E04ReservationList = () => {
             onClose={() => setOtpOpen(false)}
             onConfirm={handleOtpConfirm}
             guide="예약이체 취소를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-            transactionType={OtpTransactionType.SCHEDULED_TRANSFER}
             // otp_integration_guide.md의 취소 계약은 건당 scheduledTransferId
             // 하나다. 여러 건을 동시에 선택해도 OTP는 한 번만 인증하므로 첫
             // 건 기준으로 발급한다 — 다건 취소·단건 인증 불일치는 BE의 실제
             // 검증 연동 시 재확인이 필요하다.
-            transactionData={{
-              scheduledTransferId: Number(selectedRows[0]?.id ?? 0),
+            transaction={{
+              type: OtpTransactionType.SCHEDULED_TRANSFER,
+              data: { scheduledTransferId: Number(selectedRows[0]?.id ?? 0) },
             }}
           />
 

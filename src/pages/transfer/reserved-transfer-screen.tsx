@@ -209,12 +209,14 @@ export const ReservedTransferScreen = () => {
           onClose={() => setOtpOpen(false)}
           onConfirm={handleRegisterConfirm}
           guide="예약이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-          transactionType={OtpTransactionType.SCHEDULED_TRANSFER}
-          transactionData={{
-            withdrawalAccountId: selectedAccount?.accountId ?? 0,
-            depositAccountNumber: form.toAccount,
-            amount: form.amount ?? 0,
-            scheduledDate: form.scheduledDate,
+          transaction={{
+            type: OtpTransactionType.SCHEDULED_TRANSFER,
+            data: {
+              withdrawalAccountId: selectedAccount?.accountId ?? 0,
+              depositAccountNumber: form.toAccount,
+              amount: form.amount ?? 0,
+              scheduledDate: form.scheduledDate,
+            },
           }}
         />
 

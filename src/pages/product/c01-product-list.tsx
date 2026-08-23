@@ -7,12 +7,11 @@ import {
   type SortKey,
 } from "@/pages/product/product-card-grid"
 import { toProductCard } from "@/entities/product"
-import { useSearchProducts } from "@/shared/api/generated/product-controller/product-controller"
 import {
+  useProductSearch,
   SearchProductsProductGroup,
   SearchProductsSort,
-  type PageResponseProductListItemResponse,
-} from "@/shared/api/generated/model"
+} from "@/entities/product"
 
 const CATEGORY_TO_GROUP: Record<
   Exclude<CategoryFilter, "전체">,
@@ -36,7 +35,7 @@ export const C01ProductList = () => {
   const [filter, setFilter] = React.useState<CategoryFilter>("전체")
   const [sort, setSort] = React.useState<SortKey>("rate")
 
-  const { data, isLoading, isError } = useSearchProducts(
+  const { data, isLoading, isError } = useProductSearch(
     {
       productGroup: filter === "전체" ? undefined : CATEGORY_TO_GROUP[filter],
       sort: SORT_KEY_TO_SERVER[sort],
@@ -47,10 +46,7 @@ export const C01ProductList = () => {
     { query: { placeholderData: keepPreviousData } },
   )
 
-  // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-  // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로, 실제 형태로 다시 맞춰준다.
-  const page = data as unknown as
-    PageResponseProductListItemResponse | undefined
+  const page = data
   const products = (page?.items ?? []).map(toProductCard)
 
   return (

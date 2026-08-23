@@ -1,13 +1,13 @@
 import { keepPreviousData } from "@tanstack/react-query"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
-import { useSearchAutoTransferExecutions } from "@/shared/api/generated/auto-transfer-controller/auto-transfer-controller"
-import { useSearchScheduledTransferExecutions } from "@/shared/api/generated/scheduled-transfer-controller/scheduled-transfer-controller"
+import {
+  useSearchAutoTransferExecutions,
+  useSearchScheduledTransferExecutions,
+} from "@/shared/api/generated"
 import type {
-  AutoTransferExecutionHistoryPageResponse,
-  ScheduledTransferExecutionResultPageResponse,
   SearchAutoTransferExecutionsParams,
   SearchScheduledTransferExecutionsParams,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 
 /**
  * 기준일시는 지금 화면에 떠 있는 데이터를 받은 시각이다(#44). 마운트 시각을 쓰면
@@ -37,10 +37,7 @@ export const useAutoTransferExecutions = (
   })
 
   return {
-    // orval이 생성한 타입은 스펙에 적힌 공통 응답 봉투(ApiResponse<T>) 그대로다.
-    // customFetch가 런타임에는 이미 봉투를 벗겨 data만 돌려주므로 여기서 맞춰준다.
-    page: data as unknown as
-      AutoTransferExecutionHistoryPageResponse | undefined,
+    page: data,
     baseTime: useQueryBaseTime({ dataUpdatedAt, isPlaceholderData }),
     isFetching,
     isError,
@@ -62,8 +59,7 @@ export const useScheduledTransferExecutions = (
   } = useSearchScheduledTransferExecutions(params, { query: KEEP_PREVIOUS })
 
   return {
-    page: data as unknown as
-      ScheduledTransferExecutionResultPageResponse | undefined,
+    page: data,
     baseTime: useQueryBaseTime({ dataUpdatedAt, isPlaceholderData }),
     isFetching,
     isError,

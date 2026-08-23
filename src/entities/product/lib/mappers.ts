@@ -2,7 +2,7 @@ import { formatAmount } from "@/shared/lib/format"
 import type {
   ProductDetailResponse,
   ProductListItemResponse,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 import type {
   ProductCard,
   ProductCategory,

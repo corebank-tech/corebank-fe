@@ -1,11 +1,4 @@
-import { useGetAccounts } from "@/shared/api/generated/account-controller/account-controller"
-import type { AccountOverviewResponse } from "@/shared/api/generated/model"
+import { useGetAccounts } from "@/shared/api/generated"
 
-export const useAccountOverviewQuery = () => {
-  const query = useGetAccounts()
-
-  return {
-    ...query,
-    data: query.data as unknown as AccountOverviewResponse | undefined,
-  }
-}
+/** 전체계좌 개요(B-01). 생성 훅을 화면이 직접 참조하지 않도록 여기서 한 번 감싼다. */
+export const useAccountOverviewQuery = () => useGetAccounts()

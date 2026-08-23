@@ -1,5 +1,3 @@
 pnpm-lock.yaml
 public/mockServiceWorker.js
-src/shared/api/generated
-openapi.yaml
 *.md

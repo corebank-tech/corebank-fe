@@ -8,7 +8,7 @@ import {
 import type {
   ProductDetailResponse,
   ProductListItemResponse,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 
 const BASE_DETAIL: ProductDetailResponse = {
   productId: 1,

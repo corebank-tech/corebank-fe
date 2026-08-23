@@ -130,6 +130,11 @@ export const E04ReservationList = () => {
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [multiSelectBlockedOpen, setMultiSelectBlockedOpen] =
     React.useState(false)
+  // OTP 토큰은 발급 시점의 scheduledTransferId 에 묶인다. selectedRows 는 조회
+  // 결과에서 파생돼 재조회가 끼면 바뀌므로, 발급 직전의 대상을 잡아둔다.
+  const [cancelTarget, setCancelTarget] = React.useState<ReservationRow | null>(
+    null,
+  )
   const [cancelErrorMessage, setCancelErrorMessage] = React.useState<
     string | null
   >(null)
@@ -255,14 +260,16 @@ export const E04ReservationList = () => {
   /** REQ-RSV-008: 취소 확인 후 OTP 인증을 거쳐야 실제로 취소된다. */
   const handleConfirmCancel = () => {
     setConfirmOpen(false)
+    setCancelTarget(selectedRows[0] ?? null)
     setOtpOpen(true)
   }
 
   const handleOtpConfirm = async (otpAuthToken: string) => {
     if (isCancelling) return
     setOtpOpen(false)
-    // 진입 가드가 한 건만 통과시킨다.
-    const target = selectedRows[0]
+    // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
+    // 건과 실행 대상이 갈릴 수 있다.
+    const target = cancelTarget
     if (!target) return
     setIsCancelling(true)
     try {
@@ -297,6 +304,7 @@ export const E04ReservationList = () => {
       }
     } finally {
       setIsCancelling(false)
+      setCancelTarget(null)
     }
   }
 
@@ -394,6 +402,7 @@ export const E04ReservationList = () => {
     <QueryPageLayout
       noticeItems={[
         "대기 상태이고 이체 예정일 전일 23:59:59까지인 건만 취소할 수 있습니다.",
+        "OTP 인증은 한 건에만 유효하므로 취소는 한 건씩 진행합니다.",
         "이체 예정일 당일에는 취소할 수 없습니다.",
         "대기 건은 이체 예정일이 빠른 순으로 정렬됩니다.",
       ]}
@@ -422,14 +431,17 @@ export const E04ReservationList = () => {
 
           <OtpModal
             open={otpOpen}
-            onClose={() => setOtpOpen(false)}
+            onClose={() => {
+              setOtpOpen(false)
+              setCancelTarget(null)
+            }}
             onConfirm={handleOtpConfirm}
             guide="예약이체 취소를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
             // otp_integration_guide.md의 취소 계약은 건당 scheduledTransferId
-            // 하나다. 진입 가드가 다건 선택을 막으므로 선택된 한 건으로 발급한다.
+            // 하나다. 진입 가드가 다건 선택을 막고, 대상은 발급 직전에 잡아둔다.
             transaction={{
               type: OtpTransactionType.SCHEDULED_TRANSFER,
-              data: { scheduledTransferId: Number(selectedRows[0]?.id ?? 0) },
+              data: { scheduledTransferId: Number(cancelTarget?.id ?? 0) },
             }}
           />
 

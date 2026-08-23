@@ -131,10 +131,6 @@ export const C05ConfirmAuth = () => {
     setOtpOpen(true)
   }
 
-  // 실행 요청이 나가는 동안 다시 눌리지 않게 막는다. OtpModal은 onConfirm만
-  // 호출하고 스스로 닫지 않아서(otp-modal.tsx), 확인 버튼을 빠르게 두 번 누르면
-  // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
-  // 서버 멱등성으로도 걸러지지 않는다.
   /**
    * OTP 발급 시점의 거래정보와 가입 실행 요청을 서버가 정규화해 대조한다(어긋나면
    * OTP0102). 서버가 재구성하는 항목은 아래 네 개뿐이다
@@ -149,6 +145,10 @@ export const C05ConfirmAuth = () => {
     withdrawalAccountId: form.withdrawalAccountId ?? 0,
   }
 
+  // 실행 요청이 나가는 동안 다시 눌리지 않게 막는다. OtpModal은 onConfirm만
+  // 호출하고 스스로 닫지 않아서(otp-modal.tsx), 확인 버튼을 빠르게 두 번 누르면
+  // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
+  // 서버 멱등성으로도 걸러지지 않는다.
   const handleOtpConfirm = async (otpAuthToken: string) => {
     if (isSubmitting) return
     setOtpOpen(false)

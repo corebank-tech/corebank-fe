@@ -88,6 +88,10 @@ export const G04AutoTransferList = () => {
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [multiSelectBlockedOpen, setMultiSelectBlockedOpen] =
     React.useState(false)
+  // OTP 토큰은 발급 시점의 autoTransferId 에 묶인다. selectedRows 는 조회 결과에서
+  // 파생돼 재조회가 끼면 바뀌므로(refetchOnReconnect), 발급 직전의 대상을 잡아둔다.
+  const [terminateTarget, setTerminateTarget] =
+    React.useState<AutoTransferRow | null>(null)
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
   >(null)
@@ -204,14 +208,16 @@ export const G04AutoTransferList = () => {
   /** REQ-AUTO-011: 해지 확인 후 OTP 인증을 거쳐야 실제로 해지된다. */
   const handleConfirmTerminate = () => {
     setTerminateConfirmOpen(false)
+    setTerminateTarget(selectedRows[0] ?? null)
     setTerminateOtpOpen(true)
   }
 
   const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
     if (isTerminating) return
     setTerminateOtpOpen(false)
-    // 진입 가드가 한 건만 통과시킨다.
-    const target = selectedRows[0]
+    // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
+    // 건과 실행 대상이 갈릴 수 있다.
+    const target = terminateTarget
     if (!target) return
     setIsTerminating(true)
     try {
@@ -247,6 +253,7 @@ export const G04AutoTransferList = () => {
       }
     } finally {
       setIsTerminating(false)
+      setTerminateTarget(null)
     }
   }
 
@@ -391,6 +398,7 @@ export const G04AutoTransferList = () => {
     <QueryPageLayout
       noticeItems={[
         "정상 상태이고 다음 실행 예정일 전일까지인 건만 해지할 수 있습니다.",
+        "OTP 인증은 한 건에만 유효하므로 해지는 한 건씩 진행합니다.",
         "출금계좌, 입금계좌, 이체지정일은 변경할 수 없으며 해지 후 재등록해야 합니다.",
         "이체주기를 변경하면 다음 실행 예정일이 직전 실행 예정일 기준으로 다시 계산됩니다.",
       ]}
@@ -423,6 +431,7 @@ export const G04AutoTransferList = () => {
             title="해지 불가"
             messages={[
               "정상 상태이고 다음 실행 예정일 전일까지인 건만 해지할 수 있습니다.",
+              "OTP 인증은 한 건에만 유효하므로 해지는 한 건씩 진행합니다.",
               "이미 종료·해지되었거나 오늘 실행 예정인 건은 선택에서 제외하세요.",
             ]}
           />
@@ -455,11 +464,14 @@ export const G04AutoTransferList = () => {
 
           <OtpModal
             open={terminateOtpOpen}
-            onClose={() => setTerminateOtpOpen(false)}
+            onClose={() => {
+              setTerminateOtpOpen(false)
+              setTerminateTarget(null)
+            }}
             onConfirm={handleTerminateOtpConfirm}
             transaction={{
               type: OtpTransactionType.AUTO_TRANSFER,
-              data: { autoTransferId: Number(selectedRows[0]?.id ?? 0) },
+              data: { autoTransferId: Number(terminateTarget?.id ?? 0) },
             }}
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />

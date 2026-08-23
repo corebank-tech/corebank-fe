@@ -54,8 +54,10 @@ const expectDatesConsistent = (
     })
   }
 
-  // REQ-AUTO-011. cancelable은 서버 판정값이라 목업에서는 손으로 적는데,
-  // 다음 실행일이 상대값이 된 뒤로는 날짜와 어긋날 수 있다.
+  // cancelable은 서버 판정값(REQ-AUTO-011)이라 목업에서는 손으로 적는데, 다음 실행일이
+  // 상대값이 된 뒤로는 날짜와 어긋날 수 있다. 검증하는 것은 요구사항이 아니라 목업의
+  // 정합이다 — nextExecDateOn()이 항상 오늘보다 뒤를 돌려주므로 "당일 해지 거부" 케이스
+  // 자체가 이 데이터에 없고, 그 전제가 깨지면 여기서 걸린다.
   const mismatched = rows.filter(
     (r) => r.cancelable !== (r.status === "정상" && r.nextExecDate !== today),
   )

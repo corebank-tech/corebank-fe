@@ -48,7 +48,14 @@ const onDayOfMonth = (dayOfMonth: number, monthOffset: number): string =>
     monthOffset,
   )
 
-/** 오늘 이후 처음 돌아오는 이체지정일. 매월(주기 1개월) 자동이체 기준이다. */
+/**
+ * 오늘 이후 처음 돌아오는 이체지정일. 매월(주기 1개월) 자동이체 기준이다.
+ *
+ * 항상 오늘보다 뒤를 돌려주므로 이 목업에는 **다음 실행 예정일이 당일인 건이 없다** —
+ * REQ-AUTO-011이 규정한 "당일 해지 거부"는 이 데이터로 재현되지 않는다. G-04는 서버가
+ * 내려준 `cancelable`을 그대로 쓰고 이 목업은 B-05 삭제 차단(상태만 참조)에서만 읽히므로
+ * 화면 동작에는 영향이 없다.
+ */
 const nextExecDateOn = (dayOfMonth: number): string => {
   const thisMonth = onDayOfMonth(dayOfMonth, 0)
   return thisMonth > getToday() ? thisMonth : onDayOfMonth(dayOfMonth, 1)

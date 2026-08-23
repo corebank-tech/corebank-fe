@@ -20,6 +20,12 @@ test-results/
 coverage/
 .eslintcache
 
+# orval 생성물 — 커밋하지 않는다. 각자 `pnpm codegen` 으로 만든다
+src/shared/api/generated
+
+# 스펙은 서버 api-docs 에서 직접 읽는다 (orval.config.ts)
+openapi.yaml
+
 *storybook.log
 storybook-static
 

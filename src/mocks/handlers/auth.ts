@@ -11,6 +11,9 @@ const MOCK_LATENCY_MS = 200
  * 실계정으로 e2e 를 돌리면 POL-003(5회 연속 실패 시 잠금) 때문에 스펙이 한 번
  * 어긋나는 순간 계정이 잠겨 CI 가 영구히 죽는다. 자격증명은 A-07·A-08 이 쓰는
  * MOCK_MEMBERS 를 그대로 재사용한다.
+ *
+ * 경로는 base 를 박지 않고 끝부분만 맞춘다 — VITE_API_BASE_URL 이 바뀌어도(로컬 프록시
+ * /api/v1, 배포 절대 URL) 같은 핸들러가 걸린다. 단위 테스트의 서버 페이크도 같은 형태다.
  */
 const SESSION_KEY = "corebank-mock-session"
 
@@ -40,7 +43,7 @@ const unauthorized = () =>
   fail("CMN0101", "인증정보가 없거나 세션이 만료되었습니다.", 401)
 
 export const authHandlers = [
-  http.post("*/api/v1/auth/login", async ({ request }) => {
+  http.post("*/auth/login", async ({ request }) => {
     await delay(MOCK_LATENCY_MS)
     const { userId, password } = (await request.json()) as {
       userId: string
@@ -61,13 +64,13 @@ export const authHandlers = [
     })
   }),
 
-  http.post("*/api/v1/auth/logout", async () => {
+  http.post("*/auth/logout", async () => {
     await delay(MOCK_LATENCY_MS)
     writeSignedInMemberId(null)
     return ok(null)
   }),
 
-  http.get("*/api/v1/customers/me", async () => {
+  http.get("*/customers/me", async () => {
     await delay(MOCK_LATENCY_MS)
     const signedInMemberId = readSignedInMemberId()
     const member = MOCK_MEMBERS.find((m) => m.memberId === signedInMemberId)
@@ -85,7 +88,7 @@ export const authHandlers = [
     })
   }),
 
-  http.get("*/api/v1/dashboard/login-status", async () => {
+  http.get("*/dashboard/login-status", async () => {
     await delay(MOCK_LATENCY_MS)
     if (readSignedInMemberId() == null) return unauthorized()
 

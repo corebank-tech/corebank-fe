@@ -27,7 +27,7 @@ export const A01Login = () => {
   const [password, setPassword] = React.useState("")
   const [failure, setFailure] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
-  const { isAuthenticated, setSession } = useSession()
+  const { isAuthenticated, isBootstrapping, setSession } = useSession()
   const loginMutation = useLoginMutation()
   const location = useLocation()
 
@@ -83,6 +83,11 @@ export const A01Login = () => {
       setIsSubmitting(false)
     }
   }
+
+  // 서버 세션 복원 응답 전에는 로그인 여부가 미정이다. 폼을 먼저 그리면 세션이 있는
+  // 사용자에게 로그인 화면이 한 번 번쩍였다가 넘어가고, 그 사이에 제출까지 되면
+  // 서버가 새 세션을 발급해 상태가 어긋난다. RequireAuth 와 같은 방식으로 미룬다.
+  if (isBootstrapping) return null
 
   // 이미 세션이 있는데 폼을 다시 제출하면 서버가 새 세션을 발급해 상태가 어긋난다.
   if (isAuthenticated) return <Navigate to={redirectTo} replace />

@@ -1,4 +1,4 @@
-import type { TransactionItemResponse } from "@/shared/api/generated/model"
+import type { TransactionItemResponse } from "@/shared/api/generated"
 import type { Transaction } from "@/entities/transaction/api/transactions"
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {

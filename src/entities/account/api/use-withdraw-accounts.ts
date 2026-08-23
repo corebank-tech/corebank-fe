@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useAccountOverviewQuery } from "@/entities/account/api/account-overview-query"
-import type { AccountItemResponse } from "@/shared/api/generated/model"
+import type { AccountItemResponse } from "@/shared/api/generated"
 
 /**
  * 출금계좌로 쓸 수 있는 보유 계좌 목록.

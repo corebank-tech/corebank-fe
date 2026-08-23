@@ -3,7 +3,7 @@ import type {
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 import type {
   ReservationRow,
   ReservationStatus,

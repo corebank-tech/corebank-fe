@@ -124,3 +124,41 @@ describe("세션 만료 (POL-001)", () => {
     unsubscribe()
   })
 })
+
+describe("요청 취소 신호", () => {
+  it("호출자가 signal 을 넘겨도 타임아웃 상한이 함께 걸린다", async () => {
+    server.use(
+      http.get("*/api/ping", () =>
+        HttpResponse.json({ code: "0000", message: "ok", data: null }),
+      ),
+    )
+    const controller = new AbortController()
+    let sentSignal: AbortSignal | undefined
+    const originalFetch = globalThis.fetch
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      sentSignal = init?.signal ?? undefined
+      return originalFetch(input, init)
+    })
+
+    await customFetch("/api/ping", { signal: controller.signal })
+
+    // 호출자 신호를 그대로 넘기면 타임아웃이 사라진다. 합성 신호여야 한다.
+    expect(sentSignal).toBeDefined()
+    expect(sentSignal).not.toBe(controller.signal)
+    vi.restoreAllMocks()
+  })
+
+  it("호출자가 취소하면 요청이 중단된다", async () => {
+    server.use(
+      http.get("*/api/ping", () =>
+        HttpResponse.json({ code: "0000", message: "ok", data: null }),
+      ),
+    )
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      customFetch("/api/ping", { signal: controller.signal }),
+    ).rejects.toSatisfy((error: unknown) => isApiError(error))
+  })
+})

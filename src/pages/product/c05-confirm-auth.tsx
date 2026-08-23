@@ -17,7 +17,6 @@ import {
   useProductDetail,
   useExecuteSubscription,
   fetchSubscriptionResult,
-  type ProductSubscriptionExecuteResponse,
   type ProductSubscriptionResultResponse,
   addMonthsWithEomCorrection,
   estimateMaturityAmount,
@@ -166,8 +165,7 @@ export const C05ConfirmAuth = () => {
         },
       })
 
-      const executed = response as unknown as
-        ProductSubscriptionExecuteResponse | undefined
+      const executed = response
 
       // 실행 응답의 계좌번호는 마스킹돼 있고(088******002) 자동이체 프리필도 없다.
       // 원본 계좌번호는 가입 상세 조회에만 담겨 오므로 이어서 한 번 더 부른다.

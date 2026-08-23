@@ -29,6 +29,12 @@ export {
 
 export { useProductDetail } from "@/entities/product/api/use-product-detail"
 export {
+  useProductSearch,
+  SearchProductsProductGroup,
+  SearchProductsSort,
+} from "@/entities/product/api/use-product-search"
+export type { SearchProductsParams } from "@/entities/product/api/use-product-search"
+export {
   fetchProductTerms,
   fetchSubscriptionResult,
   useExecuteSubscription,

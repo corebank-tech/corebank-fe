@@ -1,14 +1,14 @@
 import {
   useExecuteProductSubscription,
   getProductSubscriptions,
-} from "@/shared/api/generated/product-subscription-controller/product-subscription-controller"
-import { getProductTerms } from "@/shared/api/generated/product-controller/product-controller"
+  getProductTerms,
+} from "@/shared/api/generated"
 import type {
   ProductSubscriptionExecuteRequest,
   ProductSubscriptionExecuteResponse,
   ProductSubscriptionResultResponse,
   ProductTermsViewResponse,
-} from "@/shared/api/generated/model"
+} from "@/shared/api/generated"
 
 /**
  * 약관 전문. 서버는 이 요청을 열람 이력으로 기록하고, 가입 실행 시 전문 미열람을
@@ -19,8 +19,7 @@ export const fetchProductTerms = async (
   productId: number,
   termsId: number,
 ): Promise<ProductTermsViewResponse | undefined> => {
-  const response = await getProductTerms(productId, termsId)
-  return response as unknown as ProductTermsViewResponse | undefined
+  return getProductTerms(productId, termsId)
 }
 
 /** 가입 실행(C-05). */
@@ -33,8 +32,7 @@ export const useExecuteSubscription = () => useExecuteProductSubscription()
 export const fetchSubscriptionResult = async (
   subscriptionId: number,
 ): Promise<ProductSubscriptionResultResponse | undefined> => {
-  const response = await getProductSubscriptions(subscriptionId)
-  return response as unknown as ProductSubscriptionResultResponse | undefined
+  return getProductSubscriptions(subscriptionId)
 }
 
 export type {

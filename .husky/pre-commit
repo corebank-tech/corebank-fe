@@ -1,1 +1,19 @@
+# 생성물은 커밋하지 않는다. .gitignore 로 막고 있지만 git add -f 나
+# 이미 추적 중이던 파일은 통과하므로 여기서 한 번 더 끊는다.
+staged_generated=$(git diff --cached --name-only --diff-filter=ACMR | grep '^src/shared/api/generated/' || true)
+
+if [ -n "$staged_generated" ]; then
+  echo ""
+  echo "커밋을 중단합니다 — orval 생성물이 스테이지에 올라와 있습니다."
+  echo ""
+  echo "$staged_generated" | sed 's/^/  /'
+  echo ""
+  echo "  src/shared/api/generated 는 저장소에 올리지 않습니다."
+  echo "  각자 로컬에서 pnpm codegen 으로 만들고, CI·Cloudflare 도 빌드 시 생성합니다."
+  echo ""
+  echo "  해제: git restore --staged src/shared/api/generated"
+  echo ""
+  exit 1
+fi
+
 pnpm exec lint-staged

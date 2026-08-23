@@ -16,7 +16,7 @@ import {
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
@@ -35,7 +35,7 @@ import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
   useScheduledTransfers,
-  useCancelScheduledTransferMutation,
+  cancelScheduledTransfer,
 } from "@/entities/transfer"
 import { ApiError } from "@/shared/api/api-error"
 
@@ -66,9 +66,8 @@ const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
   return [...waiting, ...others]
 }
 
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify)·OTP(POST /otp/issue, /otp/verify)
-// 실제 발급 API가 연동되면 그 결과 토큰으로 교체한다. scheduledtransfer 도메인의 토큰
-// 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 /**
@@ -178,14 +177,8 @@ export const E04ReservationList = () => {
 
   const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
 
-  const cancelMutation = useCancelScheduledTransferMutation({
-    request: {
-      headers: {
-        "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
-        "Otp-Auth-Token": TEMP_AUTH_TOKEN,
-      },
-    },
-  })
+  // 훅이 아닌 raw 함수를 호출하므로 mutation의 isPending을 쓸 수 없어 직접 든다.
+  const [isCancelling, setIsCancelling] = React.useState(false)
 
   const clearSelection = () => setSelectedIds([])
 
@@ -256,36 +249,49 @@ export const E04ReservationList = () => {
     setOtpOpen(true)
   }
 
-  const handleOtpConfirm = async () => {
+  const handleOtpConfirm = async (otpAuthToken: string) => {
+    if (isCancelling) return
     setOtpOpen(false)
-    // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
-    // 응답을 기다리는 취소 요청이 남은 채로 재조회가 나간다. 그러면 나중에
-    // 성공한 건이 반영되기 전의 목록을 받아 "일부만 성공했을 수 있으니 최신
-    // 상태를 다시 불러온다"는 의도가 그대로 깨진다.
-    const results = await Promise.allSettled(
-      selectedRows.map((r) =>
-        cancelMutation.mutateAsync({ scheduledTransferId: Number(r.id) }),
-      ),
-    )
-    clearSelection()
-
-    const failed = results.find((r) => r.status === "rejected")
-    const refreshed = await refetch()
-
-    // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
-    // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
-    // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
-    if (failed) {
-      const reason = failed.reason
-      setCancelErrorMessage(
-        reason instanceof ApiError
-          ? reason.message
-          : "예약이체 취소에 실패했습니다.",
+    setIsCancelling(true)
+    try {
+      // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
+      // 응답을 기다리는 취소 요청이 남은 채로 재조회가 나간다. 그러면 나중에
+      // 성공한 건이 반영되기 전의 목록을 받아 "일부만 성공했을 수 있으니 최신
+      // 상태를 다시 불러온다"는 의도가 그대로 깨진다.
+      // Otp-Auth-Token은 검증 시점에만 실제 값을 알 수 있어(OtpModal onConfirm),
+      // 매 호출마다 헤더를 새로 만들어야 한다.
+      const results = await Promise.allSettled(
+        selectedRows.map((r) =>
+          cancelScheduledTransfer(Number(r.id), {
+            headers: {
+              "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+              "Otp-Auth-Token": otpAuthToken,
+            },
+          }),
+        ),
       )
-    } else if (refreshed.isError) {
-      setCancelErrorMessage(
-        "취소 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
-      )
+      clearSelection()
+
+      const failed = results.find((r) => r.status === "rejected")
+      const refreshed = await refetch()
+
+      // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+      // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
+      // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
+      if (failed) {
+        const reason = failed.reason
+        setCancelErrorMessage(
+          reason instanceof ApiError
+            ? reason.message
+            : "예약이체 취소에 실패했습니다.",
+        )
+      } else if (refreshed.isError) {
+        setCancelErrorMessage(
+          "취소 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
+        )
+      }
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -414,6 +420,14 @@ export const E04ReservationList = () => {
             onClose={() => setOtpOpen(false)}
             onConfirm={handleOtpConfirm}
             guide="예약이체 취소를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            // otp_integration_guide.md의 취소 계약은 건당 scheduledTransferId
+            // 하나다. 여러 건을 동시에 선택해도 OTP는 한 번만 인증하므로 첫
+            // 건 기준으로 발급한다 — 다건 취소·단건 인증 불일치는 BE의 실제
+            // 검증 연동 시 재확인이 필요하다.
+            transaction={{
+              type: OtpTransactionType.SCHEDULED_TRANSFER,
+              data: { scheduledTransferId: Number(selectedRows[0]?.id ?? 0) },
+            }}
           />
 
           <ErrorDialog
@@ -483,7 +497,7 @@ export const E04ReservationList = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={selectedRows.length === 0 || cancelMutation.isPending}
+            disabled={selectedRows.length === 0 || isCancelling}
             onClick={handleCancelClick}
           >
             선택 취소

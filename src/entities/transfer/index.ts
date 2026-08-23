@@ -93,7 +93,7 @@ export {
 
 export {
   useScheduledTransfers,
-  useCancelScheduledTransferMutation,
+  cancelScheduledTransfer,
   useRegisterScheduledTransferMutation,
 } from "@/entities/transfer/api/use-scheduled-transfers"
 export type { SearchScheduledTransfersParams } from "@/entities/transfer/api/use-scheduled-transfers"

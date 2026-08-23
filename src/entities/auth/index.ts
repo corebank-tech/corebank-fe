@@ -16,4 +16,5 @@ export {
 } from "@/entities/auth/lib/auth-rules"
 
 export { OtpModal } from "@/entities/auth/ui/otp-modal"
+export { IssueOtpRequestTransactionType as OtpTransactionType } from "@/shared/api/generated"
 export { SessionExpiredModal } from "@/entities/auth/ui/session-expired-modal"

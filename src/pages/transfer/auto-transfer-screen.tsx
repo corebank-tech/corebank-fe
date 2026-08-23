@@ -171,23 +171,28 @@ export const AutoTransferScreen = () => {
    * (otp_integration_guide.md, 어긋나면 OTP0102). 두 곳에 같은 값을 손으로 적으면
    * 한쪽만 고쳐도 조용히 어긋나므로 한 객체를 양쪽이 함께 쓴다.
    */
-  const otpTransactionData = {
-    withdrawalAccountId: selectedAccount?.accountId ?? 0,
-    depositAccountNumber: form.toAccount,
-    amount: form.amount ?? 0,
-    cycleMonths: form.cycleMonths,
-    transferDay: form.dayOfMonth,
-    startDate: form.startDate,
-    endDate: form.endDate,
-  }
+  const otpTransactionData =
+    selectedAccount == null
+      ? null
+      : {
+          withdrawalAccountId: selectedAccount.accountId,
+          depositAccountNumber: form.toAccount,
+          amount: form.amount ?? 0,
+          cycleMonths: form.cycleMonths,
+          transferDay: form.dayOfMonth,
+          startDate: form.startDate,
+          endDate: form.endDate,
+        }
 
   /**
    * 같은 조건(출금계좌·입금계좌·이체지정일)의 자동이체가 이미 있으면 서버가
    * AUT0301로 거부한다. 화면에서 미리 걸러내지 않고 그 사유를 그대로 띄운다.
    */
   const handleRegisterConfirm = async (otpAuthToken: string) => {
+    // 출금계좌는 확인 다이얼로그에서 인증 전에 걸러낸다. 여기서는 타입을 좁히는
+    // 역할만 한다.
+    if (otpTransactionData == null) return
     setOtpOpen(false)
-    if (!selectedAccount) return
     try {
       const registered = await registerMutation.mutateAsync({
         data: {
@@ -245,6 +250,15 @@ export const AutoTransferScreen = () => {
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => {
             setConfirmOpen(false)
+            // 인증을 시작하기 전에 막는다. OTP는 발급·검증이 실제 토큰을
+            // 소비하므로, 인증을 마친 뒤에 걸러내면 그 토큰이 그대로 버려진다.
+            // 출금계좌 목록은 백그라운드 재조회로 바뀔 수 있다.
+            if (otpTransactionData == null) {
+              setErrorMessage(
+                "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
+              )
+              return
+            }
             setOtpOpen(true)
           }}
           messages={[
@@ -271,16 +285,18 @@ export const AutoTransferScreen = () => {
           ]}
         />
 
-        <OtpModal
-          open={otpOpen}
-          onClose={() => setOtpOpen(false)}
-          onConfirm={handleRegisterConfirm}
-          guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-          transaction={{
-            type: OtpTransactionType.AUTO_TRANSFER,
-            data: otpTransactionData,
-          }}
-        />
+        {otpTransactionData != null && (
+          <OtpModal
+            open={otpOpen}
+            onClose={() => setOtpOpen(false)}
+            onConfirm={handleRegisterConfirm}
+            guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            transaction={{
+              type: OtpTransactionType.AUTO_TRANSFER,
+              data: otpTransactionData,
+            }}
+          />
+        )}
 
         <ErrorDialog
           open={errorMessage != null}

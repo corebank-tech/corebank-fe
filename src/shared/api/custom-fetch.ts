@@ -3,6 +3,7 @@ import {
   NETWORK_ERROR_CODE,
   NETWORK_ERROR_MESSAGE,
   NETWORK_ERROR_STATUS,
+  SESSION_EXPIRED_CODE,
   SUCCESS_CODE,
   type ApiEnvelope,
 } from "@/shared/api/api-error"
@@ -105,7 +106,9 @@ export const customFetch = async <TData>(
   const envelope = await readEnvelope<TData>(response)
 
   if (response.status === SESSION_EXPIRED_STATUS) {
-    emitSessionExpired()
+    // 401 을 쓰는 실패가 세션 만료만은 아니다 — 로그인 실패도 401(ATH0101)이라
+    // 상태코드로 판정하면 A-01 의 실패가 A-11 세션만료 모달을 띄운다.
+    if (envelope?.code === SESSION_EXPIRED_CODE) emitSessionExpired()
     throw new ApiError({
       code: envelope?.code ?? NETWORK_ERROR_CODE,
       message: envelope?.message ?? NETWORK_ERROR_MESSAGE,

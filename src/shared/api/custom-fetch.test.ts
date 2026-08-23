@@ -135,20 +135,59 @@ describe("Idempotency-Key (REQ-CMN-014)", () => {
 })
 
 describe("세션 만료 (POL-001)", () => {
-  it("401 응답 시 onSessionExpired 리스너에 알린다", async () => {
+  /** 401 을 응답하는 핸들러를 걸고, 그 요청이 만료 신호를 냈는지 센다. */
+  const countExpiredSignals = async (body: {
+    code: string
+    message: string
+  }): Promise<number> => {
     server.use(
       http.get("*/api/ping", () =>
-        HttpResponse.json(
-          { code: "AUTH4010", message: "세션이 만료되었습니다.", data: null },
-          { status: 401 },
-        ),
+        HttpResponse.json({ ...body, data: null }, { status: 401 }),
       ),
     )
     const listener = vi.fn()
     const unsubscribe = onSessionExpired(listener)
 
     await expect(customFetch("/api/ping")).rejects.toBeDefined()
-    expect(listener).toHaveBeenCalledOnce()
+    unsubscribe()
+
+    return listener.mock.calls.length
+  }
+
+  it("CMN0101 을 받으면 onSessionExpired 리스너에 알린다", async () => {
+    const calls = await countExpiredSignals({
+      code: "CMN0101",
+      message: "세션이 만료되었습니다.",
+    })
+    expect(calls).toBe(1)
+  })
+
+  // 로그인 실패도 401 이다. 상태코드로 판정하면 A-01 의 실패가 A-11 모달을 띄운다.
+  it("로그인 실패(ATH0101)는 401 이어도 만료로 보지 않는다", async () => {
+    const calls = await countExpiredSignals({
+      code: "ATH0101",
+      message: "아이디 또는 비밀번호가 올바르지 않습니다.",
+    })
+    expect(calls).toBe(0)
+  })
+
+  it("code 를 모르는 401 은 만료로 보지 않는다", async () => {
+    const calls = await countExpiredSignals({
+      code: "ATH9999",
+      message: "알 수 없는 인증 오류입니다.",
+    })
+    expect(calls).toBe(0)
+  })
+
+  it("봉투 없는 401(JSON 아님)도 만료로 보지 않는다", async () => {
+    server.use(
+      http.get("*/api/ping", () => new HttpResponse("", { status: 401 })),
+    )
+    const listener = vi.fn()
+    const unsubscribe = onSessionExpired(listener)
+
+    await expect(customFetch("/api/ping")).rejects.toBeDefined()
+    expect(listener).not.toHaveBeenCalled()
 
     unsubscribe()
   })

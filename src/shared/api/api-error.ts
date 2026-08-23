@@ -12,6 +12,13 @@ export const SUCCESS_CODE = "0000"
  * 아래 두 상수는 서버 응답이 아예 없을 때(전송 실패)만 쓰는 유일한 예외이며,
  * 화면이 아니라 이 모듈 한 곳에서만 정의한다.
  */
+/**
+ * REQ-CMN-006: 인증정보가 없거나 서버 세션이 만료됐을 때의 코드.
+ * 401 이라고 모두 세션 만료가 아니다 — 로그인 실패도 401(`ATH0101`)이라,
+ * 상태코드가 아니라 이 코드로만 만료를 판정한다.
+ */
+export const SESSION_EXPIRED_CODE = "CMN0101"
+
 export const NETWORK_ERROR_CODE = "CMN9000"
 export const NETWORK_ERROR_MESSAGE =
   "네트워크 연결을 확인한 뒤 다시 시도하세요."

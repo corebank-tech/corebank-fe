@@ -2,7 +2,7 @@ import { getToday } from "@/shared/config/clock"
 import { addMonths } from "@/shared/lib/date"
 
 /**
- * G-04 자동이체 조회/변경/해지 목업 데이터. REQ-AUTO-009·010·011.
+ * G-04 자동이체 조회/변경/해지의 도메인 타입. REQ-AUTO-009·010·011.
  * 등록 상태는 POL-036의 3종(정상/종료/해지)만 사용한다 — POL-025 이체 처리상태와 혼동하지 말 것.
  */
 
@@ -61,6 +61,11 @@ const nextExecDateOn = (dayOfMonth: number): string => {
   return thisMonth > getToday() ? thisMonth : onDayOfMonth(dayOfMonth, 1)
 }
 
+/**
+ * **B-05 출금계좌 삭제 차단(REQ-ACCT-011)의 입력**이다. G-04는 서버 응답을 매핑해서 쓰므로
+ * 화면도 스토리도 이 배열을 읽지 않는다 — 계좌번호와 상태 조합을 바꾸면 B-05에서 안내되는
+ * 차단 사유만 달라진다.
+ */
 export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
   {
     id: "at5",

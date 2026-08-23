@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { MOCK_TRANSFER_LIMITS, MOCK_PAYEE_NAME } from "@/entities/transfer"
 import {
   formatAccountNo,
@@ -26,8 +26,8 @@ import type { AccountOption } from "@/shared/types/account"
 import { ApiError } from "@/shared/api/api-error"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 
-// TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. autotransfer
-// 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export type AutoTransferForm = {
@@ -167,26 +167,36 @@ export const AutoTransferScreen = () => {
   }
 
   /**
+   * OTP 발급 시점의 거래정보와 등록 요청 본문은 서버가 정규화해 문자열로 대조한다
+   * (otp_integration_guide.md, 어긋나면 OTP0102). 두 곳에 같은 값을 손으로 적으면
+   * 한쪽만 고쳐도 조용히 어긋나므로 한 객체를 양쪽이 함께 쓴다.
+   */
+  const otpTransactionData = {
+    withdrawalAccountId: selectedAccount?.accountId ?? 0,
+    depositAccountNumber: form.toAccount,
+    amount: form.amount ?? 0,
+    cycleMonths: form.cycleMonths,
+    transferDay: form.dayOfMonth,
+    startDate: form.startDate,
+    endDate: form.endDate,
+  }
+
+  /**
    * 같은 조건(출금계좌·입금계좌·이체지정일)의 자동이체가 이미 있으면 서버가
    * AUT0301로 거부한다. 화면에서 미리 걸러내지 않고 그 사유를 그대로 띄운다.
    */
-  const handleRegisterConfirm = async () => {
+  const handleRegisterConfirm = async (otpAuthToken: string) => {
     setOtpOpen(false)
     if (!selectedAccount) return
     try {
       const registered = await registerMutation.mutateAsync({
         data: {
-          withdrawalAccountId: selectedAccount.accountId,
-          depositAccountNumber: form.toAccount,
+          ...otpTransactionData,
           payeeName: MOCK_PAYEE_NAME,
-          amount: form.amount ?? 0,
-          cycleMonths: form.cycleMonths,
-          transferDay: form.dayOfMonth,
-          startDate: form.startDate,
-          endDate: form.endDate,
           myPassbookMemo: form.myMemo || undefined,
           recipientPassbookMemo: form.payeeMemo || undefined,
           accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          otpAuthToken,
         },
       })
       setNextExecDate(registered?.nextExecutionDate ?? null)
@@ -266,6 +276,10 @@ export const AutoTransferScreen = () => {
           onClose={() => setOtpOpen(false)}
           onConfirm={handleRegisterConfirm}
           guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+          transaction={{
+            type: OtpTransactionType.AUTO_TRANSFER,
+            data: otpTransactionData,
+          }}
         />
 
         <ErrorDialog

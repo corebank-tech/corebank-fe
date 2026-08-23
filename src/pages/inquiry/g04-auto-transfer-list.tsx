@@ -15,7 +15,7 @@ import {
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
@@ -86,6 +86,8 @@ export const G04AutoTransferList = () => {
   // 와 같은 형태). 선택이 비워져 버튼이 어차피 비활성이 되는 것에 기대지 않는다.
   const [isTerminating, setIsTerminating] = React.useState(false)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
+  const [multiSelectBlockedOpen, setMultiSelectBlockedOpen] =
+    React.useState(false)
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
   >(null)
@@ -189,6 +191,13 @@ export const G04AutoTransferList = () => {
       setBlockedOpen(true)
       return
     }
+    // OTP 인증 토큰은 autoTransferId 하나에 묶여 발급되고 1회만 소비된다
+    // (otp_integration_guide.md). 여러 건을 한 번의 인증으로 해지하면 토큰에 묶인
+    // 건만 처리되고 나머지는 OTP0102로 실패하므로, 한 건씩만 받는다.
+    if (selectedRows.length > 1) {
+      setMultiSelectBlockedOpen(true)
+      return
+    }
     setTerminateConfirmOpen(true)
   }
 
@@ -198,35 +207,37 @@ export const G04AutoTransferList = () => {
     setTerminateOtpOpen(true)
   }
 
-  const handleTerminateOtpConfirm = async () => {
+  const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
     if (isTerminating) return
     setTerminateOtpOpen(false)
+    // 진입 가드가 한 건만 통과시킨다.
+    const target = selectedRows[0]
+    if (!target) return
     setIsTerminating(true)
     try {
-      // allSettled를 쓰는 이유: Promise.all은 첫 실패에서 즉시 reject하므로 아직
-      // 응답을 기다리는 해지 요청이 남은 채로 재조회가 나간다. 그러면 나중에
-      // 성공한 건이 반영되기 전의 목록을 받는다.
-      const results = await Promise.allSettled(
-        selectedRows.map((r) =>
-          // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
-          cancelAutoTransfer(Number(r.id), {
-            headers: { "Account-Password-Auth-Token": TEMP_AUTH_TOKEN },
-          }),
-        ),
+      // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
+      // 화면이 요청 전 상태를 계속 보여준다. 그래서 예외를 잡아 값으로 옮긴다.
+      // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
+      const failure = await cancelAutoTransfer(Number(target.id), {
+        headers: {
+          "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+          "Otp-Auth-Token": otpAuthToken,
+        },
+      }).then(
+        () => null,
+        (error: unknown) => error,
       )
       clearSelection()
 
-      const failed = results.find((r) => r.status === "rejected")
       const refreshed = await refetch()
 
       // 해지 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
       // 응답을 그대로 들고 있어서 방금 해지한 건이 여전히 "정상"으로 보이는데,
       // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
-      if (failed) {
-        const reason = failed.reason
+      if (failure) {
         setActionErrorMessage(
-          reason instanceof ApiError
-            ? reason.message
+          failure instanceof ApiError
+            ? failure.message
             : "자동이체 해지에 실패했습니다.",
         )
       } else if (refreshed.isError) {
@@ -251,6 +262,7 @@ export const G04AutoTransferList = () => {
    */
   const handleEditSave = async (
     updatedRow: AutoTransferRow,
+    otpAuthToken: string,
   ): Promise<boolean> => {
     try {
       await changeAutoTransfer(Number(updatedRow.id), {
@@ -259,6 +271,7 @@ export const G04AutoTransferList = () => {
         endDate: updatedRow.endDate,
         myPassbookMemo: updatedRow.memo,
         accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+        otpAuthToken,
       })
     } catch (error) {
       setActionErrorMessage(
@@ -415,6 +428,16 @@ export const G04AutoTransferList = () => {
           />
 
           <ErrorDialog
+            open={multiSelectBlockedOpen}
+            onClose={() => setMultiSelectBlockedOpen(false)}
+            title="해지는 한 건씩 가능합니다"
+            messages={[
+              "OTP 인증은 자동이체 한 건에만 유효합니다.",
+              "해지할 건을 하나만 선택한 뒤 다시 시도하세요.",
+            ]}
+          />
+
+          <ErrorDialog
             open={actionErrorMessage != null}
             onClose={() => setActionErrorMessage(null)}
             title="처리 실패"
@@ -434,6 +457,10 @@ export const G04AutoTransferList = () => {
             open={terminateOtpOpen}
             onClose={() => setTerminateOtpOpen(false)}
             onConfirm={handleTerminateOtpConfirm}
+            transaction={{
+              type: OtpTransactionType.AUTO_TRANSFER,
+              data: { autoTransferId: Number(selectedRows[0]?.id ?? 0) },
+            }}
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />
 

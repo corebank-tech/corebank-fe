@@ -210,6 +210,14 @@ export const B05WithdrawAccounts = () => {
   }
 
   const handleRegisterCancel = () => {
+    if (registrationSuccessCount > 0) {
+      setSuccessMessage(
+        registrationSuccessCount === 1
+          ? "1개 계좌가 출금계좌로 등록되었습니다."
+          : `${registrationSuccessCount}개 계좌가 출금계좌로 등록되었습니다.`,
+      )
+    }
+
     closeRegisterFlow()
     setUnregisteredSelected([])
   }

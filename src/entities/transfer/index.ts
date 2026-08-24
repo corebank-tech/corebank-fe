@@ -26,7 +26,6 @@ export type {
   ReservationStatus,
   ReservationRow,
 } from "@/entities/transfer/api/e04-reservations"
-export { MOCK_RESERVATIONS } from "@/entities/transfer/api/e04-reservations"
 
 export { toReservationRow } from "@/entities/transfer/lib/mappers"
 
@@ -41,7 +40,6 @@ export type {
   TransferCycle,
   AutoTransferRow,
 } from "@/entities/transfer/api/g04-auto-transfers"
-export { MOCK_AUTO_TRANSFERS } from "@/entities/transfer/api/g04-auto-transfers"
 
 export {
   toAutoTransferRow,

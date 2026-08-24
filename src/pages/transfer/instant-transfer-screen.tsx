@@ -4,31 +4,29 @@ import { useNavigate, useSearchParams } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { ResultPanel, type ResultVariant } from "@/widgets/transfer"
 import type { DataGridColumn } from "@/shared/ui/data-grid"
 import {
-  MOCK_ACCOUNT_PASSWORDS,
-  MOCK_FREQUENT_ACCOUNTS_MAX,
-  MOCK_FREQUENT_TRANSFER_ACCOUNTS,
   MOCK_RECENT_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_LIMITS,
-  generateTransactionId,
-  lookupPayeeAccount,
-  type FrequentTransferAccount,
+  fetchPayee,
+  getFavoriteAccountsQueryKey,
+  useExecuteTransferMutation,
+  useFavoriteAccountsQuery,
+  useRegisterFavoriteAccountMutation,
+  useTransferLimitQuery,
+  getTransferLimitQueryKey,
   type TransferResultRow,
 } from "@/entities/transfer"
 import {
-  MOCK_OVERVIEW_ACCOUNTS,
-  MOCK_ORDER_ACCOUNTS,
-  MOCK_PASSWORD_ACCOUNTS,
-  MOCK_WITHDRAWAL_ACCOUNTS,
+  useAccountOverviewQuery,
+  useWithdrawAccounts,
+  useVerifyAccountPasswordMutation,
 } from "@/entities/account"
-import {
-  getLoginStatusQueryKey,
-  MOCK_DASHBOARD_ACCOUNTS,
-} from "@/entities/dashboard"
+import { getLoginStatusQueryKey } from "@/entities/dashboard"
+import { ApiError } from "@/shared/api/api-error"
+import type { AccountOption } from "@/shared/types/account"
+import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
   formatAccountNo,
   formatAmount,
@@ -66,30 +64,8 @@ type InstantTransferResultState = {
   failReason?: string
 }
 
-type DebitableAccount = {
-  accountNo: string
-  balance: number
-  withdrawable?: number
-}
-
-/**
- * 이체 실행 후 계좌를 표시하는 모든 화면(B-01·B-04·B-05·B-07·대시보드)의
- * 잔액을 함께 갱신한다. 각 화면이 자체 mock 배열을 보유하고 있어 화면별로
- * 반복 적용한다.
- */
-const debitAccount = (
-  rows: DebitableAccount[],
-  accountNo: string,
-  amount: number,
-) => {
-  const row = rows.find((r) => r.accountNo === accountNo)
-  if (!row) return
-  row.balance -= amount
-  if (row.withdrawable != null) row.withdrawable -= amount
-}
-
 const INITIAL_FORM: InstantTransferForm = {
-  fromAccount: MOCK_TRANSFER_ACCOUNTS[0].accountNo,
+  fromAccount: "",
   password: "",
   toAccount: "",
   toConfirmed: false,
@@ -113,16 +89,34 @@ export const InstantTransferScreen = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)
-  const [form, setForm] = React.useState<InstantTransferForm>(() => {
-    /** REQ-INQR-005: 계좌목록의 [이체] 진입 시 출금계좌가 선택된 상태로 시작한다. */
-    const fromParam = searchParams.get("from")
-    const preselected = MOCK_TRANSFER_ACCOUNTS.find(
-      (a) => a.accountNo === fromParam,
-    )
-    return preselected
-      ? { ...INITIAL_FORM, fromAccount: preselected.accountNo }
-      : INITIAL_FORM
-  })
+  const [form, setForm] = React.useState<InstantTransferForm>(INITIAL_FORM)
+
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
+  const accountOverviewQuery = useAccountOverviewQuery()
+  const { data: limit } = useTransferLimitQuery()
+  const favoriteAccountsQuery = useFavoriteAccountsQuery()
+  const registerFavoriteMutation = useRegisterFavoriteAccountMutation()
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const executeMutation = useExecuteTransferMutation()
+
+  const accounts: AccountOption[] = React.useMemo(
+    () =>
+      withdrawAccounts.map((a) => ({
+        alias: a.accountName ?? "",
+        accountNo: a.accountNumber ?? "",
+        balance: a.balance ?? 0,
+        withdrawable: a.balance ?? 0,
+      })),
+    [withdrawAccounts],
+  )
+
+  /** REQ-INQR-005: 계좌목록의 [이체] 진입 시 출금계좌가 선택된 상태로 시작한다. */
+  const fromParam = searchParams.get("from")
+  const effectiveFromAccount =
+    form.fromAccount ||
+    (accounts.some((a) => a.accountNo === fromParam)
+      ? (fromParam ?? "")
+      : (accounts[0]?.accountNo ?? ""))
   // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
   // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
   // 어긋나지 않게 한다.
@@ -133,13 +127,13 @@ export const InstantTransferScreen = () => {
   const [result, setResult] = React.useState<InstantTransferResultState | null>(
     null,
   )
-  const [frequentAccounts, setFrequentAccounts] = React.useState<
-    FrequentTransferAccount[]
-  >(MOCK_FREQUENT_TRANSFER_ACCOUNTS)
+  const [passwordAuthToken, setPasswordAuthToken] = React.useState<
+    string | null
+  >(null)
+  const [idempotencyKey, setIdempotencyKey] = React.useState("")
 
-  const dailyRemaining =
-    MOCK_TRANSFER_LIMITS.perDay - MOCK_TRANSFER_LIMITS.usedToday
-  const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
+  const dailyRemaining = limit?.dailyRemainingAmount ?? 0
+  const perTransferLimit = limit?.oneTimeLimit ?? 0
   const effectiveLimit = Math.min(perTransferLimit, dailyRemaining)
 
   const setField = <K extends keyof InstantTransferForm>(
@@ -147,12 +141,15 @@ export const InstantTransferScreen = () => {
     value: InstantTransferForm[K],
   ) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const selectedAccount = MOCK_TRANSFER_ACCOUNTS.find(
-    (a) => a.accountNo === form.fromAccount,
+  const selectedAccount = accounts.find(
+    (a) => a.accountNo === effectiveFromAccount,
   )
+  const selectedAccountId = withdrawAccounts.find(
+    (a) => a.accountNumber === effectiveFromAccount,
+  )?.accountId
 
   /** REQ-TRSF-004·007·030: 입금계좌번호를 조회해 예금주·계좌유형·동일계좌 여부를 검증한다. */
-  const resolveToAccount = (accountNo: string) => {
+  const resolveToAccount = async (accountNo: string) => {
     if (accountNo.length !== 12) {
       setForm((f) => ({
         ...f,
@@ -164,7 +161,7 @@ export const InstantTransferScreen = () => {
       }))
       return
     }
-    if (accountNo === form.fromAccount) {
+    if (accountNo === effectiveFromAccount) {
       setForm((f) => ({
         ...f,
         toAccount: accountNo,
@@ -176,26 +173,29 @@ export const InstantTransferScreen = () => {
       }))
       return
     }
-    const looked = lookupPayeeAccount(accountNo)
-    if (!looked.ok) {
+    try {
+      const payee = await fetchPayee(accountNo)
+      setForm((f) => ({
+        ...f,
+        toAccount: accountNo,
+        toConfirmed: true,
+        payeeName: payee.payeeName ?? "",
+        executionFails: false,
+        toAccountError: null,
+      }))
+    } catch (error) {
       setForm((f) => ({
         ...f,
         toAccount: accountNo,
         toConfirmed: false,
         payeeName: "",
         executionFails: false,
-        toAccountError: looked.error ?? null,
+        toAccountError:
+          error instanceof ApiError
+            ? error.message
+            : "입금계좌를 조회하지 못했습니다. 계좌번호를 확인하세요.",
       }))
-      return
     }
-    setForm((f) => ({
-      ...f,
-      toAccount: accountNo,
-      toConfirmed: true,
-      payeeName: looked.payeeName ?? "",
-      executionFails: looked.executionFails ?? false,
-      toAccountError: null,
-    }))
   }
 
   const canSubmit =
@@ -226,87 +226,111 @@ export const InstantTransferScreen = () => {
       setConfirmOpen(true)
     }
 
-    const handleConfirmDialogConfirm = () => {
+    const handleConfirmDialogConfirm = async () => {
       setConfirmOpen(false)
-      if (form.password !== MOCK_ACCOUNT_PASSWORDS[form.fromAccount]) {
+      if (selectedAccountId == null) {
         setAuthError(
-          "계좌비밀번호가 일치하지 않습니다. 이전 단계에서 계좌비밀번호를 다시 확인하세요.",
+          "출금계좌를 확인할 수 없습니다. 이전 단계에서 다시 선택하세요.",
         )
         return
       }
-      setAuthError(null)
-      setOtpOpen(true)
+      try {
+        const verified = await verifyPasswordMutation.mutateAsync({
+          accountId: selectedAccountId,
+          data: { accountPassword: form.password },
+        })
+        // 평문 비밀번호는 검증 직후 지운다.
+        setField("password", "")
+        verifyPasswordMutation.reset()
+
+        if (!verified.accountPasswordAuthToken) {
+          setAuthError(
+            "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도하세요.",
+          )
+          return
+        }
+        setPasswordAuthToken(verified.accountPasswordAuthToken)
+        setAuthError(null)
+        setIdempotencyKey(crypto.randomUUID())
+        setOtpOpen(true)
+      } catch (error) {
+        setAuthError(
+          error instanceof ApiError
+            ? error.message
+            : "계좌비밀번호 확인에 실패했습니다. 다시 시도하세요.",
+        )
+      }
     }
 
-    const handleOtpConfirm = () => {
-      const executedAt = transactionAt ?? getNow()
+    const handleOtpConfirm = async (otpAuthToken: string) => {
       setOtpOpen(false)
-      if (form.executionFails) {
-        setResult({
-          variant: "fail",
-          row: {
-            transactionId: "-",
-            processedAt: executedAt,
-            fromAccountNo: form.fromAccount,
-            toAccountNo: form.toAccount,
-            payeeName: form.payeeName,
+      if (selectedAccountId == null || passwordAuthToken == null) {
+        setAuthError(
+          "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도하세요.",
+        )
+        return
+      }
+      const executedAt = transactionAt ?? getNow()
+      try {
+        const executed = await executeMutation.mutateAsync({
+          request: {
+            withdrawalAccountId: selectedAccountId,
+            depositAccountNumber: form.toAccount,
             amount,
-            fee: 0,
-            memo: form.payeeMemo || "-",
-            balanceAfter: selectedAccount?.withdrawable ?? 0,
+            myPassbookMemo: form.myMemo || undefined,
+            recipientPassbookMemo: form.payeeMemo || undefined,
           },
-          errorCode: "ERR-9001",
-          failReason:
-            "일시적인 시스템 오류로 이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
-        })
-      } else {
-        const transactionId = generateTransactionId(executedAt)
-        setResult({
-          variant: "success",
-          row: {
-            transactionId,
-            processedAt: executedAt,
-            fromAccountNo: form.fromAccount,
-            toAccountNo: form.toAccount,
-            payeeName: form.payeeName,
-            amount,
-            fee: 0,
-            memo: form.payeeMemo || "-",
-            balanceAfter,
-          },
+          accountPasswordAuthToken: passwordAuthToken,
+          otpAuthToken,
+          idempotencyKey,
         })
 
-        /**
-         * 이체 실행 결과를 원장에 반영한다 — REQ-TRSF-024(당일 사용금액 즉시 갱신),
-         * 계좌 잔액·최근거래일 갱신. 이체결과조회(D-04)는 서버를 조회하므로
-         * 목업 이체 내역을 쌓지 않는다.
-         */
-        MOCK_TRANSFER_LIMITS.usedToday += amount
-        // A-09 최종접속정보의 최근 거래일시는 서버가 계산한다. 이체가 끝났으니
-        // 다음 조회에서 새로 받도록 캐시만 무효화한다.
+        const row: TransferResultRow = {
+          transactionId: executed.transactionNumber ?? "-",
+          processedAt: executed.transferredAt ?? executedAt,
+          fromAccountNo: effectiveFromAccount,
+          toAccountNo: form.toAccount,
+          payeeName: form.payeeName,
+          amount,
+          fee: 0,
+          memo: form.payeeMemo || "-",
+          balanceAfter:
+            executed.withdrawalBalanceAfter ??
+            selectedAccount?.withdrawable ??
+            0,
+        }
+
+        // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
+        if (executed.status === "ERROR") {
+          setResult({
+            variant: "fail",
+            row: { ...row, transactionId: executed.transactionNumber ?? "-" },
+            errorCode: executed.errorCode ?? undefined,
+            failReason:
+              executed.errorMessage ??
+              "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
+          })
+        } else {
+          setResult({ variant: "success", row })
+        }
+
+        // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
         void queryClient.invalidateQueries({
           queryKey: getLoginStatusQueryKey(),
         })
-        for (const rows of [
-          MOCK_TRANSFER_ACCOUNTS,
-          MOCK_OVERVIEW_ACCOUNTS,
-          MOCK_PASSWORD_ACCOUNTS,
-          MOCK_WITHDRAWAL_ACCOUNTS,
-          MOCK_ORDER_ACCOUNTS,
-          MOCK_DASHBOARD_ACCOUNTS,
-        ]) {
-          debitAccount(rows, form.fromAccount, amount)
-        }
-        const transferDate = executedAt.slice(0, 10)
-        const overviewRow = MOCK_OVERVIEW_ACCOUNTS.find(
-          (a) => a.accountNo === form.fromAccount,
+        void queryClient.invalidateQueries({
+          queryKey: getTransferLimitQueryKey(),
+        })
+        void accountOverviewQuery.refetch()
+      } catch (error) {
+        setAuthError(
+          error instanceof ApiError
+            ? error.message
+            : "이체 실행에 실패했습니다. 잠시 후 다시 시도하세요.",
         )
-        if (overviewRow) overviewRow.lastActivityDate = transferDate
-        const dashboardRow = MOCK_DASHBOARD_ACCOUNTS.find(
-          (a) => a.accountNo === form.fromAccount,
-        )
-        if (dashboardRow) dashboardRow.lastTxDate = transferDate
+        return
       }
+      setPasswordAuthToken(null)
       setStep(3)
     }
 
@@ -368,7 +392,15 @@ export const InstantTransferScreen = () => {
         <OtpModal
           open={otpOpen}
           onClose={() => setOtpOpen(false)}
-          onConfirm={handleOtpConfirm}
+          onConfirm={(otpAuthToken) => void handleOtpConfirm(otpAuthToken)}
+          transaction={{
+            type: OtpTransactionType.IMMEDIATE_TRANSFER,
+            data: {
+              withdrawalAccountId: selectedAccountId,
+              depositAccountNumber: form.toAccount,
+              amount,
+            },
+          }}
           title="즉시이체 OTP 인증"
           guide="즉시이체 실행을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
         />
@@ -448,17 +480,32 @@ export const InstantTransferScreen = () => {
       },
     ]
 
-    const alreadyFrequent = frequentAccounts.some(
-      (a) => a.accountNo === row.toAccountNo,
+    const favorites = favoriteAccountsQuery.data ?? []
+    const alreadyFrequent = favorites.some(
+      (a) => a.depositAccountNumber === row.toAccountNo,
     )
-    const frequentFull = frequentAccounts.length >= MOCK_FREQUENT_ACCOUNTS_MAX
+    const frequentFull = favorites.length >= FREQUENT_TRANSFER_ACCOUNT_MAX
 
-    const handleRegisterFrequent = () => {
+    const handleRegisterFrequent = async () => {
       if (alreadyFrequent || frequentFull) return
-      setFrequentAccounts((prev) => [
-        ...prev,
-        { accountNo: row.toAccountNo, payeeName: row.payeeName },
-      ])
+      try {
+        await registerFavoriteMutation.mutateAsync({
+          request: {
+            depositAccountNumber: row.toAccountNo,
+            alias: row.payeeName,
+          },
+          idempotencyKey: crypto.randomUUID(),
+        })
+        await queryClient.invalidateQueries({
+          queryKey: getFavoriteAccountsQueryKey(),
+        })
+      } catch (error) {
+        setAuthError(
+          error instanceof ApiError
+            ? error.message
+            : "자주 쓰는 계좌 등록에 실패했습니다.",
+        )
+      }
     }
 
     return (
@@ -514,7 +561,7 @@ export const InstantTransferScreen = () => {
                     {alreadyFrequent
                       ? "자주 쓰는 계좌 등록됨"
                       : frequentFull
-                        ? `자주 쓰는 계좌 ${MOCK_FREQUENT_ACCOUNTS_MAX}건 초과`
+                        ? `자주 쓰는 계좌 ${FREQUENT_TRANSFER_ACCOUNT_MAX}건 초과`
                         : "자주 쓰는 계좌로 등록"}
                   </Button>
                 )}
@@ -529,16 +576,19 @@ export const InstantTransferScreen = () => {
   return (
     <InstantTransferStep1
       steps={STEPS}
-      accounts={MOCK_TRANSFER_ACCOUNTS}
-      form={form}
+      accounts={accounts}
+      form={{ ...form, fromAccount: effectiveFromAccount }}
       onChange={setField}
       perTransferLimit={perTransferLimit}
       dailyRemaining={dailyRemaining}
       canSubmit={canSubmit}
       onNext={() => setStep(2)}
-      onConfirmAccount={() => resolveToAccount(form.toAccount)}
-      onSelectQuickAccount={resolveToAccount}
-      frequentAccounts={frequentAccounts}
+      onConfirmAccount={() => void resolveToAccount(form.toAccount)}
+      onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}
+      frequentAccounts={(favoriteAccountsQuery.data ?? []).map((a) => ({
+        accountNo: a.depositAccountNumber ?? "",
+        payeeName: a.payeeName ?? "",
+      }))}
       recentAccounts={MOCK_RECENT_TRANSFER_ACCOUNTS}
     />
   )

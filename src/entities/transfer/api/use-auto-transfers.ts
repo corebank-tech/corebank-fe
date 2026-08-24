@@ -4,9 +4,9 @@
  * 해지·변경은 선택한 여러 건을 순차 처리해서 훅이 아니라 함수를 쓴다.
  */
 export {
-  useSearchAutoTransfers as useAutoTransfers,
+  useGetAutoTransfers as useAutoTransfers,
   useRegisterAutoTransfer as useRegisterAutoTransferMutation,
   cancelAutoTransfer,
-  changeAutoTransfer,
+  updateAutoTransfer,
 } from "@/shared/api/generated"
-export type { SearchAutoTransfersParams } from "@/shared/api/generated"
+export type { GetAutoTransfersParams } from "@/shared/api/generated"

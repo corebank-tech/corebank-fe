@@ -1,7 +1,7 @@
 import {
-  useExecuteProductSubscription,
+  useCreateProductSubscription,
   useValidateProductSubscription,
-  getProductSubscriptions,
+  getProductSubscriptionDetail,
   getProductTerms,
 } from "@/shared/api/generated"
 import type {
@@ -33,7 +33,7 @@ export const fetchProductTerms = async (
 export const useValidateSubscription = () => useValidateProductSubscription()
 
 /** 가입 실행(C-05). */
-export const useExecuteSubscription = () => useExecuteProductSubscription()
+export const useExecuteSubscription = () => useCreateProductSubscription()
 
 /**
  * 가입 상세. 실행 응답의 계좌번호는 마스킹돼 있고(088******002) 자동이체 프리필도
@@ -42,7 +42,7 @@ export const useExecuteSubscription = () => useExecuteProductSubscription()
 export const fetchSubscriptionResult = async (
   subscriptionId: number,
 ): Promise<ProductSubscriptionResultResponse | undefined> => {
-  return getProductSubscriptions(subscriptionId)
+  return getProductSubscriptionDetail(subscriptionId)
 }
 
 export type {

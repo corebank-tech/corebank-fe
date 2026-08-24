@@ -102,15 +102,15 @@ export {
   cancelScheduledTransfer,
   useRegisterScheduledTransferMutation,
 } from "@/entities/transfer/api/use-scheduled-transfers"
-export type { SearchScheduledTransfersParams } from "@/entities/transfer/api/use-scheduled-transfers"
+export type { GetScheduledTransfersParams } from "@/entities/transfer/api/use-scheduled-transfers"
 
 export {
   useAutoTransfers,
   useRegisterAutoTransferMutation,
   cancelAutoTransfer,
-  changeAutoTransfer,
+  updateAutoTransfer,
 } from "@/entities/transfer/api/use-auto-transfers"
-export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto-transfers"
+export type { GetAutoTransfersParams } from "@/entities/transfer/api/use-auto-transfers"
 
 export {
   TransferResponseStatus,

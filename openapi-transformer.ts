@@ -6,48 +6,14 @@ import type {
 } from "openapi3-ts/oas31"
 
 /**
- * `openapi.yaml` 은 서버(`/v3/api-docs`) 스냅샷을 손대지 않고 그대로 둔다.
- * 대신 codegen 직전에 operationId 만 이 파일에서 고정한다.
+ * codegen 직전에 REQ-CMN-007 공통 응답 봉투를 벗긴다 — 아래 `unwrapApiEnvelope` 참고.
  *
- * 서버에 `@Operation(operationId=...)` 가 하나도 없어 springdoc 이 자바 메서드명을
- * 그대로 내보낸다. 이름이 겹치면 orval 이 `verify1`·`register2` 처럼 번호를 붙이는데,
- * 이 번호는 컨트롤러가 하나만 늘어도 밀려서 훅 이름이 조용히 바뀐다.
- * 화면이 참조하는 오퍼레이션은 여기서 이름을 고정한다.
+ * operationId 는 손대지 않는다. 서버가 `corebank-server#308` 로 컨트롤러 47곳에
+ * `@Operation(operationId=...)` 를 명시해 안정적인 이름을 직접 내려준다.
  *
- * 함께 REQ-CMN-007 공통 응답 봉투도 여기서 벗긴다 — 아래 `unwrapApiEnvelope` 참고.
- *
- * 태그는 건드리지 않는다. `mode: "single"` 이라 태그가 파일 경로에 쓰이지 않으므로
+ * 태그도 건드리지 않는다. `mode: "single"` 이라 태그가 파일 경로에 쓰이지 않으므로
  * 서버가 한글 `@Tag` 를 달거나 바꿔도 생성물이 흔들리지 않는다.
  */
-
-/**
- * `"<method> <path>"` → 고정할 operationId.
- * 여기 없는 오퍼레이션은 서버 메서드명을 그대로 쓴다 — 화면에서 참조하게 되면
- * 그때 이 표에 추가한다. 이름은 `동사 + 도메인` 으로 맞춘다(`searchProducts`).
- */
-const OPERATION_ID: Record<string, string> = {
-  "get /accounts": "getAccounts",
-  "get /accounts/{accountId}/transactions": "searchAccountTransactions",
-
-  "get /products": "searchProducts",
-  "get /products/{productId}": "getProductDetail",
-  "get /products/{productId}/terms/{termsId}": "getProductTerms",
-  "post /product-subscriptions": "executeProductSubscription",
-  "post /product-subscriptions/validation": "validateProductSubscription",
-  "get /product-subscriptions/{subscriptionId}": "getProductSubscriptions",
-
-  "get /scheduled-transfers": "searchScheduledTransfers",
-  "post /scheduled-transfers": "registerScheduledTransfer",
-  "post /scheduled-transfers/{scheduledTransferId}/cancel":
-    "cancelScheduledTransfer",
-  "get /scheduled-transfers/executions": "searchScheduledTransferExecutions",
-
-  "get /auto-transfers": "searchAutoTransfers",
-  "post /auto-transfers": "registerAutoTransfer",
-  "patch /auto-transfers/{autoTransferId}": "changeAutoTransfer",
-  "delete /auto-transfers/{autoTransferId}": "cancelAutoTransfer",
-  "get /auto-transfers/executions": "searchAutoTransferExecutions",
-}
 
 const HTTP_METHODS = [
   "get",
@@ -119,16 +85,6 @@ const unwrapApiEnvelope = (spec: OpenAPIObject): void => {
 }
 
 export default (spec: OpenAPIObject): OpenAPIObject => {
-  for (const [path, pathItem] of Object.entries(spec.paths ?? {})) {
-    for (const method of HTTP_METHODS) {
-      const operation = pathItem[method] as OperationObject | undefined
-      if (!operation) continue
-
-      const operationId = OPERATION_ID[`${method} ${path}`]
-      if (operationId) operation.operationId = operationId
-    }
-  }
-
   unwrapApiEnvelope(spec)
 
   return spec

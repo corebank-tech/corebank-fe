@@ -6,8 +6,8 @@
  * request.headers를 훅 생성 시점에 고정한다.
  */
 export {
-  useSearchScheduledTransfers as useScheduledTransfers,
+  useGetScheduledTransfers as useScheduledTransfers,
   cancelScheduledTransfer,
   useRegisterScheduledTransfer as useRegisterScheduledTransferMutation,
 } from "@/shared/api/generated"
-export type { SearchScheduledTransfersParams } from "@/shared/api/generated"
+export type { GetScheduledTransfersParams } from "@/shared/api/generated"

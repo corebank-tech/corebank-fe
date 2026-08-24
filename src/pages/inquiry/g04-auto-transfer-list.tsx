@@ -42,7 +42,7 @@ import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-
 import {
   useAutoTransfers,
   cancelAutoTransfer,
-  changeAutoTransfer,
+  updateAutoTransfer,
 } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
@@ -274,7 +274,7 @@ export const G04AutoTransferList = () => {
     otpAuthToken: string,
   ): Promise<boolean> => {
     try {
-      await changeAutoTransfer(Number(updatedRow.id), {
+      await updateAutoTransfer(Number(updatedRow.id), {
         amount: updatedRow.amount,
         cycleMonths: updatedRow.cycleMonths,
         endDate: updatedRow.endDate,

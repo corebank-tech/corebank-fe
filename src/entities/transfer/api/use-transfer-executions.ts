@@ -1,12 +1,12 @@
 import { keepPreviousData } from "@tanstack/react-query"
 import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import {
-  useSearchAutoTransferExecutions,
-  useSearchScheduledTransferExecutions,
+  useGetAutoTransferExecutions,
+  useGetScheduledTransferExecutions,
 } from "@/shared/api/generated"
 import type {
-  SearchAutoTransferExecutionsParams,
-  SearchScheduledTransferExecutionsParams,
+  GetAutoTransferExecutionsParams,
+  GetScheduledTransferExecutionsParams,
 } from "@/shared/api/generated"
 
 /**
@@ -22,7 +22,7 @@ const KEEP_PREVIOUS = { placeholderData: keepPreviousData } as const
 
 /** 자동이체 실행이력(G-05). */
 export const useAutoTransferExecutions = (
-  params: SearchAutoTransferExecutionsParams,
+  params: GetAutoTransferExecutionsParams,
   options?: { enabled?: boolean },
 ) => {
   const {
@@ -33,7 +33,7 @@ export const useAutoTransferExecutions = (
     isError,
     error,
     refetch,
-  } = useSearchAutoTransferExecutions(params, {
+  } = useGetAutoTransferExecutions(params, {
     query: { ...KEEP_PREVIOUS, enabled: options?.enabled },
   })
 
@@ -49,7 +49,7 @@ export const useAutoTransferExecutions = (
 
 /** 예약이체 처리결과(E-05). */
 export const useScheduledTransferExecutions = (
-  params: SearchScheduledTransferExecutionsParams,
+  params: GetScheduledTransferExecutionsParams,
 ) => {
   const {
     data,
@@ -59,7 +59,7 @@ export const useScheduledTransferExecutions = (
     isError,
     error,
     refetch,
-  } = useSearchScheduledTransferExecutions(params, { query: KEEP_PREVIOUS })
+  } = useGetScheduledTransferExecutions(params, { query: KEEP_PREVIOUS })
 
   return {
     page: data,

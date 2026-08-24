@@ -432,7 +432,7 @@ export const E04ReservationList = () => {
             cancelLabel="닫기"
             items={selectedRows.map((r) => ({
               label: formatDate(r.scheduledDate),
-              value: `${r.fromAlias ?? r.fromAccountNo} → ${r.payeeName} / ${formatAmount(r.amount)}`,
+              value: `${r.fromAlias || r.fromAccountNo} → ${r.payeeName} / ${formatAmount(r.amount)}`,
             }))}
           />
 

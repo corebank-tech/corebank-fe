@@ -132,6 +132,16 @@ describe("toAutoTransferRow", () => {
     spy.mockRestore()
   })
 
+  // 서버가 별칭 미설정 건에 fromAlias 를 안 내려준다. 빈 문자열로 메우면 화면·엑셀에서
+  // `${fromAlias} ${계좌번호}` 가 구분자만 남은 표기가 되므로 undefined 그대로 둔다.
+  it("서버가 안 내려준 별칭은 빈 문자열로 메우지 않는다", () => {
+    const row = toAutoTransferRow(
+      { ...BASE_ITEM, fromAlias: undefined },
+      FROM_ACCOUNT_NO,
+    )
+    expect(row.fromAlias).toBeUndefined()
+  })
+
   it("nextExecDate는 응답에 없어 비어 있다", () => {
     const row = toAutoTransferRow(BASE_ITEM, FROM_ACCOUNT_NO)
     expect(row.nextExecDate).toBeUndefined()
@@ -144,7 +154,6 @@ describe("toAutoTransferRow", () => {
 
     expect(row).toMatchObject({
       id: "",
-      fromAlias: "",
       toAccountNo: "",
       payeeName: "",
       amount: 0,

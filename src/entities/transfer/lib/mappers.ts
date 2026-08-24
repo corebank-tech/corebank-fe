@@ -134,7 +134,7 @@ export const toAutoTransferRow = (
 ): AutoTransferRow => ({
   id: String(item.autoTransferId ?? ""),
   fromAccountNo,
-  fromAlias: item.fromAlias ?? "",
+  fromAlias: item.fromAlias,
   toAccountNo: item.depositAccountNumber ?? "",
   payeeName: item.payeeName ?? "",
   amount: item.amount ?? 0,

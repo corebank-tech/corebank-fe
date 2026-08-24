@@ -118,7 +118,6 @@ export const InstantTransferStep1 = ({
                     onChange("toAccount", v)
                     onChange("toConfirmed", false)
                     onChange("payeeName", "")
-                    onChange("executionFails", false)
                     onChange("toAccountError", null)
                   }}
                   onConfirm={onConfirmAccount}

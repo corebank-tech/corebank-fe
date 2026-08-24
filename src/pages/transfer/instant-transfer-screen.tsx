@@ -16,6 +16,7 @@ import {
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   getTransferLimitQueryKey,
+  type FrequentTransferAccount,
   type TransferResultRow,
 } from "@/entities/transfer"
 import {
@@ -51,8 +52,6 @@ export type InstantTransferForm = {
   payeeName: string
   /** REQ-TRSF-004·007·030: 계좌확인 실패 사유. */
   toAccountError: string | null
-  /** 조회는 통과했지만 실행 단계에서 실패하는 데모 계좌 여부. */
-  executionFails: boolean
   amount: number | null
   payeeMemo: string
   myMemo: string
@@ -72,7 +71,6 @@ const INITIAL_FORM: InstantTransferForm = {
   toConfirmed: false,
   payeeName: "",
   toAccountError: null,
-  executionFails: false,
   amount: null,
   payeeMemo: "",
   myMemo: "",
@@ -127,6 +125,16 @@ export const InstantTransferScreen = () => {
   // 셀렉트를 건드리지 않으면 form.fromAccount 가 빈 문자열이다. 화면·확인모달·실행이
   // 전부 이 파생값만 보게 해서 소비처가 늘어도 원본이 새지 않게 한다.
   const displayForm = { ...form, fromAccount: effectiveFromAccount }
+
+  const frequentAccounts: FrequentTransferAccount[] = React.useMemo(
+    () =>
+      (favoriteAccountsQuery.data ?? []).map((a) => ({
+        accountNo: a.depositAccountNumber ?? "",
+        payeeName: a.payeeName ?? "",
+        nickname: a.alias ?? undefined,
+      })),
+    [favoriteAccountsQuery.data],
+  )
   // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
   // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
   // 어긋나지 않게 한다.
@@ -170,7 +178,6 @@ export const InstantTransferScreen = () => {
         toAccount: accountNo,
         toConfirmed: false,
         payeeName: "",
-        executionFails: false,
         toAccountError: "입금계좌번호 12자리를 정확히 입력하세요.",
       }))
       return
@@ -181,7 +188,6 @@ export const InstantTransferScreen = () => {
         toAccount: accountNo,
         toConfirmed: false,
         payeeName: "",
-        executionFails: false,
         toAccountError:
           "출금계좌와 입금계좌가 동일합니다. 다른 계좌를 입력하세요.",
       }))
@@ -194,7 +200,6 @@ export const InstantTransferScreen = () => {
         toAccount: accountNo,
         toConfirmed: true,
         payeeName: payee.payeeName ?? "",
-        executionFails: false,
         toAccountError: null,
       }))
     } catch (error) {
@@ -203,7 +208,6 @@ export const InstantTransferScreen = () => {
         toAccount: accountNo,
         toConfirmed: false,
         payeeName: "",
-        executionFails: false,
         toAccountError:
           error instanceof ApiError
             ? error.message
@@ -573,7 +577,9 @@ export const InstantTransferScreen = () => {
             description={
               isSuccess
                 ? "이체결과조회에서 처리 내역을 확인할 수 있습니다."
-                : `${result.failReason} (오류코드 ${result.errorCode})`
+                : result.errorCode
+                  ? `${result.failReason} (오류코드 ${result.errorCode})`
+                  : (result.failReason ?? "")
             }
             highlightValue={formatAmount(row.amount)}
             footnote={
@@ -639,10 +645,7 @@ export const InstantTransferScreen = () => {
       onNext={() => setStep(2)}
       onConfirmAccount={() => void resolveToAccount(form.toAccount)}
       onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}
-      frequentAccounts={(favoriteAccountsQuery.data ?? []).map((a) => ({
-        accountNo: a.depositAccountNumber ?? "",
-        payeeName: a.payeeName ?? "",
-      }))}
+      frequentAccounts={frequentAccounts}
       recentAccounts={MOCK_RECENT_TRANSFER_ACCOUNTS}
     />
   )

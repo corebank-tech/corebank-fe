@@ -3,7 +3,14 @@ import type {
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
+  TransferHistoryDetailResponse,
+  TransferHistoryItemResponse,
 } from "@/shared/api/generated"
+import type {
+  TransferHistoryDetail,
+  TransferHistoryRow,
+  TransferStatus,
+} from "@/entities/transfer/api/d04-transfers"
 import type {
   ReservationRow,
   ReservationStatus,
@@ -175,4 +182,44 @@ export const toAutoTransferResultRow = (
   cycleMonths: toTransferCycle(item.cycleMonths),
   memo: item.myPassbookMemo ?? "",
   failReason: item.failureReason ?? undefined,
+})
+
+const TRANSFER_STATUS_MAP: Record<string, TransferStatus> = {
+  SUCCESS: "정상",
+  ERROR: "오류",
+  PROCESSING: "처리중",
+}
+
+/**
+ * 모르는 값이 오면 '정상'으로 뭉개지 않고 '처리중'으로 떨어뜨린다 — 확정되지 않은
+ * 건을 확정된 것처럼 보여주면 고객이 이체가 끝났다고 판단한다.
+ */
+const toTransferStatus = (status: string | undefined): TransferStatus => {
+  const mapped = status ? TRANSFER_STATUS_MAP[status] : undefined
+  if (mapped) return mapped
+  console.error(`[entities/transfer] 알 수 없는 이체 처리상태: ${status}`)
+  return "처리중"
+}
+
+/** 이체결과조회(D-04) 목록 한 건을 화면 표시용 타입으로 변환한다. */
+export const toTransferHistoryRow = (
+  item: TransferHistoryItemResponse,
+): TransferHistoryRow => ({
+  txId: item.transactionNumber ?? "",
+  status: toTransferStatus(item.status),
+  datetime: item.executedAt ?? "",
+  toAccountNo: item.accountNumber ?? "",
+  payeeName: item.payeeName ?? "",
+  amount: item.amount ?? 0,
+  failureReason: item.failureReason ?? undefined,
+})
+
+/** 이체 상세(REQ-TRSF-023). 목록에 없는 수수료·표시내용을 더 담는다. */
+export const toTransferHistoryDetail = (
+  detail: TransferHistoryDetailResponse,
+): TransferHistoryDetail => ({
+  ...toTransferHistoryRow(detail),
+  fee: detail.fee ?? 0,
+  memo: detail.recipientPassbookMemo ?? "",
+  errorCode: detail.errorCode ?? undefined,
 })

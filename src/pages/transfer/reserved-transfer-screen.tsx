@@ -26,7 +26,6 @@ import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
 import { useRegisterScheduledTransferMutation } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
-import type { AccountOption } from "@/shared/types/account"
 
 export type ReservedTransferForm = {
   fromAccount: string
@@ -75,16 +74,12 @@ export const ReservedTransferScreen = () => {
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
 
-  const { accounts: withdrawAccounts, isLoading: accountsLoading } =
-    useWithdrawAccounts()
+  const {
+    accounts: withdrawAccounts,
+    options: accountOptions,
+    isLoading: accountsLoading,
+  } = useWithdrawAccounts()
   const registerMutation = useRegisterScheduledTransferMutation()
-
-  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
-    alias: a.accountName ?? "",
-    accountNo: a.accountNumber ?? "",
-    balance: a.balance ?? 0,
-    withdrawable: a.balance ?? 0,
-  }))
 
   // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
   // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).

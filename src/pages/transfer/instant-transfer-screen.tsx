@@ -27,7 +27,6 @@ import {
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
 import { ApiError } from "@/shared/api/api-error"
 import { TransferResponseStatus } from "@/entities/transfer"
-import type { AccountOption } from "@/shared/types/account"
 import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
   formatAccountNo,
@@ -90,8 +89,11 @@ export const InstantTransferScreen = () => {
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<InstantTransferForm>(INITIAL_FORM)
 
-  const { accounts: withdrawAccounts, isLoading: isAccountsLoading } =
-    useWithdrawAccounts()
+  const {
+    accounts: withdrawAccounts,
+    options: accounts,
+    isLoading: isAccountsLoading,
+  } = useWithdrawAccounts()
   const accountOverviewQuery = useAccountOverviewQuery()
   const {
     data: limit,
@@ -102,17 +104,6 @@ export const InstantTransferScreen = () => {
   const registerFavoriteMutation = useRegisterFavoriteAccountMutation()
   const verifyPasswordMutation = useVerifyAccountPasswordMutation()
   const executeMutation = useExecuteTransferMutation()
-
-  const accounts: AccountOption[] = React.useMemo(
-    () =>
-      withdrawAccounts.map((a) => ({
-        alias: a.accountName ?? "",
-        accountNo: a.accountNumber ?? "",
-        balance: a.balance ?? 0,
-        withdrawable: a.balance ?? 0,
-      })),
-    [withdrawAccounts],
-  )
 
   /** REQ-INQR-005: 계좌목록의 [이체] 진입 시 출금계좌가 선택된 상태로 시작한다. */
   const fromParam = searchParams.get("from")

@@ -132,6 +132,16 @@ describe("toAutoTransferRow", () => {
     spy.mockRestore()
   })
 
+  // 서버가 별칭 미설정 건에 fromAlias 를 안 내려준다. 빈 문자열로 메우면 화면·엑셀에서
+  // `${fromAlias} ${계좌번호}` 가 구분자만 남은 표기가 되므로 undefined 그대로 둔다.
+  it("서버가 안 내려준 별칭은 빈 문자열로 메우지 않는다", () => {
+    const row = toAutoTransferRow(
+      { ...BASE_ITEM, fromAlias: undefined },
+      FROM_ACCOUNT_NO,
+    )
+    expect(row.fromAlias).toBeUndefined()
+  })
+
   it("nextExecDate는 응답에 없어 비어 있다", () => {
     const row = toAutoTransferRow(BASE_ITEM, FROM_ACCOUNT_NO)
     expect(row.nextExecDate).toBeUndefined()
@@ -144,7 +154,6 @@ describe("toAutoTransferRow", () => {
 
     expect(row).toMatchObject({
       id: "",
-      fromAlias: "",
       toAccountNo: "",
       payeeName: "",
       amount: 0,
@@ -161,10 +170,13 @@ const RESERVATION_ITEM: ScheduledTransferListItemResponse = {
   scheduledTransferId: 7,
   status: "WAITING",
   scheduledDate: "2026-08-24",
+  registeredAt: "2026-08-20T10:12:00",
   withdrawalAccountNumber: "110******877",
+  fromAlias: "자유입출금",
   accountNumber: "333******135",
   payeeName: "김*수",
   amount: 300_000,
+  myPassbookMemo: "월세",
   cancelable: true,
 }
 
@@ -183,6 +195,29 @@ describe("toReservationRow", () => {
       status: "PROCESSING",
     })
     expect(row.status).toBe("대기")
+  })
+
+  it("별칭·표시내용·등록일시를 옮긴다", () => {
+    const row = toReservationRow(RESERVATION_ITEM)
+
+    expect(row.fromAlias).toBe("자유입출금")
+    expect(row.memo).toBe("월세")
+    expect(row.registeredAt).toBe("2026-08-20T10:12:00")
+  })
+
+  // 서버는 별칭 미설정·표시내용 미입력 건에 필드를 아예 안 내려준다. 여기서 빈 문자열로
+  // 메워버리면 화면(E-04)의 `?? "-"` 폴백이 죽어 빈 칸으로 보이므로 undefined 그대로 둔다.
+  it("서버가 안 내려준 별칭·표시내용·등록일시는 빈 문자열로 메우지 않는다", () => {
+    const row = toReservationRow({
+      ...RESERVATION_ITEM,
+      fromAlias: undefined,
+      myPassbookMemo: undefined,
+      registeredAt: undefined,
+    })
+
+    expect(row.fromAlias).toBeUndefined()
+    expect(row.memo).toBeUndefined()
+    expect(row.registeredAt).toBeUndefined()
   })
 })
 

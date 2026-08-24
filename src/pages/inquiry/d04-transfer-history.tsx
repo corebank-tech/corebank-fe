@@ -22,6 +22,7 @@ import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
+  formatAccountLabel,
   formatAccountNo,
   formatAmount,
   formatDate,
@@ -170,7 +171,11 @@ export const D04TransferHistory = () => {
     (account) => account.accountId === effectiveAppliedAccountId,
   )
   const fromAccountLabel = appliedAccount
-    ? `${appliedAccount.accountName ?? ""} / ${formatAccountNo(appliedAccount.accountNumber ?? "")}`
+    ? formatAccountLabel(
+        appliedAccount.accountName,
+        formatAccountNo(appliedAccount.accountNumber ?? ""),
+        " / ",
+      )
     : "-"
 
   const handleReset = () => {

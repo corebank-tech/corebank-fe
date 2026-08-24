@@ -22,7 +22,12 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
-import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
+import {
+  formatAccountLabel,
+  formatAmount,
+  formatDate,
+  formatDateTime,
+} from "@/shared/lib/format"
 import {
   getReservationStatusBadgeVariant,
   toReservationRow,
@@ -323,11 +328,11 @@ export const E04ReservationList = () => {
   const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    `${r.fromAlias ?? ""} ${r.fromAccountNo}`,
+    formatAccountLabel(r.fromAlias, r.fromAccountNo),
     r.toAccountNo,
     r.payeeName,
     formatAmount(r.amount),
-    r.memo ?? "-",
+    r.memo || "-",
     r.registeredAt ? formatDateTime(r.registeredAt) : "-",
   ])
 
@@ -356,9 +361,15 @@ export const E04ReservationList = () => {
       key: "fromAccountNo",
       header: "출금계좌",
       width: 170,
+      // 별칭은 서버가 미설정 건에 안 내려준다. 그때 구분자만 남아 `/ 110******877` 로
+      // 보이지 않게 별칭이 있을 때만 구분자를 붙인다.
       render: (r) => (
         <span className="whitespace-nowrap">
-          {r.fromAlias ?? ""} <span className="text-ink-faint">/</span>{" "}
+          {r.fromAlias ? (
+            <>
+              {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
+            </>
+          ) : null}
           <span>{r.fromAccountNo}</span>
         </span>
       ),
@@ -387,7 +398,7 @@ export const E04ReservationList = () => {
       key: "memo",
       header: "표시내용",
       align: "left",
-      render: (r) => <span>{r.memo ?? "-"}</span>,
+      render: (r) => <span>{r.memo || "-"}</span>,
     },
     {
       key: "registeredAt",
@@ -426,7 +437,7 @@ export const E04ReservationList = () => {
             cancelLabel="닫기"
             items={selectedRows.map((r) => ({
               label: formatDate(r.scheduledDate),
-              value: `${r.fromAlias ?? r.fromAccountNo} → ${r.payeeName} / ${formatAmount(r.amount)}`,
+              value: `${r.fromAlias || r.fromAccountNo} → ${r.payeeName} / ${formatAmount(r.amount)}`,
             }))}
           />
 

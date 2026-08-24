@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  formatAccountLabel,
   formatAccountNo,
   maskAccountNo,
   maskEmail,
@@ -42,5 +43,32 @@ describe("계좌번호 표시 (REQ-CMN-017 / REQ-INQR-015)", () => {
   it("서버가 이미 마스킹해 내려준 값은 다시 가공하지 않는다", () => {
     expect(formatAccountNo("110******877")).toBe("110******877")
     expect(maskAccountNo("110******877")).toBe("110******877")
+  })
+})
+
+describe("formatAccountLabel", () => {
+  it("별칭이 있으면 계좌번호 앞에 붙인다", () => {
+    expect(formatAccountLabel("자유입출금", "110-220-093412")).toBe(
+      "자유입출금 110-220-093412",
+    )
+  })
+
+  it("구분자를 지정할 수 있다", () => {
+    expect(formatAccountLabel("자유입출금", "110-220-093412", " / ")).toBe(
+      "자유입출금 / 110-220-093412",
+    )
+  })
+
+  // 서버는 별칭 미설정 건에 값을 안 내려준다. 그대로 보간하면 구분자만 남는다.
+  it("별칭이 없으면 계좌번호만 남기고 구분자를 붙이지 않는다", () => {
+    expect(formatAccountLabel(undefined, "110-220-093412", " / ")).toBe(
+      "110-220-093412",
+    )
+  })
+
+  it("별칭이 빈 문자열이어도 미설정으로 본다", () => {
+    expect(formatAccountLabel("", "110-220-093412", " / ")).toBe(
+      "110-220-093412",
+    )
   })
 })

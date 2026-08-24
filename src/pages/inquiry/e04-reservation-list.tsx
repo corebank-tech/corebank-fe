@@ -323,7 +323,7 @@ export const E04ReservationList = () => {
   const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    `${r.fromAlias ?? ""} ${r.fromAccountNo}`,
+    r.fromAlias ? `${r.fromAlias} ${r.fromAccountNo}` : r.fromAccountNo,
     r.toAccountNo,
     r.payeeName,
     formatAmount(r.amount),
@@ -356,9 +356,15 @@ export const E04ReservationList = () => {
       key: "fromAccountNo",
       header: "출금계좌",
       width: 170,
+      // 별칭은 서버가 미설정 건에 안 내려준다. 그때 구분자만 남아 `/ 110******877` 로
+      // 보이지 않게 별칭이 있을 때만 구분자를 붙인다.
       render: (r) => (
         <span className="whitespace-nowrap">
-          {r.fromAlias ?? ""} <span className="text-ink-faint">/</span>{" "}
+          {r.fromAlias ? (
+            <>
+              {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
+            </>
+          ) : null}
           <span>{r.fromAccountNo}</span>
         </span>
       ),

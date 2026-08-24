@@ -327,7 +327,7 @@ export const E04ReservationList = () => {
     r.toAccountNo,
     r.payeeName,
     formatAmount(r.amount),
-    r.memo ?? "-",
+    r.memo || "-",
     r.registeredAt ? formatDateTime(r.registeredAt) : "-",
   ])
 
@@ -393,7 +393,7 @@ export const E04ReservationList = () => {
       key: "memo",
       header: "표시내용",
       align: "left",
-      render: (r) => <span>{r.memo ?? "-"}</span>,
+      render: (r) => <span>{r.memo || "-"}</span>,
     },
     {
       key: "registeredAt",

@@ -16,6 +16,7 @@ type TermsAgreementProps = {
   /**
    * 동의한 항목의 id 목록. 선택 약관 동의까지 서버에 실어 보내야 하는 화면(C-03)이
    * 쓴다. 필수만 필터해 보내면 고객이 동의한 선택 약관이 이력에서 누락된다.
+   * 사용자가 체크를 바꾼 시점에만 호출되고, 목록 순서는 `terms` 순서를 따른다.
    */
   onAgreedChange?: (agreedIds: string[]) => void
   /**
@@ -25,9 +26,6 @@ type TermsAgreementProps = {
    */
   onView?: (id: string) => void
 }
-
-/** 동의한 약관 id 를 하나의 키로 잇는 구분자. 약관 id 에 들어갈 수 없는 문자를 쓴다. */
-const AGREED_ID_SEPARATOR = "\u0000"
 
 export type TermsAgreementHandle = {
   /**
@@ -67,34 +65,32 @@ export const TermsAgreement = React.forwardRef<
     onAllRequiredAgreedChange?.(allRequiredAgreed)
   }, [allRequiredAgreed, onAllRequiredAgreedChange])
 
-  // 동의한 항목을 terms 순서대로 이어붙인 키. 배열을 그대로 effect 의존성에 쓰면
-  // terms 를 렌더마다 새로 만드는 소비자에서 effect → 부모 setState → 리렌더가
-  // 끝없이 반복된다. 값이 실제로 바뀔 때만 올려보낸다.
-  const agreedKey = terms
-    .filter((t) => checked[t.id])
-    .map((t) => t.id)
-    .join(AGREED_ID_SEPARATOR)
-
-  React.useEffect(() => {
-    onAgreedChange?.(
-      agreedKey === "" ? [] : agreedKey.split(AGREED_ID_SEPARATOR),
-    )
-  }, [agreedKey, onAgreedChange])
-
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))
     setViewingId(term.id)
     onView?.(term.id)
   }
 
+  // 동의 목록은 checked 를 바꾸는 자리에서 바로 올려보낸다. 파생 상태를 effect 로
+  // 부모에 동기화하면 terms 나 콜백을 렌더마다 새로 만드는 소비자에서
+  // 통지 → 부모 setState → 리렌더 → 통지 가 끝없이 반복된다.
+  // 마운트 시에는 부모의 초기값과 같은 빈 목록이므로 통지하지 않는다.
+  const notifyAgreed = (nextChecked: Record<string, boolean>) => {
+    onAgreedChange?.(terms.filter((t) => nextChecked[t.id]).map((t) => t.id))
+  }
+
   const toggleOne = (id: string) => {
     if (!viewed[id]) return
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
+    const nextChecked = { ...checked, [id]: !checked[id] }
+    setChecked(nextChecked)
+    notifyAgreed(nextChecked)
   }
 
   const agreeFromModal = (id: string) => {
-    setChecked((prev) => ({ ...prev, [id]: true }))
+    const nextChecked = { ...checked, [id]: true }
+    setChecked(nextChecked)
     setViewingId(null)
+    notifyAgreed(nextChecked)
   }
 
   React.useImperativeHandle(ref, () => ({

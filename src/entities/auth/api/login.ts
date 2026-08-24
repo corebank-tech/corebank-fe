@@ -24,7 +24,13 @@ export const resolveLoginFailure = (error: unknown): LoginFailureReason => {
   return "UNKNOWN"
 }
 
-/** REQ-AUTH-024. MISMATCH 응답에만 실려 온다 — 서버가 값을 안 주면(다른 실패 사유 포함) undefined. */
+/**
+ * REQ-AUTH-024. MISMATCH 응답에만 실려 온다 — 서버가 값을 안 주면(다른 실패 사유 포함) undefined.
+ *
+ * 아직 화면에서 호출하지 않는다. 존재하지 않는 아이디는 data:null, 존재하는
+ * 아이디는 data:{remainingAttempts}라 표시 여부만으로 계정 존재가 드러난다
+ * (REQ-AUTH-023 위반, corebank-server#323). 서버 수정 후 A-01에 연결한다.
+ */
 export const resolveRemainingAttempts = (
   error: unknown,
 ): number | undefined => {

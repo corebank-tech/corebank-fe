@@ -47,9 +47,6 @@ export const A01Login = () => {
 
   const toFailureMessage = (error: unknown): string => {
     const reason = resolveLoginFailure(error)
-    // REQ-AUTH-024 잔여 시도 횟수는 아직 화면에 표시하지 않는다. 존재하지 않는 아이디는
-    // data:null, 존재하는 아이디는 data:{remainingAttempts}를 내려받아 표시 여부만으로
-    // 계정 존재가 드러난다(REQ-AUTH-023 위반, corebank-server#323). 서버 수정 후 노출한다.
     if (reason !== "UNKNOWN") return FAILURE_MESSAGE[reason]
     // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
     return isApiError(error)

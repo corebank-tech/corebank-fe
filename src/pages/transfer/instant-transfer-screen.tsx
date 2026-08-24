@@ -321,10 +321,9 @@ export const InstantTransferScreen = () => {
           amount,
           fee: 0,
           memo: form.payeeMemo || "-",
-          balanceAfter:
-            executed.withdrawalBalanceAfter ??
-            selectedAccount?.withdrawable ??
-            0,
+          // 미확정·실패 건은 서버가 잔액을 주지 않는다. 이체 전 잔액으로 채우면
+          // 처리되지 않은 이체를 반영된 것처럼 보여준다(REQ-TRSF-018).
+          balanceAfter: executed.withdrawalBalanceAfter ?? 0,
         }
 
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
@@ -449,6 +448,7 @@ export const InstantTransferScreen = () => {
 
   if (step === 3 && result) {
     const isSuccess = result.variant === "success"
+    const isPending = result.variant === "pending"
     const row = result.row
 
     const columns: DataGridColumn<TransferResultRow>[] = [
@@ -458,8 +458,10 @@ export const InstantTransferScreen = () => {
         align: "center",
         width: 70,
         render: () => (
-          <Badge variant={isSuccess ? "success" : "danger"}>
-            {isSuccess ? "정상" : "오류"}
+          <Badge
+            variant={isSuccess ? "success" : isPending ? "warning" : "danger"}
+          >
+            {isSuccess ? "정상" : isPending ? "처리중" : "오류"}
           </Badge>
         ),
       },
@@ -475,7 +477,9 @@ export const InstantTransferScreen = () => {
         header: "거래일시",
         align: "center",
         width: 150,
-        render: (r) => <span>{formatDateTime(r.processedAt)}</span>,
+        render: (r) => (
+          <span>{r.processedAt ? formatDateTime(r.processedAt) : "-"}</span>
+        ),
       },
       {
         key: "fromAccountNo",
@@ -515,7 +519,8 @@ export const InstantTransferScreen = () => {
         header: "이체후잔액(원)",
         align: "right",
         width: 140,
-        render: (r) => formatAmount(r.balanceAfter, { suffix: false }),
+        render: (r) =>
+          isSuccess ? formatAmount(r.balanceAfter, { suffix: false }) : "-",
       },
     ]
 
@@ -563,11 +568,15 @@ export const InstantTransferScreen = () => {
             message={
               isSuccess
                 ? "이체가 완료되었습니다."
-                : "이체가 처리되지 않았습니다."
+                : isPending
+                  ? "이체 결과를 확인하는 중입니다."
+                  : "이체가 처리되지 않았습니다."
             }
             description={
-              isSuccess
-                ? "이체결과조회에서 처리 내역을 확인할 수 있습니다."
+              isSuccess || isPending
+                ? isPending
+                  ? (result.failReason ?? "")
+                  : "이체결과조회에서 처리 내역을 확인할 수 있습니다."
                 : result.errorCode
                   ? `${result.failReason} (오류코드 ${result.errorCode})`
                   : (result.failReason ?? "")
@@ -576,7 +585,9 @@ export const InstantTransferScreen = () => {
             footnote={
               isSuccess
                 ? "※ 이체 후 출금계좌 잔액은 이체결과조회에서 다시 확인할 수 있습니다."
-                : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
+                : isPending
+                  ? "※ 결과가 확정되기 전까지 잔액과 거래내역이 달라질 수 있습니다. 같은 이체를 다시 실행하지 마세요."
+                  : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
             }
             columns={columns}
             row={row}

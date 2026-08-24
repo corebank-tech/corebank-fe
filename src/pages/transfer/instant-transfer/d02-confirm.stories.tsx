@@ -12,7 +12,7 @@ import {
   formatDateTime,
   maskName,
 } from "@/shared/lib/format"
-import { MOCK_NOW } from "@/shared/config/mock-clock"
+import { getNow } from "@/shared/config/clock"
 import { WithAuthenticatedPage } from "../../../../.storybook/decorators/page-providers"
 
 const FROM_ACCOUNT = MOCK_TRANSFER_ACCOUNTS[0]
@@ -32,17 +32,13 @@ const meta = {
     >
       <InstantTransferStep2
         steps={TRANSFER_STEPS}
-        scheduledAt={
-          <span className="tabular-nums">{formatDateTime(MOCK_NOW)}</span>
-        }
+        scheduledAt={<span>{formatDateTime(getNow())}</span>}
         fromAccount={
-          <span className="tabular-nums">
+          <span>
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
-        toAccount={
-          <span className="tabular-nums">{formatAccountNo(TO_ACCOUNT_NO)}</span>
-        }
+        toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
         fee={formatAmount(0, { suffix: false })}
@@ -72,17 +68,13 @@ export const WithAuthError: Story = {
     >
       <InstantTransferStep2
         steps={TRANSFER_STEPS}
-        scheduledAt={
-          <span className="tabular-nums">{formatDateTime(MOCK_NOW)}</span>
-        }
+        scheduledAt={<span>{formatDateTime(getNow())}</span>}
         fromAccount={
-          <span className="tabular-nums">
+          <span>
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
-        toAccount={
-          <span className="tabular-nums">{formatAccountNo(TO_ACCOUNT_NO)}</span>
-        }
+        toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
         fee={formatAmount(0, { suffix: false })}

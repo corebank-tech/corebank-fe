@@ -26,52 +26,57 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="전체메뉴"
+    // 상단 GNB 헤더(h-18)는 그대로 두고, 그 아래 영역만 메뉴 시트로 덮는다.
+    <nav
+      id="full-menu"
+      aria-label="전체 메뉴"
+      className="fixed inset-x-0 top-18 bottom-0 z-overlay"
     >
       <div
-        className="absolute inset-0 bg-overlay-scrim"
         onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="absolute inset-x-0 top-0 bg-surface-elevated shadow-pop">
-        <div className="mx-auto w-320 px-4">
+        className="absolute inset-0 overflow-y-auto bg-surface-elevated"
+      >
+        <div
+          className="mx-auto w-320 px-4"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex h-18 items-center justify-between border-b border-border">
-            <span className="text-h2 leading-[1.5] font-heading text-primary">
+            <span className="text-page leading-[1.5] font-heading text-ink">
               전체메뉴
             </span>
             <IconButton
               onClick={onClose}
-              className="text-ink-muted hover:bg-primary-tint hover:text-primary"
+              className="border border-border bg-surface-elevated text-ink-muted hover:bg-surface hover:text-ink"
               aria-label="전체메뉴 닫기"
             >
               <X className="h-5 w-5" aria-hidden="true" />
             </IconButton>
           </div>
 
-          <div className="grid grid-cols-4 gap-8 pt-8 pb-12">
+          <div className="grid grid-cols-4 gap-x-12 pb-12">
             {NAV.map((cat) => (
-              <div key={cat.id}>
-                <h3 className="mb-3 text-lg leading-[1.5] font-heading text-primary">
+              <div key={cat.id} className="pt-10">
+                <h3 className="mb-6 text-h2 leading-[1.5] font-heading text-primary">
                   {cat.label}
                 </h3>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-10">
                   {cat.groups.map((group) => (
                     <div key={group.title}>
-                      <p className="mb-1 text-base leading-[1.5] whitespace-nowrap text-ink-faint">
+                      <p className="mb-4 flex items-center gap-2 text-lg leading-[1.5] font-heading whitespace-nowrap text-ink">
+                        <span
+                          aria-hidden="true"
+                          className="h-4 w-0.5 bg-primary"
+                        />
                         {group.title}
                       </p>
-                      <ul className="flex flex-col gap-1">
+                      <ul className="flex flex-col gap-5 pl-3">
                         {group.items.map((item) => (
                           <li key={`${item.screenId}-${item.path}`}>
                             <Link
                               to={item.path}
                               data-screen-id={item.screenId}
                               onClick={onClose}
-                              className="inline-block py-0.5 text-lg leading-[1.5] font-label whitespace-nowrap text-ink hover:text-primary hover:underline"
+                              className="inline-block text-base leading-[1.5] font-label whitespace-nowrap text-ink-muted hover:text-primary hover:underline"
                             >
                               {item.label}
                             </Link>
@@ -86,6 +91,6 @@ export const FullMenuOverlay = ({ open, onClose }: FullMenuOverlayProps) => {
           </div>
         </div>
       </div>
-    </div>
+    </nav>
   )
 }

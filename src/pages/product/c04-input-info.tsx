@@ -8,34 +8,86 @@ import { WithdrawAccountField } from "@/widgets/transfer"
 import { TermMonthsField, JoinAmountField } from "@/pages/product/fields"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { formatKoreanAmount } from "@/shared/lib/format"
-import { estimateMaturityAmount } from "@/entities/product"
-import { MOCK_JOIN_ACCOUNTS, MOCK_JOIN_PRODUCTS } from "@/entities/product"
+import {
+  estimateMaturityAmount,
+  getAppliedRateForTerm,
+  getProductTermRange,
+  toProductDetailData,
+  useProductDetail,
+  useValidateSubscription,
+  type ViolationItem,
+} from "@/entities/product"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinFormState,
 } from "@/pages/product/join-shared"
+import { Alert } from "@/shared/ui/alert"
+import { EmptyState } from "@/shared/ui/empty-state"
+import { ApiError } from "@/shared/api/api-error"
+import { useWithdrawAccounts } from "@/entities/account"
+import type { AccountOption } from "@/shared/types/account"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
 export const C04InputInfo = () => {
-  const { productId = "P001" } = useParams()
+  const { productId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const product = MOCK_JOIN_PRODUCTS[productId] ?? MOCK_JOIN_PRODUCTS.P001
+  const id = Number(productId)
+  const { detail, isLoading, isError } = useProductDetail(id)
   const prev = location.state as ProductJoinFormState | null
 
   const [termMonths, setTermMonths] = React.useState<number | null>(
     prev?.termMonths ?? null,
   )
-  const [fromAccount, setFromAccount] = React.useState(
-    prev?.fromAccount ?? MOCK_JOIN_ACCOUNTS[0].accountNo,
+  const [fromAccountNo, setFromAccountNo] = React.useState(
+    prev?.fromAccountNo ?? "",
   )
   const [amount, setAmount] = React.useState<number | null>(
     prev?.amount ?? null,
   )
 
-  const selectedAccount = MOCK_JOIN_ACCOUNTS.find(
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
+
+  const validateMutation = useValidateSubscription()
+  const [violations, setViolations] = React.useState<ViolationItem[]>([])
+  const [validationError, setValidationError] = React.useState<string | null>(
+    null,
+  )
+
+  if (isLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
+
+  if (isError || !detail) {
+    return (
+      <EmptyState
+        message="상품을 찾을 수 없습니다."
+        description={`상품ID: ${productId}`}
+      />
+    )
+  }
+
+  const product = toProductDetailData(detail)
+  const { minTermMonths, maxTermMonths } = getProductTermRange(detail)
+
+  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
+    alias: a.accountName ?? "",
+    accountNo: a.accountNumber ?? "",
+    balance: a.balance ?? 0,
+    withdrawable: a.balance ?? 0,
+  }))
+
+  // 계좌 목록은 비동기로 도착하므로, 아직 고르지 않았다면 첫 계좌를 렌더링 중에
+  // 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const fromAccount = fromAccountNo || (accountOptions[0]?.accountNo ?? "")
+  const selectedAccount = accountOptions.find(
     (a) => a.accountNo === fromAccount,
   )
+  const selectedAccountId = withdrawAccounts.find(
+    (a) => a.accountNumber === fromAccount,
+  )?.accountId
   const amountLabel =
     product.category === "정기적금"
       ? "가입금액(월납입금액)"
@@ -43,8 +95,8 @@ export const C04InputInfo = () => {
 
   const termValid =
     termMonths != null &&
-    termMonths >= product.minTermMonths &&
-    termMonths <= product.maxTermMonths
+    termMonths >= minTermMonths &&
+    termMonths <= maxTermMonths
   const amountValid =
     amount != null &&
     amount >= product.minAmount &&
@@ -61,13 +113,62 @@ export const C04InputInfo = () => {
           category: product.category,
           amount,
           termMonths,
-          annualRatePercent: product.rate,
+          annualRatePercent: getAppliedRateForTerm(detail, termMonths),
         })
       : null
 
-  const handleNext = () => {
-    const next: ProductJoinFormState = { termMonths, fromAccount, amount }
-    navigate(`/product/${product.id}/join/3`, { state: next })
+  /**
+   * REQ-PRDT-007 은 서버 재검증을 요구한다. 화면이 막는 범위 검증만으로는 약관 동의
+   * 이력·출금계좌 소유·잔액을 판단할 수 없어, 다음 단계로 넘기기 전에 서버에 묻는다.
+   * 입력할 때마다 부르지 않는 이유는 검증이 조회가 아니라 상태를 남기는 요청이고,
+   * 화면 표시는 이미 클라이언트 계산으로 즉시 갱신되기 때문이다(REQ-PRDT-009).
+   */
+  const handleNext = async () => {
+    if (validateMutation.isPending) return
+    if (termMonths == null || amount == null || selectedAccountId == null) {
+      setValidationError("가입기간·가입금액·출금계좌를 모두 입력하세요.")
+      return
+    }
+
+    setViolations([])
+    setValidationError(null)
+
+    const agreedTerms = prev?.agreedTerms ?? []
+
+    try {
+      const validation = await validateMutation.mutateAsync({
+        data: {
+          productId: product.id,
+          subscriptionAmount: amount,
+          termMonths,
+          withdrawalAccountId: selectedAccountId,
+          agreedTerms,
+        },
+      })
+
+      if (validation?.valid !== true) {
+        setViolations(validation?.violations ?? [])
+        if ((validation?.violations ?? []).length === 0) {
+          setValidationError("가입정보를 확인한 뒤 다시 시도하세요.")
+        }
+        return
+      }
+
+      const next: ProductJoinFormState = {
+        termMonths,
+        fromAccountNo: fromAccount,
+        // 가입 실행 요청은 계좌번호가 아니라 계좌 ID를 받는다.
+        withdrawalAccountId: selectedAccountId,
+        amount,
+        // C-03에서 받은 동의 이력을 그대로 실어 나른다.
+        agreedTerms,
+      }
+      navigate(`/product/${product.id}/join/3`, { state: next })
+    } catch (e) {
+      setValidationError(
+        e instanceof ApiError ? e.message : "가입정보 검증에 실패했습니다.",
+      )
+    }
   }
 
   return (
@@ -85,13 +186,31 @@ export const C04InputInfo = () => {
             variant="primary"
             size="lg"
             className="min-w-40"
-            disabled={!canSubmit}
-            onClick={handleNext}
+            disabled={!canSubmit || validateMutation.isPending}
+            onClick={() => void handleNext()}
           >
-            다음
+            {validateMutation.isPending ? "확인 중..." : "다음"}
           </Button>
         }
       >
+        {violations.length > 0 && (
+          <Alert variant="danger">
+            <ul className="flex flex-col gap-1">
+              {/* 서버는 약관 ID마다 violation을 따로 담아서, 필수 약관 여러 건이
+                  미동의면 field·code가 같고 reason의 termsId만 다른 항목이 함께
+                  내려온다. 목록은 검증할 때마다 통째로 교체되고 정렬·필터를 거치지
+                  않으므로 순서를 키로 쓴다. */}
+              {violations.map((violation, index) => (
+                <li key={index}>{violation.reason}</li>
+              ))}
+            </ul>
+          </Alert>
+        )}
+
+        {validationError != null && (
+          <Alert variant="danger">{validationError}</Alert>
+        )}
+
         <FormSection title="가입정보 입력">
           <div>
             <FormRow
@@ -104,8 +223,8 @@ export const C04InputInfo = () => {
                 id="c04-term"
                 value={termMonths}
                 onChange={setTermMonths}
-                min={product.minTermMonths}
-                max={product.maxTermMonths}
+                min={minTermMonths}
+                max={maxTermMonths}
               />
             </FormRow>
             <FormRow
@@ -116,9 +235,9 @@ export const C04InputInfo = () => {
             >
               <WithdrawAccountField
                 id="c04-account"
-                options={MOCK_JOIN_ACCOUNTS}
+                options={accountOptions}
                 value={fromAccount}
-                onChange={setFromAccount}
+                onChange={setFromAccountNo}
               />
             </FormRow>
             <FormRow
@@ -156,7 +275,7 @@ export const C04InputInfo = () => {
         <FormSection title="예상 만기금액(참고)">
           <div className="border border-border bg-surface px-5 py-4">
             <p className="text-2xs text-ink-faint">세전 단리 기준 참고값</p>
-            <p className="mt-1 text-page font-bold text-primary tabular-nums">
+            <p className="mt-1 text-page font-bold text-primary">
               {expectedMaturity != null
                 ? formatKoreanAmount(expectedMaturity)
                 : "-"}

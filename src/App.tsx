@@ -82,11 +82,11 @@ const DEV_ROUTES: DevRoute[] = [
   { screenId: "B-07", label: "계좌순서 변경", path: "/user/accounts/order" },
 
   { screenId: "C-01", label: "상품목록", path: "/products" },
-  { screenId: "C-02", label: "상품상세", path: "/products/P001" },
-  { screenId: "C-03", label: "상품가입 1단계", path: "/product/P001/join/1" },
-  { screenId: "C-04", label: "상품가입 2단계", path: "/product/P001/join/2" },
-  { screenId: "C-05", label: "상품가입 3단계", path: "/product/P001/join/3" },
-  { screenId: "C-06", label: "상품가입 4단계", path: "/product/P001/join/4" },
+  { screenId: "C-02", label: "상품상세", path: "/products/1" },
+  { screenId: "C-03", label: "상품가입 1단계", path: "/product/1/join/1" },
+  { screenId: "C-04", label: "상품가입 2단계", path: "/product/1/join/2" },
+  { screenId: "C-05", label: "상품가입 3단계", path: "/product/1/join/3" },
+  { screenId: "C-06", label: "상품가입 4단계", path: "/product/1/join/4" },
 
   { screenId: "D-01", label: "즉시이체", path: "/instant-transfer" },
   { screenId: "D-04", label: "이체결과조회", path: "/transfer/history" },
@@ -191,18 +191,24 @@ const DevNav = () => {
  * 위에 비해제형 모달을 띄운다(REQ-AUTH-031).
  */
 const SessionExpiredGate = () => {
-  const { expired, acknowledgeExpired } = useSession()
+  const { expiredReason, acknowledgeExpired } = useSession()
   const navigate = useNavigate()
 
-  if (!expired) return null
+  if (expiredReason == null) return null
 
   const goRelogin = () => {
     acknowledgeExpired()
     navigate("/", { replace: true })
   }
+  // 만료 후에는 대시보드가 RequireAuth 에 막히므로 어차피 로그인 화면으로 튕긴다.
+  // 튕겨서 도착하게 두면 버튼이 먹지 않는 것처럼 보여, 도착지를 명시한다
+  // (REQ-AUTH-031 이 버튼 2개를 요구하므로 버튼 자체는 유지한다).
+  // [다시 로그인]과 결과가 같아지는 것은 라벨 불일치가 아니라, "메인화면"을
+  // 인증 여부와 무관한 앱의 시작 지점(`/`)으로 해석한 결과다 — 만료 상태에서
+  // 그 시작 지점이 로그인 화면인 것은 RequireAuth 의 정상 동작이다. #95 에서 확정(2026-08-24).
   const goMain = () => {
     acknowledgeExpired()
-    navigate("/dashboard", { replace: true })
+    navigate("/", { replace: true })
   }
 
   return (

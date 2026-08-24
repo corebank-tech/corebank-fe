@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "codegen": "orval",
+    "codegen": "orval && prettier --write --log-level warn --ignore-path .prettierignore src/shared/api/generated",
     "msw:init": "msw init public --save",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "storybook": "storybook dev -p 6006",
@@ -28,11 +28,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
       "eslint --fix",
       "prettier --write"
     ],
-    "*.{css,json,md}": [
+    "*.{css,scss,json,jsonc,html,yaml,yml}": [
       "prettier --write"
     ]
   },
@@ -53,6 +53,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^5.2.1",
     "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "^10.6.0",
     "@playwright/test": "^1.62.0",
     "@storybook/addon-a11y": "^10.5.5",
     "@storybook/addon-docs": "^10.5.5",

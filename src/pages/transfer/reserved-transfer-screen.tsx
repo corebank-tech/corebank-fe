@@ -1,13 +1,12 @@
 import * as React from "react"
 import { useNavigate } from "react-router"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
-import {
-  MOCK_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_LIMITS,
-  MOCK_PAYEE_NAME,
-} from "@/entities/transfer"
-import { MOCK_RESERVATIONS } from "@/entities/transfer"
+import { ErrorDialog } from "@/shared/ui/error-dialog"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
+// TODO: 실시간 예금주 조회(GET /transfers/payee, 즉시이체 영역)가 연동되면
+// 입금계좌번호 확인 시 실제 예금주명을 조회해서 MOCK_PAYEE_NAME 대신 써야 한다.
+// 지금은 입력한 계좌번호와 무관하게 항상 이 값이 표시된다.
+import { MOCK_TRANSFER_LIMITS, MOCK_PAYEE_NAME } from "@/entities/transfer"
 import {
   formatAccountNo,
   formatAmount,
@@ -16,15 +15,18 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import { daysBetween } from "@/shared/lib/date"
-import {
-  MOCK_NOW as NOW,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
+import { getNow } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { RESERVATION_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
 import { ReservedTransferStep2 } from "@/pages/transfer/reserved/e02-confirm"
 import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
+import { useRegisterScheduledTransferMutation } from "@/entities/transfer"
+import { useWithdrawAccounts } from "@/entities/account"
+import { ApiError } from "@/shared/api/api-error"
+import type { AccountOption } from "@/shared/types/account"
 
 export type ReservedTransferForm = {
   fromAccount: string
@@ -38,7 +40,7 @@ export type ReservedTransferForm = {
 }
 
 const INITIAL_FORM: ReservedTransferForm = {
-  fromAccount: MOCK_TRANSFER_ACCOUNTS[0].accountNo,
+  fromAccount: "",
   password: "",
   toAccount: "",
   toConfirmed: false,
@@ -48,18 +50,9 @@ const INITIAL_FORM: ReservedTransferForm = {
   myMemo: "",
 }
 
-const isDuplicate = (form: ReservedTransferForm): boolean => {
-  if (!form.toConfirmed || form.amount == null || !form.scheduledDate)
-    return false
-  return MOCK_RESERVATIONS.some(
-    (r) =>
-      r.status === "대기" &&
-      r.fromAccountNo === form.fromAccount &&
-      r.toAccountNo === form.toAccount &&
-      r.scheduledDate === form.scheduledDate &&
-      r.amount === form.amount,
-  )
-}
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
+const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 /**
  * E-01 ~ E-03 assembly. Holds the shared form state and step index; each step
@@ -68,21 +61,43 @@ const isDuplicate = (form: ReservedTransferForm): boolean => {
  * execution (REQ-RSV-005, REQ-TRSF-031) is orchestrated here.
  */
 export const ReservedTransferScreen = () => {
+  const NOW = useBaseTime()
+  const TODAY = getToday()
   const navigate = useNavigate()
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<ReservedTransferForm>(INITIAL_FORM)
+  // 확인 다이얼로그를 여는 시점의 시각. 다이얼로그에 표시하는 거래일자·거래시각이
+  // 화면 진입 시각으로 고정되지 않게 한다.
+  const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
+
+  const { accounts: withdrawAccounts, isLoading: accountsLoading } =
+    useWithdrawAccounts()
+  const registerMutation = useRegisterScheduledTransferMutation()
+
+  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
+    alias: a.accountName ?? "",
+    accountNo: a.accountNumber ?? "",
+    balance: a.balance ?? 0,
+    withdrawable: a.balance ?? 0,
+  }))
+
+  // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
+  // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const fromAccount = form.fromAccount || (accountOptions[0]?.accountNo ?? "")
+  const displayForm: ReservedTransferForm = { ...form, fromAccount }
 
   const setField = <K extends keyof ReservedTransferForm>(
     key: K,
     value: ReservedTransferForm[K],
   ) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const selectedAccount = MOCK_TRANSFER_ACCOUNTS.find(
-    (a) => a.accountNo === form.fromAccount,
+  const selectedAccount = withdrawAccounts.find(
+    (a) => a.accountNumber === fromAccount,
   )
 
   const dateSpan = form.scheduledDate
@@ -90,7 +105,6 @@ export const ReservedTransferScreen = () => {
     : null
   const dateValid =
     dateSpan != null && dateSpan >= 1 && dateSpan <= RESERVATION_MAX_RANGE_DAYS
-  const duplicate = isDuplicate(form)
 
   const canSubmit =
     form.password.length === 4 &&
@@ -98,12 +112,42 @@ export const ReservedTransferScreen = () => {
     form.amount != null &&
     form.amount > 0 &&
     form.amount <= perTransferLimit &&
-    dateValid &&
-    !duplicate
+    dateValid
 
   const resetAll = () => {
     setForm(INITIAL_FORM)
     setStep(1)
+  }
+
+  const handleRegisterConfirm = async (otpAuthToken: string) => {
+    setOtpOpen(false)
+    if (!selectedAccount) return
+    try {
+      await registerMutation.mutateAsync({
+        data: {
+          withdrawalAccountId: selectedAccount.accountId,
+          depositAccountNumber: form.toAccount,
+          payeeName: MOCK_PAYEE_NAME,
+          amount: form.amount ?? 0,
+          scheduledDate: form.scheduledDate,
+          myPassbookMemo: form.myMemo || undefined,
+          recipientPassbookMemo: form.payeeMemo || undefined,
+          accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          otpAuthToken,
+        },
+      })
+      setStep(3)
+    } catch (e) {
+      setErrorMessage(
+        e instanceof ApiError ? e.message : "예약이체 등록에 실패했습니다.",
+      )
+    }
+  }
+
+  if (accountsLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
   }
 
   if (step === 2) {
@@ -111,27 +155,22 @@ export const ReservedTransferScreen = () => {
       <>
         <ReservedTransferStep2
           steps={STEPS}
-          scheduledDate={
-            <span className="tabular-nums">
-              {formatDate(form.scheduledDate)}
-            </span>
-          }
+          scheduledDate={<span>{formatDate(form.scheduledDate)}</span>}
           fromAccount={
-            <span className="tabular-nums">
-              {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
+            <span>
+              {selectedAccount?.accountName} {formatAccountNo(fromAccount)}
             </span>
           }
-          toAccount={
-            <span className="tabular-nums">
-              {formatAccountNo(form.toAccount)}
-            </span>
-          }
+          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
           payeeName={maskName(MOCK_PAYEE_NAME)}
           amount={formatAmount(form.amount ?? 0, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
           payeeMemo={form.payeeMemo || "-"}
           onPrev={() => setStep(1)}
-          onSubmit={() => setConfirmOpen(true)}
+          onSubmit={() => {
+            setTransactionAt(getNow())
+            setConfirmOpen(true)
+          }}
         />
 
         <ConfirmDialog
@@ -147,11 +186,14 @@ export const ReservedTransferScreen = () => {
           ]}
           confirmLabel="확인"
           items={[
-            { label: "1. 거래일자", value: formatDate(NOW) },
-            { label: "2. 거래시각", value: formatDateTime(NOW).slice(11) },
+            { label: "1. 거래일자", value: formatDate(transactionAt ?? NOW) },
+            {
+              label: "2. 거래시각",
+              value: formatDateTime(transactionAt ?? NOW).slice(11),
+            },
             {
               label: "3. 출금계좌번호",
-              value: formatAccountNo(form.fromAccount),
+              value: formatAccountNo(fromAccount),
             },
             {
               label: "4. 입금계좌번호",
@@ -165,24 +207,24 @@ export const ReservedTransferScreen = () => {
         <OtpModal
           open={otpOpen}
           onClose={() => setOtpOpen(false)}
-          onConfirm={() => {
-            setOtpOpen(false)
-            /** REQ-RSV-007: 등록한 예약이체가 즉시 예약이체 조회/취소(E-04) 목록에 반영된다. */
-            MOCK_RESERVATIONS.unshift({
-              id: `rsv-${crypto.randomUUID()}`,
-              status: "대기",
-              scheduledDate: form.scheduledDate,
-              registeredAt: NOW,
-              fromAccountNo: form.fromAccount,
-              fromAlias: selectedAccount?.alias ?? "",
-              toAccountNo: form.toAccount,
-              payeeName: MOCK_PAYEE_NAME,
-              amount: form.amount ?? 0,
-              memo: form.payeeMemo || "-",
-            })
-            setStep(3)
-          }}
+          onConfirm={handleRegisterConfirm}
           guide="예약이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+          transaction={{
+            type: OtpTransactionType.SCHEDULED_TRANSFER,
+            data: {
+              withdrawalAccountId: selectedAccount?.accountId ?? 0,
+              depositAccountNumber: form.toAccount,
+              amount: form.amount ?? 0,
+              scheduledDate: form.scheduledDate,
+            },
+          }}
+        />
+
+        <ErrorDialog
+          open={errorMessage != null}
+          onClose={() => setErrorMessage(null)}
+          title="예약이체 등록 실패"
+          messages={errorMessage ? [errorMessage] : []}
         />
       </>
     )
@@ -195,8 +237,8 @@ export const ReservedTransferScreen = () => {
         row={{
           scheduledDate: formatDate(form.scheduledDate),
           fromAccount: (
-            <span className="tabular-nums">
-              {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
+            <span>
+              {selectedAccount?.accountName} {formatAccountNo(fromAccount)}
             </span>
           ),
           toAccount: formatAccountNo(form.toAccount),
@@ -218,13 +260,12 @@ export const ReservedTransferScreen = () => {
   return (
     <ReservedTransferStep1
       steps={STEPS}
-      accounts={MOCK_TRANSFER_ACCOUNTS}
-      form={form}
+      accounts={accountOptions}
+      form={displayForm}
       onChange={setField}
       today={TODAY}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
-      duplicate={duplicate}
       canSubmit={canSubmit}
       onNext={() => setStep(2)}
     />

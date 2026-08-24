@@ -64,7 +64,7 @@ export const WithdrawAccountField = ({
       {selected && (
         <p className="text-base text-ink-muted">
           출금가능금액{" "}
-          <span className="font-bold text-ink tabular-nums">
+          <span className="font-bold text-ink">
             {formatAmount(selected.withdrawable)}
           </span>
         </p>
@@ -260,13 +260,13 @@ export const AmountField = ({
             const digits = e.target.value.replace(/\D/g, "")
             onChange(digits ? Number(digits) : null)
           }}
-          className="max-w-xs text-right tabular-nums"
+          className="max-w-xs text-right"
         />
         <span className="shrink-0 text-base text-ink-muted">원</span>
       </div>
 
       {value != null && value > 0 && (
-        <span className="text-page font-bold text-primary tabular-nums">
+        <span className="text-page font-bold text-primary">
           {formatKoreanAmount(value)}
         </span>
       )}
@@ -290,7 +290,7 @@ export const AmountField = ({
         </Chip>
       </div>
 
-      <p className="text-2xs text-ink-muted tabular-nums">
+      <p className="text-2xs text-ink-muted">
         {showDailyLimit
           ? `1회 한도 ${formatAmount(perTransferLimit)} · 1일 잔여한도 ${formatAmount(dailyRemaining)}`
           : `1회 한도 ${formatAmount(perTransferLimit)}`}
@@ -336,7 +336,7 @@ export const MemoField = ({
         onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
         className="max-w-xs"
       />
-      <span className="shrink-0 text-xs text-ink-muted tabular-nums">
+      <span className="shrink-0 text-xs text-ink-muted">
         {value.length}/{maxLength}
       </span>
     </div>

@@ -87,9 +87,7 @@ export const A07FindId = () => {
       {foundId && (
         <Alert variant="success" title="조회 결과">
           회원님의 아이디는{" "}
-          <span className="font-bold text-ink tabular-nums">
-            {maskUserId(foundId)}
-          </span>{" "}
+          <span className="font-bold text-ink">{maskUserId(foundId)}</span>{" "}
           입니다.
         </Alert>
       )}

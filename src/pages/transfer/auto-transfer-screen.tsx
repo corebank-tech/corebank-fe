@@ -1,13 +1,8 @@
 import * as React from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
-import {
-  MOCK_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_LIMITS,
-  MOCK_PAYEE_NAME,
-} from "@/entities/transfer"
-import { MOCK_AUTO_TRANSFERS } from "@/entities/transfer"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
+import { MOCK_TRANSFER_LIMITS, MOCK_PAYEE_NAME } from "@/entities/transfer"
 import {
   formatAccountNo,
   formatAmount,
@@ -15,17 +10,25 @@ import {
   formatDateTime,
   maskName,
 } from "@/shared/lib/format"
-import { addMonths, daysBetween, parseISO, toISO } from "@/shared/lib/date"
-import {
-  MOCK_NOW as NOW,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
+import { addMonths, daysBetween } from "@/shared/lib/date"
+import { getToday } from "@/shared/config/clock"
+import { getNow } from "@/shared/config/clock"
+import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { AUTO_TRANSFER_START_MAX_RANGE_DAYS } from "@/shared/config/policy"
 import type { TransferCycleMonths } from "@/widgets/transfer"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
 import { AutoTransferStep1 } from "@/pages/transfer/auto/g01-input"
 import { AutoTransferStep2 } from "@/pages/transfer/auto/g02-confirm"
 import { AutoTransferStep3 } from "@/pages/transfer/auto/g03-complete"
+import { useRegisterAutoTransferMutation } from "@/entities/transfer"
+import { useWithdrawAccounts } from "@/entities/account"
+import type { AccountOption } from "@/shared/types/account"
+import { ApiError } from "@/shared/api/api-error"
+import { ErrorDialog } from "@/shared/ui/error-dialog"
+
+// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
+// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
+const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export type AutoTransferForm = {
   fromAccount: string
@@ -42,7 +45,8 @@ export type AutoTransferForm = {
 }
 
 const INITIAL_FORM: AutoTransferForm = {
-  fromAccount: MOCK_TRANSFER_ACCOUNTS[0].accountNo,
+  // 출금계좌는 GET /accounts 응답이 도착한 뒤 첫 계좌로 채워진다.
+  fromAccount: "",
   password: "",
   toAccount: "",
   toConfirmed: false,
@@ -83,40 +87,6 @@ const buildInitialForm = (searchParams: URLSearchParams): AutoTransferForm => {
   }
 }
 
-const isDuplicate = (form: AutoTransferForm): boolean => {
-  if (!form.toConfirmed) return false
-  return MOCK_AUTO_TRANSFERS.some(
-    (a) =>
-      a.status === "정상" &&
-      a.fromAccountNo === form.fromAccount &&
-      a.toAccountNo === form.toAccount &&
-      a.dayOfMonth === form.dayOfMonth,
-  )
-}
-
-/** 대상 월에 지정일이 없으면(29·30·31일) 말일로 보정한다 (POL-034). */
-const clampToMonth = (year: number, monthIndex: number, day: number): Date => {
-  const lastDay = new Date(year, monthIndex + 1, 0).getDate()
-  return new Date(year, monthIndex, Math.min(day, lastDay))
-}
-
-/** 시작일 이후 첫 이체지정일(말일 보정 포함)을 첫 실행 예정일로 산출한다. */
-const computeFirstExecDate = (startISO: string, dayOfMonth: number): string => {
-  const start = parseISO(startISO)
-  let candidate = clampToMonth(
-    start.getFullYear(),
-    start.getMonth(),
-    dayOfMonth,
-  )
-  if (candidate < start) {
-    const nextMonthIndex = start.getMonth() + 1
-    const year = start.getFullYear() + Math.floor(nextMonthIndex / 12)
-    const month = nextMonthIndex % 12
-    candidate = clampToMonth(year, month, dayOfMonth)
-  }
-  return toISO(candidate)
-}
-
 /**
  * G-01 ~ G-03 assembly. Holds the shared form state and step index; each step
  * is a pure presentation component that receives values and callbacks. The
@@ -124,24 +94,49 @@ const computeFirstExecDate = (startISO: string, dayOfMonth: number): string => {
  * execution (REQ-AUTO-005, REQ-TRSF-031) is orchestrated here.
  */
 export const AutoTransferScreen = () => {
+  const NOW = useBaseTime()
+  const TODAY = getToday()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<AutoTransferForm>(() =>
     buildInitialForm(searchParams),
   )
+  // 확인 다이얼로그를 여는 시점의 시각. 다이얼로그에 표시하는 거래일자·거래시각이
+  // 화면 진입 시각으로 고정되지 않게 한다.
+  const [transactionAt, setTransactionAt] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  // 첫 실행 예정일은 서버가 산출한다(말일 보정 POL-034 포함). 등록 응답의 값을
+  // 그대로 완료 화면에 보여준다 — 화면에서 다시 계산하면 배치 규칙과 어긋난다.
+  const [nextExecDate, setNextExecDate] = React.useState<string | null>(null)
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
+
+  const { accounts: withdrawAccounts, isLoading: accountsLoading } =
+    useWithdrawAccounts()
+  const registerMutation = useRegisterAutoTransferMutation()
+
+  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
+    alias: a.accountName ?? "",
+    accountNo: a.accountNumber ?? "",
+    balance: a.balance ?? 0,
+    withdrawable: a.balance ?? 0,
+  }))
 
   const setField = <K extends keyof AutoTransferForm>(
     key: K,
     value: AutoTransferForm[K],
   ) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const selectedAccount = MOCK_TRANSFER_ACCOUNTS.find(
-    (a) => a.accountNo === form.fromAccount,
+  // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
+  // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const fromAccount = form.fromAccount || (accountOptions[0]?.accountNo ?? "")
+  const displayForm: AutoTransferForm = { ...form, fromAccount }
+
+  const selectedAccount = withdrawAccounts.find(
+    (a) => a.accountNumber === fromAccount,
   )
 
   const startSpan = form.startDate ? daysBetween(TODAY, form.startDate) : null
@@ -157,8 +152,6 @@ export const AutoTransferScreen = () => {
     endSpan != null &&
     endSpan > 0 &&
     form.endDate <= addMonths(form.startDate, 60)
-  const duplicate = isDuplicate(form)
-
   const canSubmit =
     form.password.length === 4 &&
     form.toConfirmed &&
@@ -166,18 +159,67 @@ export const AutoTransferScreen = () => {
     form.amount > 0 &&
     form.amount <= perTransferLimit &&
     startValid &&
-    endValid &&
-    !duplicate
+    endValid
 
   const resetAll = () => {
     setForm(INITIAL_FORM)
     setStep(1)
   }
 
+  /**
+   * OTP 발급 시점의 거래정보와 등록 요청 본문은 서버가 정규화해 문자열로 대조한다
+   * (otp_integration_guide.md, 어긋나면 OTP0102). 두 곳에 같은 값을 손으로 적으면
+   * 한쪽만 고쳐도 조용히 어긋나므로 한 객체를 양쪽이 함께 쓴다.
+   */
+  const otpTransactionData =
+    selectedAccount == null
+      ? null
+      : {
+          withdrawalAccountId: selectedAccount.accountId,
+          depositAccountNumber: form.toAccount,
+          amount: form.amount ?? 0,
+          cycleMonths: form.cycleMonths,
+          transferDay: form.dayOfMonth,
+          startDate: form.startDate,
+          endDate: form.endDate,
+        }
+
+  /**
+   * 같은 조건(출금계좌·입금계좌·이체지정일)의 자동이체가 이미 있으면 서버가
+   * AUT0301로 거부한다. 화면에서 미리 걸러내지 않고 그 사유를 그대로 띄운다.
+   */
+  const handleRegisterConfirm = async (otpAuthToken: string) => {
+    // 출금계좌는 확인 다이얼로그에서 인증 전에 걸러낸다. 여기서는 타입을 좁히는
+    // 역할만 한다.
+    if (otpTransactionData == null) return
+    setOtpOpen(false)
+    try {
+      const registered = await registerMutation.mutateAsync({
+        data: {
+          ...otpTransactionData,
+          payeeName: MOCK_PAYEE_NAME,
+          myPassbookMemo: form.myMemo || undefined,
+          recipientPassbookMemo: form.payeeMemo || undefined,
+          accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          otpAuthToken,
+        },
+      })
+      setNextExecDate(registered?.nextExecutionDate ?? null)
+      setStep(3)
+    } catch (e) {
+      setErrorMessage(
+        e instanceof ApiError ? e.message : "자동이체 등록에 실패했습니다.",
+      )
+    }
+  }
+
   const periodLabel = `${formatDate(form.startDate)} ~ ${formatDate(form.endDate)}`
-  const nextExecDate = form.startDate
-    ? computeFirstExecDate(form.startDate, form.dayOfMonth)
-    : ""
+
+  if (accountsLoading) {
+    return (
+      <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
+    )
+  }
 
   if (step === 2) {
     return (
@@ -185,23 +227,22 @@ export const AutoTransferScreen = () => {
         <AutoTransferStep2
           steps={STEPS}
           fromAccount={
-            <span className="tabular-nums">
-              {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
+            <span>
+              {selectedAccount?.accountName} {formatAccountNo(fromAccount)}
             </span>
           }
-          toAccount={
-            <span className="tabular-nums">
-              {formatAccountNo(form.toAccount)}
-            </span>
-          }
+          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
           payeeName={maskName(MOCK_PAYEE_NAME)}
           amount={formatAmount(form.amount ?? 0, { suffix: false })}
           cycle={`${form.cycleMonths}개월`}
           dayOfMonth={`매월 ${form.dayOfMonth}일`}
-          period={<span className="tabular-nums">{periodLabel}</span>}
+          period={<span>{periodLabel}</span>}
           payeeMemo={form.payeeMemo || "-"}
           onPrev={() => setStep(1)}
-          onSubmit={() => setConfirmOpen(true)}
+          onSubmit={() => {
+            setTransactionAt(getNow())
+            setConfirmOpen(true)
+          }}
         />
 
         <ConfirmDialog
@@ -209,6 +250,15 @@ export const AutoTransferScreen = () => {
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => {
             setConfirmOpen(false)
+            // 인증을 시작하기 전에 막는다. OTP는 발급·검증이 실제 토큰을
+            // 소비하므로, 인증을 마친 뒤에 걸러내면 그 토큰이 그대로 버려진다.
+            // 출금계좌 목록은 백그라운드 재조회로 바뀔 수 있다.
+            if (otpTransactionData == null) {
+              setErrorMessage(
+                "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
+              )
+              return
+            }
             setOtpOpen(true)
           }}
           messages={[
@@ -217,11 +267,14 @@ export const AutoTransferScreen = () => {
           ]}
           confirmLabel="확인"
           items={[
-            { label: "1. 거래일자", value: formatDate(NOW) },
-            { label: "2. 거래시각", value: formatDateTime(NOW).slice(11) },
+            { label: "1. 거래일자", value: formatDate(transactionAt ?? NOW) },
+            {
+              label: "2. 거래시각",
+              value: formatDateTime(transactionAt ?? NOW).slice(11),
+            },
             {
               label: "3. 출금계좌번호",
-              value: formatAccountNo(form.fromAccount),
+              value: formatAccountNo(fromAccount),
             },
             {
               label: "4. 입금계좌번호",
@@ -232,30 +285,24 @@ export const AutoTransferScreen = () => {
           ]}
         />
 
-        <OtpModal
-          open={otpOpen}
-          onClose={() => setOtpOpen(false)}
-          onConfirm={() => {
-            setOtpOpen(false)
-            /** REQ-AUTO-009: 등록한 자동이체가 즉시 자동이체 조회/변경/해지(G-04) 목록에 반영된다. */
-            MOCK_AUTO_TRANSFERS.unshift({
-              id: `at-${crypto.randomUUID()}`,
-              fromAccountNo: form.fromAccount,
-              fromAlias: selectedAccount?.alias ?? "",
-              toAccountNo: form.toAccount,
-              payeeName: MOCK_PAYEE_NAME,
-              amount: form.amount ?? 0,
-              cycleMonths: form.cycleMonths,
-              dayOfMonth: form.dayOfMonth,
-              startDate: form.startDate,
-              endDate: form.endDate,
-              memo: form.payeeMemo || "-",
-              status: "정상",
-              nextExecDate,
-            })
-            setStep(3)
-          }}
-          guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+        {otpTransactionData != null && (
+          <OtpModal
+            open={otpOpen}
+            onClose={() => setOtpOpen(false)}
+            onConfirm={handleRegisterConfirm}
+            guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            transaction={{
+              type: OtpTransactionType.AUTO_TRANSFER,
+              data: otpTransactionData,
+            }}
+          />
+        )}
+
+        <ErrorDialog
+          open={errorMessage != null}
+          onClose={() => setErrorMessage(null)}
+          title="자동이체 등록 실패"
+          messages={errorMessage ? [errorMessage] : []}
         />
       </>
     )
@@ -267,8 +314,8 @@ export const AutoTransferScreen = () => {
         steps={STEPS}
         row={{
           fromAccount: (
-            <span className="tabular-nums">
-              {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
+            <span>
+              {selectedAccount?.accountName} {formatAccountNo(fromAccount)}
             </span>
           ),
           toAccount: formatAccountNo(form.toAccount),
@@ -277,7 +324,7 @@ export const AutoTransferScreen = () => {
           period: periodLabel,
           cycle: `${form.cycleMonths}개월`,
           dayOfMonth: `매월 ${form.dayOfMonth}일`,
-          nextExecDate: formatDate(nextExecDate),
+          nextExecDate: formatDate(nextExecDate ?? ""),
         }}
         highlightAmount={formatAmount(form.amount ?? 0)}
         onViewAutoTransfers={() => {
@@ -291,13 +338,12 @@ export const AutoTransferScreen = () => {
   return (
     <AutoTransferStep1
       steps={STEPS}
-      accounts={MOCK_TRANSFER_ACCOUNTS}
-      form={form}
+      accounts={accountOptions}
+      form={displayForm}
       onChange={setField}
       today={TODAY}
       perTransferLimit={perTransferLimit}
       payeeName={MOCK_PAYEE_NAME}
-      duplicate={duplicate}
       canSubmit={canSubmit}
       onNext={() => setStep(2)}
     />

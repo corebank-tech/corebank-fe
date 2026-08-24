@@ -4,12 +4,14 @@ import {
   AccountSelectField,
   KeywordField,
   PeriodField,
+  type PeriodPreset,
   RadioRowField,
   type RadioRowOption,
 } from "@/widgets/query/search-fields"
 import { FormRow } from "@/shared/ui/form-row"
 import { MOCK_TRANSFER_ACCOUNTS } from "@/entities/transfer"
-import { MOCK_TODAY } from "@/shared/config/mock-clock"
+import { getToday } from "@/shared/config/clock"
+import { addDays } from "@/shared/lib/date"
 
 const CONTENT_OPTIONS: RadioRowOption[] = [
   { label: "전체", value: "all" },
@@ -33,8 +35,8 @@ const AccountSelectFieldDemo = () => {
 
 const PeriodFieldDemo = () => {
   const [range, setRange] = React.useState({
-    start: "2026-06-23",
-    end: MOCK_TODAY,
+    start: addDays(getToday(), -59),
+    end: getToday(),
   })
   return (
     <FormRow label="조회기간">
@@ -42,7 +44,33 @@ const PeriodFieldDemo = () => {
         start={range.start}
         end={range.end}
         onChange={setRange}
-        today={MOCK_TODAY}
+        today={getToday()}
+      />
+    </FormRow>
+  )
+}
+
+/** E-04처럼 미래 건을 다루는 화면이 넘기는 프리셋. */
+const FUTURE_PRESETS: PeriodPreset[] = [
+  { id: "today", label: "오늘", startOffset: 0, endOffset: 0 },
+  { id: "1m", label: "1개월", startOffset: -30, endOffset: 0 },
+  { id: "1m-ahead", label: "1개월 후", startOffset: 0, endOffset: 30 },
+  { id: "3m-ahead", label: "3개월 후", startOffset: 0, endOffset: 90 },
+]
+
+const PeriodFieldFuturePresetsDemo = () => {
+  const [range, setRange] = React.useState({
+    start: addDays(getToday(), -60),
+    end: addDays(getToday(), 60),
+  })
+  return (
+    <FormRow label="조회기간">
+      <PeriodField
+        start={range.start}
+        end={range.end}
+        onChange={setRange}
+        today={getToday()}
+        presets={FUTURE_PRESETS}
       />
     </FormRow>
   )
@@ -91,6 +119,14 @@ export const Period: Story = {
   render: () => (
     <div className="w-200">
       <PeriodFieldDemo />
+    </div>
+  ),
+}
+
+export const PeriodFuturePresets: Story = {
+  render: () => (
+    <div className="w-200">
+      <PeriodFieldFuturePresetsDemo />
     </div>
   ),
 }

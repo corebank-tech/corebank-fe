@@ -1,16 +1,22 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
 import { Select } from "@/shared/ui/select"
 import { Badge } from "@/shared/ui/badge"
-import { GridToolbar, PeriodField, SearchPanel } from "@/widgets/query"
+import {
+  GridToolbar,
+  PeriodField,
+  SavedConditionAlert,
+  SearchPanel,
+} from "@/widgets/query"
 import { SummaryRow } from "@/shared/ui/summary-row"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
-import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
+import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
   formatAccountNo,
   formatAmount,
@@ -20,56 +26,110 @@ import {
   maskName,
 } from "@/shared/lib/format"
 import {
-  MOCK_AUTO_TRANSFER_RESULTS,
   getAutoTransferResultBadgeVariant,
+  toAutoTransferResultRow,
+  useAutoTransferExecutions,
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferResultRow,
 } from "@/entities/transfer"
-import {
-  MOCK_NOW as BASE_TIME,
-  MOCK_TODAY as TODAY,
-} from "@/shared/config/mock-clock"
-
-const FROM_ACCOUNTS = Array.from(
-  new Map(
-    MOCK_AUTO_TRANSFER_RESULTS.map((r) => [r.fromAccountNo, r.fromAlias]),
-  ).entries(),
-)
+import { getToday } from "@/shared/config/clock"
+import { recentPeriod } from "@/shared/config/query-period"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
+import { useWithdrawAccounts } from "@/entities/account"
 
 export const G05AutoTransferResults = () => {
-  const [fromAccount, setFromAccount] = React.useState("all")
-  const [period, setPeriod] = React.useState({
-    start: "2026-06-23",
-    end: TODAY,
-  })
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const TODAY = getToday()
+  // 입력 중인 조회조건과 실제로 조회에 쓰인 조건을 분리한다. 쿼리 키가 입력 state에
+  // 바로 물려 있으면 계좌·기간을 건드릴 때마다 요청이 나가고 "조회" 버튼이 무의미해진다.
+  const [applied, setApplied] = React.useState<{
+    accountId: number | null
+    period: { start: string; end: string }
+  }>(() => ({ accountId: null, period: recentPeriod() }))
+  const [fromAccountId, setFromAccountId] = React.useState<number | null>(null)
+  const [period, setPeriod] = React.useState(recentPeriod)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    QUERY_DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
-  const [savedOpen, setSavedOpen] = React.useState(false)
+  const savedCondition = useSavedConditionAlert()
+  const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
-  const rows = React.useMemo(() => {
-    return MOCK_AUTO_TRANSFER_RESULTS.filter((r) => {
-      const d = r.processedAt.slice(0, 10)
-      if (d < period.start || d > period.end) return false
-      if (fromAccount !== "all" && r.fromAccountNo !== fromAccount) return false
-      return true
-    }).sort((a, b) => b.processedAt.localeCompare(a.processedAt))
-  }, [fromAccount, period])
+  const { accounts: withdrawAccounts } = useWithdrawAccounts()
 
-  const normal = rows.filter((r) => r.result === "정상")
-  const error = rows.filter((r) => r.result === "오류")
-  const sum = (list: AutoTransferResultRow[]) =>
-    list.reduce((s, r) => s + r.amount, 0)
+  // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
+  // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
+  const defaultAccountId = withdrawAccounts[0]?.accountId ?? null
+  const selectedAccountId = fromAccountId ?? defaultAccountId
+  const appliedAccountId = applied.accountId ?? defaultAccountId
+  const appliedAccount = withdrawAccounts.find(
+    (a) => a.accountId === appliedAccountId,
+  )
 
-  const size = pageSize === "all" ? rows.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(rows.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * size, safePage * size)
+  // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
+  // 않는다. 타입을 좁히기 위한 분기다.
+  const size = pageSize === "all" ? QUERY_DEFAULT_PAGE_SIZE : pageSize
+  const {
+    page: pageData,
+    baseTime,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useAutoTransferExecutions(
+    {
+      // REQ-AUTO-018: 출금계좌는 조회조건이라 서버가 필수로 받는다. 값이 정해지기
+      // 전에는 enabled로 요청 자체를 막으므로 이 0은 실제로 나가지 않는다.
+      withdrawalAccountId: appliedAccountId ?? 0,
+      fromDate: applied.period.start,
+      toDate: applied.period.end,
+      page: page - 1,
+      size,
+    },
+    { enabled: appliedAccountId != null },
+  )
+
+  // 출금계좌 정보는 응답에 없다. 조회 조건으로 지정한 계좌가 그대로 그 값이다.
+  const pageRows = (pageData?.items ?? []).map((item) =>
+    toAutoTransferResultRow(item, {
+      accountNo: appliedAccount?.accountNumber ?? "",
+      alias: appliedAccount?.accountName ?? "",
+    }),
+  )
+  const totalCount = pageData?.totalCount ?? 0
+  const totalPages = Math.max(1, pageData?.totalPages ?? 1)
+
+  // REQ-AUTO-019: 집계는 페이징과 무관한 조회조건 전체 기준이라 서버가 계산해 준다.
+  // 현재 페이지만 더하면 페이지를 넘길 때마다 값이 달라진다.
+  const summary = pageData?.summary
+
+  // 조회조건이 바뀌어 결과가 줄면 totalPages만 작아지고 page는 그대로라, 요청은 범위
+  // 밖 페이지를 계속 보내면서 빈 목록이 뜬다. 렌더 중 보정하면 React가 커밋 전에
+  // 다시 렌더해서 같은 패스에서 올바른 페이지로 요청이 나간다.
+  if (page > totalPages) setPage(totalPages)
 
   const handleReset = () => {
-    setFromAccount("all")
-    setPeriod({ start: "2026-06-23", end: TODAY })
+    const next = recentPeriod()
+    setFromAccountId(null)
+    setPeriod(next)
+    setApplied({ accountId: null, period: next })
     setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+  }
+
+  const handleSearch = () => {
+    const sameCondition =
+      appliedAccountId === selectedAccountId &&
+      applied.period.start === period.start &&
+      applied.period.end === period.end
+    setApplied({ accountId: selectedAccountId, period })
+    setPage(1)
+    savedCondition.clear()
+    downloadComplete.clear()
+    // 조건도 페이지도 그대로면 쿼리 키가 같아 요청이 나가지 않는다. 조회를 누른
+    // 이상 최신 상태를 보여줘야 하므로 명시적으로 다시 부른다.
+    if (sameCondition && page === 1) refetch()
   }
 
   const exportHeaders = [
@@ -83,7 +143,7 @@ export const G05AutoTransferResults = () => {
     "표시내용",
     "실패사유",
   ]
-  const exportRows = rows.map((r) => [
+  const exportRows = pageRows.map((r) => [
     r.result,
     formatDateTime(r.processedAt),
     `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
@@ -113,9 +173,7 @@ export const G05AutoTransferResults = () => {
       width: 150,
       sortable: true,
       sortValue: (r) => r.processedAt,
-      render: (r) => (
-        <span className="tabular-nums">{formatDateTime(r.processedAt)}</span>
-      ),
+      render: (r) => <span>{formatDateTime(r.processedAt)}</span>,
     },
     {
       key: "fromAccountNo",
@@ -124,9 +182,7 @@ export const G05AutoTransferResults = () => {
       render: (r) => (
         <span className="whitespace-nowrap">
           {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
-          <span className="tabular-nums">
-            {formatAccountNo(r.fromAccountNo)}
-          </span>
+          <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),
     },
@@ -134,9 +190,7 @@ export const G05AutoTransferResults = () => {
       key: "toAccountNo",
       header: "입금계좌",
       width: 150,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.toAccountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
     },
     {
       key: "payeeName",
@@ -180,12 +234,6 @@ export const G05AutoTransferResults = () => {
       ]}
       modals={
         <>
-          <AlertDialog
-            open={savedOpen}
-            onClose={() => setSavedOpen(false)}
-            messages={["조회조건이 저장되었습니다."]}
-          />
-
           <TextViewModal
             open={brailleOpen}
             onClose={() => setBrailleOpen(false)}
@@ -199,20 +247,20 @@ export const G05AutoTransferResults = () => {
       <FormSection title="조회조건">
         <SearchPanel
           onReset={handleReset}
-          onSearch={() => setPage(1)}
-          onSaveCondition={() => setSavedOpen(true)}
+          onSearch={handleSearch}
+          onSaveCondition={savedCondition.save}
         >
+          {/* REQ-AUTO-018: 출금계좌는 조회조건이라 "전체"가 없다. */}
           <FormRow label="출금계좌번호" htmlFor="g05-from">
             <Select
               id="g05-from"
               className="max-w-md"
-              value={fromAccount}
-              onChange={(e) => setFromAccount(e.target.value)}
+              value={selectedAccountId ?? ""}
+              onChange={(e) => setFromAccountId(Number(e.target.value))}
             >
-              <option value="all">전체</option>
-              {FROM_ACCOUNTS.map(([accountNo, alias]) => (
-                <option key={accountNo} value={accountNo}>
-                  {`${alias} / ${formatAccountNo(accountNo)}`}
+              {withdrawAccounts.map((a) => (
+                <option key={a.accountId} value={a.accountId}>
+                  {`${a.accountName ?? ""} / ${formatAccountNo(a.accountNumber ?? "")}`}
                 </option>
               ))}
             </Select>
@@ -236,9 +284,9 @@ export const G05AutoTransferResults = () => {
               label: "정상처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(normal))}{" "}
+                  {formatAmount(summary?.successAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({normal.length}건)
+                    ({summary?.successCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -248,9 +296,9 @@ export const G05AutoTransferResults = () => {
               label: "오류처리",
               value: (
                 <span className="text-h2 font-bold">
-                  {formatAmount(sum(error))}{" "}
+                  {formatAmount(summary?.errorAmount ?? 0)}{" "}
                   <span className="text-base font-normal text-ink-faint">
-                    ({error.length}건)
+                    ({summary?.errorCount ?? 0}건)
                   </span>
                 </span>
               ),
@@ -264,36 +312,53 @@ export const G05AutoTransferResults = () => {
         </p>
 
         <GridToolbar
+          // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
+          // GridToolbar의 showAllOption 주석(#46).
+          showAllOption={false}
           periodLabel={`${formatDate(period.start)} ~ ${formatDate(period.end)}`}
-          totalCount={rows.length}
+          totalCount={totalCount}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
             setPage(1)
           }}
-          baseTimeLabel={formatDateTime(BASE_TIME)}
+          baseTimeLabel={
+            baseTime ? formatDateTime(new Date(baseTime)) : undefined
+          }
           onPrint={() => window.print()}
           onBrailleView={() => setBrailleOpen(true)}
-          onSaveFile={() =>
+          onSaveFile={() => {
             downloadCsv(
               `자동이체결과조회_${TODAY}.csv`,
               exportHeaders,
               exportRows,
             )
-          }
+            downloadComplete.save()
+          }}
+          resultLabel="현재 페이지 자동이체결과조회"
         />
 
         <DataGrid
           columns={columns}
           rows={pageRows}
+          loading={isFetching}
           rowKey={(r) => r.id}
-          emptyMessage="조회 결과가 없습니다."
+          emptyMessage={
+            isError ? (toErrorMessage(error) ?? "") : "조회 결과가 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           onPageChange={setPage}
+        />
+
+        <SavedConditionAlert open={savedCondition.saved} className="mt-2" />
+        <SavedConditionAlert
+          open={downloadComplete.saved}
+          message="파일이 저장되었습니다."
+          className="mt-2"
         />
       </FormSection>
     </QueryPageLayout>

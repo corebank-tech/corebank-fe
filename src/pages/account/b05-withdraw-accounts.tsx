@@ -63,9 +63,7 @@ export const B05WithdrawAccounts = () => {
       key: "accountNo",
       header: "계좌번호",
       width: 180,
-      render: (r) => (
-        <span className="tabular-nums">{formatAccountNo(r.accountNo)}</span>
-      ),
+      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
     },
     {
       key: "balance",
@@ -172,7 +170,7 @@ export const B05WithdrawAccounts = () => {
         "대기 상태의 예약이체 또는 정상 상태의 자동이체가 등록된 계좌는 삭제할 수 없습니다.",
       ]}
       footerItems={[
-        "예약 상태의 예약이체 또는 정상 상태의 자동이체가 등록된 계좌는 삭제할 수 없으며, 삭제 시도 시 사유가 계좌별로 안내됩니다(REQ-ACCT-011).",
+        "대기 상태의 예약이체 또는 정상 상태의 자동이체가 등록된 계좌는 삭제할 수 없으며, 삭제 시도 시 사유가 계좌별로 안내됩니다(REQ-ACCT-011).",
         "출금계좌 등록은 계좌비밀번호 검증과 OTP 인증을 모두 완료해야 처리됩니다(REQ-ACCT-010).",
         "등록 해제된 계좌는 즉시이체의 출금계좌로 선택할 수 없으며, 다시 등록해야 이용할 수 있습니다.",
       ]}

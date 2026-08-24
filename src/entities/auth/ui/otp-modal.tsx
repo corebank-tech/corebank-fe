@@ -8,25 +8,54 @@ import {
   OTP_MAX_ATTEMPTS as MAX_ATTEMPTS,
   OTP_TTL_SECONDS,
 } from "@/shared/config/policy"
+import {
+  useIssueOtp,
+  useVerifyOtp,
+  type IssueOtpRequestTransactionData,
+  type IssueOtpRequestTransactionType,
+} from "@/shared/api/generated"
+import { ApiError } from "@/shared/api/api-error"
+
+type OtpTransaction = {
+  type: IssueOtpRequestTransactionType
+  data: IssueOtpRequestTransactionData
+}
 
 type OtpModalProps = {
   open: boolean
   onClose: () => void
-  /** Called with the entered code when verification succeeds. */
-  onConfirm: (code: string) => void
+  /**
+   * 검증 성공 시 호출된다. 실거래 모드(transaction 지정)에서는 서버가 발급한
+   * otpAuthToken을, mock 모드(미지정)에서는 로컬 발급 코드값을 그대로 돌려준다.
+   */
+  onConfirm: (value: string) => void
   title?: React.ReactNode
   /** One-line guidance shown above the issue button. */
   guide?: React.ReactNode
+  /**
+   * 지정하면 실제 POST /otp/issue·/otp/verify를 호출해 서버가 검증한
+   * otpAuthToken을 발급받는다. 미지정 시 기존처럼 로컬 mock으로 동작한다 —
+   * 아직 이 모달만 붙어 있고 업무 API에 실거래 토큰 연동이 안 된 화면 대비.
+   * type·data를 하나로 묶어서, 한쪽만 넘기고 다른 쪽을 빠뜨려 조용히 mock으로
+   * 떨어지는 경로를 타입으로 막는다.
+   */
+  transaction?: OtpTransaction
 }
 
 const generateOtp = (): string => {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
+/** 재발급이 필요한 서버 오류 코드. 코드 불일치(OTP0001)만 재입력을 허용한다. */
+const REISSUE_REQUIRED_CODES = new Set([
+  "OTP0103", // 시도 횟수 초과
+  "OTP0104", // 만료
+  "OTP0201", // 요청을 찾을 수 없음(이미 소비 포함)
+])
+
 /**
- * A-93 OTP 인증 모달 (Mock). Issues a 6-digit code that is displayed on screen
- * (unlike a real token) with a 180-second countdown. The user re-enters the
- * code to confirm; mismatches are reported inline with an attempt counter.
+ * A-93 OTP 인증 모달. transaction이 지정되면 실제 서버 OTP를 발급·검증하고,
+ * 미지정 시 화면에 표시되는 로컬 mock 코드로 동작한다(두 모드 모두 180초 카운트다운).
  */
 export const OtpModal = ({
   open,
@@ -34,23 +63,39 @@ export const OtpModal = ({
   onConfirm,
   title = "OTP 인증",
   guide = "OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요.",
+  transaction,
 }: OtpModalProps) => {
+  const isRealMode = transaction != null
+  const issueMutation = useIssueOtp()
+  const verifyMutation = useVerifyOtp()
+
+  const [otpRequestId, setOtpRequestId] = React.useState<string | null>(null)
+  // 실거래 모드에서는 운영 설정에서 otpCode가 응답에서 빠질 수 있다(스펙상
+  // nullable — "운영 설정에서는 응답에서 제외된다"). 발급 여부 판정에 쓰면
+  // 발급은 됐는데 코드가 안 와서 "미발급" 화면에 갇히는 상태가 된다. 표시
+  // 전용 값으로만 쓰고, 발급 판정은 hasIssued(실거래: otpRequestId /
+  // mock: issued)로 따로 둔다.
   const [issued, setIssued] = React.useState<string | null>(null)
+  const hasIssued = isRealMode ? otpRequestId != null : issued != null
   const { remaining, reset: resetCountdown } = useCountdown(
     OTP_TTL_SECONDS,
-    open && issued != null,
+    open && hasIssued,
   )
   const [value, setValue] = React.useState("")
   const [attempts, setAttempts] = React.useState(0)
+  const [locked, setLocked] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  const expired = issued != null && remaining <= 0
+  const expired = hasIssued && remaining <= 0
+  const attemptsExhausted = isRealMode ? locked : attempts >= MAX_ATTEMPTS
 
   const reset = React.useCallback(() => {
+    setOtpRequestId(null)
     setIssued(null)
     resetCountdown()
     setValue("")
     setAttempts(0)
+    setLocked(false)
     setError(null)
   }, [resetCountdown])
 
@@ -69,15 +114,41 @@ export const OtpModal = ({
     if (expired) setError("입력 시간이 초과되었습니다. OTP를 재발급해 주세요.")
   }
 
-  const issue = () => {
+  const issue = async () => {
+    setError(null)
+    if (transaction != null) {
+      try {
+        const response = await issueMutation.mutateAsync({
+          data: {
+            transactionType: transaction.type,
+            transactionData: transaction.data,
+          },
+        })
+        // 실거래 모드로 들어온 이상, 발급 응답에 otpRequestId가 없으면 즉시
+        // 오류로 끝낸다 — 여기서 조용히 넘어가면 검증 단계가 otpRequestId
+        // 없음을 mock 모드로 오인해 사용자가 입력한 값을 그대로 인증
+        // 성공으로 처리해 버린다.
+        if (!response.otpRequestId) {
+          setError("OTP 발급에 실패했습니다.")
+          return
+        }
+        setOtpRequestId(response.otpRequestId)
+        setIssued(response.otpCode ?? null)
+        resetCountdown(response.expiresIn ?? OTP_TTL_SECONDS)
+        setValue("")
+        setLocked(false)
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "OTP 발급에 실패했습니다.")
+      }
+      return
+    }
     setIssued(generateOtp())
     resetCountdown()
     setValue("")
-    setError(null)
   }
 
-  const confirm = () => {
-    if (issued == null) {
+  const confirm = async () => {
+    if (!hasIssued) {
       setError("OTP를 먼저 발급하세요.")
       return
     }
@@ -89,6 +160,40 @@ export const OtpModal = ({
       setError("OTP 6자리를 모두 입력하세요.")
       return
     }
+
+    if (isRealMode) {
+      // hasIssued가 실거래 모드에서 otpRequestId 기준이라 이론상 항상 있어야
+      // 하지만, TS 타입만으로는 보장이 안 돼 한 번 더 막는다 — 여기서 빠지면
+      // 아래 mock 비교(value !== issued)로 새서 미검증 값이 onConfirm으로
+      // 넘어간다.
+      if (otpRequestId == null) {
+        setError("OTP 발급 정보를 확인할 수 없습니다. 재발급해 주세요.")
+        return
+      }
+      try {
+        const response = await verifyMutation.mutateAsync({
+          data: { otpRequestId, otpCode: value },
+        })
+        if (response.otpAuthToken) {
+          onConfirm(response.otpAuthToken)
+          return
+        }
+        setError("OTP 인증에 실패했습니다.")
+      } catch (e) {
+        if (e instanceof ApiError) {
+          setError(e.message)
+          if (REISSUE_REQUIRED_CODES.has(e.code)) {
+            setLocked(true)
+          } else {
+            setValue("")
+          }
+        } else {
+          setError("OTP 확인 중 오류가 발생했습니다.")
+        }
+      }
+      return
+    }
+
     if (value !== issued) {
       const next = attempts + 1
       setAttempts(next)
@@ -98,8 +203,6 @@ export const OtpModal = ({
     }
     onConfirm(value)
   }
-
-  const attemptsExhausted = attempts >= MAX_ATTEMPTS
 
   return (
     <Modal
@@ -122,7 +225,11 @@ export const OtpModal = ({
             size="lg"
             className="min-w-30"
             onClick={attemptsExhausted ? onClose : confirm}
-            disabled={attemptsExhausted ? false : issued == null || expired}
+            disabled={
+              attemptsExhausted
+                ? false
+                : !hasIssued || expired || verifyMutation.isPending
+            }
           >
             확인
           </Button>
@@ -132,37 +239,53 @@ export const OtpModal = ({
       <p className="mb-4 text-base leading-relaxed text-ink-muted">{guide}</p>
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3">
-        {issued == null ? (
+        {!hasIssued ? (
           <>
             <span className="text-base text-ink-muted">
               발급된 OTP가 없습니다.
             </span>
-            <Button variant="outline" size="sm" onClick={issue}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={issue}
+              disabled={issueMutation.isPending}
+            >
               OTP 발급
             </Button>
           </>
         ) : (
           <>
-            <span
-              className={cn(
-                "text-page font-bold tracking-2 tabular-nums",
-                expired ? "text-ink-faint line-through" : "text-primary",
-              )}
-              aria-label="발급된 OTP 번호"
-            >
-              {issued}
-            </span>
+            {issued != null ? (
+              <span
+                className={cn(
+                  "text-page font-bold tracking-2",
+                  expired ? "text-ink-faint line-through" : "text-primary",
+                )}
+                aria-label="발급된 OTP 번호"
+              >
+                {issued}
+              </span>
+            ) : (
+              <span className="text-base text-ink-muted">
+                OTP가 발급되었습니다.
+              </span>
+            )}
             <div className="flex flex-col items-end gap-1">
               <span
                 className={cn(
-                  "text-base font-bold tabular-nums",
+                  "text-base font-bold",
                   expired ? "text-ink-faint" : "text-ink",
                 )}
               >
                 {formatClock(remaining)}
               </span>
               {expired && !attemptsExhausted && (
-                <Button variant="outline" size="sm" onClick={issue}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={issue}
+                  disabled={issueMutation.isPending}
+                >
                   재발급
                 </Button>
               )}
@@ -177,12 +300,14 @@ export const OtpModal = ({
         placeholder="OTP 6자리"
         value={value}
         invalid={error != null}
-        disabled={issued == null || expired || attemptsExhausted}
+        disabled={
+          !hasIssued || expired || attemptsExhausted || verifyMutation.isPending
+        }
         onChange={(e) => {
           setValue(e.target.value.replace(/\D/g, "").slice(0, 6))
           if (error) setError(null)
         }}
-        className="text-center text-lg tracking-4 tabular-nums"
+        className="text-center text-lg tracking-4"
         aria-label="OTP 입력"
       />
 

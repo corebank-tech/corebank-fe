@@ -13,6 +13,17 @@ type TermsAgreementProps = {
    * 부모는 이 값으로 onNext 버튼의 활성화를 제어한다.
    */
   onAllRequiredAgreedChange?: (allRequiredAgreed: boolean) => void
+  /**
+   * 동의한 항목의 id 목록. 선택 약관 동의까지 서버에 실어 보내야 하는 화면(C-03)이
+   * 쓴다. 필수만 필터해 보내면 고객이 동의한 선택 약관이 이력에서 누락된다.
+   */
+  onAgreedChange?: (agreedIds: string[]) => void
+  /**
+   * [보기] 를 눌러 전문을 열 때 호출된다. 전문을 서버에서 받아오는 화면(C-03)이
+   * 이 시점에 조회를 걸고, 서버는 그 요청으로 열람 이력을 남긴다.
+   * 전달한 `terms` 의 body 가 갱신되면 열려 있는 모달에도 그대로 반영된다.
+   */
+  onView?: (id: string) => void
 }
 
 export type TermsAgreementHandle = {
@@ -32,16 +43,19 @@ export type TermsAgreementHandle = {
 export const TermsAgreement = React.forwardRef<
   TermsAgreementHandle,
   TermsAgreementProps
->(({ terms, onAllRequiredAgreedChange }, ref) => {
+>(({ terms, onAllRequiredAgreedChange, onAgreedChange, onView }, ref) => {
   const [checked, setChecked] = React.useState<Record<string, boolean>>({})
   const [viewed, setViewed] = React.useState<Record<string, boolean>>({})
-  const [viewing, setViewing] = React.useState<TermItem | null>(null)
+  // 열람 중인 약관은 객체가 아니라 id 로 들고 terms 에서 찾는다. 전문을 나중에
+  // 받아오는 화면에서 body 가 도착했을 때 열려 있는 모달이 옛 객체를 계속
+  // 가리키지 않게 하기 위해서다.
+  const [viewingId, setViewingId] = React.useState<string | null>(null)
+  const viewing = terms.find((t) => t.id === viewingId) ?? null
   const [blocked, setBlocked] = React.useState<{
     message: string
     openTerm?: TermItem
   } | null>(null)
 
-  const allChecked = terms.length > 0 && terms.every((t) => checked[t.id])
   const allRequiredAgreed = terms
     .filter((t) => t.required)
     .every((t) => checked[t.id])
@@ -50,16 +64,21 @@ export const TermsAgreement = React.forwardRef<
     onAllRequiredAgreedChange?.(allRequiredAgreed)
   }, [allRequiredAgreed, onAllRequiredAgreedChange])
 
+  // terms 순서를 그대로 따라 안정된 배열을 만든다. checked 객체를 그대로 넘기면
+  // 렌더마다 새 참조가 되어 소비자의 effect가 매번 다시 돈다.
+  const agreedIds = React.useMemo(
+    () => terms.filter((t) => checked[t.id]).map((t) => t.id),
+    [terms, checked],
+  )
+
+  React.useEffect(() => {
+    onAgreedChange?.(agreedIds)
+  }, [agreedIds, onAgreedChange])
+
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))
-    setViewing(term)
-  }
-
-  const toggleAll = () => {
-    const next = !allChecked
-    const map: Record<string, boolean> = {}
-    for (const t of terms) map[t.id] = next && !!viewed[t.id]
-    setChecked(map)
+    setViewingId(term.id)
+    onView?.(term.id)
   }
 
   const toggleOne = (id: string) => {
@@ -69,7 +88,7 @@ export const TermsAgreement = React.forwardRef<
 
   const agreeFromModal = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: true }))
-    setViewing(null)
+    setViewingId(null)
   }
 
   React.useImperativeHandle(ref, () => ({
@@ -92,20 +111,6 @@ export const TermsAgreement = React.forwardRef<
 
   return (
     <div className="overflow-hidden border border-border">
-      {/* 전체 동의 */}
-      <div className="flex items-center justify-between bg-surface px-5 py-4">
-        <Checkbox
-          checked={allChecked}
-          onChange={toggleAll}
-          label={
-            <span className="text-lg font-bold text-ink">약관 전체 동의</span>
-          }
-        />
-        <span className="text-base text-ink-muted">
-          필수 및 선택 항목에 모두 동의합니다.
-        </span>
-      </div>
-
       <ul>
         {terms.map((term) => (
           <li key={term.id} className="border-t border-border">
@@ -152,13 +157,13 @@ export const TermsAgreement = React.forwardRef<
 
       <Modal
         open={viewing !== null}
-        onClose={() => setViewing(null)}
+        onClose={() => setViewingId(null)}
         title={viewing?.title ?? ""}
         size="lg"
         footer={
           viewing && (
             <>
-              <Button variant="secondary" onClick={() => setViewing(null)}>
+              <Button variant="secondary" onClick={() => setViewingId(null)}>
                 닫기
               </Button>
               <Button onClick={() => agreeFromModal(viewing.id)}>동의</Button>

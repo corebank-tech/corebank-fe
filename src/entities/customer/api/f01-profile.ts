@@ -20,9 +20,3 @@ export const MOCK_PROFILE: CustomerProfile = {
   email: "honggildong1@corebank.co.kr",
   currentPassword: "Corebank12!",
 }
-
-/** 다른 회원이 이미 사용 중인 이메일(Mock 중복확인용). REQ-MYPG-002 */
-export const MOCK_REGISTERED_EMAILS = [
-  "taken@corebank.co.kr",
-  "existing0001@example.com",
-]

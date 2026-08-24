@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/utils"
 export type SummaryItem = {
   label: React.ReactNode
   value: React.ReactNode
-  /** Right-align + tabular-nums for numeric values. Defaults to true. */
+  /** Right-align + bold for numeric values. Defaults to true. */
   numeric?: boolean
   /** Optional value color token, e.g. "var(--color-deposit)". */
   valueColor?: string
@@ -37,15 +37,15 @@ export const SummaryRow = ({
       {items.map((item, i) => (
         <div key={i} className="flex flex-1">
           <div
-            className="flex shrink-0 items-center border-r border-b bg-surface px-3 py-2.5 text-[14px] font-bold whitespace-nowrap text-ink"
+            className="flex shrink-0 items-center border-r border-b bg-surface px-3 py-2.5 text-base font-bold whitespace-nowrap text-ink"
             style={{ minWidth: labelWidth }}
           >
             {item.label}
           </div>
           <div
             className={cn(
-              "flex flex-1 items-center border-r border-b bg-surface-elevated px-3 py-2.5 text-[14px] whitespace-nowrap text-ink",
-              (item.numeric ?? true) && "justify-end font-bold tabular-nums",
+              "flex flex-1 items-center border-r border-b bg-surface-elevated px-3 py-2.5 text-base whitespace-nowrap text-ink",
+              (item.numeric ?? true) && "justify-end font-bold",
             )}
             style={item.valueColor ? { color: item.valueColor } : undefined}
           >

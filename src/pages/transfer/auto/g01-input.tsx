@@ -29,7 +29,6 @@ type AutoTransferStep1Props = {
   today: string
   perTransferLimit: number
   payeeName: string
-  duplicate: boolean
   canSubmit: boolean
   onNext: () => void
 }
@@ -43,7 +42,6 @@ export const AutoTransferStep1 = ({
   today,
   perTransferLimit,
   payeeName,
-  duplicate,
   canSubmit,
   onNext,
 }: AutoTransferStep1Props) => {
@@ -190,14 +188,6 @@ export const AutoTransferStep1 = ({
             </FormRow>
           </div>
         </FormSection>
-
-        {duplicate && (
-          <p role="alert" className="text-base font-bold text-danger">
-            출금계좌·입금계좌·이체지정일이 모두 같은 자동이체가 이미 정상
-            등록되어 있습니다. 자동이체 조회/변경/해지에서 기존 등록 건을
-            확인하세요.
-          </p>
-        )}
       </StepLayout>
 
       <NoticeBoxFooter

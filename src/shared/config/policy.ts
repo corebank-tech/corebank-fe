@@ -38,6 +38,30 @@ export const RESERVATION_MAX_RANGE_DAYS = 365
 /** POL-021: 거래내역 조회 가능 기간 최대 1년. */
 export const QUERY_MAX_RANGE_DAYS = 365
 
+/** POL-021: 조회화면 기본 조회기간 1개월(REQ-INQR-009·TRSF-021·RSV-014·AUTO-018). */
+export const QUERY_DEFAULT_PERIOD_MONTHS = 1
+
+/**
+ * POL-022: 목록 페이징 건수 선택지. 규정은 `5·10·20·30·50·전체` 6종이고,
+ * 여기 담는 것은 숫자 5종이다 — "전체"는 값이 아니라 별도 선택지라
+ * GridToolbar가 `showAllOption`으로 따로 렌더한다.
+ */
+export const QUERY_PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50] as const
+
+/**
+ * POL-022: 목록 페이징 기본 건수 10건(REQ-CMN-019).
+ *
+ * 서버 페이징 화면 5개(B-03·E-04·E-05·G-04·G-05)가 이 상수를 본다 — 그쪽은
+ * 기본 건수가 그대로 서버에 나가는 `size`라 값이 갈리면 조회가 어긋난다.
+ * 클라이언트 페이징인 D-04·F-02는 아직 리터럴 10을 들고 있다. 서버로 나가는
+ * 값이 아니라 급하지 않아 후속으로 미뤘다(#59 리뷰 R2).
+ *
+ * 타입으로 선택지 포함을 강제한다 — 선택지에 없는 값이 기본값이 되면 `<Select>`가
+ * 매칭되는 `<option>`을 못 찾아 첫 항목을 표시하고, 화면에 보이는 건수와 실제
+ * 요청 `size`가 조용히 어긋난다.
+ */
+export const QUERY_DEFAULT_PAGE_SIZE: (typeof QUERY_PAGE_SIZE_OPTIONS)[number] = 10
+
 /** POL-026: 이메일 인증번호 유효시간 180초 / 숫자 6자리. */
 export const EMAIL_CODE_TTL_SECONDS = 180
 

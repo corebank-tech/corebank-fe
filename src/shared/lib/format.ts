@@ -51,8 +51,15 @@ export function formatKoreanAmount(value: number): string {
   return `${out}원`
 }
 
-/** "110632892336" -> "110-632-892336" (3-3-6). Non-digits are stripped. */
+/**
+ * "110632892336" -> "110-632-892336" (3-3-6). Non-digits are stripped.
+ *
+ * 서버가 마스킹해서 내려준 값(예: "110******877")은 그대로 돌려준다. 숫자만
+ * 남기면 마스킹 자릿수가 통째로 사라지기 때문이다 — 호출부 주석만으로는 이미
+ * 세 번 새어 나갔다(#49 c06-complete.tsx, #51 e04-reservation-list.tsx).
+ */
 export function formatAccountNo(raw: string): string {
+  if (raw.includes("*")) return raw
   const digits = raw.replace(/\D/g, "")
   if (digits.length !== 12) {
     // Fall back to a best-effort 3-3-rest grouping for non-standard lengths.
@@ -110,6 +117,9 @@ export function maskName(name: string): string {
  * CSV export only (REQ-INQR-015) — on-screen account numbers are shown in full (REQ-CMN-017).
  */
 export function maskAccountNo(raw: string): string {
+  // 이미 마스킹된 값은 formatAccountNo가 그대로 돌려주지만, 아래 뒷자리 마스킹
+  // 로직이 하이픈 없는 문자열을 다시 갈라 진짜 숫자까지 지울 수 있어 여기서도 막는다.
+  if (raw.includes("*")) return raw
   const formatted = formatAccountNo(raw)
   const groups = formatted.split("-")
   const lastIndex = groups.length - 1

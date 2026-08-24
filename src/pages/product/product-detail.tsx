@@ -12,7 +12,7 @@ import {
 
 type ProductDetailProps = {
   product: ProductDetailData
-  onJoin?: (id: string) => void
+  onJoin?: (id: number) => void
 }
 
 type TabKey = "guide" | "rate" | "notice"
@@ -65,7 +65,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
           </p>
 
           <div className="mt-5 flex items-baseline gap-1 border-t border-border pt-5">
-            <span className="text-[32px] leading-none font-bold text-primary tabular-nums">
+            <span className="text-[32px] leading-none font-bold text-primary">
               {product.maxRate.toFixed(2)}
             </span>
             <span className="text-lg font-bold text-primary">%</span>
@@ -80,25 +80,32 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-ink-muted">가입금액</dt>
-              <dd className="font-bold text-ink tabular-nums">
+              <dd className="font-bold text-ink">
                 {formatAmount(product.minAmount)} ~{" "}
                 {formatAmount(product.maxAmount)}
               </dd>
             </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-ink-muted">이자지급방식</dt>
-              <dd className="font-bold text-ink">{product.interestMethod}</dd>
-            </div>
           </dl>
 
-          <Button
-            fullWidth
-            size="lg"
-            className="mt-6"
-            onClick={() => onJoin?.(product.id)}
-          >
-            가입하기
-          </Button>
+          {product.saleStatus === "SUSPENDED" ? (
+            <>
+              <Button fullWidth size="lg" className="mt-6" disabled>
+                판매중지
+              </Button>
+              <p className="mt-2 text-xs text-ink-faint">
+                ※ 현재 판매가 중지되어 신규 가입할 수 없습니다.
+              </p>
+            </>
+          ) : (
+            <Button
+              fullWidth
+              size="lg"
+              className="mt-6"
+              onClick={() => onJoin?.(product.id)}
+            >
+              가입하기
+            </Button>
+          )}
         </div>
       </aside>
 
@@ -130,20 +137,16 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
 
         <div className="pt-6">
           {tab === "guide" && (
-            <dl className="overflow-hidden border-t-2 border-b border-border border-t-navy text-[14px]">
+            <dl className="overflow-hidden rounded-lg border border-border">
               {product.guide.map((item, i) => (
                 <div
                   key={item.label}
-                  className={cn(
-                    "grid grid-cols-[160px_1fr]",
-                    i < product.guide.length - 1 && "border-b border-border",
-                  )}
+                  className={cn("flex", i > 0 && "border-t border-border")}
                 >
-                  <dt className="border-r border-border bg-surface px-3 py-2.5 font-bold text-ink">
+                  <dt className="flex w-40 shrink-0 items-center bg-surface px-4 py-3 text-base font-bold text-ink">
                     {item.label}
                   </dt>
-
-                  <dd className="bg-surface-elevated px-3 py-2.5 leading-relaxed text-ink">
+                  <dd className="flex-1 bg-surface-elevated px-4 py-3 text-base leading-relaxed text-ink">
                     {item.value}
                   </dd>
                 </div>
@@ -158,7 +161,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
                 rows={product.rates}
                 rowKey={(r) => r.period}
               />
-              <p className="mt-3 text-xs text-ink-faint">
+              <p className="mt-3 text-2xs text-ink-faint">
                 표시된 금리는 연 세전 기준이며, 우대금리는 조건 충족 시
                 적용됩니다.
               </p>

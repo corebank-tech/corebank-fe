@@ -3,11 +3,10 @@ import { cn } from "@/shared/lib/utils"
 import { statusToneClasses } from "@/shared/ui/status-tone"
 
 export type BadgeVariant =
-  "primary" | "secondary" | "neutral" | "success" | "danger" | "warning"
+  "primary" | "neutral" | "success" | "danger" | "warning"
 
 const BADGE_VARIANT_CLASSES: Record<BadgeVariant, string> = {
   primary: statusToneClasses("primary"),
-  secondary: statusToneClasses("secondary"),
   neutral: "border-border bg-surface text-ink-muted",
   success: statusToneClasses("success"),
   danger: statusToneClasses("danger"),
@@ -26,7 +25,7 @@ export const Badge = ({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-sm border px-1.5 py-0.5 text-xs leading-none font-bold whitespace-nowrap",
+        "inline-flex h-5 items-center rounded-sm border px-1.5 text-2xs leading-none font-bold whitespace-nowrap",
         BADGE_VARIANT_CLASSES[variant],
         className,
       )}

@@ -1,110 +1,30 @@
 /**
- * E-05 예약이체 처리결과 조회 목업 데이터. REQ-RSV-014.
+ * E-05 예약이체 처리결과 조회. REQ-RSV-014.
+ *
+ * '처리중'은 요구사항의 결과 코드에는 없다. 서버는 확정된 건(SUCCESS/FAILED/CANCELED)만
+ * 내려주지만 status enum 자체는 WAITING·PROCESSING까지 포함하고 있어, 모르는 값이 오면
+ * 정상·오류·취소 중 하나로 뭉개는 대신 여기로 떨어뜨린다 — 확정되지 않은 건을 확정된
+ * 것처럼 보여주지 않기 위해서다. G-05(AutoTransferResult)와 같은 처리다.
  */
 
-export type ReservationResult = "정상" | "오류" | "취소"
+export type ReservationResult = "정상" | "오류" | "취소" | "처리중"
 
 export type ReservationResultRow = {
   id: string
   result: ReservationResult
-  /** 이체일자 ISO date. */
+  /**
+   * 처리 확정 시각 ISO datetime. 정상·오류는 실행 시각, 취소는 취소 시각이다 —
+   * 서버가 목록을 정렬하는 기준과 같은 값이다.
+   */
   transferDate: string
+  /** 서버가 마스킹해서 내려준다(예: `110******877`). 화면에서 다시 가공하지 않는다. */
   fromAccountNo: string
-  fromAlias: string
+  /** 서버가 마스킹해서 내려준다. */
   toAccountNo: string
+  /** 서버가 마스킹해서 내려준다(예: `홍*동`). */
   payeeName: string
   amount: number
-  /** 정상 처리 건에만 존재. */
+  /** 정상·오류 건에만 존재. */
   txId?: string
   failReason?: string
 }
-
-export const MOCK_RESERVATION_RESULTS: ReservationResultRow[] = [
-  {
-    id: "rr8",
-    result: "정상",
-    transferDate: "2026-07-15",
-    fromAccountNo: "110632892336",
-    fromAlias: "자유입출금",
-    toAccountNo: "333330730135",
-    payeeName: "김민수",
-    amount: 500_000,
-    txId: "20260715019000001120",
-  },
-  {
-    id: "rr7",
-    result: "오류",
-    transferDate: "2026-07-12",
-    fromAccountNo: "255104778910",
-    fromAlias: "비상금통장",
-    toAccountNo: "999911223344",
-    payeeName: "최유진",
-    amount: 1_000_000,
-    failReason: "출금계좌 잔액 부족(RSV0012)",
-  },
-  {
-    id: "rr6",
-    result: "취소",
-    transferDate: "2026-07-10",
-    fromAccountNo: "110632892336",
-    fromAlias: "자유입출금",
-    toAccountNo: "444401122938",
-    payeeName: "이서연",
-    amount: 200_000,
-  },
-  {
-    id: "rr5",
-    result: "정상",
-    transferDate: "2026-06-30",
-    fromAccountNo: "302998112233",
-    fromAlias: "급여통장",
-    toAccountNo: "110550098213",
-    payeeName: "박지훈",
-    amount: 2_000_000,
-    txId: "20260630019000000940",
-  },
-  {
-    id: "rr4",
-    result: "정상",
-    transferDate: "2026-06-18",
-    fromAccountNo: "110632892336",
-    fromAlias: "자유입출금",
-    toAccountNo: "333330730135",
-    payeeName: "김민수",
-    amount: 300_000,
-    txId: "20260618019000000801",
-  },
-  {
-    id: "rr3",
-    result: "오류",
-    transferDate: "2026-06-05",
-    fromAccountNo: "110632892336",
-    fromAlias: "자유입출금",
-    toAccountNo: "110550098213",
-    payeeName: "박지훈",
-    amount: 5_000_000,
-    failReason: "1일 이체한도 초과(RSV0021)",
-  },
-  {
-    id: "rr2",
-    result: "정상",
-    transferDate: "2026-05-22",
-    fromAccountNo: "302998112233",
-    fromAlias: "급여통장",
-    toAccountNo: "444401122938",
-    payeeName: "이서연",
-    amount: 90_000,
-    txId: "20260522019000000410",
-  },
-  {
-    id: "rr1",
-    result: "정상",
-    transferDate: "2026-04-30",
-    fromAccountNo: "255104778910",
-    fromAlias: "비상금통장",
-    toAccountNo: "110632892336",
-    payeeName: "홍길동",
-    amount: 200_000,
-    txId: "20260430019000000052",
-  },
-]

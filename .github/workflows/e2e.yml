@@ -20,8 +20,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm codegen
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm exec playwright test e2e/smoke.spec.ts
+      - run: pnpm exec playwright test e2e/smoke.spec.ts e2e/auth-flow.spec.ts
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}

@@ -19,6 +19,8 @@ type AppHeaderProps = {
   loggedIn?: boolean
   onExtend?: () => void
   onLogout?: () => void
+  /** 로그아웃 요청 진행 중. 연타로 CSRF 토큰이 무효화된 뒤의 2차 호출이 나가는 것을 막는다. */
+  logoutPending?: boolean
   onOpenFullMenu?: () => void
   onOpenNotifications?: () => void
 }
@@ -44,6 +46,7 @@ export const AppHeader = ({
   loggedIn = true,
   onExtend,
   onLogout,
+  logoutPending = false,
   onOpenFullMenu,
   onOpenNotifications,
 }: AppHeaderProps) => {
@@ -127,7 +130,7 @@ export const AppHeader = ({
               >
                 <Bell className="h-4.5 w-4.5" aria-hidden="true" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 inline-flex min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] leading-4 font-bold text-white">
+                  <span className="absolute top-0.5 right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-2xs leading-none font-bold text-white">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
@@ -138,7 +141,7 @@ export const AppHeader = ({
               </span>
 
               <span
-                className="text-base text-ink-muted tabular-nums"
+                className="min-w-[5ch] text-center text-base text-ink-muted"
                 aria-live="off"
               >
                 {formatSession(remainingSeconds)}
@@ -155,9 +158,10 @@ export const AppHeader = ({
               <button
                 type="button"
                 onClick={onLogout}
-                className="text-base text-ink-muted transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                disabled={logoutPending}
+                className="text-base text-ink-muted transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:text-ink-faint"
               >
-                로그아웃
+                {logoutPending ? "로그아웃 중..." : "로그아웃"}
               </button>
 
               <Button

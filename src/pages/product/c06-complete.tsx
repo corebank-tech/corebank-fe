@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
+import { ProductJoinRestartNotice } from "@/pages/product/join-restart-notice"
 import { ResultPanel } from "@/widgets/transfer"
 import { type DataGridColumn } from "@/shared/ui/data-grid"
-import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
+import { formatAmount, formatDate } from "@/shared/lib/format"
 import {
   PRODUCT_JOIN_STEPS,
   type ProductJoinResult,
@@ -23,20 +24,16 @@ const resultColumns: DataGridColumn<JoinResultRow>[] = [
     key: "newAccountNo",
     header: "신규계좌번호",
     align: "center",
-    render: (r) => (
-      <span className="tabular-nums">{formatAccountNo(r.newAccountNo)}</span>
-    ),
+    // 서버가 마스킹해서 내려주는 값이라 그대로 쓴다. formatAccountNo는 비숫자를
+    // 걷어내므로 마스킹 문자가 지워진다.
+    render: (r) => <span>{r.newAccountNo}</span>,
   },
   { key: "productName", header: "상품명", align: "center" },
   {
     key: "amount",
     header: "가입금액(원)",
     align: "right",
-    render: (r) => (
-      <span className="tabular-nums">
-        {formatAmount(r.amount, { suffix: false })}
-      </span>
-    ),
+    render: (r) => <span>{formatAmount(r.amount, { suffix: false })}</span>,
   },
   {
     key: "termMonths",
@@ -67,13 +64,7 @@ export const C06Complete = () => {
   const result = location.state as ProductJoinResult | null
 
   if (!result) {
-    return (
-      <StepLayout steps={PRODUCT_JOIN_STEPS} currentStep={4} title="상품가입">
-        <p className="py-10 text-center text-base text-ink-muted">
-          가입 정보를 확인할 수 없습니다. 상품가입을 처음부터 다시 진행하세요.
-        </p>
-      </StepLayout>
-    )
+    return <ProductJoinRestartNotice currentStep={4} />
   }
 
   const title = `${result.productName} 가입`
@@ -88,11 +79,14 @@ export const C06Complete = () => {
   }
 
   // REQ-PRDT-016: G-01 진입 시 입금계좌·이체금액·이체주기(1개월)·이체종료일(적금 만기일)을 미리 채운다.
+  // 표시용 계좌번호는 마스킹돼 있어 입금계좌로 쓸 수 없다. 서버가 내려준
+  // 프리필의 원본 계좌번호를 넘긴다.
+  const prefill = result.autoTransferPrefill
   const autoTransferSearch = new URLSearchParams({
-    toAccount: result.newAccountNo,
-    amount: String(result.amount),
-    cycleMonths: "1",
-    endDate: result.maturityDate,
+    toAccount: prefill?.depositAccountNumber ?? "",
+    amount: String(prefill?.amount ?? result.amount),
+    cycleMonths: String(prefill?.cycleMonths ?? 1),
+    endDate: prefill?.endDate ?? result.maturityDate,
   }).toString()
 
   return (
@@ -105,7 +99,11 @@ export const C06Complete = () => {
         highlightValue={formatAmount(result.amount)}
         columns={resultColumns}
         row={row}
-        footnote="※ 예적금 계좌는 계좌비밀번호를 별도로 부여하지 않습니다."
+        gridHoverable={false}
+        // REQ-PRDT-006은 예적금 계좌가 비밀번호를 보유하지 않는다고 정의하지만
+        // 서버는 가입 시 비밀번호를 저장한다(corebank-tech/corebank-server#275).
+        // 어느 쪽이 맞는지 정해지기 전까지 사실이 아닐 수 있는 안내는 내리지 않는다.
+        footnote="※ 가입 내용은 계좌조회에서 다시 확인할 수 있습니다."
         actions={
           <>
             <Button

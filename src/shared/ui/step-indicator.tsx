@@ -28,13 +28,13 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
             key={label}
             aria-current={isCurrent ? "step" : undefined}
             className={cn(
-              "flex items-center gap-1.5 text-base whitespace-nowrap tabular-nums",
+              "flex items-center gap-1.5 text-base whitespace-nowrap",
               active ? "text-primary" : "text-ink-faint",
             )}
           >
             <span
               className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold",
+                "flex h-6 w-6 items-center justify-center rounded-full border text-xs leading-none font-bold",
                 active
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border-strong bg-surface-elevated text-ink-faint",

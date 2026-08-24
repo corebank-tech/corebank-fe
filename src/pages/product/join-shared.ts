@@ -8,19 +8,50 @@ export const PRODUCT_JOIN_STEPS = [
   "완료",
 ]
 
-/** C-04 에서 입력해 C-05 로 넘기는 값. 각 스텝은 독립 라우트이므로 router state 로 전달한다. */
-export type ProductJoinFormState = {
+/** 가입 실행 요청에 실을 동의 약관. C-03 에서 수집해 C-05 까지 넘긴다. */
+export type AgreedTerm = {
+  termsId: number
+  version: string
+}
+
+/** C-03 에서 C-04 로 넘기는 값. 각 스텝은 독립 라우트이므로 router state 로 전달한다. */
+export type ProductJoinTermsState = {
+  agreedTerms: AgreedTerm[]
+}
+
+/** C-04 에서 입력해 C-05 로 넘기는 값. */
+export type ProductJoinFormState = ProductJoinTermsState & {
   termMonths: number | null
-  fromAccount: string
+  /** 화면 표시용 출금계좌번호. */
+  fromAccountNo: string
+  /** 출금계좌 ID. 가입 실행 요청이 계좌번호가 아니라 ID를 받는다. */
+  withdrawalAccountId: number | null
   amount: number | null
 }
 
-/** C-05 인증 완료 후 C-06 으로 넘기는 가입 결과. */
+/**
+ * C-05 가입 실행 후 C-06 으로 넘기는 결과. 계좌번호·만기일·적용금리는 전부 서버
+ * 응답값이다 — 화면에서 다시 계산하면 서버 산출과 어긋난다.
+ */
 export type ProductJoinResult = {
-  productId: string
+  productId: number
   productName: string
   category: ProductCategory
+  /**
+   * 표시용 신규계좌번호. 서버가 마스킹해서 내려주므로(088******002) 화면에서
+   * 다시 포맷하지 않는다 — 자릿수 가공을 거치면 마스킹 문자가 지워진다.
+   */
   newAccountNo: string
+  /**
+   * 자동이체 등록(G-01) 프리필용 원본 값. 표시용 계좌번호는 마스킹돼 있어
+   * 그대로 넘기면 입금계좌가 성립하지 않는다. 서버가 이 값을 따로 내려준다.
+   */
+  autoTransferPrefill?: {
+    depositAccountNumber: string
+    amount: number
+    cycleMonths: number
+    endDate: string
+  }
   amount: number
   termMonths: number
   maturityDate: string

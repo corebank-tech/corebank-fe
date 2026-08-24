@@ -101,7 +101,7 @@ export const NAV: NavCategory[] = [
         title: "예금/적금",
         items: [
           { label: "상품목록", screenId: "C-01", path: "/products" },
-          { label: "상품상세", screenId: "C-02", path: "/products/P001" },
+          { label: "상품상세", screenId: "C-02", path: "/products/1" },
         ],
       },
     ],

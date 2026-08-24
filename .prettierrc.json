@@ -1,5 +1,7 @@
 {
   "semi": false,
+  "printWidth": 80,
+  "endOfLine": "lf",
   "plugins": ["prettier-plugin-tailwindcss"],
   "tailwindStylesheet": "./src/globals.css",
   "tailwindFunctions": ["cn"]

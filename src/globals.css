@@ -1,44 +1,59 @@
 @import "tailwindcss";
 
 /* ============================================================
+   Font loading — Spoqa Han Sans Neo(신한 참고).
+   Roboto Mono를 unicode-range로 숫자에만 얹는 방식도 시도했으나(tnum 대체),
+   실제 화면에서 두 서체가 섞이는 이음새가 계속 거슬린다는 피드백을 받아
+   걷어냈다 — Spoqa Han Sans Neo 하나로 통일한다.
+   ============================================================ */
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Medium.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@v3.3.0/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.woff2")
+    format("woff2");
+}
+
+/* ============================================================
    CoreBank Design Tokens
    ============================================================ */
 :root {
   /* Brand palette — 구조색(navy)과 상호작용색(primary)을 분리한다.
      navy: 페이지를 바닥에 고정 — DataGrid 상단 룰, FormSection 하단 라인, 강조 헤더 배경 전용.
      primary: 버튼·탭·링크 등 상호작용 요소 전용. */
-  --color-navy: #0a2e7d;
-  /* H220 S85% L26% */
-  --color-primary: #0a60f5;
-  /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
-  --color-primary-tint: #ecf2fe;
-  /* notice box background */
-  --color-secondary: #6f4ce8;
-  --color-secondary-tint: #f0edfd;
-  --color-link: #0a60f5;
-  /* inline text links */
+  --color-navy: #0a2e7d; /* H220 S85% L26% */
+  --color-primary: #0a60f5; /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
+  --color-primary-tint: #ecf2fe; /* notice box background */
+  --color-link: #0a60f5; /* inline text links */
 
   /* Neutrals */
-  --color-surface: #f3f5f8;
-  /* form label cell background */
+  --color-surface: #f3f5f8; /* form label cell background */
   --color-surface-2: #fafbfc;
-  --color-surface-elevated: #ffffff;
-  /* 버튼·인풋·카드·모달 등 흰 표면 — 다크모드에서 반전 */
+  --color-surface-elevated: #ffffff; /* 버튼·인풋·카드·모달 등 흰 표면 — 다크모드에서 반전 */
   --color-border: #e1e5ea;
   --color-border-strong: #c3c9d2;
-  --color-footer-bg: #f9fafb;
-  /* footer */
-  --color-ink: #17202e;
-  /* primary text */
-  --color-ink-muted: #4b5563;
-  /* secondary text */
-  --color-ink-faint: #6b7280;
-  /* 팀 피드백: 저대비 개선(2026-07). WCAG AA 4.5:1 이상 확보 */
+  --color-footer-bg: #f9fafb; /* footer */
+  --color-ink: #17202e; /* primary text */
+  --color-ink-muted: #4b5563; /* secondary text */
+  --color-ink-faint: #6b7280; /* 팀 피드백: 저대비 개선(2026-07). WCAG AA 4.5:1 이상 확보 */
   --color-white: #ffffff;
 
   /* Feedback — 기관 톤. 소비자 앱 채도를 피한다 */
-  --color-danger: #d81e18;
-  /* 팀 피드백: 채도 상향(2026-07) */
+  --color-danger: #d81e18; /* 팀 피드백: 채도 상향(2026-07) */
   --color-danger-tint: #fbf0ef;
   --color-danger-ring: color-mix(in srgb, var(--color-danger) 20%, white);
   --color-success: #107f46;
@@ -51,35 +66,37 @@
   /* Soft borders — 흰 배경 위에 20% 알파를 미리 섞은 고정값.
      Alert/Badge 테두리 전용. 컴포넌트에서 투명도 표기(border-x/20)를 쓰지 않기 위함(POL-039) */
   --color-primary-border-soft: #cfdef9;
-  --color-secondary-border-soft: #dcd5f8;
   --color-success-border-soft: #d0e2d9;
   --color-warning-border-soft: #eddecc;
   --color-danger-border-soft: #f4d6d5;
 
   /* Overlay — 뒤 배경이 고정색이 아니어서 실제 반투명이 필요한 경우 전용 */
-  --color-overlay-scrim: rgba(23, 32, 46, 0.5);
-  /* 모달 백드롭, 전체메뉴 레이어 */
-  --overlay-white-15: rgba(255, 255, 255, 0.15);
-  /* 색상 바 위 아이콘버튼 hover */
-  --overlay-white-70: rgba(255, 255, 255, 0.7);
-  /* 색상 바 위 포커스 링 */
+  --color-overlay-scrim: rgba(
+    23,
+    32,
+    46,
+    0.5
+  ); /* 모달 백드롭, 전체메뉴 레이어 */
+  --overlay-white-15: rgba(
+    255,
+    255,
+    255,
+    0.15
+  ); /* 색상 바 위 아이콘버튼 hover */
+  --overlay-white-70: rgba(255, 255, 255, 0.7); /* 색상 바 위 포커스 링 */
 
   /* Grid / ledger — 출금액은 danger와 hex가 완전히 같아 별도 토큰을 두지 않는다.
      입금·출금을 함께 보여줄 때는 --color-deposit과 --color-danger를 쓴다. */
-  --color-deposit: #0c5bbb;
-  /* 입금 amounts — 팀 피드백: 채도 상향(2026-07) */
+  --color-deposit: #0c5bbb; /* 입금 amounts — 팀 피드백: 채도 상향(2026-07) */
 
-  /* Type scale — 6단 (2026-07 5차: 인접 단계가 1px 차이라 사용자가 구분하지
-     못하고 개발 시 어떤 걸 골라야 할지도 헷갈린다는 피드백에 따라, 9단→7단(h3·md
-     흡수)에 이어 text-sm(13px)을 text-base(14px)에 흡수했다 — 이제 각 단계는
-     최소 2px 이상 차이난다(2xs·xs 제외 — 이 둘은 각주 vs 라벨이라는 별개 용도로
-     CLAUDE.md에 고정 규정돼 있어 유지). DataGrid·SummaryRow는 text-[14px] 리터럴로
-     직접 고정해 스케일과 분리한다(POL-041 3차 피드백: 표만 13→14px로 소폭 상향). */
+  /* Type scale — 6단 (2026-08 6차: 최소 폰트 크기가 15px이어야 한다는 피드백에 따라,
+     폰트를 정보 위계에 맞춰 15/13/11px로 재정리했다. — 이제 각 단계는 최소 2px 이상 차이난다.
+     DataGrid·SummaryRow는 text-base 를 사용해 통일성을 주었다. */
   --text-page: 26px;
   --text-h2: 20px;
   --text-lg: 16px;
-  --text-base: 14px;
-  --text-xs: 12px;
+  --text-base: 15px;
+  --text-xs: 13px;
   --text-2xs: 11px;
 
   /* 간격은 Tailwind 기본 spacing 스케일(--spacing: 0.25rem 배수인 gap, p, m 계열
@@ -88,14 +105,10 @@
      등록되지 않아 참조 0건이었으므로 제거했다 — 다시 만들지 않는다. */
 
   /* Radius */
-  --radius-sm: 6px;
-  /* 뱃지, 스텝 숫자, 소형 표식 */
-  --radius: 10px;
-  /* 버튼, 인풋, 셀렉트, 체크박스 */
-  --radius-lg: 16px;
-  /* 카드, 패널, 모달, 검색조건 박스 */
-  --radius-pill: 999px;
-  /* 토글 칩 전용 */
+  --radius-sm: 6px; /* 뱃지, 스텝 숫자, 소형 표식 */
+  --radius: 10px; /* 버튼, 인풋, 셀렉트, 체크박스 */
+  --radius-lg: 16px; /* 카드, 패널, 모달, 검색조건 박스 */
+  --radius-pill: 999px; /* 토글 칩 전용 */
 
   /* Elevation */
   --shadow-card:
@@ -115,7 +128,7 @@
   --color-footer-hover-bg: var(--color-surface);
 
   /* Font */
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  --font-sans: "Spoqa Han Sans Neo", -apple-system, sans-serif;
 
   /* z-index layers */
   --z-header: 100;
@@ -150,18 +163,17 @@
   --color-navy: #3c71dd;
   --color-primary: #5a95f7;
   --color-primary-tint: #14203a;
-  --color-secondary: #9b87f5;
-  --color-secondary-tint: #211b3d;
   --color-link: #7aa8ff;
 
-  --color-surface: #171c27;
-  /* 폼 라벨 셀 배경 */
-  --color-surface-2: #10141c;
-  /* 페이지 배경 */
-  --color-surface-elevated: #232b3c;
-  /* 버튼·인풋·카드·모달 표면 */
-  --color-overlay-scrim: rgba(0, 0, 0, 0.72);
-  /* 모달·전체메뉴 배경. surface-elevated와 대비를 확보 */
+  --color-surface: #171c27; /* 폼 라벨 셀 배경 */
+  --color-surface-2: #10141c; /* 페이지 배경 */
+  --color-surface-elevated: #232b3c; /* 버튼·인풋·카드·모달 표면 */
+  --color-overlay-scrim: rgba(
+    0,
+    0,
+    0,
+    0.72
+  ); /* 모달·전체메뉴 배경. surface-elevated와 대비를 확보 */
   /* 팀 피드백(2026-07, 2차): 다크모드에서 표 셀 구분선이 거의 안 보인다는 지적에 따라
      테두리 대비를 크게 상향(기존 대비 약 2배, 페이지 배경 대비 ≥2.8:1). */
   --color-border: #545e77;
@@ -194,7 +206,6 @@
   );
 
   --color-primary-border-soft: #294274;
-  --color-secondary-border-soft: #40336f;
   --color-success-border-soft: #1c4331;
   --color-warning-border-soft: #4a3315;
   --color-danger-border-soft: #4a2321;
@@ -207,12 +218,20 @@
   --color-footer-divider: var(--color-border);
   --color-footer-hover-bg: var(--color-surface);
 
-  /* 라이트 값(거의 검정 위 낮은 알파)을 어두운 배경 위에 그대로 쓰면 사실상 안 보인다.
-     순검정 기반으로 알파를 크게 올려 카드·모달이 배경에서 실제로 떠 보이게 한다. */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.32);
-  --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.48);
+  /* 팀 피드백: 다크모드에서는 그림자 대신 outline으로 부상감을 표현한다. box-shadow의
+     spread-only 링이라 레이아웃을 차지하지 않고 border 속성을 추가하는 것도 아니다 —
+     일반 보더를 새로 붙이는 방식이 아니라는 요구를 그대로 만족한다. */
+  --shadow-card: 0 0 0 1px var(--color-border-strong);
+  --shadow-pop: 0 0 0 1px var(--color-border-strong);
 
   color-scheme: dark;
+}
+
+/* a01-login 카드는 라이트모드부터 border를 쓰고 있어, 다크모드의 shadow-card outline과
+   겹치면 border(안쪽)+shadow(바깥쪽)가 이어져 2px 이중 경계로 보인다 — 다크모드에서는
+   shadow-card 링 하나만 경계를 담당하도록 border를 끈다. */
+:root[data-theme="dark"] .login-card {
+  border-color: transparent;
 }
 
 @theme inline {
@@ -221,8 +240,6 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-tint: var(--color-primary-tint);
-  --color-secondary: var(--color-secondary);
-  --color-secondary-tint: var(--color-secondary-tint);
   --color-link: var(--color-link);
   --color-border: var(--border);
   --color-border-strong: var(--color-border-strong);
@@ -241,7 +258,6 @@
   --color-warning: var(--color-warning);
   --color-warning-tint: var(--color-warning-tint);
   --color-primary-border-soft: var(--color-primary-border-soft);
-  --color-secondary-border-soft: var(--color-secondary-border-soft);
   --color-success-border-soft: var(--color-success-border-soft);
   --color-warning-border-soft: var(--color-warning-border-soft);
   --color-danger-border-soft: var(--color-danger-border-soft);
@@ -313,6 +329,10 @@
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  button {
+    cursor: pointer;
   }
 }
 

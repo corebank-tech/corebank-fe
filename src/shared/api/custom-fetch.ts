@@ -12,7 +12,30 @@ import {
   emitSessionExpired,
 } from "@/shared/api/session-events"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+/**
+ * 배포 환경변수가 깨진 채로 빌드돼도 빌드는 통과한다. 값이 없으면 요청이
+ * `undefined/auth/login` 으로 나가고, 눈에 보이지 않는 문자가 섞이면 경로가 조용히 어긋난다
+ * (실제 사고: 값 끝의 공백과 `│`(U+2502) 로 `/api/v1%20│/customers/me` 요청).
+ * 첫 요청이 아니라 부팅 시점에 드러나게 한다. 빈 문자열은 프록시를 쓰는 로컬·테스트의 정상값이다.
+ */
+const PRINTABLE_ASCII_ONLY = /^[\x21-\x7E]*$/
+
+const resolveApiBaseUrl = (): string => {
+  const raw = import.meta.env.VITE_API_BASE_URL
+  if (typeof raw !== "string") {
+    throw new Error(
+      "VITE_API_BASE_URL 이 설정되지 않았습니다. 배포 환경변수를 확인하세요.",
+    )
+  }
+  if (!PRINTABLE_ASCII_ONLY.test(raw)) {
+    throw new Error(
+      `VITE_API_BASE_URL 에 공백이나 보이지 않는 문자가 섞여 있습니다: ${JSON.stringify(raw)}`,
+    )
+  }
+  return raw
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 const REQUEST_TIMEOUT_MS = 30_000
 const SESSION_EXPIRED_STATUS = 401
 const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

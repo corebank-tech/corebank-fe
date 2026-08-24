@@ -19,13 +19,14 @@ import {
 import { ApiError } from "@/shared/api/api-error"
 import { ACCOUNT_PASSWORD_ERROR_LIMIT as ERROR_LIMIT } from "@/shared/config/policy"
 import { onlyDigits } from "@/shared/lib/input-filter"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 
 const PASSWORD_LIMIT = 4
 
 /**
  * REQ-ACCT-006·007·008: 계좌비밀번호 변경.
- * BE 계좌비밀번호 정책에 따라 입출금·예금·적금 계좌 모두 변경 대상이다.
+ * BE 계좌비밀번호 정책(corebank-tech/corebank-server#298)에 따라
+ * 입출금·예금·적금 계좌 모두 변경 대상이다.
  */
 export const B04AccountPassword = () => {
   const accountOverviewQuery = useAccountOverviewQuery()
@@ -233,13 +234,13 @@ export const B04AccountPassword = () => {
     <QueryPageLayout
       noticeItems={[
         "계좌비밀번호는 숫자 4자리이며 입출금·예금·적금 계좌별로 변경할 수 있습니다.",
-        "현재 비밀번호를 ${ERROR_LIMIT}회 연속 잘못 입력하면 해당 계좌의 비밀번호가 잠금 처리됩니다.",
+        `현재 비밀번호를 ${ERROR_LIMIT}회 연속 잘못 입력하면 해당 계좌의 비밀번호가 잠금 처리됩니다.`,
         "비밀번호 변경을 위해 현재 계좌비밀번호 확인과 OTP 인증이 필요합니다.",
       ]}
       footerItems={[
         "누적 오류 횟수는 계좌비밀번호 검증에 성공하면 0회로 초기화됩니다(REQ-ACCT-007).",
         "계좌비밀번호는 단방향 해시로 저장되어 평문으로 조회하거나 복원할 수 없습니다(REQ-ACCT-009).",
-        "[오류횟수 조회] 버튼으로 현재 누적 오류 횟수와 제한 정책(${ERROR_LIMIT}회)을 확인할 수 있습니다(REQ-ACCT-008).",
+        `[오류횟수 조회] 버튼으로 현재 누적 오류 횟수와 제한 정책(${ERROR_LIMIT}회)을 확인할 수 있습니다(REQ-ACCT-008).`,
       ]}
       modals={
         <>
@@ -254,7 +255,7 @@ export const B04AccountPassword = () => {
             title="계좌비밀번호 변경 OTP 인증"
             guide="계좌비밀번호 변경을 위해 OTP를 발급한 뒤 6자리 번호를 입력하세요."
             transaction={{
-              type: "ACCOUNT_PASSWORD_CHANGE",
+              type: OtpTransactionType.ACCOUNT_PASSWORD_CHANGE,
               data: {
                 accountId: selectedAccountId ?? 0,
               },

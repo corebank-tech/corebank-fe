@@ -26,6 +26,9 @@ type TermsAgreementProps = {
   onView?: (id: string) => void
 }
 
+/** 동의한 약관 id 를 하나의 키로 잇는 구분자. 약관 id 에 들어갈 수 없는 문자를 쓴다. */
+const AGREED_ID_SEPARATOR = "\u0000"
+
 export type TermsAgreementHandle = {
   /**
    * 다음 단계 진행 가능 여부를 검사한다. 필수 약관 중 미열람 항목이 있으면
@@ -64,16 +67,19 @@ export const TermsAgreement = React.forwardRef<
     onAllRequiredAgreedChange?.(allRequiredAgreed)
   }, [allRequiredAgreed, onAllRequiredAgreedChange])
 
-  // terms 순서를 그대로 따라 안정된 배열을 만든다. checked 객체를 그대로 넘기면
-  // 렌더마다 새 참조가 되어 소비자의 effect가 매번 다시 돈다.
-  const agreedIds = React.useMemo(
-    () => terms.filter((t) => checked[t.id]).map((t) => t.id),
-    [terms, checked],
-  )
+  // 동의한 항목을 terms 순서대로 이어붙인 키. 배열을 그대로 effect 의존성에 쓰면
+  // terms 를 렌더마다 새로 만드는 소비자에서 effect → 부모 setState → 리렌더가
+  // 끝없이 반복된다. 값이 실제로 바뀔 때만 올려보낸다.
+  const agreedKey = terms
+    .filter((t) => checked[t.id])
+    .map((t) => t.id)
+    .join(AGREED_ID_SEPARATOR)
 
   React.useEffect(() => {
-    onAgreedChange?.(agreedIds)
-  }, [agreedIds, onAgreedChange])
+    onAgreedChange?.(
+      agreedKey === "" ? [] : agreedKey.split(AGREED_ID_SEPARATOR),
+    )
+  }, [agreedKey, onAgreedChange])
 
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))

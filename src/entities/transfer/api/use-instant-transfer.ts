@@ -1,10 +1,16 @@
 import { useMutation } from "@tanstack/react-query"
-import { executeTransfer, getTransferPayee } from "@/shared/api/generated"
+import {
+  TransferResponseStatus,
+  executeTransfer,
+  getTransferPayee,
+} from "@/shared/api/generated"
 import type {
   PayeeResponse,
   TransferRequest,
   TransferResponse,
 } from "@/shared/api/generated"
+
+export { TransferResponseStatus }
 
 export type InstantTransferResult = TransferResponse
 export type Payee = PayeeResponse

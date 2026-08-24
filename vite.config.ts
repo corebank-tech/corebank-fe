@@ -46,6 +46,9 @@ export default defineConfig({
     },
   },
   test: {
+    // custom-fetch 는 모듈 로드 시 VITE_API_BASE_URL 을 검증한다. 테스트는 .env 없이
+    // 도는 CI 에서도 돌아야 하므로, 프록시를 쓰는 로컬과 같은 상대경로 기준값을 준다.
+    env: { VITE_API_BASE_URL: "" },
     environment: "jsdom",
     globals: false,
     setupFiles: ["./src/shared/lib/test-setup.ts"],

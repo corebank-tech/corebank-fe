@@ -32,6 +32,9 @@ export const TRANSFER_LIMIT_PER_TRANSFER_MAX = 50_000_000
 /** POL-016: 1일 이체한도 최대값(고객 변경 가능 상한). */
 export const TRANSFER_LIMIT_PER_DAY_MAX = 100_000_000
 
+/** REQ-TRSF-026: 자주 쓰는 계좌 등록 최대 건수. */
+export const FREQUENT_TRANSFER_ACCOUNT_MAX = 20
+
 /** POL-018: 예약이체 등록 가능 범위 D+1 ~ D+365. */
 export const RESERVATION_MAX_RANGE_DAYS = 365
 

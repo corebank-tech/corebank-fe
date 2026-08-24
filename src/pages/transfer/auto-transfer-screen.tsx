@@ -22,7 +22,6 @@ import { AutoTransferStep2 } from "@/pages/transfer/auto/g02-confirm"
 import { AutoTransferStep3 } from "@/pages/transfer/auto/g03-complete"
 import { useRegisterAutoTransferMutation } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { AccountOption } from "@/shared/types/account"
 import { ApiError } from "@/shared/api/api-error"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 
@@ -114,16 +113,12 @@ export const AutoTransferScreen = () => {
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
 
-  const { accounts: withdrawAccounts, isLoading: accountsLoading } =
-    useWithdrawAccounts()
+  const {
+    accounts: withdrawAccounts,
+    options: accountOptions,
+    isLoading: accountsLoading,
+  } = useWithdrawAccounts()
   const registerMutation = useRegisterAutoTransferMutation()
-
-  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
-    alias: a.accountName ?? "",
-    accountNo: a.accountNumber ?? "",
-    balance: a.balance ?? 0,
-    withdrawable: a.balance ?? 0,
-  }))
 
   const setField = <K extends keyof AutoTransferForm>(
     key: K,

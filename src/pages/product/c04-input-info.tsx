@@ -25,7 +25,6 @@ import { Alert } from "@/shared/ui/alert"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { ApiError } from "@/shared/api/api-error"
 import { useWithdrawAccounts } from "@/entities/account"
-import type { AccountOption } from "@/shared/types/account"
 
 /** C-04 상품가입 2단계 · 정보입력 (REQ-PRDT-006~009) */
 export const C04InputInfo = () => {
@@ -46,7 +45,8 @@ export const C04InputInfo = () => {
     prev?.amount ?? null,
   )
 
-  const { accounts: withdrawAccounts } = useWithdrawAccounts()
+  const { accounts: withdrawAccounts, options: accountOptions } =
+    useWithdrawAccounts()
 
   const validateMutation = useValidateSubscription()
   const [violations, setViolations] = React.useState<ViolationItem[]>([])
@@ -71,13 +71,6 @@ export const C04InputInfo = () => {
 
   const product = toProductDetailData(detail)
   const { minTermMonths, maxTermMonths } = getProductTermRange(detail)
-
-  const accountOptions: AccountOption[] = withdrawAccounts.map((a) => ({
-    alias: a.accountName ?? "",
-    accountNo: a.accountNumber ?? "",
-    balance: a.balance ?? 0,
-    withdrawable: a.balance ?? 0,
-  }))
 
   // 계좌 목록은 비동기로 도착하므로, 아직 고르지 않았다면 첫 계좌를 렌더링 중에
   // 파생값으로 기본 선택한다(useEffect + setState 대신).

@@ -23,6 +23,11 @@ import { onlyDigits } from "@/shared/lib/input-filter"
 
 const PASSWORD_LIMIT = 4
 
+const getRegistrationSuccessMessage = (count: number) =>
+  count === 1
+    ? "1개 계좌가 출금계좌로 등록되었습니다."
+    : `${count}개 계좌가 출금계좌로 등록되었습니다.`
+
 type WithdrawalAccountRow = {
   id: string
   accountId: number
@@ -211,11 +216,7 @@ export const B05WithdrawAccounts = () => {
 
   const handleRegisterCancel = () => {
     if (registrationSuccessCount > 0) {
-      setSuccessMessage(
-        registrationSuccessCount === 1
-          ? "1개 계좌가 출금계좌로 등록되었습니다."
-          : `${registrationSuccessCount}개 계좌가 출금계좌로 등록되었습니다.`,
-      )
+      setSuccessMessage(getRegistrationSuccessMessage(registrationSuccessCount))
     }
 
     closeRegisterFlow()
@@ -310,11 +311,7 @@ export const B05WithdrawAccounts = () => {
       }
 
       setUnregisteredSelected([])
-      setSuccessMessage(
-        completedCount === 1
-          ? "선택한 계좌가 출금계좌로 등록되었습니다."
-          : `${completedCount}개 계좌가 출금계좌로 등록되었습니다.`,
-      )
+      setSuccessMessage(getRegistrationSuccessMessage(completedCount))
       closeRegisterFlow()
     } catch (error) {
       // 최종 API에서 토큰이 소비됐을 가능성이 있으므로 재사용하지 않는다.
@@ -334,9 +331,7 @@ export const B05WithdrawAccounts = () => {
 
       if (registrationSuccessCount > 0) {
         setSuccessMessage(
-          registrationSuccessCount === 1
-            ? "1개 계좌가 출금계좌로 등록되었습니다."
-            : `${registrationSuccessCount}개 계좌가 출금계좌로 등록되었습니다.`,
+          getRegistrationSuccessMessage(registrationSuccessCount),
         )
       }
 

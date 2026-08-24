@@ -53,3 +53,18 @@ export class ApiError extends Error {
 
 export const isApiError = (error: unknown): error is ApiError =>
   error instanceof ApiError
+
+/**
+ * REQ-CMN-008: 화면에 보여줄 오류 문구는 서버가 준 message 다. 화면이 code 별
+ * 문구표를 만들지 않는다. customFetch 가 전송 실패까지 ApiError 로 바꿔 던지므로
+ * 폴백은 그 경로를 벗어난 경우에만 쓰인다.
+ *
+ * 세션 만료만 예외다. A-11 모달이 화면을 덮고 재로그인을 요구하므로
+ * (customFetch 가 CMN0101 에서 emitSessionExpired 를 쏜다) 같은 문구를 조회
+ * 결과 자리에 또 적으면 모달 뒤에 읽히지 않는 문장이 남는다.
+ */
+export const toErrorMessage = (error: unknown): string => {
+  if (!isApiError(error)) return NETWORK_ERROR_MESSAGE
+  if (error.code === SESSION_EXPIRED_CODE) return ""
+  return error.message
+}

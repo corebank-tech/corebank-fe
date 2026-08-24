@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { MOCK_PROFILE, useCustomerProfileQuery } from "@/entities/customer"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { F01ProfileContactForm } from "@/pages/mypage/f01-profile-contact-form"
@@ -14,6 +15,7 @@ export const F01Profile = () => {
     data: customerInfo,
     isPending: isProfilePending,
     isError: isProfileError,
+    error: profileError,
   } = useCustomerProfileQuery()
 
   // 연락처/비밀번호 API 연동 전까지만 유지하는 임시 mock 상태
@@ -40,7 +42,7 @@ export const F01Profile = () => {
 
       {isProfileError && (
         <p className="py-8 text-center text-base text-danger">
-          고객정보를 불러오지 못했습니다.
+          {toErrorMessage(profileError)}
         </p>
       )}
 

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { useNavigate } from "react-router"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
@@ -128,6 +129,7 @@ export const B01AllAccounts = () => {
     accounts: allAccounts,
     isLoading,
     isError,
+    error,
   } = useInquirableAccounts()
   const [pageSize, setPageSize] = React.useState<number | "all">("all")
   const [brailleOpen, setBrailleOpen] = React.useState(false)
@@ -199,7 +201,7 @@ export const B01AllAccounts = () => {
   if (isError || !overview) {
     return (
       <div className="p-6 text-base text-danger">
-        계좌 정보를 불러오지 못했습니다.
+        {isError ? toErrorMessage(error) : "계좌 정보를 불러오지 못했습니다."}
       </div>
     )
   }

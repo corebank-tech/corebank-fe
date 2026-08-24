@@ -25,7 +25,7 @@ import {
   useVerifyAccountPasswordMutation,
 } from "@/entities/account"
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
-import { ApiError } from "@/shared/api/api-error"
+import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 import { TransferResponseStatus } from "@/entities/transfer"
 import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
@@ -98,6 +98,7 @@ export const InstantTransferScreen = () => {
     data: limit,
     isLoading: isLimitLoading,
     isError: isLimitError,
+    error: limitError,
   } = useTransferLimitQuery()
   const favoriteAccountsQuery = useFavoriteAccountsQuery()
   const registerFavoriteMutation = useRegisterFavoriteAccountMutation()
@@ -144,6 +145,15 @@ export const InstantTransferScreen = () => {
   // "아직 모른다" 와 "한도가 0원이다" 를 같은 값으로 만들면 조회 실패가 그대로 굳어
   // [다음]이 영영 안 눌리고 "금액을 낮추라"는 틀린 안내만 남는다.
   const isLimitUnavailable = isLimitLoading || isLimitError || limit == null
+  /**
+   * 한도를 모르는 동안 [다음]이 막히므로(REQ-TRSF-010) 그 이유를 1단계에 적는다.
+   * 조회 실패 문구는 서버가 준 것을 그대로 쓴다(REQ-CMN-008).
+   */
+  const limitNotice = isLimitLoading
+    ? "이체한도를 불러오는 중입니다."
+    : isLimitUnavailable
+      ? toErrorMessage(limitError)
+      : null
   const dailyRemaining = limit?.dailyRemainingAmount ?? 0
   const perTransferLimit = limit?.oneTimeLimit ?? 0
   const effectiveLimit = Math.min(perTransferLimit, dailyRemaining)
@@ -151,7 +161,14 @@ export const InstantTransferScreen = () => {
   const setField = <K extends keyof InstantTransferForm>(
     key: K,
     value: InstantTransferForm[K],
-  ) => setForm((prev) => ({ ...prev, [key]: value }))
+  ) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
+    // REQ-TRSF-016: 키는 거래 하나를 가리킨다. 실행이 미상으로 끝난 뒤 사용자가
+    // 금액·입금계좌를 바꿔 다시 시도하면 다른 거래이므로 키를 버린다. 같은 키로
+    // 보내면 서버가 앞선 거래의 결과를 돌려줘 바뀐 금액이 반영되지 않는다.
+    // 비밀번호는 거래 내용이 아니라 인증 수단이라 제외한다.
+    if (key !== "password") setIdempotencyKey("")
+  }
 
   const selectedAccount = accounts.find(
     (a) => a.accountNo === displayForm.fromAccount,
@@ -652,12 +669,7 @@ export const InstantTransferScreen = () => {
       dailyRemaining={dailyRemaining}
       isLimitUnavailable={isLimitUnavailable}
       canSubmit={canSubmit}
-      notice={
-        authError ??
-        (isLimitError
-          ? "이체한도를 조회하지 못해 이체를 진행할 수 없습니다. 잠시 후 다시 시도하세요."
-          : null)
-      }
+      notice={[authError, limitNotice].filter(Boolean).join(" ") || null}
       onNext={() => setStep(2)}
       onConfirmAccount={() => void resolveToAccount(form.toAccount)}
       onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}

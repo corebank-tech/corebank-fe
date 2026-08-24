@@ -26,3 +26,8 @@ export type {
   InquirableAccountGroupCode,
 } from "@/entities/account/api/use-inquirable-accounts"
 export { useInquirableAccounts } from "@/entities/account/api/use-inquirable-accounts"
+export { useAccountDetailQuery } from "@/entities/account/api/account-detail-query"
+export {
+  useUpdateAccountPasswordMutation,
+  useVerifyAccountPasswordMutation,
+} from "@/entities/account/api/account-password-mutations"

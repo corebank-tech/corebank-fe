@@ -73,7 +73,7 @@ export const B05WithdrawAccounts = () => {
   const [unregisteredSelected, setUnregisteredSelected] = React.useState<
     string[]
   >([])
-  const [gridKey, setGridKey] = React.useState(0)
+
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
     null,
   )
@@ -95,6 +95,8 @@ export const B05WithdrawAccounts = () => {
   const [registerError, setRegisterError] = React.useState<string[] | null>(
     null,
   )
+  const [registrationSuccessCount, setRegistrationSuccessCount] =
+    React.useState(0)
 
   const registered = accounts.filter((account) => account.registered)
   const unregistered = accounts.filter((account) => !account.registered)
@@ -163,7 +165,6 @@ export const B05WithdrawAccounts = () => {
     })
 
     setRegisteredSelected([])
-    setGridKey((key) => key + 1)
 
     if (successCount > 0) {
       setSuccessMessage(
@@ -186,6 +187,7 @@ export const B05WithdrawAccounts = () => {
 
     setRegisterQueue(unregisteredRows)
     setQueueIndex(0)
+    setRegistrationSuccessCount(0)
     setPwValue("")
     setPwError(null)
     setAccountPasswordAuthToken(null)
@@ -197,6 +199,7 @@ export const B05WithdrawAccounts = () => {
   const closeRegisterFlow = () => {
     setRegisterQueue(null)
     setQueueIndex(0)
+    setRegistrationSuccessCount(0)
     setPwValue("")
     setPwError(null)
     setAccountPasswordAuthToken(null)
@@ -209,7 +212,6 @@ export const B05WithdrawAccounts = () => {
   const handleRegisterCancel = () => {
     closeRegisterFlow()
     setUnregisteredSelected([])
-    setGridKey((key) => key + 1)
   }
 
   const handlePasswordConfirm = async () => {
@@ -282,6 +284,9 @@ export const B05WithdrawAccounts = () => {
       registerMutation.reset()
       setAccountPasswordAuthToken(null)
 
+      const completedCount = registrationSuccessCount + 1
+      setRegistrationSuccessCount(completedCount)
+
       await queryClient.invalidateQueries({
         queryKey: getAccountOverviewQueryKey(),
       })
@@ -297,8 +302,11 @@ export const B05WithdrawAccounts = () => {
       }
 
       setUnregisteredSelected([])
-      setGridKey((key) => key + 1)
-      setSuccessMessage("선택한 계좌가 출금계좌로 등록되었습니다.")
+      setSuccessMessage(
+        completedCount === 1
+          ? "선택한 계좌가 출금계좌로 등록되었습니다."
+          : `${completedCount}개 계좌가 출금계좌로 등록되었습니다.`,
+      )
       closeRegisterFlow()
     } catch (error) {
       // 최종 API에서 토큰이 소비됐을 가능성이 있으므로 재사용하지 않는다.
@@ -309,14 +317,31 @@ export const B05WithdrawAccounts = () => {
         queryKey: getAccountOverviewQueryKey(),
       })
 
-      setRegisterError([
+      const errorMessage =
         error instanceof ApiError
           ? error.message
-          : "출금계좌 등록 중 오류가 발생했습니다.",
+          : "출금계좌 등록 중 오류가 발생했습니다."
+
+      const remainingCount = (registerQueue?.length ?? 0) - queueIndex - 1
+
+      if (registrationSuccessCount > 0) {
+        setSuccessMessage(
+          registrationSuccessCount === 1
+            ? "1개 계좌가 출금계좌로 등록되었습니다."
+            : `${registrationSuccessCount}개 계좌가 출금계좌로 등록되었습니다.`,
+        )
+      }
+
+      setRegisterError([
+        `${currentTarget.alias} (${formatAccountNo(
+          currentTarget.accountNo,
+        )}) : ${errorMessage}`,
+        ...(remainingCount > 0
+          ? [`남은 ${remainingCount}개 계좌의 등록은 진행하지 않았습니다.`]
+          : []),
       ])
 
       setUnregisteredSelected([])
-      setGridKey((key) => key + 1)
       closeRegisterFlow()
     }
   }
@@ -474,17 +499,14 @@ export const B05WithdrawAccounts = () => {
         }
       >
         <DataGrid
-          key={`reg-${gridKey}`}
           columns={columns}
           rows={registered}
           rowKey={(row) => row.id}
           selectable
+          selectedKeys={registeredSelected}
           onSelectionChange={setRegisteredSelected}
-          emptyMessage={
-            accountOverviewQuery.isLoading
-              ? "계좌 정보를 불러오는 중입니다."
-              : "등록된 출금계좌가 없습니다."
-          }
+          loading={accountOverviewQuery.isFetching}
+          emptyMessage="등록된 출금계좌가 없습니다."
         />
       </FormSection>
 
@@ -505,17 +527,14 @@ export const B05WithdrawAccounts = () => {
         }
       >
         <DataGrid
-          key={`unreg-${gridKey}`}
           columns={columns}
           rows={unregistered}
           rowKey={(row) => row.id}
           selectable
+          selectedKeys={unregisteredSelected}
           onSelectionChange={setUnregisteredSelected}
-          emptyMessage={
-            accountOverviewQuery.isLoading
-              ? "계좌 정보를 불러오는 중입니다."
-              : "미등록 계좌가 없습니다."
-          }
+          loading={accountOverviewQuery.isFetching}
+          emptyMessage="미등록 계좌가 없습니다."
         />
       </FormSection>
     </QueryPageLayout>

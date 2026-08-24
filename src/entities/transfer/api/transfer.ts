@@ -49,11 +49,6 @@ export type PayeeAccountRecord = {
   payeeName: string
   status: PayeeAccountStatus
   accountType: PayeeAccountType
-  /**
-   * 예금주 조회는 통과하지만 인증 완료 후 실행 단계에서 시스템 오류로 실패하는
-   * 데모 케이스 (REQ-TRSF-019 실패 화면 확인용).
-   */
-  executionFails?: boolean
 }
 
 export const MOCK_PAYEE_ACCOUNTS: PayeeAccountRecord[] = [
@@ -110,7 +105,6 @@ export const MOCK_PAYEE_ACCOUNTS: PayeeAccountRecord[] = [
     payeeName: "한상우",
     status: "normal",
     accountType: "checking",
-    executionFails: true,
   },
 ]
 
@@ -118,7 +112,6 @@ export type PayeeLookupResult = {
   ok: boolean
   payeeName?: string
   accountType?: PayeeAccountType
-  executionFails?: boolean
   /** ok가 false일 때 표시할 안내 문구. */
   error?: string
 }
@@ -159,7 +152,6 @@ export function lookupPayeeAccount(accountNo: string): PayeeLookupResult {
     ok: true,
     payeeName: record.payeeName,
     accountType: record.accountType,
-    executionFails: record.executionFails,
   }
 }
 

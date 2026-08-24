@@ -16,7 +16,6 @@ import {
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   getTransferLimitQueryKey,
-  type FrequentTransferAccount,
   type TransferResultRow,
 } from "@/entities/transfer"
 import {
@@ -117,15 +116,7 @@ export const InstantTransferScreen = () => {
   // 전부 이 파생값만 보게 해서 소비처가 늘어도 원본이 새지 않게 한다.
   const displayForm = { ...form, fromAccount: effectiveFromAccount }
 
-  const frequentAccounts: FrequentTransferAccount[] = React.useMemo(
-    () =>
-      (favoriteAccountsQuery.data ?? []).map((a) => ({
-        accountNo: a.depositAccountNumber ?? "",
-        payeeName: a.payeeName ?? "",
-        nickname: a.alias ?? undefined,
-      })),
-    [favoriteAccountsQuery.data],
-  )
+  const frequentAccounts = favoriteAccountsQuery.accounts
   // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
   // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
   // 어긋나지 않게 한다.

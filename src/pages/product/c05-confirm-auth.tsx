@@ -122,9 +122,9 @@ export const C05ConfirmAuth = () => {
   })
 
   /**
-   * REQ-ACCT-007의 5회 오류 거래정지는 서버가 판정한다. 계좌비밀번호 인증 API가
-   * 아직 없어 화면에서 대조할 방법이 없고, mock 값과 비교하던 기존 코드는 실제
-   * 계좌와 무관한 가짜 검증이었다. 여기서는 자릿수만 확인한다.
+   * 계좌비밀번호를 서버에 검증해 `accountPasswordAuthToken`을 받는다.
+   * REQ-ACCT-007의 5회 오류 거래정지는 서버가 판정하므로, 화면은 실패 사유를
+   * 서버 메시지 그대로 노출하고 누적 횟수를 따로 세지 않는다.
    */
   const handleAuthenticate = async () => {
     if (password.length !== PASSWORD_LIMIT) {
@@ -195,8 +195,8 @@ export const C05ConfirmAuth = () => {
   // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
   // 서버 멱등성으로도 걸러지지 않는다.
   const handleOtpConfirm = async (otpAuthToken: string) => {
-    // 출금계좌는 handleAuthenticate 가 인증 전에 걸러낸다. 여기서는 타입을 좁히는
-    // 역할만 한다.
+    // 인증 단계에서 확보한 거래정보와 계좌비밀번호 인증 토큰이 모두 있어야
+    // 상품가입 실행 요청을 보낸다.
     if (
       isSubmitting ||
       otpTransactionData == null ||

@@ -92,9 +92,14 @@ export const InstantTransferScreen = () => {
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<InstantTransferForm>(INITIAL_FORM)
 
-  const { accounts: withdrawAccounts } = useWithdrawAccounts()
+  const { accounts: withdrawAccounts, isLoading: isAccountsLoading } =
+    useWithdrawAccounts()
   const accountOverviewQuery = useAccountOverviewQuery()
-  const { data: limit } = useTransferLimitQuery()
+  const {
+    data: limit,
+    isLoading: isLimitLoading,
+    isError: isLimitError,
+  } = useTransferLimitQuery()
   const favoriteAccountsQuery = useFavoriteAccountsQuery()
   const registerFavoriteMutation = useRegisterFavoriteAccountMutation()
   const verifyPasswordMutation = useVerifyAccountPasswordMutation()
@@ -129,6 +134,7 @@ export const InstantTransferScreen = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [authError, setAuthError] = React.useState<string | null>(null)
+  const [favoriteError, setFavoriteError] = React.useState<string | null>(null)
   const [result, setResult] = React.useState<InstantTransferResultState | null>(
     null,
   )
@@ -137,6 +143,9 @@ export const InstantTransferScreen = () => {
   >(null)
   const [idempotencyKey, setIdempotencyKey] = React.useState("")
 
+  // "아직 모른다" 와 "한도가 0원이다" 를 같은 값으로 만들면 조회 실패가 그대로 굳어
+  // [다음]이 영영 안 눌리고 "금액을 낮추라"는 틀린 안내만 남는다.
+  const isLimitUnavailable = isLimitLoading || isLimitError || limit == null
   const dailyRemaining = limit?.dailyRemainingAmount ?? 0
   const perTransferLimit = limit?.oneTimeLimit ?? 0
   const effectiveLimit = Math.min(perTransferLimit, dailyRemaining)
@@ -204,6 +213,8 @@ export const InstantTransferScreen = () => {
   }
 
   const canSubmit =
+    !isLimitUnavailable &&
+    !isAccountsLoading &&
     form.password.length === 4 &&
     form.toConfirmed &&
     form.amount != null &&
@@ -259,11 +270,15 @@ export const InstantTransferScreen = () => {
         setIdempotencyKey(crypto.randomUUID())
         setOtpOpen(true)
       } catch (error) {
+        // 실패했어도 컴포넌트 state 와 mutation variables 에 평문을 남기지 않는다.
+        setField("password", "")
+        verifyPasswordMutation.reset()
         setAuthError(
           error instanceof ApiError
             ? error.message
             : "계좌비밀번호 확인에 실패했습니다. 다시 시도하세요.",
         )
+        setStep(1)
       }
     }
 
@@ -347,11 +362,15 @@ export const InstantTransferScreen = () => {
         })
         void accountOverviewQuery.refetch()
       } catch (error) {
+        // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이라, 여기서 2단계에
+        // 머무르면 다음 시도가 빈 비밀번호로 나간다.
         setAuthError(
           error instanceof ApiError
             ? error.message
-            : "이체 실행에 실패했습니다. 잠시 후 다시 시도하세요.",
+            : "이체 실행에 실패했습니다. 계좌비밀번호를 다시 입력해 주세요.",
         )
+        setPasswordAuthToken(null)
+        setStep(1)
         return
       }
       setPasswordAuthToken(null)
@@ -525,7 +544,7 @@ export const InstantTransferScreen = () => {
           queryKey: getFavoriteAccountsQueryKey(),
         })
       } catch (error) {
-        setAuthError(
+        setFavoriteError(
           error instanceof ApiError
             ? error.message
             : "자주 쓰는 계좌 등록에 실패했습니다.",
@@ -536,6 +555,7 @@ export const InstantTransferScreen = () => {
     return (
       <InstantTransferStep3
         steps={STEPS}
+        actionError={favoriteError}
         onNewTransfer={() => {
           setForm(INITIAL_FORM)
           setResult(null)
@@ -580,8 +600,12 @@ export const InstantTransferScreen = () => {
                     }
                     size="lg"
                     className="min-w-40"
-                    disabled={alreadyFrequent || frequentFull}
-                    onClick={handleRegisterFrequent}
+                    disabled={
+                      alreadyFrequent ||
+                      frequentFull ||
+                      registerFavoriteMutation.isPending
+                    }
+                    onClick={() => void handleRegisterFrequent()}
                   >
                     {alreadyFrequent
                       ? "자주 쓰는 계좌 등록됨"
@@ -607,6 +631,11 @@ export const InstantTransferScreen = () => {
       perTransferLimit={perTransferLimit}
       dailyRemaining={dailyRemaining}
       canSubmit={canSubmit}
+      notice={
+        isLimitError
+          ? "이체한도를 조회하지 못해 이체를 진행할 수 없습니다. 잠시 후 다시 시도하세요."
+          : null
+      }
       onNext={() => setStep(2)}
       onConfirmAccount={() => void resolveToAccount(form.toAccount)}
       onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}

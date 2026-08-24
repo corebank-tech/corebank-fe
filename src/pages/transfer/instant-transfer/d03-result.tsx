@@ -6,12 +6,14 @@ type InstantTransferStep3Props = {
   steps: string[]
   /** ResultPanel slot (delivered by a later chunk). */
   resultSlot?: React.ReactNode
+  actionError?: string | null
   onNewTransfer: () => void
 }
 
 /** D-03 즉시이체 3단계 · 결과 */
 export const InstantTransferStep3 = ({
   steps,
+  actionError,
   resultSlot,
   onNewTransfer,
 }: InstantTransferStep3Props) => {
@@ -31,6 +33,11 @@ export const InstantTransferStep3 = ({
         </Button>
       }
     >
+      {actionError != null && (
+        <p role="alert" className="mb-3 text-base font-bold text-danger">
+          {actionError}
+        </p>
+      )}
       {resultSlot ?? (
         <div className="flex min-h-[160px] items-center justify-center border border-dashed border-border-strong bg-surface px-4 py-10 text-base text-ink-muted">
           이체 결과 영역

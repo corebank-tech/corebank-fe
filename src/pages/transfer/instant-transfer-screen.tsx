@@ -25,6 +25,7 @@ import {
 } from "@/entities/account"
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
 import { ApiError } from "@/shared/api/api-error"
+import { TransferResponseStatus } from "@/entities/transfer"
 import type { AccountOption } from "@/shared/types/account"
 import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
@@ -117,6 +118,10 @@ export const InstantTransferScreen = () => {
     (accounts.some((a) => a.accountNo === fromParam)
       ? (fromParam ?? "")
       : (accounts[0]?.accountNo ?? ""))
+
+  // 셀렉트를 건드리지 않으면 form.fromAccount 가 빈 문자열이다. 화면·확인모달·실행이
+  // 전부 이 파생값만 보게 해서 소비처가 늘어도 원본이 새지 않게 한다.
+  const displayForm = { ...form, fromAccount: effectiveFromAccount }
   // 확인 다이얼로그를 여는 시점의 시각. 화면 표시(이체예정일시·다이얼로그)와
   // 원장 기록이 모두 이 값을 써서, 사용자가 확인한 거래시각과 저장되는 거래시각이
   // 어긋나지 않게 한다.
@@ -142,10 +147,10 @@ export const InstantTransferScreen = () => {
   ) => setForm((prev) => ({ ...prev, [key]: value }))
 
   const selectedAccount = accounts.find(
-    (a) => a.accountNo === effectiveFromAccount,
+    (a) => a.accountNo === displayForm.fromAccount,
   )
   const selectedAccountId = withdrawAccounts.find(
-    (a) => a.accountNumber === effectiveFromAccount,
+    (a) => a.accountNumber === displayForm.fromAccount,
   )?.accountId
 
   /** REQ-TRSF-004·007·030: 입금계좌번호를 조회해 예금주·계좌유형·동일계좌 여부를 검증한다. */
@@ -161,7 +166,7 @@ export const InstantTransferScreen = () => {
       }))
       return
     }
-    if (accountNo === effectiveFromAccount) {
+    if (accountNo === displayForm.fromAccount) {
       setForm((f) => ({
         ...f,
         toAccount: accountNo,
@@ -285,10 +290,22 @@ export const InstantTransferScreen = () => {
           idempotencyKey,
         })
 
+        const settled = executed.status === TransferResponseStatus.SUCCESS
+        const failed = executed.status === TransferResponseStatus.ERROR
+        if (
+          !settled &&
+          !failed &&
+          executed.status !== TransferResponseStatus.PROCESSING
+        ) {
+          console.error("알 수 없는 이체 처리상태", executed.status)
+        }
+
+        // 미확정 건은 서버가 거래일시·이체후잔액을 주지 않는다. 화면에서 만들어내면
+        // 끝나지 않은 이체를 끝난 것처럼 보여주게 된다(REQ-TRSF-017·018).
         const row: TransferResultRow = {
           transactionId: executed.transactionNumber ?? "-",
-          processedAt: executed.transferredAt ?? executedAt,
-          fromAccountNo: effectiveFromAccount,
+          processedAt: settled ? (executed.transferredAt ?? executedAt) : "",
+          fromAccountNo: displayForm.fromAccount,
           toAccountNo: form.toAccount,
           payeeName: form.payeeName,
           amount,
@@ -301,17 +318,24 @@ export const InstantTransferScreen = () => {
         }
 
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
-        if (executed.status === "ERROR") {
+        if (failed) {
           setResult({
             variant: "fail",
-            row: { ...row, transactionId: executed.transactionNumber ?? "-" },
+            row,
             errorCode: executed.errorCode ?? undefined,
             failReason:
               executed.errorMessage ??
               "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
           })
-        } else {
+        } else if (settled) {
           setResult({ variant: "success", row })
+        } else {
+          setResult({
+            variant: "pending",
+            row,
+            failReason:
+              "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+          })
         }
 
         // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
@@ -343,7 +367,8 @@ export const InstantTransferScreen = () => {
           }
           fromAccount={
             <span>
-              {selectedAccount?.alias} {formatAccountNo(form.fromAccount)}
+              {selectedAccount?.alias}{" "}
+              {formatAccountNo(displayForm.fromAccount)}
             </span>
           }
           toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
@@ -378,7 +403,7 @@ export const InstantTransferScreen = () => {
             },
             {
               label: "3. 출금계좌번호",
-              value: formatAccountNo(form.fromAccount),
+              value: formatAccountNo(displayForm.fromAccount),
             },
             {
               label: "4. 입금계좌번호",
@@ -577,7 +602,7 @@ export const InstantTransferScreen = () => {
     <InstantTransferStep1
       steps={STEPS}
       accounts={accounts}
-      form={{ ...form, fromAccount: effectiveFromAccount }}
+      form={displayForm}
       onChange={setField}
       perTransferLimit={perTransferLimit}
       dailyRemaining={dailyRemaining}

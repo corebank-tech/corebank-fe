@@ -111,6 +111,7 @@ export {
 export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto-transfers"
 
 export {
+  TransferResponseStatus,
   fetchPayee,
   useExecuteTransferMutation,
 } from "@/entities/transfer/api/use-instant-transfer"

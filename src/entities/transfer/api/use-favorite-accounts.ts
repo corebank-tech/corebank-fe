@@ -16,13 +16,13 @@ export type RegisterFavoriteAccountVariables = {
   idempotencyKey: string
 }
 
-/** D-01 자주 쓰는 계좌 목록(REQ-TRSF-006). */
+/** D-01 자주 쓰는 계좌 목록(REQ-TRSF-026). */
 export const useFavoriteAccountsQuery = () => useGetFavoriteAccounts()
 
 export const getFavoriteAccountsQueryKey = () =>
   getGetFavoriteAccountsQueryKey()
 
-/** D-01 자주 쓰는 계좌 등록(REQ-TRSF-006). 최대 20건(FAV0302). */
+/** D-01 자주 쓰는 계좌 등록(REQ-TRSF-026). 최대 20건(FAV0302). */
 export const useRegisterFavoriteAccountMutation = () =>
   useMutation({
     mutationFn: ({

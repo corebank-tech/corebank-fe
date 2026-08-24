@@ -11,8 +11,15 @@ import type { AccountItemResponse } from "@/shared/api/generated"
 export const useWithdrawAccounts = (): {
   accounts: AccountItemResponse[]
   isLoading: boolean
+  isError: boolean
+  error: unknown
 } => {
-  const { data: overview, isLoading } = useAccountOverviewQuery()
+  const {
+    data: overview,
+    isLoading,
+    isError,
+    error,
+  } = useAccountOverviewQuery()
 
   const accounts = React.useMemo(() => {
     const items = (overview?.items ?? []).flatMap((g) => g.accounts ?? [])
@@ -25,5 +32,5 @@ export const useWithdrawAccounts = (): {
     )
   }, [overview])
 
-  return { accounts, isLoading }
+  return { accounts, isLoading, isError, error }
 }

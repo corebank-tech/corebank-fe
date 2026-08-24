@@ -53,9 +53,8 @@ const onDayOfMonth = (dayOfMonth: number, monthOffset: number): string =>
  * 오늘 이후 처음 돌아오는 이체지정일. 매월(주기 1개월) 자동이체 기준이다.
  *
  * 항상 오늘보다 뒤를 돌려주므로 이 목업에는 **다음 실행 예정일이 당일인 건이 없다** —
- * REQ-AUTO-011이 규정한 "당일 해지 거부"는 이 데이터로 재현되지 않는다. G-04는 서버가
- * 내려준 `cancelable`을 그대로 쓰고 이 목업은 B-05 삭제 차단(상태만 참조)에서만 읽히므로
- * 화면 동작에는 영향이 없다.
+ * REQ-AUTO-011이 규정한 "당일 해지 거부"는 이 데이터로 재현되지 않는다.
+ * 실제 G-04 화면은 서버가 내려준 `cancelable`을 그대로 사용한다.
  */
 const nextExecDateOn = (dayOfMonth: number): string => {
   const thisMonth = onDayOfMonth(dayOfMonth, 0)
@@ -63,9 +62,8 @@ const nextExecDateOn = (dayOfMonth: number): string => {
 }
 
 /**
- * **B-05 출금계좌 삭제 차단(REQ-ACCT-011)의 입력**이다. G-04는 서버 응답을 매핑해서 쓰므로
- * 화면도 스토리도 이 배열을 읽지 않는다 — 계좌번호와 상태 조합을 바꾸면 B-05에서 안내되는
- * 차단 사유만 달라진다.
+ * G-04 자동이체 관련 mock 데이터.
+ * 실제 조회 화면은 서버 응답을 사용하며, mock이 필요한 개발/스토리 용도로 유지한다.
  */
 export const MOCK_AUTO_TRANSFERS: AutoTransferRow[] = [
   {

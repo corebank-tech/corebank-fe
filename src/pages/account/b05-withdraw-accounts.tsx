@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { Button } from "@/shared/ui/button"
@@ -8,28 +9,71 @@ import { Modal } from "@/shared/ui/modal"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-import { OtpModal } from "@/entities/auth"
-import { formatAccountNo, formatAmount } from "@/shared/lib/format"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import {
-  MOCK_WITHDRAWAL_ACCOUNTS,
-  type WithdrawalAccount,
+  getAccountOverviewQueryKey,
+  useAccountOverviewQuery,
+  useRegisterWithdrawalAccountMutation,
+  useUnregisterWithdrawalAccountMutation,
+  useVerifyAccountPasswordMutation,
 } from "@/entities/account"
-import { MOCK_AUTO_TRANSFERS, MOCK_RESERVATIONS } from "@/entities/transfer"
-import { getWithdrawalDeleteBlockReason } from "@/features/withdrawal-account"
+import { ApiError } from "@/shared/api/api-error"
+import { formatAccountNo, formatAmount } from "@/shared/lib/format"
 import { onlyDigits } from "@/shared/lib/input-filter"
 
 const PASSWORD_LIMIT = 4
 
+type WithdrawalAccountRow = {
+  id: string
+  accountId: number
+  accountNo: string
+  alias: string
+  balance: number
+  registered: boolean
+}
+
 /** REQ-ACCT-010·011·012: 출금계좌관리. 등록/미등록 목록을 상하로 구분해 표시한다. */
 export const B05WithdrawAccounts = () => {
-  const [accounts, setAccounts] = React.useState(MOCK_WITHDRAWAL_ACCOUNTS)
+  const queryClient = useQueryClient()
+  const accountOverviewQuery = useAccountOverviewQuery()
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const registerMutation = useRegisterWithdrawalAccountMutation()
+  const unregisterMutation = useUnregisterWithdrawalAccountMutation()
+
+  const accounts = React.useMemo<WithdrawalAccountRow[]>(
+    () =>
+      (accountOverviewQuery.data?.items ?? [])
+        .flatMap((group) => group.accounts ?? [])
+        .flatMap((account) => {
+          if (
+            account.accountType !== "DEMAND_DEPOSIT" ||
+            account.accountId == null ||
+            account.accountNumber == null
+          ) {
+            return []
+          }
+
+          return [
+            {
+              id: String(account.accountId),
+              accountId: account.accountId,
+              accountNo: account.accountNumber,
+              alias: account.accountName ?? "입출금통장",
+              balance: account.balance ?? 0,
+              registered: account.withdrawalRegistered === true,
+            },
+          ]
+        }),
+    [accountOverviewQuery.data],
+  )
+
   const [registeredSelected, setRegisteredSelected] = React.useState<string[]>(
     [],
   )
   const [unregisteredSelected, setUnregisteredSelected] = React.useState<
     string[]
   >([])
-  const [gridKey, setGridKey] = React.useState(0)
+
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
     null,
   )
@@ -40,86 +84,114 @@ export const B05WithdrawAccounts = () => {
   )
 
   const [registerQueue, setRegisterQueue] = React.useState<
-    WithdrawalAccount[] | null
+    WithdrawalAccountRow[] | null
   >(null)
   const [queueIndex, setQueueIndex] = React.useState(0)
   const [pwValue, setPwValue] = React.useState("")
   const [pwError, setPwError] = React.useState<string | null>(null)
+  const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
+    React.useState<string | null>(null)
   const [otpOpen, setOtpOpen] = React.useState(false)
-
-  const registered = accounts.filter((a) => a.registered)
-  const unregistered = accounts.filter((a) => !a.registered)
-
-  const registeredRows = registered.filter((a) =>
-    registeredSelected.includes(a.id),
+  const [registerError, setRegisterError] = React.useState<string[] | null>(
+    null,
   )
-  const unregisteredRows = unregistered.filter((a) =>
-    unregisteredSelected.includes(a.id),
+  const [registrationSuccessCount, setRegistrationSuccessCount] =
+    React.useState(0)
+
+  const registered = accounts.filter((account) => account.registered)
+  const unregistered = accounts.filter((account) => !account.registered)
+
+  const registeredRows = registered.filter((account) =>
+    registeredSelected.includes(account.id),
+  )
+  const unregisteredRows = unregistered.filter((account) =>
+    unregisteredSelected.includes(account.id),
   )
 
-  const columns: DataGridColumn<WithdrawalAccount>[] = [
+  const columns: DataGridColumn<WithdrawalAccountRow>[] = [
     { key: "alias", header: "계좌명", width: 200 },
     {
       key: "accountNo",
       header: "계좌번호",
       width: 180,
-      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
+      render: (row) => <span>{formatAccountNo(row.accountNo)}</span>,
     },
     {
       key: "balance",
       header: "잔액",
       align: "right",
       width: 160,
-      render: (r) => formatAmount(r.balance),
+      render: (row) => formatAmount(row.balance),
     },
   ]
 
   const handleDeleteClick = () => {
     setSuccessMessage(null)
+    setDeleteBlocked(null)
+
     if (registeredRows.length === 0) return
-    const blocked = registeredRows
-      .map((r) => ({
-        r,
-        reason: getWithdrawalDeleteBlockReason(
-          r.accountNo,
-          MOCK_RESERVATIONS,
-          MOCK_AUTO_TRANSFERS,
-        ),
-      }))
-      .filter(
-        (x): x is { r: WithdrawalAccount; reason: string } => x.reason != null,
-      )
-    if (blocked.length > 0) {
-      setDeleteBlocked(
-        blocked.map(
-          ({ r, reason }) =>
-            `${r.alias} (${formatAccountNo(r.accountNo)}) : ${reason}`,
-        ),
-      )
-      return
-    }
+
     setDeleteConfirmOpen(true)
   }
 
-  const handleConfirmDelete = () => {
-    setAccounts((prev) =>
-      prev.map((a) =>
-        registeredSelected.includes(a.id) ? { ...a, registered: false } : a,
-      ),
-    )
+  const handleConfirmDelete = async () => {
     setDeleteConfirmOpen(false)
+
+    const failures: string[] = []
+    let successCount = 0
+
+    for (const account of registeredRows) {
+      try {
+        await unregisterMutation.mutateAsync({
+          accountId: account.accountId,
+        })
+
+        successCount += 1
+      } catch (error) {
+        failures.push(
+          `${account.alias} (${formatAccountNo(account.accountNo)}) : ${
+            error instanceof ApiError
+              ? error.message
+              : "출금계좌 삭제 중 오류가 발생했습니다."
+          }`,
+        )
+      }
+    }
+
+    unregisterMutation.reset()
+
+    await queryClient.invalidateQueries({
+      queryKey: getAccountOverviewQueryKey(),
+    })
+
     setRegisteredSelected([])
-    setGridKey((k) => k + 1)
-    setSuccessMessage("선택한 계좌의 출금계좌 등록이 해제되었습니다.")
+
+    if (successCount > 0) {
+      setSuccessMessage(
+        successCount === 1
+          ? "선택한 계좌의 출금계좌 등록이 해제되었습니다."
+          : `${successCount}개 계좌의 출금계좌 등록이 해제되었습니다.`,
+      )
+    }
+
+    if (failures.length > 0) {
+      setDeleteBlocked(failures)
+    }
   }
 
   const handleRegisterClick = () => {
     setSuccessMessage(null)
+    setRegisterError(null)
+
     if (unregisteredRows.length === 0) return
+
     setRegisterQueue(unregisteredRows)
     setQueueIndex(0)
+    setRegistrationSuccessCount(0)
     setPwValue("")
     setPwError(null)
+    setAccountPasswordAuthToken(null)
+    setOtpOpen(false)
   }
 
   const currentTarget = registerQueue?.[queueIndex] ?? null
@@ -127,39 +199,151 @@ export const B05WithdrawAccounts = () => {
   const closeRegisterFlow = () => {
     setRegisterQueue(null)
     setQueueIndex(0)
+    setRegistrationSuccessCount(0)
     setPwValue("")
     setPwError(null)
+    setAccountPasswordAuthToken(null)
     setOtpOpen(false)
+
+    verifyPasswordMutation.reset()
+    registerMutation.reset()
   }
 
-  const handlePasswordConfirm = () => {
+  const handleRegisterCancel = () => {
+    closeRegisterFlow()
+    setUnregisteredSelected([])
+  }
+
+  const handlePasswordConfirm = async () => {
     if (!currentTarget) return
+
     if (pwValue.length !== PASSWORD_LIMIT) {
       setPwError("계좌비밀번호 4자리를 모두 입력하세요.")
       return
     }
-    if (pwValue !== currentTarget.mockPassword) {
-      setPwError("계좌비밀번호가 일치하지 않습니다.")
-      return
-    }
-    if (registerQueue && queueIndex + 1 < registerQueue.length) {
-      setQueueIndex((i) => i + 1)
+
+    setPwError(null)
+    setAccountPasswordAuthToken(null)
+
+    try {
+      const response = await verifyPasswordMutation.mutateAsync({
+        accountId: currentTarget.accountId,
+        data: {
+          accountPassword: pwValue,
+        },
+      })
+
+      // mutation variables와 화면 state에 평문 비밀번호를 남기지 않는다.
       setPwValue("")
-      setPwError(null)
-      return
+      verifyPasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setRegisterError([
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다.",
+          "다시 시도해 주세요.",
+        ])
+        return
+      }
+
+      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
+      setOtpOpen(true)
+    } catch (error) {
+      setPwValue("")
+      verifyPasswordMutation.reset()
+
+      setPwError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌비밀번호 확인 중 오류가 발생했습니다.",
+      )
     }
-    setOtpOpen(true)
   }
 
-  const handleOtpConfirm = () => {
-    const ids = new Set((registerQueue ?? []).map((a) => a.id))
-    setAccounts((prev) =>
-      prev.map((a) => (ids.has(a.id) ? { ...a, registered: true } : a)),
-    )
-    setUnregisteredSelected([])
-    setGridKey((k) => k + 1)
-    setSuccessMessage("선택한 계좌가 출금계좌로 등록되었습니다.")
-    closeRegisterFlow()
+  const handleOtpConfirm = async (otpAuthToken: string) => {
+    if (!currentTarget || !accountPasswordAuthToken) {
+      setRegisterError([
+        "출금계좌 등록 인증 정보를 확인할 수 없습니다.",
+        "처음부터 다시 시도해 주세요.",
+      ])
+      handleRegisterCancel()
+      return
+    }
+
+    setOtpOpen(false)
+
+    try {
+      await registerMutation.mutateAsync({
+        accountId: currentTarget.accountId,
+        data: {
+          accountPasswordAuthToken,
+          otpAuthToken,
+        },
+      })
+
+      // 최종 API에서 인증 토큰이 소비되므로 즉시 제거한다.
+      registerMutation.reset()
+      setAccountPasswordAuthToken(null)
+
+      const completedCount = registrationSuccessCount + 1
+      setRegistrationSuccessCount(completedCount)
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      const hasNext =
+        registerQueue != null && queueIndex + 1 < registerQueue.length
+
+      if (hasNext) {
+        setQueueIndex((index) => index + 1)
+        setPwValue("")
+        setPwError(null)
+        return
+      }
+
+      setUnregisteredSelected([])
+      setSuccessMessage(
+        completedCount === 1
+          ? "선택한 계좌가 출금계좌로 등록되었습니다."
+          : `${completedCount}개 계좌가 출금계좌로 등록되었습니다.`,
+      )
+      closeRegisterFlow()
+    } catch (error) {
+      // 최종 API에서 토큰이 소비됐을 가능성이 있으므로 재사용하지 않는다.
+      registerMutation.reset()
+      setAccountPasswordAuthToken(null)
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      const errorMessage =
+        error instanceof ApiError
+          ? error.message
+          : "출금계좌 등록 중 오류가 발생했습니다."
+
+      const remainingCount = (registerQueue?.length ?? 0) - queueIndex - 1
+
+      if (registrationSuccessCount > 0) {
+        setSuccessMessage(
+          registrationSuccessCount === 1
+            ? "1개 계좌가 출금계좌로 등록되었습니다."
+            : `${registrationSuccessCount}개 계좌가 출금계좌로 등록되었습니다.`,
+        )
+      }
+
+      setRegisterError([
+        `${currentTarget.alias} (${formatAccountNo(
+          currentTarget.accountNo,
+        )}) : ${errorMessage}`,
+        ...(remainingCount > 0
+          ? [`남은 ${remainingCount}개 계좌의 등록은 진행하지 않았습니다.`]
+          : []),
+      ])
+
+      setUnregisteredSelected([])
+      closeRegisterFlow()
+    }
   }
 
   return (
@@ -186,22 +370,33 @@ export const B05WithdrawAccounts = () => {
               "해제 후에는 해당 계좌로 즉시이체를 할 수 없습니다.",
             ]}
             confirmLabel="삭제하기"
-            items={registeredRows.map((r) => ({
-              label: r.alias,
-              value: formatAccountNo(r.accountNo),
+            items={registeredRows.map((row) => ({
+              label: row.alias,
+              value: formatAccountNo(row.accountNo),
             }))}
           />
 
           <ErrorDialog
             open={deleteBlocked != null}
             onClose={() => setDeleteBlocked(null)}
-            title="삭제 불가"
+            title="삭제 실패"
             messages={deleteBlocked ?? []}
           />
 
+          <ErrorDialog
+            open={registerError != null}
+            onClose={() => setRegisterError(null)}
+            title="출금계좌 등록 실패"
+            messages={registerError ?? []}
+          />
+
           <Modal
-            open={registerQueue != null && !otpOpen}
-            onClose={closeRegisterFlow}
+            open={
+              registerQueue != null &&
+              !otpOpen &&
+              accountPasswordAuthToken == null
+            }
+            onClose={handleRegisterCancel}
             title="계좌비밀번호 확인"
             size="sm"
             footer={
@@ -210,7 +405,7 @@ export const B05WithdrawAccounts = () => {
                   variant="secondary"
                   size="lg"
                   className="min-w-30"
-                  onClick={closeRegisterFlow}
+                  onClick={handleRegisterCancel}
                 >
                   취소
                 </Button>
@@ -218,11 +413,10 @@ export const B05WithdrawAccounts = () => {
                   variant="primary"
                   size="lg"
                   className="min-w-30"
+                  disabled={verifyPasswordMutation.isPending}
                   onClick={handlePasswordConfirm}
                 >
-                  {registerQueue && queueIndex + 1 < registerQueue.length
-                    ? "다음"
-                    : "확인"}
+                  확인
                 </Button>
               </>
             }
@@ -234,10 +428,12 @@ export const B05WithdrawAccounts = () => {
                     ? `${queueIndex + 1}/${registerQueue.length}번째 계좌의 비밀번호를 입력하세요.`
                     : "출금계좌로 등록할 계좌의 비밀번호를 입력하세요."}
                 </p>
+
                 <p className="text-base font-bold text-ink">
                   {currentTarget.alias} /{" "}
                   {formatAccountNo(currentTarget.accountNo)}
                 </p>
+
                 <Input
                   type="password"
                   inputMode="numeric"
@@ -245,14 +441,19 @@ export const B05WithdrawAccounts = () => {
                   maxLength={PASSWORD_LIMIT}
                   value={pwValue}
                   invalid={pwError != null}
-                  onChange={(e) => {
-                    setPwValue(onlyDigits(e.target.value, PASSWORD_LIMIT))
-                    if (pwError) setPwError(null)
+                  disabled={verifyPasswordMutation.isPending}
+                  onChange={(event) => {
+                    setPwValue(onlyDigits(event.target.value, PASSWORD_LIMIT))
+
+                    if (pwError) {
+                      setPwError(null)
+                    }
                   }}
                   placeholder="계좌비밀번호 4자리"
                   className="text-center tracking-4"
                   autoFocus
                 />
+
                 {pwError && (
                   <p role="alert" className="text-base font-bold text-danger">
                     {pwError}
@@ -262,12 +463,21 @@ export const B05WithdrawAccounts = () => {
             )}
           </Modal>
 
-          <OtpModal
-            open={otpOpen}
-            onClose={closeRegisterFlow}
-            onConfirm={handleOtpConfirm}
-            guide="출금계좌 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-          />
+          {currentTarget && (
+            <OtpModal
+              open={otpOpen && accountPasswordAuthToken != null}
+              onClose={handleRegisterCancel}
+              onConfirm={handleOtpConfirm}
+              title="출금계좌 등록 OTP 인증"
+              guide="출금계좌 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+              transaction={{
+                type: OtpTransactionType.WITHDRAWAL_ACCOUNT_REGISTER,
+                data: {
+                  accountId: currentTarget.accountId,
+                },
+              }}
+            />
+          )}
         </>
       }
     >
@@ -279,7 +489,9 @@ export const B05WithdrawAccounts = () => {
           <Button
             variant="danger"
             size="sm"
-            disabled={registeredSelected.length === 0}
+            disabled={
+              registeredSelected.length === 0 || unregisterMutation.isPending
+            }
             onClick={handleDeleteClick}
           >
             선택 계좌 삭제
@@ -287,12 +499,13 @@ export const B05WithdrawAccounts = () => {
         }
       >
         <DataGrid
-          key={`reg-${gridKey}`}
           columns={columns}
           rows={registered}
-          rowKey={(r) => r.id}
+          rowKey={(row) => row.id}
           selectable
+          selectedKeys={registeredSelected}
           onSelectionChange={setRegisteredSelected}
+          loading={accountOverviewQuery.isFetching}
           emptyMessage="등록된 출금계좌가 없습니다."
         />
       </FormSection>
@@ -304,7 +517,9 @@ export const B05WithdrawAccounts = () => {
           <Button
             variant="primary"
             size="sm"
-            disabled={unregisteredSelected.length === 0}
+            disabled={
+              unregisteredSelected.length === 0 || registerQueue != null
+            }
             onClick={handleRegisterClick}
           >
             선택 계좌 등록
@@ -312,12 +527,13 @@ export const B05WithdrawAccounts = () => {
         }
       >
         <DataGrid
-          key={`unreg-${gridKey}`}
           columns={columns}
           rows={unregistered}
-          rowKey={(r) => r.id}
+          rowKey={(row) => row.id}
           selectable
+          selectedKeys={unregisteredSelected}
           onSelectionChange={setUnregisteredSelected}
+          loading={accountOverviewQuery.isFetching}
           emptyMessage="미등록 계좌가 없습니다."
         />
       </FormSection>

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -7,10 +8,15 @@ import { Input } from "@/shared/ui/input"
 import { Alert } from "@/shared/ui/alert"
 import { SummaryRow } from "@/shared/ui/summary-row"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
-import { OtpModal } from "@/entities/auth"
+import { OtpModal, OtpTransactionType } from "@/entities/auth"
 import { formatAmount, formatDateTime } from "@/shared/lib/format"
 import { onlyDigits as onlyDigitsBase } from "@/shared/lib/input-filter"
-import { MOCK_TRANSFER_LIMIT } from "@/entities/transfer"
+import {
+  getTransferLimitQueryKey,
+  useTransferLimitQuery,
+  useUpdateTransferLimitMutation,
+} from "@/entities/transfer"
+import { ApiError } from "@/shared/api/api-error"
 import {
   TRANSFER_LIMIT_PER_DAY_MAX as PER_DAY_MAX,
   TRANSFER_LIMIT_PER_TRANSFER_MAX as PER_TRANSFER_MAX,
@@ -32,37 +38,49 @@ const formatDraft = (value: string): string => {
  */
 export const D05TransferLimit = () => {
   const BASE_TIME = useBaseTime()
-  const [limit, setLimit] = React.useState(MOCK_TRANSFER_LIMIT)
-  const [perTransferDraft, setPerTransferDraft] = React.useState(
-    String(limit.perTransferLimit),
+  const queryClient = useQueryClient()
+  const {
+    data: limit,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useTransferLimitQuery()
+  const updateMutation = useUpdateTransferLimitMutation()
+
+  const oneTimeLimit = limit?.oneTimeLimit ?? 0
+  const dailyLimit = limit?.dailyLimit ?? 0
+  const isLimitUnavailable = isLoading || isError || limit == null
+
+  const [perTransferDraft, setPerTransferDraft] = React.useState<string | null>(
+    null,
   )
-  const [perDayDraft, setPerDayDraft] = React.useState(
-    String(limit.perDayLimit),
-  )
+  const [perDayDraft, setPerDayDraft] = React.useState<string | null>(null)
   const [fieldError, setFieldError] = React.useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
     null,
   )
+  const [idempotencyKey, setIdempotencyKey] = React.useState("")
 
-  const dailyRemaining = limit.perDayLimit - limit.usedToday
-  const perTransferValue = Number(perTransferDraft || 0)
-  const perDayValue = Number(perDayDraft || 0)
+  const perTransferInput = perTransferDraft ?? String(oneTimeLimit || "")
+  const perDayInput = perDayDraft ?? String(dailyLimit || "")
+  const perTransferValue = Number(perTransferInput || 0)
+  const perDayValue = Number(perDayInput || 0)
 
   const resetDraft = () => {
-    setPerTransferDraft(String(limit.perTransferLimit))
-    setPerDayDraft(String(limit.perDayLimit))
+    setPerTransferDraft(null)
+    setPerDayDraft(null)
     setFieldError(null)
   }
 
   const handleSubmitClick = () => {
     setSuccessMessage(null)
-    if (!perTransferDraft || perTransferValue <= 0) {
+    if (!perTransferInput || perTransferValue <= 0) {
       setFieldError("1회 이체한도를 입력하세요.")
       return
     }
-    if (!perDayDraft || perDayValue <= 0) {
+    if (!perDayInput || perDayValue <= 0) {
       setFieldError("1일 이체한도를 입력하세요.")
       return
     }
@@ -88,19 +106,33 @@ export const D05TransferLimit = () => {
 
   const handleConfirm = () => {
     setConfirmOpen(false)
+    setIdempotencyKey(crypto.randomUUID())
     setOtpOpen(true)
   }
 
-  const handleOtpConfirm = () => {
-    setLimit((prev) => ({
-      ...prev,
-      perTransferLimit: perTransferValue,
-      perDayLimit: perDayValue,
-    }))
+  const handleOtpConfirm = async (otpAuthToken: string) => {
     setOtpOpen(false)
-    setSuccessMessage(
-      "이체한도가 변경되었습니다. 다음 이체부터 신규 한도가 적용됩니다.",
-    )
+    try {
+      await updateMutation.mutateAsync({
+        oneTimeLimit: perTransferValue,
+        dailyLimit: perDayValue,
+        otpAuthToken,
+        idempotencyKey,
+      })
+      await queryClient.invalidateQueries({
+        queryKey: getTransferLimitQueryKey(),
+      })
+      resetDraft()
+      setSuccessMessage(
+        "이체한도가 변경되었습니다. 다음 이체부터 신규 한도가 적용됩니다.",
+      )
+    } catch (error) {
+      setFieldError(
+        error instanceof ApiError
+          ? error.message
+          : "이체한도 변경에 실패했습니다.",
+      )
+    }
   }
 
   return (
@@ -139,7 +171,11 @@ export const D05TransferLimit = () => {
           <OtpModal
             open={otpOpen}
             onClose={() => setOtpOpen(false)}
-            onConfirm={handleOtpConfirm}
+            onConfirm={(otpAuthToken) => void handleOtpConfirm(otpAuthToken)}
+            transaction={{
+              type: OtpTransactionType.TRANSFER_LIMIT_CHANGE,
+              data: { oneTimeLimit: perTransferValue, dailyLimit: perDayValue },
+            }}
             title="이체한도 변경 OTP 인증"
             guide="이체한도 변경을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />
@@ -149,27 +185,48 @@ export const D05TransferLimit = () => {
       {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
       <FormSection title="이체한도 조회">
-        <SummaryRow
-          items={[
-            {
-              label: "1회 이체한도",
-              value: formatAmount(limit.perTransferLimit),
-            },
-            { label: "1일 이체한도", value: formatAmount(limit.perDayLimit) },
-            { label: "당일 사용금액", value: formatAmount(limit.usedToday) },
-          ]}
-        />
-        <div className="mt-4 flex flex-col items-end gap-1 border-t-2 border-t-navy pt-3">
-          <span className="font-normal text-ink-muted">
-            당일 잔여 이체가능금액
-          </span>
-          <span className="text-page font-bold text-primary">
-            {formatAmount(dailyRemaining)}
-          </span>
-        </div>
-        <p className="mt-2 text-right text-2xs text-ink-muted">
-          기준일시 : {formatDateTime(BASE_TIME)}
-        </p>
+        {isLoading && (
+          <p className="py-10 text-center text-base text-ink-muted">
+            불러오는 중...
+          </p>
+        )}
+
+        {!isLoading && (isError || limit == null) && (
+          <Alert variant="danger">
+            {queryError instanceof ApiError
+              ? queryError.message
+              : "이체한도를 조회하지 못했습니다. 잠시 후 다시 시도하세요."}
+          </Alert>
+        )}
+
+        {!isLimitUnavailable && (
+          <>
+            <SummaryRow
+              items={[
+                {
+                  label: "1회 이체한도",
+                  value: formatAmount(oneTimeLimit),
+                },
+                { label: "1일 이체한도", value: formatAmount(dailyLimit) },
+                {
+                  label: "당일 사용금액",
+                  value: formatAmount(limit?.dailyUsedAmount ?? 0),
+                },
+              ]}
+            />
+            <div className="mt-4 flex flex-col items-end gap-1 border-t-2 border-t-navy pt-3">
+              <span className="font-normal text-ink-muted">
+                당일 잔여 이체가능금액
+              </span>
+              <span className="text-page font-bold text-primary">
+                {formatAmount(limit?.dailyRemainingAmount ?? 0)}
+              </span>
+            </div>
+            <p className="mt-2 text-right text-2xs text-ink-muted">
+              기준일시 : {formatDateTime(BASE_TIME)}
+            </p>
+          </>
+        )}
       </FormSection>
 
       <FormSection title="이체한도 변경" className="mb-0">
@@ -183,7 +240,8 @@ export const D05TransferLimit = () => {
             <Input
               id="d05-per-transfer"
               inputMode="numeric"
-              value={formatDraft(perTransferDraft)}
+              disabled={isLimitUnavailable}
+              value={formatDraft(perTransferInput)}
               onChange={(e) => setPerTransferDraft(onlyDigits(e.target.value))}
               className="max-w-[220px] text-right"
             />
@@ -198,7 +256,8 @@ export const D05TransferLimit = () => {
             <Input
               id="d05-per-day"
               inputMode="numeric"
-              value={formatDraft(perDayDraft)}
+              disabled={isLimitUnavailable}
+              value={formatDraft(perDayInput)}
               onChange={(e) => setPerDayDraft(onlyDigits(e.target.value))}
               className="max-w-[220px] text-right"
             />
@@ -222,6 +281,7 @@ export const D05TransferLimit = () => {
             variant="secondary"
             size="lg"
             className="min-w-30"
+            disabled={isLimitUnavailable}
             onClick={resetDraft}
           >
             초기화
@@ -230,9 +290,10 @@ export const D05TransferLimit = () => {
             variant="primary"
             size="lg"
             className="min-w-30"
+            disabled={isLimitUnavailable || updateMutation.isPending}
             onClick={handleSubmitClick}
           >
-            변경하기
+            {updateMutation.isPending ? "변경 중..." : "변경하기"}
           </Button>
         </div>
       </FormSection>

@@ -8,8 +8,12 @@ export {
   MOCK_MONTHLY_TRANSFER_STATS,
 } from "@/entities/transfer/api/d04-transfers"
 
-export type { TransferLimitState } from "@/entities/transfer/api/d05-transfer-limit"
-export { MOCK_TRANSFER_LIMIT } from "@/entities/transfer/api/d05-transfer-limit"
+export {
+  getTransferLimitQueryKey,
+  useTransferLimitQuery,
+  useUpdateTransferLimitMutation,
+} from "@/entities/transfer/api/use-transfer-limit"
+export type { TransferLimit } from "@/entities/transfer/api/use-transfer-limit"
 
 export type {
   ReservationStatus,

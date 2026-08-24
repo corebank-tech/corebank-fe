@@ -31,14 +31,13 @@ import {
 } from "@/pages/product/join-shared"
 import { EmptyState } from "@/shared/ui/empty-state"
 import { ProductJoinRestartNotice } from "@/pages/product/join-restart-notice"
-import { useWithdrawAccounts } from "@/entities/account"
+import {
+  useVerifyAccountPasswordMutation,
+  useWithdrawAccounts,
+} from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 
 const PASSWORD_LIMIT = 4
-
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
-// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
-const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 /**
  * 신규 계좌 비밀번호. REQ-PRDT-006은 예적금 계좌가 비밀번호를 보유하지 않는다고
@@ -67,6 +66,8 @@ export const C05ConfirmAuth = () => {
 
   const [password, setPassword] = React.useState("")
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
+  const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
+    React.useState<string | null>(null)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [executeError, setExecuteError] = React.useState<string | null>(null)
   // 실행 요청 + 뒤이은 상세 조회까지를 하나의 진행 구간으로 잡는다.
@@ -74,6 +75,7 @@ export const C05ConfirmAuth = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
   const executeMutation = useExecuteSubscription()
 
   if (isLoading) {
@@ -120,25 +122,55 @@ export const C05ConfirmAuth = () => {
   })
 
   /**
-   * REQ-ACCT-007의 5회 오류 거래정지는 서버가 판정한다. 계좌비밀번호 인증 API가
-   * 아직 없어 화면에서 대조할 방법이 없고, mock 값과 비교하던 기존 코드는 실제
-   * 계좌와 무관한 가짜 검증이었다. 여기서는 자릿수만 확인한다.
+   * 계좌비밀번호를 서버에 검증해 `accountPasswordAuthToken`을 받는다.
+   * REQ-ACCT-007의 5회 오류 거래정지는 서버가 판정하므로, 화면은 실패 사유를
+   * 서버 메시지 그대로 노출하고 누적 횟수를 따로 세지 않는다.
    */
-  const handleAuthenticate = () => {
+  const handleAuthenticate = async () => {
     if (password.length !== PASSWORD_LIMIT) {
       setPasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
       return
     }
-    // 인증을 시작하기 전에 막는다. OTP는 발급·검증이 실제 토큰을 소비하므로,
-    // 인증을 마친 뒤에 걸러내면 사용자가 쓴 토큰이 그대로 버려진다.
+
     if (otpTransactionData == null) {
       setExecuteError(
         "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
       )
       return
     }
+
     setPasswordError(null)
-    setOtpOpen(true)
+
+    try {
+      const response = await verifyPasswordMutation.mutateAsync({
+        accountId: otpTransactionData.withdrawalAccountId,
+        data: {
+          accountPassword: password,
+        },
+      })
+
+      // 평문 비밀번호 및 mutation variables 즉시 제거
+      setPassword("")
+      verifyPasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setPasswordError(
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
+        )
+        return
+      }
+
+      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
+      setOtpOpen(true)
+    } catch (e) {
+      // 실패 시에도 평문 비밀번호 및 mutation variables 제거
+      setPassword("")
+      verifyPasswordMutation.reset()
+
+      setPasswordError(
+        e instanceof ApiError ? e.message : "계좌비밀번호 인증에 실패했습니다.",
+      )
+    }
   }
 
   /**
@@ -163,9 +195,15 @@ export const C05ConfirmAuth = () => {
   // 가입 실행이 두 번 나간다. 멱등키는 customFetch가 요청마다 새로 만들기 때문에
   // 서버 멱등성으로도 걸러지지 않는다.
   const handleOtpConfirm = async (otpAuthToken: string) => {
-    // 출금계좌는 handleAuthenticate 가 인증 전에 걸러낸다. 여기서는 타입을 좁히는
-    // 역할만 한다.
-    if (isSubmitting || otpTransactionData == null) return
+    // 인증 단계에서 확보한 거래정보와 계좌비밀번호 인증 토큰이 모두 있어야
+    // 상품가입 실행 요청을 보낸다.
+    if (
+      isSubmitting ||
+      otpTransactionData == null ||
+      accountPasswordAuthToken == null
+    ) {
+      return
+    }
     setOtpOpen(false)
 
     // 요청마다 새로 만든다. 재시도 시 값이 달라지지만 서버가 두 필드의 일치만
@@ -179,7 +217,7 @@ export const C05ConfirmAuth = () => {
           ...otpTransactionData,
           newAccountPassword: newAccountPassword,
           newAccountPasswordConfirm: newAccountPassword,
-          accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          accountPasswordAuthToken,
           otpAuthToken,
           agreedTerms: form.agreedTerms,
         },
@@ -226,6 +264,7 @@ export const C05ConfirmAuth = () => {
         e instanceof ApiError ? e.message : "상품가입에 실패했습니다.",
       )
     } finally {
+      setAccountPasswordAuthToken(null)
       setIsSubmitting(false)
     }
   }
@@ -254,10 +293,14 @@ export const C05ConfirmAuth = () => {
               variant="primary"
               size="lg"
               className="min-w-40"
-              disabled={isSubmitting}
+              disabled={isSubmitting || verifyPasswordMutation.isPending}
               onClick={handleAuthenticate}
             >
-              {isSubmitting ? "가입 처리 중..." : "인증하고 가입하기"}
+              {verifyPasswordMutation.isPending
+                ? "계좌 인증 중..."
+                : isSubmitting
+                  ? "가입 처리 중..."
+                  : "인증하고 가입하기"}
             </Button>
           </>
         }
@@ -312,7 +355,10 @@ export const C05ConfirmAuth = () => {
       {otpTransactionData != null && (
         <OtpModal
           open={otpOpen}
-          onClose={() => setOtpOpen(false)}
+          onClose={() => {
+            setOtpOpen(false)
+            setAccountPasswordAuthToken(null)
+          }}
           onConfirm={handleOtpConfirm}
           title="상품가입 OTP 인증"
           guide="OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하면 가입이 실행됩니다."

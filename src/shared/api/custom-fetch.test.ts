@@ -324,3 +324,35 @@ describe("유휴 타이머 활동 (POL-001, POL-A01)", () => {
     vi.restoreAllMocks()
   })
 })
+
+describe("VITE_API_BASE_URL 검증", () => {
+  const importFresh = async () => {
+    vi.resetModules()
+    return import("@/shared/api/custom-fetch")
+  }
+
+  afterEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", "")
+  })
+
+  it("값이 없으면 모듈 로드 시점에 막는다", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", undefined)
+
+    await expect(importFresh()).rejects.toThrow("설정되지 않았습니다")
+  })
+
+  it("끝에 공백과 박스문자가 섞이면 모듈 로드 시점에 막는다", async () => {
+    // 실제 사고 값 — Cloudflare 대시보드에 터미널 테두리가 딸려 들어갔다.
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.corebank.cloud/api/v1 │")
+
+    await expect(importFresh()).rejects.toThrow("보이지 않는 문자")
+  })
+
+  it("프록시를 쓰는 상대경로와 빈 문자열은 통과한다", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "/api/v1")
+    await expect(importFresh()).resolves.toBeDefined()
+
+    vi.stubEnv("VITE_API_BASE_URL", "")
+    await expect(importFresh()).resolves.toBeDefined()
+  })
+})

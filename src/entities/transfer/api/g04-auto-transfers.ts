@@ -12,7 +12,8 @@ export type TransferCycle = 1 | 3 | 6
 export type AutoTransferRow = {
   id: string
   fromAccountNo: string
-  fromAlias: string
+  /** 출금계좌 별칭. 서버가 미설정 건에는 내려주지 않는다 — 화면은 빈 문자열도 미설정으로 본다. */
+  fromAlias?: string
   toAccountNo: string
   payeeName: string
   amount: number

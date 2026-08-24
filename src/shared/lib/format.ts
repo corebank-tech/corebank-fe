@@ -162,3 +162,18 @@ export function maskUserId(id: string): string {
   if (id.length <= 3) return id
   return `${id.slice(0, 3)}${"*".repeat(id.length - 3)}`
 }
+
+/**
+ * "자유입출금 110-220-093412". 별칭이 없으면 계좌번호만 남긴다.
+ *
+ * 서버는 별칭 미설정 건에 값을 내려주지 않는다. 호출부에서 그대로 보간하면
+ * ` 110-220-093412` 처럼 구분자만 남은 표기가 되므로 이 함수를 거친다.
+ * `accountNo` 는 이미 마스킹·포맷을 끝낸 문자열을 받는다 — 화면마다 규칙이 다르다.
+ */
+export function formatAccountLabel(
+  alias: string | undefined,
+  accountNo: string,
+  separator = " ",
+): string {
+  return alias ? `${alias}${separator}${accountNo}` : accountNo
+}

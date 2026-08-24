@@ -45,10 +45,13 @@ export const toReservationRow = (
   id: String(item.scheduledTransferId ?? ""),
   status: RESERVATION_STATUS_MAP[item.status ?? "WAITING"],
   scheduledDate: item.scheduledDate ?? "",
+  registeredAt: item.registeredAt,
   fromAccountNo: item.withdrawalAccountNumber ?? "",
+  fromAlias: item.fromAlias,
   toAccountNo: item.accountNumber ?? "",
   payeeName: item.payeeName ?? "",
   amount: item.amount ?? 0,
+  memo: item.myPassbookMemo,
   cancelable: item.cancelable ?? false,
 })
 
@@ -131,7 +134,7 @@ export const toAutoTransferRow = (
 ): AutoTransferRow => ({
   id: String(item.autoTransferId ?? ""),
   fromAccountNo,
-  fromAlias: item.fromAlias ?? "",
+  fromAlias: item.fromAlias,
   toAccountNo: item.depositAccountNumber ?? "",
   payeeName: item.payeeName ?? "",
   amount: item.amount ?? 0,

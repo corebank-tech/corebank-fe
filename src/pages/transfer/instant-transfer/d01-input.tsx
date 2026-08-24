@@ -29,6 +29,8 @@ type InstantTransferStep1Props = {
   ) => void
   perTransferLimit: number
   dailyRemaining: number
+  /** 한도를 아직 모르는 상태. 한도 안내와 초과 경고를 감춘다(REQ-TRSF-010). */
+  isLimitUnavailable?: boolean
   canSubmit: boolean
   /** 한도·계좌 조회가 끝나지 않았거나 실패했을 때 보여줄 안내. */
   notice?: string | null
@@ -50,6 +52,7 @@ export const InstantTransferStep1 = ({
   notice,
   perTransferLimit,
   dailyRemaining,
+  isLimitUnavailable = false,
   canSubmit,
   onNext,
   onConfirmAccount,
@@ -178,6 +181,7 @@ export const InstantTransferStep1 = ({
                   onChange={(v) => onChange("amount", v)}
                   perTransferLimit={perTransferLimit}
                   dailyRemaining={dailyRemaining}
+                  isLimitUnavailable={isLimitUnavailable}
                   fullAmount={selected?.withdrawable}
                 />
                 <p className="text-2xs text-ink-muted">

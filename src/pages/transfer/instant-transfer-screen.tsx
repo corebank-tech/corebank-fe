@@ -261,7 +261,10 @@ export const InstantTransferScreen = () => {
         }
         setPasswordAuthToken(verified.accountPasswordAuthToken)
         setAuthError(null)
-        setIdempotencyKey(crypto.randomUUID())
+        // REQ-TRSF-016: 키는 시도가 아니라 거래 단위다. 실행이 SUCCESS·ERROR 로
+        // 확정되기 전까지 유지해, 타임아웃 뒤 재시도가 같은 키로 나가게 한다.
+        // 새 키를 만들면 서버가 별건으로 처리해 이중 출금을 막지 못한다.
+        setIdempotencyKey((prev) => prev || crypto.randomUUID())
         setOtpOpen(true)
       } catch (error) {
         // 실패했어도 컴포넌트 state 와 mutation variables 에 평문을 남기지 않는다.
@@ -368,6 +371,9 @@ export const InstantTransferScreen = () => {
         setStep(1)
         return
       }
+      // 여기까지 왔으면 서버가 SUCCESS·ERROR·PROCESSING 으로 답한 것이라 거래가
+      // 끝났다. 다음 이체는 새 키를 쓴다.
+      setIdempotencyKey("")
       setPasswordAuthToken(null)
       setStep(3)
     }
@@ -544,6 +550,7 @@ export const InstantTransferScreen = () => {
         await queryClient.invalidateQueries({
           queryKey: getFavoriteAccountsQueryKey(),
         })
+        setFavoriteError(null)
       } catch (error) {
         setFavoriteError(
           error instanceof ApiError
@@ -561,6 +568,8 @@ export const InstantTransferScreen = () => {
           setForm(INITIAL_FORM)
           setResult(null)
           setAuthError(null)
+          setFavoriteError(null)
+          setIdempotencyKey("")
           setStep(1)
         }}
         resultSlot={
@@ -616,11 +625,13 @@ export const InstantTransferScreen = () => {
                     }
                     onClick={() => void handleRegisterFrequent()}
                   >
-                    {alreadyFrequent
-                      ? "자주 쓰는 계좌 등록됨"
-                      : frequentFull
-                        ? `자주 쓰는 계좌 ${FREQUENT_TRANSFER_ACCOUNT_MAX}건 초과`
-                        : "자주 쓰는 계좌로 등록"}
+                    {registerFavoriteMutation.isPending
+                      ? "등록 중..."
+                      : alreadyFrequent
+                        ? "자주 쓰는 계좌 등록됨"
+                        : frequentFull
+                          ? `자주 쓰는 계좌 ${FREQUENT_TRANSFER_ACCOUNT_MAX}건 초과`
+                          : "자주 쓰는 계좌로 등록"}
                   </Button>
                 )}
               </>
@@ -639,11 +650,13 @@ export const InstantTransferScreen = () => {
       onChange={setField}
       perTransferLimit={perTransferLimit}
       dailyRemaining={dailyRemaining}
+      isLimitUnavailable={isLimitUnavailable}
       canSubmit={canSubmit}
       notice={
-        isLimitError
+        authError ??
+        (isLimitError
           ? "이체한도를 조회하지 못해 이체를 진행할 수 없습니다. 잠시 후 다시 시도하세요."
-          : null
+          : null)
       }
       onNext={() => setStep(2)}
       onConfirmAccount={() => void resolveToAccount(form.toAccount)}

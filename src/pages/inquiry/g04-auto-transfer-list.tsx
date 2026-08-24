@@ -567,7 +567,9 @@ export const G04AutoTransferList = () => {
           selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
           emptyMessage={
-            isError ? toErrorMessage(error) : "조회된 자동이체가 없습니다."
+            isError
+              ? (toErrorMessage(error) ?? "")
+              : "조회된 자동이체가 없습니다."
           }
         />
 

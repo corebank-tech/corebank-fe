@@ -570,9 +570,9 @@ export const D04TransferHistory = () => {
           rowKey={(r) => r.txId}
           emptyMessage={
             isAccountsError
-              ? toErrorMessage(accountsError)
+              ? (toErrorMessage(accountsError) ?? "")
               : isError
-                ? toErrorMessage(error)
+                ? (toErrorMessage(error) ?? "")
                 : "조회 결과가 없습니다."
           }
         />

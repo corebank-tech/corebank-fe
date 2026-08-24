@@ -566,7 +566,9 @@ export const E04ReservationList = () => {
           selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
           emptyMessage={
-            isError ? toErrorMessage(error) : "조회된 예약이체가 없습니다."
+            isError
+              ? (toErrorMessage(error) ?? "")
+              : "조회된 예약이체가 없습니다."
           }
         />
 

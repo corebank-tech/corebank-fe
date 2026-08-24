@@ -60,6 +60,7 @@ export const C01ProductList = () => {
       onViewDetail={(id) => navigate(`/products/${id}`)}
       onJoin={(id) => navigate(`/product/${id}/join/1`)}
       isLoading={isLoading}
+      isError={isError}
       errorMessage={isError ? toErrorMessage(error) : undefined}
     />
   )

@@ -334,7 +334,7 @@ export const E05ReservationResults = () => {
           loading={isFetching}
           rowKey={(r) => r.id}
           emptyMessage={
-            isError ? toErrorMessage(error) : "조회 결과가 없습니다."
+            isError ? (toErrorMessage(error) ?? "") : "조회 결과가 없습니다."
           }
         />
 

@@ -18,6 +18,7 @@ import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
+  formatAccountLabel,
   formatAccountNo,
   formatAmount,
   formatDate,
@@ -146,7 +147,7 @@ export const G05AutoTransferResults = () => {
   const exportRows = pageRows.map((r) => [
     r.result,
     formatDateTime(r.processedAt),
-    `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`,
+    formatAccountLabel(r.fromAlias, maskAccountNo(r.fromAccountNo)),
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
     formatAmount(r.amount),
@@ -181,7 +182,11 @@ export const G05AutoTransferResults = () => {
       width: 170,
       render: (r) => (
         <span className="whitespace-nowrap">
-          {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
+          {r.fromAlias ? (
+            <>
+              {r.fromAlias} <span className="text-ink-faint">/</span>{" "}
+            </>
+          ) : null}
           <span>{formatAccountNo(r.fromAccountNo)}</span>
         </span>
       ),

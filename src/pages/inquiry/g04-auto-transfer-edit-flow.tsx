@@ -9,6 +9,7 @@ import { RadioRowField } from "@/widgets/query"
 import { TransferEndDateField } from "@/widgets/transfer"
 import { addMonths, daysBetween } from "@/shared/lib/date"
 import {
+  formatAccountLabel,
   formatAccountNo,
   formatAmount,
   formatDate,
@@ -136,8 +137,11 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
         <div className="flex flex-col gap-0">
           <FormRow label="출금계좌" labelWidth={110}>
             <span className="text-ink-muted">
-              {target.fromAlias ? `${target.fromAlias} / ` : null}
-              {formatAccountNo(target.fromAccountNo)}
+              {formatAccountLabel(
+                target.fromAlias,
+                formatAccountNo(target.fromAccountNo),
+                " / ",
+              )}
               <span className="ml-1 text-2xs text-ink-faint">(변경 불가)</span>
             </span>
           </FormRow>

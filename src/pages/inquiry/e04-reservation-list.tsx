@@ -22,7 +22,12 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
-import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
+import {
+  formatAccountLabel,
+  formatAmount,
+  formatDate,
+  formatDateTime,
+} from "@/shared/lib/format"
 import {
   getReservationStatusBadgeVariant,
   toReservationRow,
@@ -323,7 +328,7 @@ export const E04ReservationList = () => {
   const exportRows = pageRows.map((r) => [
     r.status,
     formatDate(r.scheduledDate),
-    r.fromAlias ? `${r.fromAlias} ${r.fromAccountNo}` : r.fromAccountNo,
+    formatAccountLabel(r.fromAlias, r.fromAccountNo),
     r.toAccountNo,
     r.payeeName,
     formatAmount(r.amount),

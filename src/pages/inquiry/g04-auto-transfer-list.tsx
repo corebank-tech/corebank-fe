@@ -21,6 +21,7 @@ import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import {
+  formatAccountLabel,
   formatAccountNo,
   formatAmount,
   formatDate,
@@ -311,9 +312,7 @@ export const G04AutoTransferList = () => {
     "상태",
   ]
   const exportRows = pageRows.map((r) => [
-    r.fromAlias
-      ? `${r.fromAlias} ${maskAccountNo(r.fromAccountNo)}`
-      : maskAccountNo(r.fromAccountNo),
+    formatAccountLabel(r.fromAlias, maskAccountNo(r.fromAccountNo)),
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
     formatAmount(r.amount),

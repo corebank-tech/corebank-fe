@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 import { login, type LoginRequest } from "@/shared/api/generated"
 import { isApiError } from "@/shared/api/api-error"
+import { getAttemptFailureData } from "@/shared/api/attempt-failure-data"
 
 /**
  * 서버가 로그인 실패에 쓰는 코드(POST /auth/login 의 401·403).
@@ -21,6 +22,20 @@ export const resolveLoginFailure = (error: unknown): LoginFailureReason => {
   if (error.code === MISMATCH_CODE) return "MISMATCH"
   if (error.code === LOCKED_CODE) return "LOCKED"
   return "UNKNOWN"
+}
+
+/**
+ * REQ-AUTH-024. MISMATCH 응답에만 실려 온다 — 서버가 값을 안 주면(다른 실패 사유 포함) undefined.
+ *
+ * 아직 화면에서 호출하지 않는다. 존재하지 않는 아이디는 data:null, 존재하는
+ * 아이디는 data:{remainingAttempts}라 표시 여부만으로 계정 존재가 드러난다
+ * (REQ-AUTH-023 위반, corebank-server#323). 서버 수정 후 A-01에 연결한다.
+ */
+export const resolveRemainingAttempts = (
+  error: unknown,
+): number | undefined => {
+  if (!isApiError(error)) return undefined
+  return getAttemptFailureData(error.data)?.remainingAttempts
 }
 
 /** A-01 로그인(REQ-AUTH-024). 성공 시 서버가 JSESSIONID·XSRF-TOKEN 쿠키를 발급한다. */

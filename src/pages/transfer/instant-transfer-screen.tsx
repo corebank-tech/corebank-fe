@@ -20,7 +20,7 @@ import {
   type TransferResultRow,
 } from "@/entities/transfer"
 import {
-  useAccountOverviewQuery,
+  getAccountOverviewQueryKey,
   useWithdrawAccounts,
   useVerifyAccountPasswordMutation,
 } from "@/entities/account"
@@ -94,7 +94,6 @@ export const InstantTransferScreen = () => {
     options: accounts,
     isLoading: isAccountsLoading,
   } = useWithdrawAccounts()
-  const accountOverviewQuery = useAccountOverviewQuery()
   const {
     data: limit,
     isLoading: isLimitLoading,
@@ -354,7 +353,9 @@ export const InstantTransferScreen = () => {
         void queryClient.invalidateQueries({
           queryKey: getTransferLimitQueryKey(),
         })
-        void accountOverviewQuery.refetch()
+        void queryClient.invalidateQueries({
+          queryKey: getAccountOverviewQueryKey(),
+        })
       } catch (error) {
         // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이라, 여기서 2단계에
         // 머무르면 다음 시도가 빈 비밀번호로 나간다.

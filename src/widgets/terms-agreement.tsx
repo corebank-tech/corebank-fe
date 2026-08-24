@@ -16,6 +16,7 @@ type TermsAgreementProps = {
   /**
    * 동의한 항목의 id 목록. 선택 약관 동의까지 서버에 실어 보내야 하는 화면(C-03)이
    * 쓴다. 필수만 필터해 보내면 고객이 동의한 선택 약관이 이력에서 누락된다.
+   * 사용자가 체크를 바꾼 시점에만 호출되고, 목록 순서는 `terms` 순서를 따른다.
    */
   onAgreedChange?: (agreedIds: string[]) => void
   /**
@@ -64,31 +65,32 @@ export const TermsAgreement = React.forwardRef<
     onAllRequiredAgreedChange?.(allRequiredAgreed)
   }, [allRequiredAgreed, onAllRequiredAgreedChange])
 
-  // terms 순서를 그대로 따라 안정된 배열을 만든다. checked 객체를 그대로 넘기면
-  // 렌더마다 새 참조가 되어 소비자의 effect가 매번 다시 돈다.
-  const agreedIds = React.useMemo(
-    () => terms.filter((t) => checked[t.id]).map((t) => t.id),
-    [terms, checked],
-  )
-
-  React.useEffect(() => {
-    onAgreedChange?.(agreedIds)
-  }, [agreedIds, onAgreedChange])
-
   const openTerm = (term: TermItem) => {
     setViewed((prev) => ({ ...prev, [term.id]: true }))
     setViewingId(term.id)
     onView?.(term.id)
   }
 
+  // 동의 목록은 checked 를 바꾸는 자리에서 바로 올려보낸다. 파생 상태를 effect 로
+  // 부모에 동기화하면 terms 나 콜백을 렌더마다 새로 만드는 소비자에서
+  // 통지 → 부모 setState → 리렌더 → 통지 가 끝없이 반복된다.
+  // 마운트 시에는 부모의 초기값과 같은 빈 목록이므로 통지하지 않는다.
+  const notifyAgreed = (nextChecked: Record<string, boolean>) => {
+    onAgreedChange?.(terms.filter((t) => nextChecked[t.id]).map((t) => t.id))
+  }
+
   const toggleOne = (id: string) => {
     if (!viewed[id]) return
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
+    const nextChecked = { ...checked, [id]: !checked[id] }
+    setChecked(nextChecked)
+    notifyAgreed(nextChecked)
   }
 
   const agreeFromModal = (id: string) => {
-    setChecked((prev) => ({ ...prev, [id]: true }))
+    const nextChecked = { ...checked, [id]: true }
+    setChecked(nextChecked)
     setViewingId(null)
+    notifyAgreed(nextChecked)
   }
 
   React.useImperativeHandle(ref, () => ({

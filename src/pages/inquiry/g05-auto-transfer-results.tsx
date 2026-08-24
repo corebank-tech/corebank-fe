@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -73,6 +74,7 @@ export const G05AutoTransferResults = () => {
     baseTime,
     isFetching,
     isError,
+    error,
     refetch,
   } = useAutoTransferExecutions(
     {
@@ -342,9 +344,7 @@ export const G05AutoTransferResults = () => {
           loading={isFetching}
           rowKey={(r) => r.id}
           emptyMessage={
-            isError
-              ? "자동이체 결과를 불러오지 못했습니다."
-              : "조회 결과가 없습니다."
+            isError ? (toErrorMessage(error) ?? "") : "조회 결과가 없습니다."
           }
         />
 

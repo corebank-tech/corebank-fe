@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { useSearchParams } from "react-router"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -145,6 +146,7 @@ export const B03TransactionInquiry = () => {
     accounts,
     isLoading: isAccountsLoading,
     isError: isAccountsError,
+    error: accountsError,
   } = useInquirableAccounts()
 
   const hasRequestedAccountParam =
@@ -223,6 +225,7 @@ export const B03TransactionInquiry = () => {
     data: transactionData,
     isLoading: isTransactionsLoading,
     isError: isTransactionsError,
+    error: transactionsError,
   } = useAccountTransactionQuery(effectiveAppliedAccountId, transactionParams)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
@@ -366,7 +369,9 @@ export const B03TransactionInquiry = () => {
   if (isAccountsError || !overview) {
     return (
       <div className="p-6 text-base text-danger">
-        계좌 정보를 불러오지 못했습니다.
+        {isAccountsError
+          ? toErrorMessage(accountsError)
+          : "계좌 정보를 불러오지 못했습니다."}
       </div>
     )
   }
@@ -576,7 +581,7 @@ export const B03TransactionInquiry = () => {
           </div>
         ) : isTransactionsError ? (
           <div className="p-6 text-center text-base text-danger">
-            거래내역을 불러오지 못했습니다.
+            {toErrorMessage(transactionsError)}
           </div>
         ) : (
           <>

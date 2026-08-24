@@ -25,6 +25,11 @@ type ProductCardGridProps = {
   /** 목록 조회 상태. true면 필터·정렬 칩은 그대로 두고 목록 영역만 로딩/에러로 바꾼다. */
   isLoading?: boolean
   isError?: boolean
+  /**
+   * 조회 실패 시 서버가 준 문구(REQ-CMN-008). 세션 만료처럼 A-11 모달이 안내하는
+   * 경우는 null 이라, 실패 여부는 errorMessage 가 아니라 isError 로 본다.
+   */
+  errorMessage?: string | null
 }
 
 const FILTERS: CategoryFilter[] = ["전체", "정기예금", "정기적금"]
@@ -40,6 +45,7 @@ export const ProductCardGrid = ({
   onJoin,
   isLoading = false,
   isError = false,
+  errorMessage,
 }: ProductCardGridProps) => {
   return (
     <div>
@@ -77,10 +83,7 @@ export const ProductCardGrid = ({
       {isLoading ? (
         <div className="py-20 text-center text-ink-muted">불러오는 중...</div>
       ) : isError ? (
-        <EmptyState
-          message="상품 목록을 불러오지 못했습니다."
-          description="잠시 후 다시 시도해 주세요."
-        />
+        errorMessage && <EmptyState message={errorMessage} />
       ) : products.length === 0 ? (
         <EmptyState
           message="조회된 상품이 없습니다."

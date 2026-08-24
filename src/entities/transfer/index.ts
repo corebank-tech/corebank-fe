@@ -1,12 +1,19 @@
 export type {
   TransferStatus,
   TransferHistoryRow,
+  TransferHistoryDetail,
   MonthlyTransferStat,
 } from "@/entities/transfer/api/d04-transfers"
+export { MOCK_MONTHLY_TRANSFER_STATS } from "@/entities/transfer/api/d04-transfers"
+
 export {
-  MOCK_TRANSFER_HISTORY,
-  MOCK_MONTHLY_TRANSFER_STATS,
-} from "@/entities/transfer/api/d04-transfers"
+  toTransferHistoryRow,
+  toTransferHistoryDetail,
+} from "@/entities/transfer/lib/mappers"
+export {
+  useTransferHistory,
+  useTransferDetail,
+} from "@/entities/transfer/api/use-transfer-history"
 
 export {
   getTransferLimitQueryKey,

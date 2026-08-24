@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { useNavigate } from "react-router"
 import { keepPreviousData } from "@tanstack/react-query"
 import {
@@ -35,7 +36,7 @@ export const C01ProductList = () => {
   const [filter, setFilter] = React.useState<CategoryFilter>("전체")
   const [sort, setSort] = React.useState<SortKey>("rate")
 
-  const { data, isLoading, isError } = useProductSearch(
+  const { data, isLoading, isError, error } = useProductSearch(
     {
       productGroup: filter === "전체" ? undefined : CATEGORY_TO_GROUP[filter],
       sort: SORT_KEY_TO_SERVER[sort],
@@ -60,6 +61,7 @@ export const C01ProductList = () => {
       onJoin={(id) => navigate(`/product/${id}/join/1`)}
       isLoading={isLoading}
       isError={isError}
+      errorMessage={isError ? toErrorMessage(error) : undefined}
     />
   )
 }

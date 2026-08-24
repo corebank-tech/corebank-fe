@@ -17,7 +17,12 @@ export type InquirableAccount = {
 }
 
 export const useInquirableAccounts = () => {
-  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
+  const {
+    data: overview,
+    isLoading,
+    isError,
+    error,
+  } = useAccountOverviewQuery()
 
   const accounts = React.useMemo<InquirableAccount[]>(() => {
     return (overview?.items ?? []).flatMap((group) => {
@@ -62,5 +67,6 @@ export const useInquirableAccounts = () => {
     accounts,
     isLoading,
     isError,
+    error,
   }
 }

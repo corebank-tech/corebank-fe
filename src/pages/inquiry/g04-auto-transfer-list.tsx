@@ -44,7 +44,7 @@ import {
   changeAutoTransfer,
 } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
-import { ApiError } from "@/shared/api/api-error"
+import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -122,6 +122,7 @@ export const G04AutoTransferList = () => {
     isPlaceholderData,
     isFetching,
     isError,
+    error,
     refetch,
   } = useAutoTransfers(
     {
@@ -567,7 +568,7 @@ export const G04AutoTransferList = () => {
           onSelectionChange={setSelectedIds}
           emptyMessage={
             isError
-              ? "자동이체 목록을 불러오지 못했습니다."
+              ? (toErrorMessage(error) ?? "")
               : "조회된 자동이체가 없습니다."
           }
         />

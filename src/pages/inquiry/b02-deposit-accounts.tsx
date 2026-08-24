@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { useNavigate } from "react-router"
 import { ChevronDown } from "lucide-react"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
@@ -30,7 +31,12 @@ type DepositAccountRow = {
 export const B02DepositAccounts = () => {
   const navigate = useNavigate()
   const { open, toggle } = useDisclosure(true)
-  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
+  const {
+    data: overview,
+    isLoading,
+    isError,
+    error,
+  } = useAccountOverviewQuery()
 
   const depositGroup = overview?.items?.find(
     (group) => group.groupCode === "DEPOSIT_SAVINGS",
@@ -142,7 +148,7 @@ export const B02DepositAccounts = () => {
   if (isError || !overview) {
     return (
       <div className="p-6 text-base text-danger">
-        계좌 정보를 불러오지 못했습니다.
+        {isError ? toErrorMessage(error) : "계좌 정보를 불러오지 못했습니다."}
       </div>
     )
   }

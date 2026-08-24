@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
@@ -70,6 +71,7 @@ export const E05ReservationResults = () => {
     baseTime,
     isFetching,
     isError,
+    error,
     refetch,
   } = useScheduledTransferExecutions({
     // REQ-RSV-014: 조회조건은 조회기간과 정렬순서뿐이다. 출금계좌를 보내지
@@ -332,9 +334,7 @@ export const E05ReservationResults = () => {
           loading={isFetching}
           rowKey={(r) => r.id}
           emptyMessage={
-            isError
-              ? "예약이체 처리결과를 불러오지 못했습니다."
-              : "조회 결과가 없습니다."
+            isError ? (toErrorMessage(error) ?? "") : "조회 결과가 없습니다."
           }
         />
 

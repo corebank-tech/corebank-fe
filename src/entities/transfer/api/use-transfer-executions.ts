@@ -31,6 +31,7 @@ export const useAutoTransferExecutions = (
     isPlaceholderData,
     isFetching,
     isError,
+    error,
     refetch,
   } = useSearchAutoTransferExecutions(params, {
     query: { ...KEEP_PREVIOUS, enabled: options?.enabled },
@@ -41,6 +42,7 @@ export const useAutoTransferExecutions = (
     baseTime: useQueryBaseTime({ dataUpdatedAt, isPlaceholderData }),
     isFetching,
     isError,
+    error,
     refetch,
   }
 }
@@ -55,6 +57,7 @@ export const useScheduledTransferExecutions = (
     isPlaceholderData,
     isFetching,
     isError,
+    error,
     refetch,
   } = useSearchScheduledTransferExecutions(params, { query: KEEP_PREVIOUS })
 
@@ -63,6 +66,7 @@ export const useScheduledTransferExecutions = (
     baseTime: useQueryBaseTime({ dataUpdatedAt, isPlaceholderData }),
     isFetching,
     isError,
+    error,
     refetch,
   }
 }

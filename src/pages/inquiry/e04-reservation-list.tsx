@@ -37,7 +37,7 @@ import {
   useScheduledTransfers,
   cancelScheduledTransfer,
 } from "@/entities/transfer"
-import { ApiError } from "@/shared/api/api-error"
+import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -154,6 +154,7 @@ export const E04ReservationList = () => {
     isPlaceholderData,
     isFetching,
     isError,
+    error,
     refetch,
   } = useScheduledTransfers(
     {
@@ -533,8 +534,6 @@ export const E04ReservationList = () => {
           ※ 대기 상태이고 이체 예정일 전일까지인 건만 선택할 수 있습니다.
         </p>
 
-        {/* TODO: GridToolbar의 "검색" 버튼(그리드 내 텍스트 검색)이 onSearch 미전달로
-            동작하지 않는다. 상단 조회조건의 "조회" 버튼과는 별개 기능이다. */}
         <GridToolbar
           // POL-022의 "전체"는 서버 지원 전까지 임시로 내린다 — 근거는
           // GridToolbar의 showAllOption 주석(#46).
@@ -567,9 +566,7 @@ export const E04ReservationList = () => {
           selectedKeys={selectedIds}
           onSelectionChange={setSelectedIds}
           emptyMessage={
-            isError
-              ? "예약이체 목록을 불러오지 못했습니다."
-              : "조회된 예약이체가 없습니다."
+            isError ? toErrorMessage(error) : "조회된 예약이체가 없습니다."
           }
         />
 

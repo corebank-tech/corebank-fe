@@ -13,7 +13,6 @@ import {
   MOCK_FREQUENT_TRANSFER_ACCOUNTS,
   MOCK_RECENT_TRANSFER_ACCOUNTS,
   MOCK_TRANSFER_ACCOUNTS,
-  MOCK_TRANSFER_HISTORY,
   MOCK_TRANSFER_LIMITS,
   generateTransactionId,
   lookupPayeeAccount,
@@ -278,22 +277,10 @@ export const InstantTransferScreen = () => {
         })
 
         /**
-         * 이체 실행 결과를 원장에 반영한다 — REQ-TRSF-021·022·023(이체결과조회),
-         * REQ-TRSF-024(당일 사용금액 즉시 갱신), 계좌 잔액·최근거래일 갱신.
+         * 이체 실행 결과를 원장에 반영한다 — REQ-TRSF-024(당일 사용금액 즉시 갱신),
+         * 계좌 잔액·최근거래일 갱신. 이체결과조회(D-04)는 서버를 조회하므로
+         * 목업 이체 내역을 쌓지 않는다.
          */
-        MOCK_TRANSFER_HISTORY.unshift({
-          id: transactionId,
-          datetime: executedAt,
-          fromAccountNo: form.fromAccount,
-          fromAlias: selectedAccount?.alias ?? "",
-          toAccountNo: form.toAccount,
-          payeeName: form.payeeName,
-          amount,
-          fee: 0,
-          status: "정상",
-          txId: transactionId,
-          memo: form.payeeMemo || "-",
-        })
         MOCK_TRANSFER_LIMITS.usedToday += amount
         // A-09 최종접속정보의 최근 거래일시는 서버가 계산한다. 이체가 끝났으니
         // 다음 조회에서 새로 받도록 캐시만 무효화한다.

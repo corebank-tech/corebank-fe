@@ -62,15 +62,11 @@ export type {
 } from "@/entities/transfer/api/transfer"
 export {
   MOCK_TRANSFER_ACCOUNTS,
-  MOCK_ACCOUNT_PASSWORDS,
   MOCK_TRANSFER_LIMITS,
   MOCK_PAYEE_NAME,
   MOCK_PAYEE_ACCOUNTS,
   lookupPayeeAccount,
   MOCK_RECENT_TRANSFER_ACCOUNTS,
-  MOCK_FREQUENT_ACCOUNTS_MAX,
-  MOCK_FREQUENT_TRANSFER_ACCOUNTS,
-  generateTransactionId,
 } from "@/entities/transfer/api/transfer"
 
 export {
@@ -91,6 +87,13 @@ export {
   checkReservationDateRange,
   checkTransferEndDateRange,
 } from "@/entities/transfer/lib/validate-transfer"
+
+export {
+  isSameTransferIntent,
+  toOtpTransactionData,
+  toTransferRequest,
+} from "@/entities/transfer/lib/transfer-intent"
+export type { TransferIntent } from "@/entities/transfer/lib/transfer-intent"
 
 export { LimitModal } from "@/entities/transfer/ui/limit-modal"
 
@@ -113,3 +116,19 @@ export {
   changeAutoTransfer,
 } from "@/entities/transfer/api/use-auto-transfers"
 export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto-transfers"
+
+export {
+  TransferResponseStatus,
+  fetchPayee,
+  useExecuteTransferMutation,
+} from "@/entities/transfer/api/use-instant-transfer"
+export type {
+  InstantTransferResult,
+  Payee,
+} from "@/entities/transfer/api/use-instant-transfer"
+export {
+  getFavoriteAccountsQueryKey,
+  useFavoriteAccountsQuery,
+  useRegisterFavoriteAccountMutation,
+} from "@/entities/transfer/api/use-favorite-accounts"
+export type { FavoriteAccount } from "@/entities/transfer/api/use-favorite-accounts"

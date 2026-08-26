@@ -230,6 +230,12 @@ type AmountFieldProps = {
    * (REQ-RSV-006, REQ-AUTO-006). 기본값 true(즉시이체).
    */
   showDailyLimit?: boolean
+  /**
+   * 한도를 아직 모르는 상태(조회 중·조회 실패). true 면 한도 안내와 초과 경고를
+   * 렌더하지 않는다 — 모르는 값을 0원으로 안내하면 REQ-TRSF-010 이 요구하는
+   * "한도 금액 안내" 가 거짓이 된다. D-05 가 같은 판정으로 표시를 감춘다.
+   */
+  isLimitUnavailable?: boolean
 }
 
 export const AmountField = ({
@@ -240,12 +246,17 @@ export const AmountField = ({
   dailyRemaining,
   fullAmount,
   showDailyLimit = true,
+  isLimitUnavailable = false,
 }: AmountFieldProps) => {
   const {
-    limit,
-    overLimit,
+    limit: checkedLimit,
+    overLimit: exceedsLimit,
     overPerTransferLimit: overPer,
   } = checkAmountLimit(value, perTransferLimit, dailyRemaining, showDailyLimit)
+
+  // 한도를 모르는 동안에는 초과 판정을 하지 않는다. 0원을 한도로 읽으면 입력한
+  // 금액이 전부 초과가 되어 빨간 테두리가 선다.
+  const overLimit = !isLimitUnavailable && exceedsLimit
 
   return (
     <div className="flex w-full flex-col gap-2">
@@ -275,7 +286,15 @@ export const AmountField = ({
         {QUICK_AMOUNTS.map((chip) => (
           <Chip
             key={chip.label}
-            onClick={() => onChange(Math.min((value ?? 0) + chip.value, limit))}
+            onClick={() =>
+              onChange(
+                // 한도를 모르면 클램프하지 않는다. 0원으로 잘라내면 증액 칩이
+                // 눌러도 아무 일이 없는 것처럼 보인다.
+                isLimitUnavailable
+                  ? (value ?? 0) + chip.value
+                  : Math.min((value ?? 0) + chip.value, checkedLimit),
+              )
+            }
           >
             {chip.label}
           </Chip>
@@ -290,11 +309,13 @@ export const AmountField = ({
         </Chip>
       </div>
 
-      <p className="text-2xs text-ink-muted">
-        {showDailyLimit
-          ? `1회 한도 ${formatAmount(perTransferLimit)} · 1일 잔여한도 ${formatAmount(dailyRemaining)}`
-          : `1회 한도 ${formatAmount(perTransferLimit)}`}
-      </p>
+      {!isLimitUnavailable && (
+        <p className="text-2xs text-ink-muted">
+          {showDailyLimit
+            ? `1회 한도 ${formatAmount(perTransferLimit)} · 1일 잔여한도 ${formatAmount(dailyRemaining)}`
+            : `1회 한도 ${formatAmount(perTransferLimit)}`}
+        </p>
+      )}
 
       {overLimit && (
         <p className="text-xs font-bold text-danger">

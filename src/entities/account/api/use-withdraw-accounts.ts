@@ -1,6 +1,7 @@
 import * as React from "react"
 import { useAccountOverviewQuery } from "@/entities/account/api/account-overview-query"
 import type { AccountItemResponse } from "@/shared/api/generated"
+import type { AccountOption } from "@/shared/types/account"
 
 /**
  * 출금계좌로 쓸 수 있는 보유 계좌 목록.
@@ -10,6 +11,8 @@ import type { AccountItemResponse } from "@/shared/api/generated"
  */
 export const useWithdrawAccounts = (): {
   accounts: AccountItemResponse[]
+  /** 이체·상품가입 화면이 셀렉트에 그대로 넘기는 형태. */
+  options: AccountOption[]
   isLoading: boolean
   isError: boolean
   error: unknown
@@ -32,5 +35,17 @@ export const useWithdrawAccounts = (): {
     )
   }, [overview])
 
-  return { accounts, isLoading, isError, error }
+  const options = React.useMemo(
+    () =>
+      accounts.map((a) => ({
+        alias: a.accountName ?? "",
+        accountNo: a.accountNumber ?? "",
+        balance: a.balance ?? 0,
+        // AccountItemResponse 에 출금가능금액 필드가 없어 잔액을 그대로 쓴다.
+        withdrawable: a.balance ?? 0,
+      })),
+    [accounts],
+  )
+
+  return { accounts, options, isLoading, isError, error }
 }

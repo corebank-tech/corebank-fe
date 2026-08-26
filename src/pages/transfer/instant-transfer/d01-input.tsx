@@ -29,7 +29,11 @@ type InstantTransferStep1Props = {
   ) => void
   perTransferLimit: number
   dailyRemaining: number
+  /** 한도를 아직 모르는 상태. 한도 안내와 초과 경고를 감춘다(REQ-TRSF-010). */
+  isLimitUnavailable?: boolean
   canSubmit: boolean
+  /** 한도·계좌 조회가 끝나지 않았거나 실패했을 때 보여줄 안내. */
+  notice?: string | null
   onNext: () => void
   /** 입력된 입금계좌번호로 예금주를 조회한다(REQ-TRSF-004·007·030). */
   onConfirmAccount: () => void
@@ -45,8 +49,10 @@ export const InstantTransferStep1 = ({
   accounts,
   form,
   onChange,
+  notice,
   perTransferLimit,
   dailyRemaining,
+  isLimitUnavailable = false,
   canSubmit,
   onNext,
   onConfirmAccount,
@@ -79,6 +85,11 @@ export const InstantTransferStep1 = ({
           </Button>
         }
       >
+        {notice != null && (
+          <p role="alert" className="mb-3 text-base font-bold text-danger">
+            {notice}
+          </p>
+        )}
         <FormSection title="출금정보">
           <div>
             <FormRow label="출금계좌" required htmlFor="it-from">
@@ -110,7 +121,6 @@ export const InstantTransferStep1 = ({
                     onChange("toAccount", v)
                     onChange("toConfirmed", false)
                     onChange("payeeName", "")
-                    onChange("executionFails", false)
                     onChange("toAccountError", null)
                   }}
                   onConfirm={onConfirmAccount}
@@ -171,6 +181,7 @@ export const InstantTransferStep1 = ({
                   onChange={(v) => onChange("amount", v)}
                   perTransferLimit={perTransferLimit}
                   dailyRemaining={dailyRemaining}
+                  isLimitUnavailable={isLimitUnavailable}
                   fullAmount={selected?.withdrawable}
                 />
                 <p className="text-2xs text-ink-muted">

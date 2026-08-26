@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   isSameTransferIntent,
+  toOtpTransactionData,
+  toTransferRequest,
   type TransferIntent,
 } from "@/entities/transfer/lib/transfer-intent"
 
@@ -36,5 +38,37 @@ describe("isSameTransferIntent", () => {
 
   it("입력 중이라 금액이 비어 있어도 이전 값과 다르면 다른 거래다", () => {
     expect(isSameTransferIntent(intent(), intent({ amount: null }))).toBe(false)
+  })
+})
+
+describe("toTransferRequest", () => {
+  it("거래 내용을 그대로 요청 본문으로 옮긴다", () => {
+    expect(toTransferRequest(intent())).toEqual({
+      withdrawalAccountId: 1,
+      depositAccountNumber: "333330730135",
+      amount: 500_000,
+      myPassbookMemo: "생활비",
+      recipientPassbookMemo: "생활비",
+    })
+  })
+
+  it("표시내용이 비면 보내지 않는다 — 서버가 빈 문자열을 통장에 찍지 않게 한다", () => {
+    const request = toTransferRequest(
+      intent({ myPassbookMemo: "", recipientPassbookMemo: "" }),
+    )
+    expect(request.myPassbookMemo).toBeUndefined()
+    expect(request.recipientPassbookMemo).toBeUndefined()
+  })
+})
+
+describe("toOtpTransactionData", () => {
+  // 서버가 OTP 발급 시점의 거래정보와 실행 요청을 대조한다(OTP0102).
+  it("실행 요청과 같은 값을 쓴다", () => {
+    const request = toTransferRequest(intent())
+    expect(toOtpTransactionData(intent())).toEqual({
+      withdrawalAccountId: request.withdrawalAccountId,
+      depositAccountNumber: request.depositAccountNumber,
+      amount: request.amount,
+    })
   })
 })

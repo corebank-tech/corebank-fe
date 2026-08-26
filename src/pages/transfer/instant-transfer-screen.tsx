@@ -16,6 +16,8 @@ import {
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   isSameTransferIntent,
+  toOtpTransactionData,
+  toTransferRequest,
   getTransferLimitQueryKey,
   type TransferIntent,
   type TransferResultRow,
@@ -166,7 +168,10 @@ export const InstantTransferScreen = () => {
     (a) => a.accountNumber === displayForm.fromAccount,
   )?.accountId
 
-  /** 지금 폼이 가리키는 거래. 실행 요청 본문과 같은 값으로 만든다(REQ-TRSF-016). */
+  /**
+   * 지금 폼이 가리키는 거래(REQ-TRSF-016). 실행 요청 본문과 OTP 거래정보를 모두
+   * 이 값에서 만들어, 거래 내용을 말하는 자리를 하나로 둔다.
+   */
   const currentIntent: TransferIntent = {
     withdrawalAccountId: selectedAccountId ?? null,
     depositAccountNumber: form.toAccount,
@@ -309,14 +314,7 @@ export const InstantTransferScreen = () => {
       const executedAt = transactionAt ?? getNow()
       try {
         const executed = await executeMutation.mutateAsync({
-          request: {
-            withdrawalAccountId: selectedAccountId,
-            depositAccountNumber: currentIntent.depositAccountNumber,
-            amount,
-            myPassbookMemo: currentIntent.myPassbookMemo || undefined,
-            recipientPassbookMemo:
-              currentIntent.recipientPassbookMemo || undefined,
-          },
+          request: toTransferRequest(currentIntent),
           accountPasswordAuthToken: passwordAuthToken,
           otpAuthToken,
           idempotencyKey,
@@ -461,11 +459,7 @@ export const InstantTransferScreen = () => {
           onConfirm={(otpAuthToken) => void handleOtpConfirm(otpAuthToken)}
           transaction={{
             type: OtpTransactionType.IMMEDIATE_TRANSFER,
-            data: {
-              withdrawalAccountId: selectedAccountId,
-              depositAccountNumber: form.toAccount,
-              amount,
-            },
+            data: toOtpTransactionData(currentIntent),
           }}
           title="즉시이체 OTP 인증"
           guide="즉시이체 실행을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."

@@ -88,7 +88,11 @@ export {
   checkTransferEndDateRange,
 } from "@/entities/transfer/lib/validate-transfer"
 
-export { isSameTransferIntent } from "@/entities/transfer/lib/transfer-intent"
+export {
+  isSameTransferIntent,
+  toOtpTransactionData,
+  toTransferRequest,
+} from "@/entities/transfer/lib/transfer-intent"
 export type { TransferIntent } from "@/entities/transfer/lib/transfer-intent"
 
 export { LimitModal } from "@/entities/transfer/ui/limit-modal"

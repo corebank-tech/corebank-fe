@@ -15,7 +15,9 @@ import {
   useFavoriteAccountsQuery,
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
+  isSameTransferIntent,
   getTransferLimitQueryKey,
+  type TransferIntent,
   type TransferResultRow,
 } from "@/entities/transfer"
 import {
@@ -132,6 +134,9 @@ export const InstantTransferScreen = () => {
     string | null
   >(null)
   const [idempotencyKey, setIdempotencyKey] = React.useState("")
+  const [keyedIntent, setKeyedIntent] = React.useState<TransferIntent | null>(
+    null,
+  )
 
   // "아직 모른다" 와 "한도가 0원이다" 를 같은 값으로 만들면 조회 실패가 그대로 굳어
   // [다음]이 영영 안 눌리고 "금액을 낮추라"는 틀린 안내만 남는다.
@@ -152,14 +157,7 @@ export const InstantTransferScreen = () => {
   const setField = <K extends keyof InstantTransferForm>(
     key: K,
     value: InstantTransferForm[K],
-  ) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    // REQ-TRSF-016: 키는 거래 하나를 가리킨다. 실행이 미상으로 끝난 뒤 사용자가
-    // 금액·입금계좌를 바꿔 다시 시도하면 다른 거래이므로 키를 버린다. 같은 키로
-    // 보내면 서버가 앞선 거래의 결과를 돌려줘 바뀐 금액이 반영되지 않는다.
-    // 비밀번호는 거래 내용이 아니라 인증 수단이라 제외한다.
-    if (key !== "password") setIdempotencyKey("")
-  }
+  ) => setForm((prev) => ({ ...prev, [key]: value }))
 
   const selectedAccount = accounts.find(
     (a) => a.accountNo === displayForm.fromAccount,
@@ -167,6 +165,15 @@ export const InstantTransferScreen = () => {
   const selectedAccountId = withdrawAccounts.find(
     (a) => a.accountNumber === displayForm.fromAccount,
   )?.accountId
+
+  /** 지금 폼이 가리키는 거래. 실행 요청 본문과 같은 값으로 만든다(REQ-TRSF-016). */
+  const currentIntent: TransferIntent = {
+    withdrawalAccountId: selectedAccountId ?? null,
+    depositAccountNumber: form.toAccount,
+    amount: form.amount,
+    myPassbookMemo: form.myMemo,
+    recipientPassbookMemo: form.payeeMemo,
+  }
 
   /** REQ-TRSF-004·007·030: 입금계좌번호를 조회해 예금주·계좌유형·동일계좌 여부를 검증한다. */
   const resolveToAccount = async (accountNo: string) => {
@@ -224,7 +231,7 @@ export const InstantTransferScreen = () => {
     form.amount <= effectiveLimit
 
   if (step === 2) {
-    const amount = form.amount ?? 0
+    const amount = currentIntent.amount ?? 0
     const balanceInsufficient =
       selectedAccount != null && amount > selectedAccount.withdrawable
     const balanceAfter = Math.max(
@@ -269,10 +276,14 @@ export const InstantTransferScreen = () => {
         }
         setPasswordAuthToken(verified.accountPasswordAuthToken)
         setAuthError(null)
-        // REQ-TRSF-016: 키는 시도가 아니라 거래 단위다. 실행이 SUCCESS·ERROR 로
-        // 확정되기 전까지 유지해, 타임아웃 뒤 재시도가 같은 키로 나가게 한다.
-        // 새 키를 만들면 서버가 별건으로 처리해 이중 출금을 막지 못한다.
-        setIdempotencyKey((prev) => prev || crypto.randomUUID())
+        // REQ-TRSF-016: 미상으로 끝난 실행을 같은 내용으로 다시 보낼 때만 키를
+        // 유지한다. 내용이 달라졌으면 다른 거래라 새 키를 쓴다 — 같은 키로 보내면
+        // 서버가 앞선 거래의 결과를 돌려주고 화면은 바뀐 내용으로 이체된 것처럼
+        // 표시한다.
+        if (!isSameTransferIntent(keyedIntent, currentIntent)) {
+          setIdempotencyKey(crypto.randomUUID())
+          setKeyedIntent(currentIntent)
+        }
         setOtpOpen(true)
       } catch (error) {
         // 실패했어도 컴포넌트 state 와 mutation variables 에 평문을 남기지 않는다.
@@ -300,10 +311,11 @@ export const InstantTransferScreen = () => {
         const executed = await executeMutation.mutateAsync({
           request: {
             withdrawalAccountId: selectedAccountId,
-            depositAccountNumber: form.toAccount,
+            depositAccountNumber: currentIntent.depositAccountNumber,
             amount,
-            myPassbookMemo: form.myMemo || undefined,
-            recipientPassbookMemo: form.payeeMemo || undefined,
+            myPassbookMemo: currentIntent.myPassbookMemo || undefined,
+            recipientPassbookMemo:
+              currentIntent.recipientPassbookMemo || undefined,
           },
           accountPasswordAuthToken: passwordAuthToken,
           otpAuthToken,
@@ -379,9 +391,10 @@ export const InstantTransferScreen = () => {
         setStep(1)
         return
       }
-      // 여기까지 왔으면 서버가 SUCCESS·ERROR·PROCESSING 으로 답한 것이라 거래가
-      // 끝났다. 다음 이체는 새 키를 쓴다.
+      // 서버가 SUCCESS·ERROR·PROCESSING 으로 답했으면 요청이 접수된 것이다.
+      // 다음 이체는 새 키를 쓴다.
       setIdempotencyKey("")
+      setKeyedIntent(null)
       setPasswordAuthToken(null)
       setStep(3)
     }
@@ -578,6 +591,7 @@ export const InstantTransferScreen = () => {
           setAuthError(null)
           setFavoriteError(null)
           setIdempotencyKey("")
+          setKeyedIntent(null)
           setStep(1)
         }}
         resultSlot={
@@ -661,7 +675,12 @@ export const InstantTransferScreen = () => {
       isLimitUnavailable={isLimitUnavailable}
       canSubmit={canSubmit}
       notice={[authError, limitNotice].filter(Boolean).join(" ") || null}
-      onNext={() => setStep(2)}
+      onNext={() => {
+        // 1단계 안내를 보고 다시 진행하는 것이므로 이전 시도의 문구를 지운다.
+        // 남겨두면 2단계가 열리자마자 아직 누르지도 않은 실패가 떠 있다.
+        setAuthError(null)
+        setStep(2)
+      }}
       onConfirmAccount={() => void resolveToAccount(form.toAccount)}
       onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}
       frequentAccounts={frequentAccounts}

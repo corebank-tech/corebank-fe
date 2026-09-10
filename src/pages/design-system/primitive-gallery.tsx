@@ -23,6 +23,7 @@ const BUTTON_VARIANTS = [
 const BUTTON_SIZES = ["sm", "md", "lg"] as const
 const BADGE_VARIANTS: BadgeVariant[] = [
   "primary",
+  "coolViolet",
   "neutral",
   "success",
   "danger",

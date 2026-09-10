@@ -35,3 +35,8 @@ export {
   useSignupConfirmationQuery,
   useCompleteSignupMutation,
 } from "@/entities/auth/api/signup"
+export {
+  readSessionAuthority,
+  type SessionAuthority,
+  type SessionRole,
+} from "@/entities/auth/lib/session-role"

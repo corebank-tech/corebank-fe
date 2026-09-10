@@ -1,6 +1,7 @@
 import { delay, http } from "msw"
 import { MOCK_MEMBERS } from "@/entities/auth"
 import { maskName } from "@/shared/lib/format"
+import { readMockAuthority } from "@/mocks/handlers/admin"
 import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
@@ -85,6 +86,8 @@ export const authHandlers = [
       phoneNumber: "010****5678",
       email: member.email,
       joinedAt: "2026-08-01T10:00:00+09:00",
+      // 서버 스펙에 아직 없는 필드. entities/auth 의 readSessionAuthority 가 읽는다.
+      ...readMockAuthority(member.memberId),
     })
   }),
 

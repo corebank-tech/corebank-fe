@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router"
 import { RootLayout } from "@/app/layouts/root-layout"
+import { adminRoutes } from "@/app/routes/admin-routes"
 import { customerRoutes } from "@/app/routes/customer-routes"
 
 /**
@@ -8,5 +9,5 @@ import { customerRoutes } from "@/app/routes/customer-routes"
  * 관리자 채널(#126)이 그 둘을 모두 쓴다.
  */
 export const router = createBrowserRouter([
-  { element: <RootLayout />, children: customerRoutes },
+  { element: <RootLayout />, children: [...customerRoutes, adminRoutes] },
 ])

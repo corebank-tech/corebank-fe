@@ -35,16 +35,14 @@
   /* Brand palette — 구조색(navy)과 상호작용색(primary)을 분리한다.
      navy: 페이지를 바닥에 고정 — DataGrid 상단 룰, FormSection 하단 라인, 강조 헤더 배경 전용.
      primary: 버튼·탭·링크 등 상호작용 요소 전용. */
-  --color-navy: #0a2e7d;
-  /* H220 S85% L26% */
-  --color-primary: #0a60f5;
-  /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
-  --color-primary-tint: #ecf2fe;
-  /* notice box background */
-  --color-secondary: #6f4ce8;
-  --color-secondary-tint: #f0edfd;
-  --color-link: #0a60f5;
+  --color-navy: #0a2e7d; /* H220 S85% L26% */
+  --color-primary: #0a60f5; /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
+  --color-primary-tint: #ecf2fe; /* notice box background */
+  --color-cool-violet: #6f4ce8; /* Cool Violet — 상품 카테고리 강조 */
+  --color-cool-violet-tint: #f0edfd; /* Cool Violet tint background */
+
   /* inline text links */
+  --color-link: #0a60f5;
 
   /* Neutrals */
   --color-surface: #f3f5f8; /* form label cell background */
@@ -72,18 +70,25 @@
   /* Soft borders — 흰 배경 위에 20% 알파를 미리 섞은 고정값.
      Alert/Badge 테두리 전용. 컴포넌트에서 투명도 표기(border-x/20)를 쓰지 않기 위함(POL-039) */
   --color-primary-border-soft: #cfdef9;
-  --color-secondary-border-soft: #dcd5f8;
+  --color-cool-violet-border-soft: #dcd5f8;
   --color-success-border-soft: #d0e2d9;
   --color-warning-border-soft: #eddecc;
   --color-danger-border-soft: #f4d6d5;
 
   /* Overlay — 뒤 배경이 고정색이 아니어서 실제 반투명이 필요한 경우 전용 */
-  --color-overlay-scrim: rgba(23, 32, 46, 0.5);
-  /* 모달 백드롭, 전체메뉴 레이어 */
-  --overlay-white-15: rgba(255, 255, 255, 0.15);
-  /* 색상 바 위 아이콘버튼 hover */
-  --overlay-white-70: rgba(255, 255, 255, 0.7);
-  /* 색상 바 위 포커스 링 */
+  --color-overlay-scrim: rgba(
+    23,
+    32,
+    46,
+    0.5
+  ); /* 모달 백드롭, 전체메뉴 레이어 */
+  --overlay-white-15: rgba(
+    255,
+    255,
+    255,
+    0.15
+  ); /* 색상 바 위 아이콘버튼 hover */
+  --overlay-white-70: rgba(255, 255, 255, 0.7); /* 색상 바 위 포커스 링 */
 
   /* Grid / ledger — 출금액은 danger와 hex가 완전히 같아 별도 토큰을 두지 않는다.
      입금·출금을 함께 보여줄 때는 --color-deposit과 --color-danger를 쓴다. */
@@ -163,8 +168,8 @@
   --color-navy: #3c71dd;
   --color-primary: #5a95f7;
   --color-primary-tint: #14203a;
-  --color-secondary: #9b87f5;
-  --color-secondary-tint: #211b3d;
+  --color-cool-violet: #9b87f5;
+  --color-cool-violet-tint: #211b3d;
   --color-link: #7aa8ff;
 
   --color-surface: #171c27; /* 폼 라벨 셀 배경 */
@@ -208,7 +213,7 @@
   );
 
   --color-primary-border-soft: #294274;
-  --color-secondary-border-soft: #40336f;
+  --color-cool-violet-border-soft: #40336f;
   --color-success-border-soft: #1c4331;
   --color-warning-border-soft: #4a3315;
   --color-danger-border-soft: #4a2321;
@@ -243,8 +248,8 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-tint: var(--color-primary-tint);
-  --color-secondary: var(--color-secondary);
-  --color-secondary-tint: var(--color-secondary-tint);
+  --color-cool-violet: var(--color-cool-violet);
+  --color-cool-violet-tint: var(--color-cool-violet-tint);
   --color-link: var(--color-link);
   --color-border: var(--border);
   --color-border-strong: var(--color-border-strong);
@@ -263,7 +268,7 @@
   --color-warning: var(--color-warning);
   --color-warning-tint: var(--color-warning-tint);
   --color-primary-border-soft: var(--color-primary-border-soft);
-  --color-secondary-border-soft: var(--color-secondary-border-soft);
+  --color-cool-violet-border-soft: var(--color-cool-violet-border-soft);
   --color-success-border-soft: var(--color-success-border-soft);
   --color-warning-border-soft: var(--color-warning-border-soft);
   --color-danger-border-soft: var(--color-danger-border-soft);

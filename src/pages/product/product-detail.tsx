@@ -137,7 +137,7 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
 
         <div className="pt-6">
           {tab === "guide" && (
-            <dl className="overflow-hidden border-t-2 border-b border-border border-t-navy text-[14px]">
+            <dl className="overflow-x-auto border-t-2 border-b border-border border-t-navy text-base">
               {product.guide.map((item, i) => (
                 <div
                   key={item.label}

@@ -1,15 +1,19 @@
 import { cn } from "@/shared/lib/utils"
 
 /**
- * info/success/warning/danger 색상 톤의 단일 출처. Badge·Alert·ResultPanel이
- * 각자 정의하던 border/bg/text 클래스 조합을 여기서 가져다 쓴다. 새 톤을
- * 추가하거나 색을 바꿀 때 이 파일 한 곳만 고치면 세 컴포넌트에 모두 반영된다.
+ * primary/coolViolet/success/warning/danger 색상 톤의 단일 출처.
+ * Badge·Alert·ResultPanel이 각자 정의하던 border/bg/text 클래스 조합을 여기서 가져다 쓴다.
  */
 export const STATUS_TONE_CLASSES = {
   primary: {
     border: "border-primary-border-soft",
     bg: "bg-primary-tint",
     text: "text-primary",
+  },
+  coolViolet: {
+    border: "border-cool-violet-border-soft",
+    bg: "bg-cool-violet-tint",
+    text: "text-cool-violet",
   },
   success: {
     border: "border-success-border-soft",

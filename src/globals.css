@@ -38,7 +38,11 @@
   --color-navy: #0a2e7d; /* H220 S85% L26% */
   --color-primary: #0a60f5; /* H218 S92% L50% — POL-039 팀 피드백: 채도 상향(2026-07) */
   --color-primary-tint: #ecf2fe; /* notice box background */
-  --color-link: #0a60f5; /* inline text links */
+  --color-cool-violet: #6f4ce8; /* Cool Violet — 상품 카테고리 강조 */
+  --color-cool-violet-tint: #f0edfd; /* Cool Violet tint background */
+
+  /* inline text links */
+  --color-link: #0a60f5;
 
   /* Neutrals */
   --color-surface: #f3f5f8; /* form label cell background */
@@ -66,6 +70,7 @@
   /* Soft borders — 흰 배경 위에 20% 알파를 미리 섞은 고정값.
      Alert/Badge 테두리 전용. 컴포넌트에서 투명도 표기(border-x/20)를 쓰지 않기 위함(POL-039) */
   --color-primary-border-soft: #cfdef9;
+  --color-cool-violet-border-soft: #dcd5f8;
   --color-success-border-soft: #d0e2d9;
   --color-warning-border-soft: #eddecc;
   --color-danger-border-soft: #f4d6d5;
@@ -163,6 +168,8 @@
   --color-navy: #3c71dd;
   --color-primary: #5a95f7;
   --color-primary-tint: #14203a;
+  --color-cool-violet: #9b87f5;
+  --color-cool-violet-tint: #211b3d;
   --color-link: #7aa8ff;
 
   --color-surface: #171c27; /* 폼 라벨 셀 배경 */
@@ -206,6 +213,7 @@
   );
 
   --color-primary-border-soft: #294274;
+  --color-cool-violet-border-soft: #40336f;
   --color-success-border-soft: #1c4331;
   --color-warning-border-soft: #4a3315;
   --color-danger-border-soft: #4a2321;
@@ -240,6 +248,8 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-tint: var(--color-primary-tint);
+  --color-cool-violet: var(--color-cool-violet);
+  --color-cool-violet-tint: var(--color-cool-violet-tint);
   --color-link: var(--color-link);
   --color-border: var(--border);
   --color-border-strong: var(--color-border-strong);
@@ -258,6 +268,7 @@
   --color-warning: var(--color-warning);
   --color-warning-tint: var(--color-warning-tint);
   --color-primary-border-soft: var(--color-primary-border-soft);
+  --color-cool-violet-border-soft: var(--color-cool-violet-border-soft);
   --color-success-border-soft: var(--color-success-border-soft);
   --color-warning-border-soft: var(--color-warning-border-soft);
   --color-danger-border-soft: var(--color-danger-border-soft);

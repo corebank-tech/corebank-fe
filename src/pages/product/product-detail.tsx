@@ -137,16 +137,19 @@ export const ProductDetail = ({ product, onJoin }: ProductDetailProps) => {
 
         <div className="pt-6">
           {tab === "guide" && (
-            <dl className="overflow-hidden rounded-lg border border-border">
+            <dl className="overflow-x-auto border-t-2 border-b border-border border-t-navy text-base">
               {product.guide.map((item, i) => (
                 <div
                   key={item.label}
-                  className={cn("flex", i > 0 && "border-t border-border")}
+                  className={cn(
+                    "grid grid-cols-[160px_1fr]",
+                    i < product.guide.length - 1 && "border-b border-border",
+                  )}
                 >
-                  <dt className="flex w-40 shrink-0 items-center bg-surface px-4 py-3 text-base font-bold text-ink">
+                  <dt className="border-r border-border bg-surface px-3 py-2.5 font-bold text-ink">
                     {item.label}
                   </dt>
-                  <dd className="flex-1 bg-surface-elevated px-4 py-3 text-base leading-relaxed text-ink">
+                  <dd className="bg-surface-elevated px-3 py-2.5 leading-relaxed text-ink">
                     {item.value}
                   </dd>
                 </div>

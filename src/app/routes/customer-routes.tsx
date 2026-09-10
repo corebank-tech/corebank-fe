@@ -1,5 +1,8 @@
-import { Route } from "react-router"
-import { PageShell } from "@/app/page-shell"
+import type { RouteObject } from "react-router"
+import {
+  AuthedShellLayout,
+  PublicShellLayout,
+} from "@/app/layouts/shell-layout"
 import { A01Login, B03TransactionInquiry } from "@/pages"
 import {
   B04AccountPassword,
@@ -40,408 +43,274 @@ import {
   InstantTransferScreen,
   ReservedTransferScreen,
 } from "@/pages/transfer"
-import { RequireAuth } from "@/app/require-auth"
 
 /**
- * 고객 채널 라우트. `<Routes>` 는 자식으로 `<Route>` 나 Fragment 만 받으므로
- * 컴포넌트가 아니라 **엘리먼트 값**으로 내보낸다 — `<CustomerRoutes />` 로 감싸면
- * React Router 가 내부의 `<Route>` 를 찾지 못한다.
+ * 디자인 시스템 갤러리는 개발 빌드에서만 라우트에 오른다.
+ * 요구사항정의서의 화면이 아니라 내부 참조용이다.
  */
-export const customerRoutes = (
-  <>
-    <Route
-      path="/"
-      element={
-        <PageShell bare>
-          <A01Login />
-        </PageShell>
-      }
-    />
-    <Route
-      path="/dashboard"
-      element={
-        <RequireAuth>
-          <PageShell
-            breadcrumb={["개인", "메인", "대시보드"]}
-            title="메인 대시보드"
-          >
-            <A09MainDashboard />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/inquiry"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="inquiry"
-            breadcrumb={["조회", "계좌조회", "거래내역"]}
-            title="거래내역조회"
-            notice={[
-              "거래내역은 최근 1년 이내의 범위에서 조회할 수 있습니다.",
-              "조회 기준일시 이후 발생한 거래는 다음 조회 시 반영됩니다.",
-              "실제 잔액은 미결제 거래 처리 상태에 따라 달라질 수 있습니다.",
-            ]}
-          >
-            <B03TransactionInquiry />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/instant-transfer"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "즉시이체", "당행이체"]}
-          >
-            <InstantTransferScreen />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/reservation/new"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "예약이체", "예약이체 등록"]}
-          >
-            <ReservedTransferScreen />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/auto/new"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "자동이체", "자동이체 등록"]}
-          >
-            <AutoTransferScreen />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    {import.meta.env.DEV && (
-      <Route
-        path="/design-system"
-        element={
-          <PageShell
-            activeId="user"
-            breadcrumb={["개인", "공통", "디자인 시스템"]}
-            title="디자인 시스템"
-          >
-            <DesignSystemPage />
-          </PageShell>
-        }
-      />
-    )}
+const designSystemRoutes: RouteObject[] = import.meta.env.DEV
+  ? [
+      {
+        handle: { crumb: "개인" },
+        children: [
+          {
+            handle: { crumb: "공통", activeId: "user" },
+            children: [
+              {
+                path: "design-system",
+                element: <DesignSystemPage />,
+                handle: { crumb: "디자인 시스템", title: "디자인 시스템" },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+  : []
 
-    <Route
-      path="/accounts"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="inquiry"
-            breadcrumb={["조회", "계좌조회", "전체계좌"]}
-            title="전체계좌조회"
-          >
-            <B01AllAccounts />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/accounts/deposits"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="inquiry"
-            breadcrumb={["조회", "계좌조회", "예금·적금"]}
-            title="예금/적금 계좌조회"
-          >
-            <B02DepositAccounts />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/history"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "즉시이체", "이체결과조회"]}
-            title="이체결과조회"
-          >
-            <D04TransferHistory />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/reservation"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "예약이체", "예약이체등록 조회·취소"]}
-            title="예약이체 조회/취소"
-          >
-            <E04ReservationList />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/reservation/history"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "예약이체", "예약이체 처리결과 조회"]}
-            title="예약이체 처리결과 조회"
-          >
-            <E05ReservationResults />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/auto"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "자동이체", "자동이체 조회·변경·해지"]}
-            title="자동이체 조회/변경/해지"
-          >
-            <G04AutoTransferList />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/transfer/auto/history"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="transfer"
-            breadcrumb={["이체", "자동이체", "자동이체결과 조회"]}
-            title="자동이체 결과조회"
-          >
-            <G05AutoTransferResults />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/accounts/password"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "계좌관리", "계좌비밀번호"]}
-            title="계좌비밀번호 변경"
-          >
-            <B04AccountPassword />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/accounts/withdrawal"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "계좌관리", "출금계좌관리"]}
-            title="출금계좌관리"
-          >
-            <B05WithdrawAccounts />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/accounts/alias"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "계좌관리", "계좌별명관리"]}
-            title="계좌별명 관리"
-          >
-            <B06AccountAlias />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/accounts/order"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "계좌관리", "계좌순서변경"]}
-            title="계좌순서 변경"
-          >
-            <B07AccountOrder />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/profile"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "고객정보관리"]}
-            title="고객정보 조회/변경"
-          >
-            <F01Profile />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/user/transfer-limit"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="user"
-            breadcrumb={["사용자관리", "이체한도관리"]}
-            title="이체한도 조회/변경"
-          >
-            <D05TransferLimit />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/signup"
-      element={
-        <PageShell breadcrumb={["홈", "로그인", "회원가입"]}>
-          <SignupFlow />
-        </PageShell>
-      }
-    />
-    <Route
-      path="/find-id"
-      element={
-        <PageShell
-          breadcrumb={["홈", "로그인", "아이디 찾기"]}
-          title="아이디 찾기"
-        >
-          <A07FindId />
-        </PageShell>
-      }
-    />
-    <Route
-      path="/reset-password"
-      element={
-        <PageShell
-          breadcrumb={["홈", "로그인", "비밀번호 재설정"]}
-          title="비밀번호 재설정"
-        >
-          <A08ResetPassword />
-        </PageShell>
-      }
-    />
-    <Route
-      path="/logout"
-      element={
-        <PageShell breadcrumb={["홈", "로그아웃"]} title="로그아웃 완료">
-          <A10LogoutComplete />
-        </PageShell>
-      }
-    />
-    <Route
-      path="/notifications"
-      element={
-        <RequireAuth>
-          <PageShell breadcrumb={["헤더", "알림"]} title="알림함">
-            <F02NotificationInbox />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
+/** 인증 없이 들어오는 화면. */
+const publicRoutes: RouteObject = {
+  element: <PublicShellLayout />,
+  children: [
+    { index: true, element: <A01Login />, handle: { bare: true } },
+    {
+      handle: { crumb: "홈" },
+      children: [
+        {
+          handle: { crumb: "로그인" },
+          children: [
+            {
+              path: "signup",
+              element: <SignupFlow />,
+              handle: { crumb: "회원가입" },
+            },
+            {
+              path: "find-id",
+              element: <A07FindId />,
+              handle: { crumb: "아이디 찾기", title: "아이디 찾기" },
+            },
+            {
+              path: "reset-password",
+              element: <A08ResetPassword />,
+              handle: { crumb: "비밀번호 재설정", title: "비밀번호 재설정" },
+            },
+          ],
+        },
+        {
+          path: "logout",
+          element: <A10LogoutComplete />,
+          handle: { crumb: "로그아웃", title: "로그아웃 완료" },
+        },
+      ],
+    },
+    ...designSystemRoutes,
+  ],
+}
 
-    <Route
-      path="/products"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="product"
-            breadcrumb={["금융상품", "예금·적금", "상품목록"]}
-            title="상품몰 - 상품목록"
-          >
-            <C01ProductList />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/products/:productId"
-      element={
-        <RequireAuth>
-          <PageShell
-            activeId="product"
-            breadcrumb={["금융상품", "예금·적금", "상품상세"]}
-            title="상품 상세"
-          >
-            <C02ProductDetail />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
+/** 로그인해야 들어갈 수 있는 화면. */
+const authedRoutes: RouteObject = {
+  element: <AuthedShellLayout />,
+  children: [
+    {
+      handle: { crumb: "개인" },
+      children: [
+        {
+          handle: { crumb: "메인" },
+          children: [
+            {
+              path: "dashboard",
+              element: <A09MainDashboard />,
+              handle: { crumb: "대시보드", title: "메인 대시보드" },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      handle: { crumb: "조회", activeId: "inquiry" },
+      children: [
+        {
+          handle: { crumb: "계좌조회" },
+          children: [
+            {
+              path: "accounts",
+              element: <B01AllAccounts />,
+              handle: { crumb: "전체계좌", title: "전체계좌조회" },
+            },
+            {
+              path: "accounts/deposits",
+              element: <B02DepositAccounts />,
+              handle: { crumb: "예금·적금", title: "예금/적금 계좌조회" },
+            },
+            {
+              path: "inquiry",
+              element: <B03TransactionInquiry />,
+              handle: {
+                crumb: "거래내역",
+                title: "거래내역조회",
+                notice: [
+                  "거래내역은 최근 1년 이내의 범위에서 조회할 수 있습니다.",
+                  "조회 기준일시 이후 발생한 거래는 다음 조회 시 반영됩니다.",
+                  "실제 잔액은 미결제 거래 처리 상태에 따라 달라질 수 있습니다.",
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      handle: { crumb: "이체", activeId: "transfer" },
+      children: [
+        {
+          handle: { crumb: "즉시이체" },
+          children: [
+            {
+              path: "instant-transfer",
+              element: <InstantTransferScreen />,
+              handle: { crumb: "당행이체" },
+            },
+            {
+              path: "transfer/history",
+              element: <D04TransferHistory />,
+              handle: { crumb: "이체결과조회", title: "이체결과조회" },
+            },
+          ],
+        },
+        {
+          handle: { crumb: "예약이체" },
+          children: [
+            {
+              path: "transfer/reservation/new",
+              element: <ReservedTransferScreen />,
+              handle: { crumb: "예약이체 등록" },
+            },
+            {
+              path: "transfer/reservation",
+              element: <E04ReservationList />,
+              handle: {
+                crumb: "예약이체등록 조회·취소",
+                title: "예약이체 조회/취소",
+              },
+            },
+            {
+              path: "transfer/reservation/history",
+              element: <E05ReservationResults />,
+              handle: {
+                crumb: "예약이체 처리결과 조회",
+                title: "예약이체 처리결과 조회",
+              },
+            },
+          ],
+        },
+        {
+          handle: { crumb: "자동이체" },
+          children: [
+            {
+              path: "transfer/auto/new",
+              element: <AutoTransferScreen />,
+              handle: { crumb: "자동이체 등록" },
+            },
+            {
+              path: "transfer/auto",
+              element: <G04AutoTransferList />,
+              handle: {
+                crumb: "자동이체 조회·변경·해지",
+                title: "자동이체 조회/변경/해지",
+              },
+            },
+            {
+              path: "transfer/auto/history",
+              element: <G05AutoTransferResults />,
+              handle: {
+                crumb: "자동이체결과 조회",
+                title: "자동이체 결과조회",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      handle: { crumb: "사용자관리", activeId: "user" },
+      children: [
+        {
+          handle: { crumb: "계좌관리" },
+          children: [
+            {
+              path: "user/accounts/password",
+              element: <B04AccountPassword />,
+              handle: { crumb: "계좌비밀번호", title: "계좌비밀번호 변경" },
+            },
+            {
+              path: "user/accounts/withdrawal",
+              element: <B05WithdrawAccounts />,
+              handle: { crumb: "출금계좌관리", title: "출금계좌관리" },
+            },
+            {
+              path: "user/accounts/alias",
+              element: <B06AccountAlias />,
+              handle: { crumb: "계좌별명관리", title: "계좌별명 관리" },
+            },
+            {
+              path: "user/accounts/order",
+              element: <B07AccountOrder />,
+              handle: { crumb: "계좌순서변경", title: "계좌순서 변경" },
+            },
+          ],
+        },
+        {
+          path: "user/profile",
+          element: <F01Profile />,
+          handle: { crumb: "고객정보관리", title: "고객정보 조회/변경" },
+        },
+        {
+          path: "user/transfer-limit",
+          element: <D05TransferLimit />,
+          handle: { crumb: "이체한도관리", title: "이체한도 조회/변경" },
+        },
+      ],
+    },
+    {
+      handle: { crumb: "금융상품", activeId: "product" },
+      children: [
+        {
+          handle: { crumb: "예금·적금" },
+          children: [
+            {
+              path: "products",
+              element: <C01ProductList />,
+              handle: { crumb: "상품목록", title: "상품몰 - 상품목록" },
+            },
+            {
+              path: "products/:productId",
+              element: <C02ProductDetail />,
+              handle: { crumb: "상품상세", title: "상품 상세" },
+            },
+          ],
+        },
+        {
+          handle: { crumb: "가입" },
+          children: [
+            { path: "product/:productId/join/1", element: <C03Terms /> },
+            { path: "product/:productId/join/2", element: <C04InputInfo /> },
+            { path: "product/:productId/join/3", element: <C05ConfirmAuth /> },
+            { path: "product/:productId/join/4", element: <C06Complete /> },
+          ],
+        },
+      ],
+    },
+    {
+      handle: { crumb: "헤더" },
+      children: [
+        {
+          path: "notifications",
+          element: <F02NotificationInbox />,
+          handle: { crumb: "알림", title: "알림함" },
+        },
+      ],
+    },
+  ],
+}
 
-    <Route
-      path="/product/:productId/join/1"
-      element={
-        <RequireAuth>
-          <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
-            <C03Terms />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/product/:productId/join/2"
-      element={
-        <RequireAuth>
-          <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
-            <C04InputInfo />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/product/:productId/join/3"
-      element={
-        <RequireAuth>
-          <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
-            <C05ConfirmAuth />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-    <Route
-      path="/product/:productId/join/4"
-      element={
-        <RequireAuth>
-          <PageShell activeId="product" breadcrumb={["금융상품", "가입"]}>
-            <C06Complete />
-          </PageShell>
-        </RequireAuth>
-      }
-    />
-  </>
-)
+export const customerRoutes: RouteObject[] = [publicRoutes, authedRoutes]

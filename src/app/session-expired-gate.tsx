@@ -1,14 +1,12 @@
-import { Routes, useNavigate } from "react-router"
-import { DevNav } from "@/app/dev-nav"
-import { customerRoutes } from "@/app/routes/customer-routes"
-import { useSession } from "@/features/session"
+import { useNavigate } from "react-router"
 import { SessionExpiredModal } from "@/entities/auth"
+import { useSession } from "@/features/session"
 
 /**
  * A-11 세션 만료. SessionProvider의 10분 무조작 타이머가 만료되면 전 화면
  * 위에 비해제형 모달을 띄운다(REQ-AUTH-031).
  */
-const SessionExpiredGate = () => {
+export const SessionExpiredGate = () => {
   const { expiredReason, acknowledgeExpired } = useSession()
   const navigate = useNavigate()
 
@@ -33,17 +31,3 @@ const SessionExpiredGate = () => {
     <SessionExpiredModal open onRelogin={goRelogin} onMainScreen={goMain} />
   )
 }
-
-const App = () => {
-  return (
-    <>
-      {/* Dev-only route switcher (not part of the design system). 프로덕션 빌드에서 제외된다. */}
-      {import.meta.env.DEV && <DevNav />}
-      <SessionExpiredGate />
-
-      <Routes>{customerRoutes}</Routes>
-    </>
-  )
-}
-
-export default App

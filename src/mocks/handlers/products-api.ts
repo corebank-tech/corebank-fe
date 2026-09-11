@@ -12,6 +12,11 @@ const MOCK_LATENCY_MS = 200
  *
  * 날짜를 담지 않는 응답이라 상대 날짜 헬퍼를 쓰지 않는다 — 시각 회귀
  * 베이스라인이 흔들릴 여지도 없다.
+ *
+ * **반영하는 파라미터는 `productGroup` 하나뿐이다.** `keyword`·`sort`·`page`·`size`
+ * 는 받고도 버린다(`SearchProductsParams` 에는 여섯 개가 있다). 서버는 전부
+ * 처리하므로, 이 목 위에서 정렬·검색·페이징이 동작하는 것처럼 보이면 안 된다 —
+ * 그 화면을 검증하려면 목을 먼저 늘려야 한다.
  */
 const PRODUCTS: ProductListItemResponse[] = [
   {

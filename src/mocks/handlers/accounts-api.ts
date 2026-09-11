@@ -1,76 +1,85 @@
 import { delay, http } from "msw"
-import type { AccountOverviewResponse } from "@/shared/api/generated"
-import { daysAgo } from "@/shared/lib/mock-date"
+import {
+  MOCK_OVERVIEW_ACCOUNTS,
+  type OverviewAccount,
+} from "@/entities/account"
+import type {
+  AccountItemResponse,
+  AccountOverviewResponse,
+  GroupResponse,
+} from "@/shared/api/generated"
+import { getToday } from "@/shared/config/clock"
 import { ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
 
 /**
- * `GET /accounts` 목. e2e 가 전체계좌조회(B-01)를 밟게 한다.
+ * `GET /accounts` 목. 전체계좌조회(B-01)·예적금 계좌조회(B-02)·대시보드(A-09)가
+ * 모두 이 응답 하나를 쓴다.
+ *
+ * 값을 여기 다시 적지 않고 `MOCK_OVERVIEW_ACCOUNTS` 를 변환한다 — 계좌번호·잔액을
+ * 두 파일에 손으로 맞춰 두면 한쪽만 고쳐도 아무 테스트가 깨지지 않는다
+ * (`b01-accounts.test.ts` 는 정본 쪽만 검증한다).
  *
  * 기존 `handlers/account.ts` 는 와일드카드 + `/api/accounts` 경로를 쓰는 customFetch
- * 계약 예시라, 실제 경로(`{VITE_API_BASE_URL}/accounts` = `/api/v1/accounts`)에
- * 걸리지 않는다. 그래서 B-01 이 e2e 에서 늘 네트워크 오류 화면으로 떨어져 있었다.
- *
- * 최근거래일은 상대 날짜로 둔다 — 고정 날짜면 기본 조회기간(POL-021) 밖으로
- * 밀려난다(`shared/lib/mock-date.ts`).
+ * 계약 예시라 실제 경로(`{VITE_API_BASE_URL}/accounts`)에 걸리지 않는다.
  */
-const overview = (): AccountOverviewResponse => ({
-  asOf: `${daysAgo(0)}T09:00:00`,
-  totalAssets: 17_700_500,
-  items: [
-    {
-      groupCode: "DEMAND_DEPOSIT",
-      groupName: "입출금",
-      groupTotalBalance: 17_700_500,
-      accounts: [
-        {
-          accountId: 1,
-          accountName: "자유입출금",
-          accountNumber: "110632892336",
-          accountType: "DEMAND_DEPOSIT",
-          status: "ACTIVE",
-          balance: 12_340_500,
-          openedDate: "2021-03-14",
-          lastTransactionAt: `${daysAgo(0)}T09:12:40`,
-          maturityDate: null,
-          withdrawalRegistered: true,
-          transferEnabled: true,
-        },
-        {
-          accountId: 2,
-          accountName: "급여통장",
-          accountNumber: "302998112233",
-          accountType: "DEMAND_DEPOSIT",
-          status: "ACTIVE",
-          balance: 3_860_000,
-          openedDate: "2019-11-02",
-          lastTransactionAt: `${daysAgo(1)}T19:12:47`,
-          maturityDate: null,
-          withdrawalRegistered: true,
-          transferEnabled: true,
-        },
-        {
-          accountId: 3,
-          accountName: "비상금통장",
-          accountNumber: "255104778910",
-          accountType: "DEMAND_DEPOSIT",
-          status: "ACTIVE",
-          balance: 1_500_000,
-          openedDate: "2023-06-20",
-          lastTransactionAt: `${daysAgo(5)}T14:03:15`,
-          maturityDate: null,
-          withdrawalRegistered: false,
-          transferEnabled: true,
-        },
-      ],
-    },
-  ],
+
+/** 정본 픽스처의 그룹 구분을 API 그룹 코드로 옮긴다. */
+const GROUPS = [
+  { id: "checking", code: "DEMAND_DEPOSIT", name: "입출금" },
+  { id: "deposit", code: "DEPOSIT_SAVINGS", name: "예금·적금" },
+] as const
+
+const toAccountItem = (
+  account: OverviewAccount,
+  index: number,
+): AccountItemResponse => ({
+  // 정본에는 문자열 id(`acc-1`)뿐이라 순번으로 수치 식별자를 만든다.
+  accountId: index + 1,
+  accountName: account.alias,
+  accountNumber: account.accountNo,
+  // 정본은 예금과 적금을 구분하지 않는다. 화면들이 보는 것은
+  // DEMAND_DEPOSIT 여부뿐이라(B-05 출금계좌 자격) 예적금은 하나로 둔다.
+  accountType: account.group === "checking" ? "DEMAND_DEPOSIT" : "TIME_DEPOSIT",
+  status: "ACTIVE",
+  balance: account.balance,
+  openedDate: account.openedDate,
+  // 정본은 한 필드(lastActivityDate)에 최근거래일과 만기일을 겸해 담고
+  // isMaturityDate 로 구분한다. API 는 두 필드로 갈라져 있다.
+  lastTransactionAt: account.isMaturityDate
+    ? null
+    : `${account.lastActivityDate}T09:12:40`,
+  maturityDate: account.isMaturityDate ? account.lastActivityDate : null,
+  withdrawalRegistered: account.isWithdrawalAccount,
+  transferEnabled: account.group === "checking",
 })
+
+const buildOverview = (): AccountOverviewResponse => {
+  const items: GroupResponse[] = GROUPS.map((group) => {
+    const accounts = MOCK_OVERVIEW_ACCOUNTS.filter(
+      (account) => account.group === group.id,
+    ).map(toAccountItem)
+
+    return {
+      groupCode: group.code,
+      groupName: group.name,
+      // 합계는 적지 않고 더한다 — 계좌를 하나 넣고 합계를 못 고치는 일이 없게.
+      groupTotalBalance: accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0),
+      accounts,
+    }
+  })
+
+  return {
+    asOf: `${getToday()}T09:00:00`,
+    totalAssets: items.reduce((sum, g) => sum + (g.groupTotalBalance ?? 0), 0),
+    items,
+  }
+}
 
 export const accountsApiHandlers = [
   http.get("*/accounts", async () => {
     await delay(MOCK_LATENCY_MS)
-    return ok(overview())
+    return ok(buildOverview())
   }),
 ]

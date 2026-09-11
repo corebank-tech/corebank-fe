@@ -40,3 +40,4 @@ export {
   type SessionAuthority,
   type SessionRole,
 } from "@/entities/auth/lib/session-role"
+export { resolveLoginFailureMessage } from "@/entities/auth/lib/login-failure-message"

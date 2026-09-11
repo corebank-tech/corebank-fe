@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useLocation, useNavigate } from "react-router"
-import { useLoginMutation } from "@/entities/auth"
+import { resolveLoginFailureMessage, useLoginMutation } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
@@ -35,11 +35,7 @@ export const AdminLogin = () => {
     try {
       await login.mutateAsync({ userId, password })
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      )
+      setError(resolveLoginFailureMessage(cause))
       return
     }
 

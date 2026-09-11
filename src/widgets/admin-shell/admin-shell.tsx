@@ -2,14 +2,13 @@ import type * as React from "react"
 import { NavLink, useNavigate } from "react-router"
 import { useSession } from "@/features/session"
 import { ADMIN_NAV } from "@/shared/config/admin-nav"
+import { formatSessionClock } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 
 type AdminShellProps = {
   title?: React.ReactNode
-  /** 조회 응답의 기준시점(PH-84). 정보계 계열 화면은 이 값 없이 숫자를 그리지 않는다. */
-  asOf?: string
   children: React.ReactNode
 }
 
@@ -18,9 +17,16 @@ type AdminShellProps = {
  * 레이아웃 전제가 다르다 — 고정폭(w-320)이 아니라 화면 폭을 쓰고, 텍스트 확대
  * 대신 사이드 네비를 둔다. 관리자 화면은 대부분 넓은 표이기 때문이다.
  */
-export const AdminShell = ({ title, asOf, children }: AdminShellProps) => {
+export const AdminShell = ({ title, children }: AdminShellProps) => {
   const navigate = useNavigate()
-  const { customerName, canModify, isLoggingOut, logout } = useSession()
+  const {
+    customerName,
+    canModify,
+    isLoggingOut,
+    logout,
+    remainingSeconds,
+    extend,
+  } = useSession()
 
   const handleLogout = async () => {
     await logout()
@@ -79,15 +85,23 @@ export const AdminShell = ({ title, asOf, children }: AdminShellProps) => {
             {title != null && (
               <h1 className="text-h3 truncate font-bold text-ink">{title}</h1>
             )}
-            {asOf != null && (
-              <span className="shrink-0 text-[13px] text-ink-faint">
-                기준 {asOf}
-              </span>
-            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-[13px] text-ink-muted">{customerName}</span>
+
+            {/* POL-001 무조작 만료는 채널을 가리지 않는다. 관리자 화면은 표를 놓고
+                오래 머무는 작업이라 남은 시간과 연장 수단이 고객 화면보다 더 필요하다
+                (REQ-AUTH-030). */}
+            <span
+              className="text-[13px] text-ink-muted tabular-nums"
+              aria-label="세션 잔여시간"
+            >
+              {formatSessionClock(remainingSeconds)}
+            </span>
+            <Button size="sm" variant="secondary" onClick={extend}>
+              연장
+            </Button>
             {/* 조회 전용 관리자에게 자기 권한을 계속 보이게 둔다 — 왜 버튼이
                 없는지 화면에서 설명되지 않으면 결함으로 오인된다. */}
             <Badge variant={canModify ? "success" : "neutral"}>

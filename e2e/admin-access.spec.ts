@@ -30,16 +30,43 @@ test("비로그인 상태로 관리자 화면에 들어가면 관리자 로그�
   ).toBeVisible()
 })
 
-test("고객 계정으로는 관리자 화면 대신 403 안내를 보여준다", async ({
+test("관리자 로그인은 고객 계정을 로그인시키지 않는다", async ({ page }) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, CUSTOMER)
+
+  await expect(page.getByRole("alert")).toContainText(
+    "관리자 권한이 없는 계정입니다",
+  )
+  await expect(page).toHaveURL(/\/admin\/login/)
+})
+
+test("관리자 문으로 들어온 고객 계정은 세션이 남지 않는다", async ({
   page,
 }) => {
   await page.goto("/admin/login")
   await loginAsAdmin(page, CUSTOMER)
+  await expect(page.getByRole("alert")).toBeVisible()
+
+  // 로그인 실패로 다뤘는데 고객 세션이 살아 있으면 관리자 문이 고객 채널의
+  // 뒷문이 된다.
+  await page.goto("/dashboard")
+  await expect(page).toHaveURL("/")
+})
+
+test("고객 세션으로 관리자 화면에 직접 들어가면 403 을 보여준다", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await page.getByLabel("이용자ID").fill(CUSTOMER.userId)
+  await page.getByLabel("비밀번호").fill(CUSTOMER.password)
+  await page.getByRole("button", { name: "로그인" }).click()
+  await page.waitForURL("**/dashboard")
+
+  await page.goto("/admin")
 
   await expect(page.getByText("접근 권한이 없습니다")).toBeVisible()
   // 로그인 화면으로 튕기면 무엇이 거부됐는지 URL 에 남지 않는다.
   await expect(page).toHaveURL(/\/admin/)
-  await expect(page.getByText("관리자 홈")).toBeHidden()
 })
 
 test("관리자 계정은 관리자 홈에 들어가고 권한이 화면에 드러난다", async ({

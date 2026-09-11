@@ -5,6 +5,8 @@ import {
   MOCK_PRODUCTS,
 } from "@/mocks/handlers/products-api"
 
+const VIEWED_AT = new Date(2026, 8, 11, 9, 0, 0)
+
 /**
  * 목록(C-01) 카드·상세(C-02)·약관 전문(C-03)이 같은 상품을 같은 숫자로 보여주는지
  * 지킨다.
@@ -61,7 +63,11 @@ describe.each(MOCK_PRODUCTS.map((p) => [p.productName, p] as const))(
       (_, term) => {
         // 상세 목록에는 있는데 전문이 없으면 C-03 [보기]가 404 로 떨어진다.
         // 버전이 다르면 동의 이력(termsId·version)이 엉뚱한 버전으로 실린다.
-        const view = buildProductTermsView(product, term.termsId ?? 0)
+        const view = buildProductTermsView(
+          product,
+          term.termsId ?? 0,
+          VIEWED_AT,
+        )
         expect(view).toBeDefined()
         expect(view?.termsName).toBe(term.termsName)
         expect(view?.version).toBe(term.version)
@@ -76,7 +82,8 @@ describe.each(MOCK_PRODUCTS.map((p) => [p.productName, p] as const))(
         (t) => t.termsName === "상품설명서",
       )
       const content =
-        buildProductTermsView(product, explanation?.termsId ?? 0)?.content ?? ""
+        buildProductTermsView(product, explanation?.termsId ?? 0, VIEWED_AT)
+          ?.content ?? ""
       expect(content).toContain(product.productName ?? "")
       expect(content).toContain(`기본금리: 연 ${product.baseRate}%`)
       expect(content).toContain(`최고금리: 연 ${product.maxRate}%`)
@@ -85,8 +92,15 @@ describe.each(MOCK_PRODUCTS.map((p) => [p.productName, p] as const))(
       )
     })
 
+    it("열람 유효기간이 열람 시각 + 30분이다", () => {
+      // 서버 TermsViewHistoryRedisAdapter.VIEW_TTL(30분)과 같아야 한다.
+      const view = buildProductTermsView(product, 1, VIEWED_AT)
+      expect(view?.viewedAt).toBe("2026-09-11T09:00:00")
+      expect(view?.viewExpiresAt).toBe("2026-09-11T09:30:00")
+    })
+
     it("상세에 없는 약관 ID 는 전문이 없다", () => {
-      expect(buildProductTermsView(product, 999)).toBeUndefined()
+      expect(buildProductTermsView(product, 999, VIEWED_AT)).toBeUndefined()
     })
   },
 )

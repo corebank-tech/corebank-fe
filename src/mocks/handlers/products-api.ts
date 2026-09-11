@@ -8,9 +8,10 @@ import type {
   RateTierItem,
   TermsItem,
 } from "@/shared/api/generated"
-import { getNow } from "@/shared/config/clock"
 import { formatAmount } from "@/shared/lib/format"
+import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
 import { fail, ok } from "@/mocks/lib/envelope"
+import { readStore, toLocalDateTime, writeStore } from "@/mocks/lib/mock-store"
 
 const MOCK_LATENCY_MS = 200
 
@@ -66,6 +67,9 @@ export const MOCK_PRODUCTS: ProductListItemResponse[] = [
     newProduct: false,
   },
 ]
+
+export const findProduct = (productId: unknown) =>
+  MOCK_PRODUCTS.find((item) => item.productId === Number(productId))
 
 /** 가입기간 선택지 후보(개월). 상품별 최소~최대 범위 안의 것만 쓴다. */
 const TERM_CANDIDATES = [6, 12, 24, 36]
@@ -235,9 +239,16 @@ const TERMS_CONTENT: Record<number, (detail: ProductDetailResponse) => string> =
       ].join("\n"),
   }
 
+/**
+ * 약관 열람 이력의 유효시간. 서버 `TermsViewHistoryRedisAdapter.VIEW_TTL`(30분)과 같다.
+ * 가입 검증은 이 시간 안에 열람한 기록이 있어야 PRD0005 를 내지 않는다.
+ */
+export const TERMS_VIEW_TTL_MS = 30 * 60 * 1000
+
 export const buildProductTermsView = (
   product: ProductListItemResponse,
   termsId: number,
+  viewedAt: Date,
 ): ProductTermsViewResponse | undefined => {
   const detail = buildProductDetail(product)
   const term = (detail.terms ?? []).find((item) => item.termsId === termsId)
@@ -251,14 +262,29 @@ export const buildProductTermsView = (
     required: term.required,
     viewRequired: term.viewRequired,
     content: content(detail),
-    // 서버는 이 조회를 열람 이력으로 남긴다(C-03 주석, PRD0005). 열람 유효기간
-    // (viewExpiresAt)은 서버 정책을 확인하지 않아 싣지 않는다.
-    viewedAt: getNow(),
+    viewedAt: toLocalDateTime(viewedAt),
+    viewExpiresAt: toLocalDateTime(
+      new Date(viewedAt.getTime() + TERMS_VIEW_TTL_MS),
+    ),
   }
 }
 
-const findProduct = (productId: unknown) =>
-  MOCK_PRODUCTS.find((item) => item.productId === Number(productId))
+/** 고객·약관 단위 열람 만료 시각(ms). 서버 Redis 키 `terms-view:{customerId}:{termsId}` 와 같은 단위다. */
+const TERMS_VIEWS_KEY = "terms-views"
+
+const recordTermsView = (memberId: string, termsId: number, viewedAt: Date) => {
+  const views = readStore<Record<string, number>>(TERMS_VIEWS_KEY, {})
+  views[`${memberId}:${termsId}`] = viewedAt.getTime() + TERMS_VIEW_TTL_MS
+  writeStore(TERMS_VIEWS_KEY, views)
+}
+
+export const isTermsViewed = (memberId: string, termsId: number): boolean =>
+  (readStore<Record<string, number>>(TERMS_VIEWS_KEY, {})[
+    `${memberId}:${termsId}`
+  ] ?? 0) > Date.now()
+
+/** 서버 ProductErrorCode.PRODUCT_NOT_FOUND. */
+const productNotFound = () => fail("PRD0201", "상품을 찾을 수 없습니다.", 404)
 
 export const productsApiHandlers = [
   /**
@@ -285,25 +311,33 @@ export const productsApiHandlers = [
     return ok(body)
   }),
 
-  // 오류 코드(PRD0404)는 서버 실제 값을 확인하지 않았다. C-02·C-03 은 코드가
-  // 아니라 오류 여부만 보고 화면을 그린다.
+  // 상품상세는 서버에서도 로그인 없이 열린다(실서버 GET /products/1 이 200).
   http.get("*/products/:productId", async ({ params }) => {
     await delay(MOCK_LATENCY_MS)
 
     const product = findProduct(params.productId)
-    if (!product) return fail("PRD0404", "존재하지 않는 상품입니다.", 404)
+    if (!product) return productNotFound()
 
     return ok(buildProductDetail(product))
   }),
 
+  // 약관 전문은 로그인이 필요하고(실서버 401), 조회 자체가 열람 이력으로 남는다.
   http.get("*/products/:productId/terms/:termsId", async ({ params }) => {
     await delay(MOCK_LATENCY_MS)
 
-    const product = findProduct(params.productId)
-    const view =
-      product && buildProductTermsView(product, Number(params.termsId))
-    if (!view) return fail("PRD0404", "존재하지 않는 약관입니다.", 404)
+    const memberId = readSignedInMemberId()
+    if (memberId == null) return unauthorized()
 
+    const product = findProduct(params.productId)
+    if (!product) return productNotFound()
+
+    const termsId = Number(params.termsId)
+    const viewedAt = new Date()
+    const view = buildProductTermsView(product, termsId, viewedAt)
+    // 서버 ProductErrorCode.TERMS_NOT_FOUND.
+    if (!view) return fail("PRD0202", "약관을 찾을 수 없습니다.", 404)
+
+    recordTermsView(memberId, termsId, viewedAt)
     return ok(view)
   }),
 ]

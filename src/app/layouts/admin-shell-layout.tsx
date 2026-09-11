@@ -1,5 +1,5 @@
 import { Outlet } from "react-router"
-import { RequireRole } from "@/app/require-role"
+import { RequireAdmin } from "@/app/require-admin"
 import { useShellProps } from "@/app/routes/shell-handle"
 import { AdminShell } from "@/widgets/admin-shell"
 
@@ -11,10 +11,10 @@ export const AdminShellLayout = () => {
   const shell = useShellProps()
 
   return (
-    <RequireRole role="ADMIN">
+    <RequireAdmin>
       <AdminShell title={shell.title}>
         <Outlet />
       </AdminShell>
-    </RequireRole>
+    </RequireAdmin>
   )
 }

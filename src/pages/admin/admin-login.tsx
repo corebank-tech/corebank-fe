@@ -53,7 +53,7 @@ export const AdminLogin = () => {
       return
     }
 
-    // 세션 복원까지 끝나야 역할이 정해진다. 그 전에 이동하면 RequireRole 이
+    // 세션 복원까지 끝나야 역할이 정해진다. 그 전에 이동하면 RequireAdmin 이
     // 아직 CUSTOMER 로 보고 403 을 그린다.
     const restored = await setSession()
     if (!restored) {

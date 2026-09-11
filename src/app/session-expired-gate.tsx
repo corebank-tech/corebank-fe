@@ -17,8 +17,8 @@ export const SessionExpiredGate = () => {
   /**
    * 도착지는 만료 시점에 보고 있던 채널을 따른다. 관리자 화면에서 끊겼는데 고객
    * 로그인으로 보내면 재로그인해도 `/dashboard` 로 가서, 원래 보던 화면으로
-   * 돌아가려면 주소를 직접 쳐야 한다. RequireRole 이 인증 실패를
-   * `/admin/login` 으로 보내는 것과 같은 규칙이다(app/require-role.tsx).
+   * 돌아가려면 주소를 직접 쳐야 한다. RequireAdmin 이 인증 실패를
+   * `/admin/login` 으로 보내는 것과 같은 규칙이다(app/require-admin.tsx).
    */
   const loginPath = isAdminPath(location.pathname) ? "/admin/login" : "/"
 
@@ -31,7 +31,7 @@ export const SessionExpiredGate = () => {
   // (REQ-AUTH-031 이 버튼 2개를 요구하므로 버튼 자체는 유지한다).
   // [다시 로그인]과 결과가 같아지는 것은 라벨 불일치가 아니라, "메인화면"을
   // 인증 여부와 무관한 **그 채널의** 시작 지점으로 해석한 결과다 — 만료 상태에서
-  // 그 시작 지점이 로그인 화면인 것은 RequireAuth·RequireRole 의 정상 동작이다.
+  // 그 시작 지점이 로그인 화면인 것은 RequireAuth·RequireAdmin 의 정상 동작이다.
   // #95 에서 확정(2026-08-24). 채널별 도착지는 #126 에서 갈랐다.
   const goMain = () => {
     acknowledgeExpired()

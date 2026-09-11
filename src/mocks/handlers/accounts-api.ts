@@ -15,7 +15,8 @@ const MOCK_LATENCY_MS = 200
 
 /**
  * `GET /accounts` 목. 전체계좌조회(B-01)·예적금 계좌조회(B-02)·대시보드(A-09)가
- * 모두 이 응답 하나를 쓴다.
+ * 모두 이 응답 하나를 쓴다. 계좌 ID 로 계좌를 찾는 다른 목(계좌비밀번호 검증·상품가입
+ * 출금계좌)도 `findMockAccount` 로 여기서 읽는다.
  *
  * 값을 여기 다시 적지 않고 `MOCK_OVERVIEW_ACCOUNTS` 를 변환한다 — 계좌번호·잔액을
  * 두 파일에 손으로 맞춰 두면 한쪽만 고쳐도 아무 테스트가 깨지지 않는다
@@ -55,11 +56,22 @@ const toAccountItem = (
   transferEnabled: account.group === "checking",
 })
 
+/**
+ * 정본 픽스처 **전체 순번**으로 식별자를 매긴다. 그룹별로 매기면 입출금 1번과 예적금
+ * 1번이 같은 accountId 를 갖게 돼, 계좌 ID 로 찾는 목이 엉뚱한 계좌를 잡는다.
+ */
+export const MOCK_ACCOUNT_ITEMS = MOCK_OVERVIEW_ACCOUNTS.map(
+  (account, index) => ({ account, item: toAccountItem(account, index) }),
+)
+
+export const findMockAccount = (accountId: number) =>
+  MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
+
 const buildOverview = (): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
-    const accounts = MOCK_OVERVIEW_ACCOUNTS.filter(
-      (account) => account.group === group.id,
-    ).map(toAccountItem)
+    const accounts = MOCK_ACCOUNT_ITEMS.filter(
+      (entry) => entry.account.group === group.id,
+    ).map((entry) => entry.item)
 
     return {
       groupCode: group.code,

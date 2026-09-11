@@ -13,6 +13,21 @@ import { expect, test, type Page } from "@playwright/test"
  * 의도된 시각 변경(보더 색상 버그 수정 등)이 있는 커밋 직후에만 `--update-snapshots`로 재베이스라인한다.
  */
 
+/**
+ * 시계와 타임존을 고정한다.
+ *
+ * mock 데이터는 의도적으로 상대 날짜(`shared/lib/mock-date.ts`의 `daysAgo`)를 쓴다 —
+ * 고정 날짜로 두면 기본 조회기간(POL-021) 밖으로 밀려나 화면이 빈 목록이 되기 때문이다.
+ * 그 대가로 화면에 찍히는 날짜가 매일 달라져, 시계를 풀어두면 베이스라인이 하루 만에
+ * 깨진다(실제로 10건 전부 그렇게 깨져 있었다).
+ *
+ * 타임존까지 묶는 이유는 `getToday()`가 브라우저 로컬 타임존을 읽기 때문이다.
+ * UTC 로 맞춘 기기에서는 KST 오전 9시 이전에 하루 이른 날짜가 찍힌다.
+ */
+test.use({ timezoneId: "Asia/Seoul" })
+
+const FIXED_NOW = new Date("2026-09-10T09:00:00+09:00")
+
 const CREDENTIALS = { userId: "honggildong", password: "Passw0rd!" }
 
 async function login(page: Page) {
@@ -88,6 +103,8 @@ const SCENARIOS: Scenario[] = [
 for (const scenario of SCENARIOS) {
   for (const theme of ["light", "dark"] as const) {
     test(`${scenario.name} — ${theme}`, async ({ page }) => {
+      // 첫 스크립트가 돌기 전에 걸어야 mock 데이터의 상대 날짜가 고정된다.
+      await page.clock.setFixedTime(FIXED_NOW)
       await login(page)
       await setTheme(page, theme)
       await navigate(page, scenario.path)

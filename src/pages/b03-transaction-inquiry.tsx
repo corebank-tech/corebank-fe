@@ -286,7 +286,11 @@ export const B03TransactionInquiry = () => {
   const totalPages = transactionData?.totalPages ?? 0
 
   const accountStatus =
-    accountDetail?.status === "SUSPENDED" ? "거래정지" : "정상"
+    accountDetail?.status === "SUSPENDED"
+      ? "거래정지"
+      : accountDetail?.status === "CLOSED"
+        ? "해지"
+        : "정상"
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",

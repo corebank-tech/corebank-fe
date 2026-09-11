@@ -3,12 +3,14 @@ import {
   MOCK_OVERVIEW_ACCOUNTS,
   type OverviewAccount,
 } from "@/entities/account"
+import { MOCK_MEMBERS } from "@/entities/auth"
 import type {
   AccountItemResponse,
   AccountOverviewResponse,
   GroupResponse,
 } from "@/shared/api/generated"
 import { getToday } from "@/shared/config/clock"
+import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
 import { ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
@@ -64,14 +66,32 @@ export const MOCK_ACCOUNT_ITEMS = MOCK_OVERVIEW_ACCOUNTS.map(
   (account, index) => ({ account, item: toAccountItem(account, index) }),
 )
 
-export const findMockAccount = (accountId: number) =>
-  MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
+/**
+ * 계좌 픽스처의 소유자. 정본의 첫 계좌번호를 가진 회원이다 — 이름을 여기 다시 적지
+ * 않고 회원 픽스처(`MOCK_MEMBERS`)에서 찾는다.
+ *
+ * 서버는 계좌를 늘 고객 단위로 찾는다(`findByAccountIdAndCustomerId`). 목도 소유자가
+ * 아니면 없는 계좌로 보고, 다른 회원이 이 계좌의 비밀번호를 검증하거나 출금계좌로
+ * 쓰지 못하게 한다.
+ */
+export const MOCK_ACCOUNT_OWNER_ID = MOCK_MEMBERS.find(
+  (member) => member.accountNo === MOCK_OVERVIEW_ACCOUNTS[0]?.accountNo,
+)?.memberId
 
-const buildOverview = (): AccountOverviewResponse => {
+const isOwner = (memberId: string) => memberId === MOCK_ACCOUNT_OWNER_ID
+
+export const findMockAccount = (accountId: number, memberId: string) =>
+  isOwner(memberId)
+    ? MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
+    : undefined
+
+const buildOverview = (memberId: string): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
-    const accounts = MOCK_ACCOUNT_ITEMS.filter(
-      (entry) => entry.account.group === group.id,
-    ).map((entry) => entry.item)
+    const accounts = isOwner(memberId)
+      ? MOCK_ACCOUNT_ITEMS.filter(
+          (entry) => entry.account.group === group.id,
+        ).map((entry) => entry.item)
+      : []
 
     return {
       groupCode: group.code,
@@ -90,8 +110,14 @@ const buildOverview = (): AccountOverviewResponse => {
 }
 
 export const accountsApiHandlers = [
+  // 실서버도 로그인 없이는 401 CMN0101 이다. 200 을 주면 세션이 끝난 뒤 다시
+  // 조회해도 customFetch 의 만료 신호가 나가지 않는다.
   http.get("*/accounts", async () => {
     await delay(MOCK_LATENCY_MS)
-    return ok(buildOverview())
+
+    const memberId = readSignedInMemberId()
+    if (memberId == null) return unauthorized()
+
+    return ok(buildOverview(memberId))
   }),
 ]

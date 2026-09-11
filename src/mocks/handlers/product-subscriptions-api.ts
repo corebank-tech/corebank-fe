@@ -156,7 +156,7 @@ const validate = (memberId: string, input: ValidationInput): Validation => {
   }
   const detail = buildProductDetail(product)
 
-  const entry = findMockAccount(input.withdrawalAccountId)
+  const entry = findMockAccount(input.withdrawalAccountId, memberId)
   if (entry == null || entry.item.transferEnabled !== true) {
     return {
       ok: false,
@@ -309,6 +309,16 @@ const SUBSCRIPTIONS_KEY = "product-subscriptions"
 /** 정본 계좌(1~n)와 겹치지 않게 신규 계좌 ID 는 1000 번대에서 준다. */
 const NEW_ACCOUNT_ID_BASE = 1000
 
+/**
+ * 서버 요청 DTO 는 `agreedTerms` 가 `@NotNull` 이라, 필드가 없으면 본문 검증 단계에서
+ * 400 CMN0001(INVALID_INPUT)이다. 빈 배열은 "아직 동의 전 상태로 미리 검증"하는 정상
+ * 요청이라 통과시킨다 — 없는 필드를 빈 배열로 바꾸면 서버와 결과가 달라진다.
+ */
+const hasAgreedTerms = (body: { agreedTerms?: unknown }) =>
+  Array.isArray(body.agreedTerms)
+
+const invalidInput = () => fail("CMN0001", "입력값이 올바르지 않습니다.", 400)
+
 export const productSubscriptionsApiHandlers = [
   http.post("*/product-subscriptions/validation", async ({ request }) => {
     await delay(MOCK_LATENCY_MS)
@@ -317,6 +327,7 @@ export const productSubscriptionsApiHandlers = [
     if (memberId == null) return unauthorized()
 
     const body = (await request.json()) as ProductSubscriptionValidationRequest
+    if (!hasAgreedTerms(body)) return invalidInput()
     const result = validate(memberId, body)
     return result.ok ? ok(result.body) : result.response
   }),
@@ -328,6 +339,7 @@ export const productSubscriptionsApiHandlers = [
     if (memberId == null) return unauthorized()
 
     const req = (await request.json()) as ProductSubscriptionExecuteRequest
+    if (!hasAgreedTerms(req)) return invalidInput()
 
     // 순서는 서버와 같다 — 토큰을 소비하지 않는 검증을 전부 먼저 끝내고, 일회용 토큰은
     // 계좌 개설 바로 앞에서 소비한다(무관한 검증 실패로 인증을 다시 받게 하지 않으려고).

@@ -9,11 +9,12 @@ import {
   vi,
 } from "vitest"
 import { MOCK_WITHDRAWAL_ACCOUNTS } from "@/entities/account"
+import { MOCK_MEMBERS } from "@/entities/auth"
 import { server } from "@/mocks/server"
 import { consumeAccountPasswordToken } from "@/mocks/handlers/account-password-api"
 import {
-  findMockAccount,
   MOCK_ACCOUNT_ITEMS,
+  MOCK_ACCOUNT_OWNER_ID,
 } from "@/mocks/handlers/accounts-api"
 import { consumeOtpAuthToken } from "@/mocks/handlers/otp-api"
 
@@ -27,7 +28,11 @@ import { consumeOtpAuthToken } from "@/mocks/handlers/otp-api"
  */
 const BASE = "http://localhost/api/v1"
 const SESSION_KEY = "corebank-mock-session"
-const MEMBER_ID = "honggildong"
+/** 계좌 픽스처의 소유자와, 계좌가 없는 다른 회원. 값은 픽스처에서 읽는다. */
+const MEMBER_ID = MOCK_ACCOUNT_OWNER_ID!
+const OTHER_MEMBER_ID = MOCK_MEMBERS.find(
+  (m) => m.memberId !== MEMBER_ID,
+)!.memberId
 
 type Envelope = { code: string; message: string; data: Record<string, unknown> }
 
@@ -156,6 +161,41 @@ describe("계좌비밀번호 검증 목 — 서버 AccountPasswordVerificationSe
     )
     expect(status).toBe(401)
     expect(body.code).toBe("CMN0101")
+  })
+
+  it("소유자가 아니면 ACC0201(404)이고, 소유자의 오류 횟수를 쌓지 않는다", async () => {
+    sessionStorage.setItem(SESSION_KEY, OTHER_MEMBER_ID)
+    const denied = await verify(
+      WITHDRAWAL.accountId,
+      wrongPassword(WITHDRAWAL.password),
+    )
+    expect(denied.status).toBe(404)
+    expect(denied.body.code).toBe("ACC0201")
+
+    // 남의 계좌를 잠글 수 있으면 안 된다 — 소유자의 첫 오류가 1회째여야 한다.
+    sessionStorage.setItem(SESSION_KEY, MEMBER_ID)
+    const own = await verify(
+      WITHDRAWAL.accountId,
+      wrongPassword(WITHDRAWAL.password),
+    )
+    expect(own.body.data).toMatchObject({ errorCount: 1 })
+  })
+})
+
+describe("계좌 개요 목 — GET /accounts", () => {
+  it("로그인하지 않으면 401 CMN0101 이다(실서버와 같다)", async () => {
+    sessionStorage.clear()
+    const { status, body } = await call("GET", "/accounts")
+    expect(status).toBe(401)
+    expect(body.code).toBe("CMN0101")
+  })
+
+  it("소유자가 아닌 회원에게는 계좌가 없다", async () => {
+    sessionStorage.setItem(SESSION_KEY, OTHER_MEMBER_ID)
+    const { body } = await call("GET", "/accounts")
+    const groups = body.data.items as { accounts: unknown[] }[]
+    expect(groups.flatMap((g) => g.accounts)).toHaveLength(0)
+    expect(body.data.totalAssets).toBe(0)
   })
 })
 
@@ -342,6 +382,36 @@ describe("상품가입 목 — 서버 ProductSubscriptionValidation·ExecuteServ
     expect(violationCodes(savings.body)).not.toContain("LMT0001")
   })
 
+  it("agreedTerms 가 없으면 400 CMN0001, 빈 배열은 정상 요청이다", async () => {
+    // 서버 DTO 가 @NotNull 이라 없는 필드는 본문 검증 오류다. 빈 배열은 통과해
+    // 필수 약관 미동의(PRD0003) 위반으로 나온다.
+    const missing = await validate({ ...DEPOSIT, agreedTerms: undefined })
+    expect(missing.status).toBe(400)
+    expect(missing.body.code).toBe("CMN0001")
+
+    const empty = await validate({ ...DEPOSIT, agreedTerms: [] })
+    expect(empty.status).toBe(200)
+    expect(violationCodes(empty.body)).toContain("PRD0003")
+
+    const execute = await call("POST", "/product-subscriptions", {
+      ...DEPOSIT,
+      agreedTerms: undefined,
+      newAccountPassword: "1357",
+      newAccountPasswordConfirm: "1357",
+      accountPasswordAuthToken: "unused",
+      otpAuthToken: "unused",
+    })
+    expect(execute.status).toBe(400)
+    expect(execute.body.code).toBe("CMN0001")
+  })
+
+  it("소유자가 아닌 회원은 그 계좌를 출금계좌로 쓸 수 없다(ACC0201)", async () => {
+    sessionStorage.setItem(SESSION_KEY, OTHER_MEMBER_ID)
+    const { status, body } = await validate(DEPOSIT)
+    expect(status).toBe(404)
+    expect(body.code).toBe("ACC0201")
+  })
+
   it("상품에 없는 약관으로 동의하면 위반이 아니라 즉시 PRD0202(404)다", async () => {
     const { status, body } = await validate({
       ...DEPOSIT,
@@ -395,6 +465,20 @@ describe("상품가입 목 — 서버 ProductSubscriptionValidation·ExecuteServ
     })
     expect(status).toBe(403)
     expect(body.code).toBe("OTP0102")
-    expect(findMockAccount(WITHDRAWAL.accountId)).toBeDefined()
+    // OTP 가 거부되면 계좌를 열지 않는다 — 가입 내역이 없다.
+    const result = await call("GET", "/product-subscriptions/1")
+    expect(result.status).toBe(404)
+    expect(result.body.code).toBe("PRD0203")
+
+    // 계좌비밀번호 토큰은 OTP 확인 전에 소비된다. 서버도 같은 순서라
+    // (ProductSubscriptionExecuteService: 비밀번호 토큰 소비 → OTP 확인), OTP 가
+    // 실패하면 비밀번호 인증부터 다시 받아야 한다.
+    expect(
+      consumeAccountPasswordToken(
+        String(password.body.data.accountPasswordAuthToken),
+        MEMBER_ID,
+        WITHDRAWAL.accountId,
+      ),
+    ).toBe("INVALID")
   })
 })

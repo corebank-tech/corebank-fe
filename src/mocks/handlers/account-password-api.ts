@@ -96,10 +96,11 @@ export const accountPasswordApiHandlers = [
       if (memberId == null) return unauthorized()
 
       const accountId = Number(params.accountId)
-      const entry = findMockAccount(accountId)
+      const entry = findMockAccount(accountId, memberId)
       const expected = entry && passwordOf(entry.account.accountNo)
-      // 비밀번호 픽스처가 없는 계좌(예적금)는 검증 대상이 아니다. 서버의
-      // ACCOUNT_NOT_FOUND_OR_FORBIDDEN 과 같은 응답으로 떨어뜨린다.
+      // 소유자가 아니거나 비밀번호 픽스처가 없는 계좌(예적금)는 서버의
+      // ACCOUNT_NOT_FOUND_OR_FORBIDDEN 과 같은 응답으로 떨어뜨린다. 소유자 확인이
+      // 오류 횟수를 쌓기 전이어야 한다 — 남의 계좌를 잠글 수 있으면 안 된다.
       if (entry == null || expected == null) {
         return fail("ACC0201", "계좌를 찾을 수 없거나 접근할 수 없습니다.", 404)
       }

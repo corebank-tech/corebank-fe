@@ -4,23 +4,23 @@ import type {
   PreferentialRateItem,
   ProductDetailResponse,
   ProductListItemResponse,
+  ProductTermsViewResponse,
   RateTierItem,
   TermsItem,
 } from "@/shared/api/generated"
+import { getNow } from "@/shared/config/clock"
+import { formatAmount } from "@/shared/lib/format"
 import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
 
 /**
- * 상품목록(C-01)·상품상세(C-02) MSW 목.
+ * 상품목록(C-01)·상품상세(C-02)·약관 전문(C-03) MSW 목.
  *
- * 상품 데이터의 출처는 아래 `MOCK_PRODUCTS` 하나다. 상세 응답은 이걸 늘려서 만들고
- * 목록과 겹치는 값(이름·금리·가입기간·금액)을 다시 적지 않는다 — 두 곳에 손으로
- * 맞춰 두면 C-01 카드와 C-02 상세의 최고금리·가입기간이 조용히 어긋난다.
- * 목록↔상세 불변식은 `products-api.test.ts` 가 지킨다.
- *
- * 날짜를 담지 않는 응답이라 상대 날짜 헬퍼를 쓰지 않는다 — 시각 회귀
- * 베이스라인이 흔들릴 여지도 없다.
+ * 상품 데이터의 출처는 아래 `MOCK_PRODUCTS` 하나다. 상세 응답은 이걸 늘려서 만들고,
+ * 약관 전문은 상세 응답을 읽어서 만든다. 겹치는 값(이름·금리·가입기간·금액)을
+ * 다시 적지 않는다 — 여러 곳에 손으로 맞춰 두면 C-01 카드·C-02 상세·C-03
+ * 상품설명서의 숫자가 조용히 어긋난다. 이 불변식은 `products-api.test.ts` 가 지킨다.
  */
 export const MOCK_PRODUCTS: ProductListItemResponse[] = [
   {
@@ -84,6 +84,16 @@ const PREFERENTIAL_RATES: PreferentialRateItem[] = [
   },
 ]
 
+const NOTICES = [
+  "금리는 세전 연이율이며, 가입 시점의 금리가 만기까지 적용됩니다.",
+  "우대금리는 조건 충족 시 만기해지할 때 적용됩니다.",
+]
+
+/**
+ * 약관 목록. 상세 응답의 `terms` 와 약관 전문 응답의 메타데이터(이름·버전·필수 여부)가
+ * 모두 이 배열에서 나온다 — 둘이 다르면 C-03 이 동의 이력을 엉뚱한 버전으로 싣는다
+ * (동의 이력은 termsId·version 쌍으로 저장된다).
+ */
 const TERMS: TermsItem[] = [
   {
     termsId: 1,
@@ -167,14 +177,88 @@ export const buildProductDetail = (
     preferentialRates: PREFERENTIAL_RATES,
     eligibility: "실명의 개인 (1인 1계좌)",
     subscriptionRestrictions: [],
-    notices: [
-      "금리는 세전 연이율이며, 가입 시점의 금리가 만기까지 적용됩니다.",
-      "우대금리는 조건 충족 시 만기해지할 때 적용됩니다.",
-    ],
+    notices: NOTICES,
     saleStatus: "ON_SALE",
     terms: TERMS,
   }
 }
+
+/**
+ * 약관 전문. 상품설명서는 상품마다 다르므로 상세 응답에서 금리·기간·금액을 읽어
+ * 만든다 — 전문에 숫자를 따로 적으면 C-02 상세와 C-03 설명서가 어긋난다.
+ * `TERMS` 에 항목을 추가하면 여기도 채워야 한다(빠지면 테스트가 잡는다).
+ */
+const TERMS_CONTENT: Record<number, (detail: ProductDetailResponse) => string> =
+  {
+    1: () =>
+      [
+        "제1조(목적)",
+        '이 약관은 CoreBank(이하 "은행")와 예금주 사이의 예금거래에 관한 기본적인 사항을 정합니다.',
+        "",
+        "제2조(거래방법)",
+        "예금주는 은행의 인터넷뱅킹을 통해 예금을 신규·해지하거나 입출금할 수 있습니다.",
+        "",
+        "제3조(이자)",
+        "이자는 은행이 정한 이율과 계산방법에 따라 지급하며, 관계 법령에 따른 세금을 원천징수합니다.",
+        "",
+        "제4조(중도해지)",
+        "만기 전에 해지하면 은행이 정한 중도해지이율을 적용합니다.",
+      ].join("\n"),
+    2: (detail) => {
+      const terms = detail.termOptions ?? []
+      const preferential = (detail.preferentialRates ?? [])
+        .map((item) => `${item.conditionName} +${item.rate}%p`)
+        .join(", ")
+      return [
+        `상품명: ${detail.productName}`,
+        `가입대상: ${detail.eligibility}`,
+        `가입기간: ${terms[0]}개월 ~ ${terms[terms.length - 1]}개월`,
+        `가입금액: ${formatAmount(detail.minAmount ?? 0)} ~ ${formatAmount(detail.maxAmount ?? 0)}`,
+        `기본금리: 연 ${detail.baseRate}% (세전)`,
+        `최고금리: 연 ${detail.maxRate}% (세전, 우대조건 충족 시)`,
+        `우대조건: ${preferential}`,
+        "",
+        "유의사항",
+        ...(detail.notices ?? []).map((notice) => `- ${notice}`),
+      ].join("\n")
+    },
+    3: () =>
+      [
+        "1. 수집·이용 목적",
+        "신상품 안내, 금리 우대 이벤트 등 마케팅 정보 제공",
+        "",
+        "2. 보유·이용 기간",
+        "동의 철회 시까지",
+        "",
+        "3. 동의 거부 권리",
+        "동의하지 않아도 상품 가입에는 제한이 없습니다.",
+      ].join("\n"),
+  }
+
+export const buildProductTermsView = (
+  product: ProductListItemResponse,
+  termsId: number,
+): ProductTermsViewResponse | undefined => {
+  const detail = buildProductDetail(product)
+  const term = (detail.terms ?? []).find((item) => item.termsId === termsId)
+  const content = TERMS_CONTENT[termsId]
+  if (!term || !content) return undefined
+
+  return {
+    termsId: term.termsId,
+    termsName: term.termsName,
+    version: term.version,
+    required: term.required,
+    viewRequired: term.viewRequired,
+    content: content(detail),
+    // 서버는 이 조회를 열람 이력으로 남긴다(C-03 주석, PRD0005). 열람 유효기간
+    // (viewExpiresAt)은 서버 정책을 확인하지 않아 싣지 않는다.
+    viewedAt: getNow(),
+  }
+}
+
+const findProduct = (productId: unknown) =>
+  MOCK_PRODUCTS.find((item) => item.productId === Number(productId))
 
 export const productsApiHandlers = [
   /**
@@ -201,20 +285,25 @@ export const productsApiHandlers = [
     return ok(body)
   }),
 
-  /**
-   * 상품상세. 약관 본문(`/products/:productId/terms/:termsId`)은 목이 없다 —
-   * C-03 약관동의까지 e2e 로 밟으려면 그 목을 먼저 만들어야 한다.
-   */
+  // 오류 코드(PRD0404)는 서버 실제 값을 확인하지 않았다. C-02·C-03 은 코드가
+  // 아니라 오류 여부만 보고 화면을 그린다.
   http.get("*/products/:productId", async ({ params }) => {
     await delay(MOCK_LATENCY_MS)
 
-    const product = MOCK_PRODUCTS.find(
-      (item) => item.productId === Number(params.productId),
-    )
-    // 오류 코드는 서버 실제 값을 확인하지 않았다. C-02 는 코드가 아니라
-    // isError 만 보고 오류 화면을 그린다.
+    const product = findProduct(params.productId)
     if (!product) return fail("PRD0404", "존재하지 않는 상품입니다.", 404)
 
     return ok(buildProductDetail(product))
+  }),
+
+  http.get("*/products/:productId/terms/:termsId", async ({ params }) => {
+    await delay(MOCK_LATENCY_MS)
+
+    const product = findProduct(params.productId)
+    const view =
+      product && buildProductTermsView(product, Number(params.termsId))
+    if (!view) return fail("PRD0404", "존재하지 않는 약관입니다.", 404)
+
+    return ok(view)
   }),
 ]

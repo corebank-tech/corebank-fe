@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest"
 import {
   buildProductDetail,
+  buildProductTermsView,
   MOCK_PRODUCTS,
 } from "@/mocks/handlers/products-api"
 
 /**
- * 목록(C-01) 카드와 상세(C-02)가 같은 상품을 같은 숫자로 보여주는지 지킨다.
+ * 목록(C-01) 카드·상세(C-02)·약관 전문(C-03)이 같은 상품을 같은 숫자로 보여주는지
+ * 지킨다.
  *
- * 상세 목은 목록 목에서 파생하지만, 파생 규칙(가입기간 후보·구간 금리 역산)을
- * 누가 고치면 두 화면이 어긋날 수 있다. 이 테스트는 그 편집을 잡는다.
+ * 상세 목은 목록 목에서, 약관 전문은 상세에서 파생하지만, 파생 규칙(가입기간 후보·
+ * 구간 금리 역산·전문 생성)을 누가 고치면 세 화면이 어긋날 수 있다. 이 테스트는
+ * 그 편집을 잡는다.
  */
 describe.each(MOCK_PRODUCTS.map((p) => [p.productName, p] as const))(
   "상품 목 %s",
@@ -51,6 +54,39 @@ describe.each(MOCK_PRODUCTS.map((p) => [p.productName, p] as const))(
       // 최고금리 열 끝값이 이 값이 된다. C-01 카드의 최고금리와 같아야 한다.
       const topTier = Math.max(...tiers.map((t) => t.rate ?? 0))
       expect(topTier + preferentialSum).toBeCloseTo(product.maxRate ?? 0, 2)
+    })
+
+    it.each((detail.terms ?? []).map((t) => [t.termsName, t] as const))(
+      "상세에 실린 약관 %s 의 전문이 있고 메타데이터가 같다",
+      (_, term) => {
+        // 상세 목록에는 있는데 전문이 없으면 C-03 [보기]가 404 로 떨어진다.
+        // 버전이 다르면 동의 이력(termsId·version)이 엉뚱한 버전으로 실린다.
+        const view = buildProductTermsView(product, term.termsId ?? 0)
+        expect(view).toBeDefined()
+        expect(view?.termsName).toBe(term.termsName)
+        expect(view?.version).toBe(term.version)
+        expect(view?.required).toBe(term.required)
+        expect(view?.viewRequired).toBe(term.viewRequired)
+        expect(view?.content?.length ?? 0).toBeGreaterThan(0)
+      },
+    )
+
+    it("상품설명서가 상세와 같은 상품명·금리·가입기간을 적는다", () => {
+      const explanation = (detail.terms ?? []).find(
+        (t) => t.termsName === "상품설명서",
+      )
+      const content =
+        buildProductTermsView(product, explanation?.termsId ?? 0)?.content ?? ""
+      expect(content).toContain(product.productName ?? "")
+      expect(content).toContain(`기본금리: 연 ${product.baseRate}%`)
+      expect(content).toContain(`최고금리: 연 ${product.maxRate}%`)
+      expect(content).toContain(
+        `가입기간: ${product.minTermMonths}개월 ~ ${product.maxTermMonths}개월`,
+      )
+    })
+
+    it("상세에 없는 약관 ID 는 전문이 없다", () => {
+      expect(buildProductTermsView(product, 999)).toBeUndefined()
     })
   },
 )

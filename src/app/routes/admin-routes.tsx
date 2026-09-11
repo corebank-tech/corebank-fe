@@ -1,5 +1,9 @@
 import type { RouteObject } from "react-router"
 
+/** 관리자 채널 경로인지. 도착지를 채널별로 가를 때 쓴다(세션 만료·오류 화면). */
+export const isAdminPath = (pathname: string) =>
+  pathname === "/admin" || pathname.startsWith("/admin/")
+
 /**
  * 관리자 채널 라우트.
  *

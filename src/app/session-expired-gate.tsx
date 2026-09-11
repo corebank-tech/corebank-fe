@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router"
+import { isAdminPath } from "@/app/routes/admin-routes"
 import { SessionExpiredModal } from "@/entities/auth"
 import { useSession } from "@/features/session"
 
@@ -19,9 +20,7 @@ export const SessionExpiredGate = () => {
    * 돌아가려면 주소를 직접 쳐야 한다. RequireRole 이 인증 실패를
    * `/admin/login` 으로 보내는 것과 같은 규칙이다(app/require-role.tsx).
    */
-  const isAdminChannel =
-    location.pathname === "/admin" || location.pathname.startsWith("/admin/")
-  const loginPath = isAdminChannel ? "/admin/login" : "/"
+  const loginPath = isAdminPath(location.pathname) ? "/admin/login" : "/"
 
   const goRelogin = () => {
     acknowledgeExpired()

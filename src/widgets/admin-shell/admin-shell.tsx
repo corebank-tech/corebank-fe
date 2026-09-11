@@ -93,9 +93,12 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
             {/* POL-001 무조작 만료는 채널을 가리지 않는다. 관리자 화면은 표를 놓고
                 오래 머무는 작업이라 남은 시간과 연장 수단이 고객 화면보다 더 필요하다
                 (REQ-AUTH-030). */}
+            {/* 형제 셸(AppHeader)과 같은 방식이다. role 없는 span 의 aria-label 은
+                상당수 스크린리더가 무시하고, aria-live 를 꺼 두는 이유는 매초 바뀌는
+                숫자를 계속 읽으면 작업을 방해해서다. */}
             <span
-              className="text-[13px] text-ink-muted tabular-nums"
-              aria-label="세션 잔여시간"
+              className="min-w-[5ch] text-center text-[13px] text-ink-muted tabular-nums"
+              aria-live="off"
             >
               {formatSessionClock(remainingSeconds)}
             </span>

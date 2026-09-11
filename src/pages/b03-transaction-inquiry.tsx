@@ -27,7 +27,10 @@ import {
   useAccountTransactionQuery,
   type Transaction,
 } from "@/entities/transaction"
-import { useInquirableAccounts } from "@/entities/account"
+import {
+  useAccountDetailQuery,
+  useInquirableAccounts,
+} from "@/entities/account"
 import {
   formatAccountNo,
   formatAmount,
@@ -227,6 +230,11 @@ export const B03TransactionInquiry = () => {
     isError: isTransactionsError,
     error: transactionsError,
   } = useAccountTransactionQuery(effectiveAppliedAccountId, transactionParams)
+  const {
+    data: accountDetail,
+    isLoading: isAccountDetailLoading,
+    isError: isAccountDetailError,
+  } = useAccountDetailQuery(effectiveAppliedAccountId)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
@@ -236,6 +244,18 @@ export const B03TransactionInquiry = () => {
   const selectedAccount =
     accounts.find((item) => item.accountId === effectiveAppliedAccountId) ??
     null
+  const ownerName = isAccountDetailLoading
+    ? "불러오는 중"
+    : isAccountDetailError
+      ? "조회 실패"
+      : (accountDetail?.ownerName ?? "정보 없음")
+  const availableBalance = isAccountDetailLoading
+    ? "불러오는 중"
+    : isAccountDetailError
+      ? "조회 실패"
+      : accountDetail?.availableBalance != null
+        ? formatAmount(accountDetail.availableBalance)
+        : "정보 없음"
   const accountOptions = React.useMemo(
     () =>
       accounts.map((item) => ({
@@ -478,7 +498,7 @@ export const B03TransactionInquiry = () => {
             gridCols="grid-cols-4"
             items={[
               { term: "계좌명", desc: selectedAccount.accountName || "-" },
-              { term: "예금주", desc: "-" },
+              { term: "예금주", desc: ownerName },
               {
                 term: "계좌번호",
                 desc: formatAccountNo(selectedAccount.accountNumber),
@@ -509,7 +529,7 @@ export const B03TransactionInquiry = () => {
                 },
                 {
                   term: "출금가능금액",
-                  desc: "-",
+                  desc: availableBalance,
                 },
                 {
                   term: "신규일자",

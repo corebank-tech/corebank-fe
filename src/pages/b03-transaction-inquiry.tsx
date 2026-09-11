@@ -48,6 +48,8 @@ import {
 } from "@/shared/config/policy"
 import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
+import { Button } from "@/shared/ui/button"
+import { Skeleton } from "@/shared/ui/skeleton"
 
 /**
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-INQR-009 인수기준:
@@ -234,6 +236,7 @@ export const B03TransactionInquiry = () => {
     data: accountDetail,
     isLoading: isAccountDetailLoading,
     isError: isAccountDetailError,
+    refetch: refetchAccountDetail,
   } = useAccountDetailQuery(effectiveAppliedAccountId)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
@@ -244,18 +247,6 @@ export const B03TransactionInquiry = () => {
   const selectedAccount =
     accounts.find((item) => item.accountId === effectiveAppliedAccountId) ??
     null
-  const ownerName = isAccountDetailLoading
-    ? "불러오는 중"
-    : isAccountDetailError
-      ? "조회 실패"
-      : (accountDetail?.ownerName ?? "정보 없음")
-  const availableBalance = isAccountDetailLoading
-    ? "불러오는 중"
-    : isAccountDetailError
-      ? "조회 실패"
-      : accountDetail?.availableBalance != null
-        ? formatAmount(accountDetail.availableBalance)
-        : "정보 없음"
   const accountOptions = React.useMemo(
     () =>
       accounts.map((item) => ({
@@ -274,6 +265,17 @@ export const B03TransactionInquiry = () => {
     () => toTransactionRows(transactionData?.items ?? []),
     [transactionData?.items],
   )
+  const renderAccountDetailValue = (value: React.ReactNode) => {
+    if (isAccountDetailLoading) {
+      return <Skeleton className="h-5 w-24" />
+    }
+
+    if (isAccountDetailError || accountDetail == null) {
+      return "-"
+    }
+
+    return value
+  }
 
   const depositSum = transactionData?.summary?.depositAmount ?? 0
   const depositCount = transactionData?.summary?.depositCount ?? 0
@@ -282,6 +284,9 @@ export const B03TransactionInquiry = () => {
 
   const totalCount = transactionData?.totalCount ?? 0
   const totalPages = transactionData?.totalPages ?? 0
+
+  const accountStatus =
+    accountDetail?.status === "SUSPENDED" ? "거래정지" : "정상"
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",
@@ -497,24 +502,31 @@ export const B03TransactionInquiry = () => {
           <InfoRow
             gridCols="grid-cols-4"
             items={[
-              { term: "계좌명", desc: selectedAccount.accountName || "-" },
-              { term: "예금주", desc: ownerName },
+              {
+                term: "계좌명",
+                desc: renderAccountDetailValue(
+                  accountDetail?.accountName || "-",
+                ),
+              },
+              {
+                term: "예금주",
+                desc: renderAccountDetailValue(accountDetail?.ownerName || "-"),
+              },
               {
                 term: "계좌번호",
-                desc: formatAccountNo(selectedAccount.accountNumber),
+                desc: renderAccountDetailValue(
+                  accountDetail?.accountNumber
+                    ? formatAccountNo(accountDetail.accountNumber)
+                    : "-",
+                ),
               },
               {
                 term: "계좌상태",
-                desc: (() => {
-                  const status =
-                    selectedAccount.status === "SUSPENDED" ? "거래정지" : "정상"
-
-                  return (
-                    <Badge variant={getAccountStatusBadgeVariant(status)}>
-                      {status}
-                    </Badge>
-                  )
-                })(),
+                desc: renderAccountDetailValue(
+                  <Badge variant={getAccountStatusBadgeVariant(accountStatus)}>
+                    {accountStatus}
+                  </Badge>,
+                ),
               },
             ]}
           />
@@ -524,22 +536,49 @@ export const B03TransactionInquiry = () => {
               items={[
                 {
                   term: "계좌잔액",
-                  desc: formatAmount(selectedAccount.balance),
+                  desc: renderAccountDetailValue(
+                    accountDetail?.balance != null
+                      ? formatAmount(accountDetail.balance)
+                      : "-",
+                  ),
                   dominant: true,
                 },
                 {
                   term: "출금가능금액",
-                  desc: availableBalance,
+                  desc: renderAccountDetailValue(
+                    accountDetail?.availableBalance != null
+                      ? formatAmount(accountDetail.availableBalance)
+                      : "-",
+                  ),
                 },
                 {
                   term: "신규일자",
-                  desc: selectedAccount.openedDate
-                    ? formatDate(selectedAccount.openedDate)
-                    : "-",
+                  desc: renderAccountDetailValue(
+                    accountDetail?.openedDate
+                      ? formatDate(accountDetail.openedDate)
+                      : "-",
+                  ),
                 },
               ]}
             />
           </div>
+          {isAccountDetailError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-2 border-t border-border bg-danger-tint px-4 py-2"
+            >
+              <p className="text-base text-ink">
+                계좌 상세정보를 불러오지 못했습니다.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void refetchAccountDetail()}
+              >
+                다시 조회
+              </Button>
+            </div>
+          )}
         </div>
       </CollapsibleSection>
 

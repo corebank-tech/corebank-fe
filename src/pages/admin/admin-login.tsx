@@ -2,6 +2,7 @@ import * as React from "react"
 import { useLocation, useNavigate } from "react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import {
+  LOGIN_MISMATCH_MESSAGE,
   readSessionAuthority,
   resolveLoginFailureMessage,
   useLoginMutation,
@@ -26,6 +27,7 @@ type RedirectState = { from?: string } | null
  * 권한 없는 계정이 여기서 로그인에 성공하면 관리자 화면 대신 403 을 보게 되는데,
  * 그 사이 고객 세션은 이미 열려 있다. 관리자 문에서 고객 세션이 열리는 건
  * 직무분리(PH-49) 관점에서 어긋나므로 세션을 되돌리고 로그인 실패로 다룬다.
+ * 문구도 아이디·비밀번호 불일치와 같게 둔다(`LOGIN_MISMATCH_MESSAGE`).
  */
 export const AdminLogin = () => {
   const navigate = useNavigate()
@@ -66,7 +68,7 @@ export const AdminLogin = () => {
     )
     if (role !== "ADMIN") {
       await logout()
-      setError("관리자 권한이 없는 계정입니다.")
+      setError(LOGIN_MISMATCH_MESSAGE)
       return
     }
 

@@ -34,8 +34,9 @@ test("관리자 로그인은 고객 계정을 로그인시키지 않는다", asy
   await page.goto("/admin/login")
   await loginAsAdmin(page, CUSTOMER)
 
+  // 권한 없음을 따로 알리면 "자격증명은 맞았다"가 드러난다(REQ-AUTH-023 취지).
   await expect(page.getByRole("alert")).toContainText(
-    "관리자 권한이 없는 계정입니다",
+    "아이디 또는 비밀번호가 올바르지 않습니다",
   )
   await expect(page).toHaveURL(/\/admin\/login/)
 })

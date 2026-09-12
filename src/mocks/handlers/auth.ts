@@ -1,6 +1,7 @@
 import { delay, http } from "msw"
 import { MOCK_MEMBERS } from "@/entities/auth"
 import { maskName } from "@/shared/lib/format"
+import { readMockAuthority } from "@/mocks/handlers/admin"
 import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
@@ -22,7 +23,7 @@ const SESSION_KEY = "corebank-mock-session"
  * 세션 복원(GET /customers/me)을 검증하려면 리로드를 견뎌야 하므로
  * sessionStorage 에 둔다 — 탭을 닫으면 사라져 테스트 간 격리도 유지된다.
  */
-const readSignedInMemberId = (): string | null => {
+export const readSignedInMemberId = (): string | null => {
   try {
     return sessionStorage.getItem(SESSION_KEY)
   } catch {
@@ -39,7 +40,7 @@ const writeSignedInMemberId = (memberId: string | null): void => {
   }
 }
 
-const unauthorized = () =>
+export const unauthorized = () =>
   fail("CMN0101", "인증정보가 없거나 세션이 만료되었습니다.", 401)
 
 export const authHandlers = [
@@ -85,6 +86,8 @@ export const authHandlers = [
       phoneNumber: "010****5678",
       email: member.email,
       joinedAt: "2026-08-01T10:00:00+09:00",
+      // 서버 스펙에 아직 없는 필드. entities/auth 의 readSessionAuthority 가 읽는다.
+      ...readMockAuthority(member.memberId),
     })
   }),
 

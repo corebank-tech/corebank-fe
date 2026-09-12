@@ -177,3 +177,19 @@ export function formatAccountLabel(
 ): string {
   return alias ? `${alias}${separator}${accountNo}` : accountNo
 }
+
+/**
+ * 세션 잔여시간 `mm:ss`. 헤더에 카운트다운을 그리는 셸이 둘(고객 `AppHeader`,
+ * 관리자 `AdminShell`)이라 여기 둔다 — 같은 값을 두 곳에서 다르게 찍으면
+ * 화면마다 남은 시간이 달라 보인다.
+ *
+ * **음수는 `00:00` 으로 접는다.** 이건 AppHeader 의 지역 함수를 옮기면서 더한
+ * 동작이다 — 만료 판정과 타이머 갱신 사이 한 틱 동안 잔여시간이 음수가 될 수
+ * 있고, 그때 원본은 `-1:-1` 꼴을 그렸다.
+ */
+export function formatSessionClock(seconds: number): string {
+  const safe = Math.max(0, seconds)
+  const m = Math.floor(safe / 60)
+  const s = safe % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}

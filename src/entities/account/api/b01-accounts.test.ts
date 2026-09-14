@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest"
 import { MOCK_OVERVIEW_ACCOUNTS, MOCK_ORDER_ACCOUNTS } from "@/entities/account"
-import { MOCK_DASHBOARD_ACCOUNTS } from "@/entities/dashboard"
 import { daysBetween } from "@/shared/lib/date"
 
 /**
  * 같은 계좌를 여러 mock 파일이 각자 들고 있으므로
- * B-01(전체계좌조회)을 기준으로 B-07·대시보드 mock의 정합성을 검증한다.
+ * B-01(전체계좌조회)을 기준으로 B-07 mock의 정합성을 검증한다.
  */
 const overviewByAccountNo = new Map(
   MOCK_OVERVIEW_ACCOUNTS.map((a) => [a.accountNo, a]),
@@ -19,19 +18,11 @@ const TERM_DAYS: Record<string, number> = {
 }
 
 describe("MOCK_OVERVIEW_ACCOUNTS", () => {
-  it("같은 계좌의 신규일자가 B-07·대시보드·B-03에서 모두 같다", () => {
-    const others = [...MOCK_ORDER_ACCOUNTS, ...MOCK_DASHBOARD_ACCOUNTS]
-    const mismatched = others.filter(
+  it("같은 계좌의 신규일자가 B-07과 같다", () => {
+    const mismatched = MOCK_ORDER_ACCOUNTS.filter(
       (a) => overviewByAccountNo.get(a.accountNo)?.openedDate !== a.openedDate,
     )
-    expect(mismatched).toEqual([])
-  })
 
-  it("입출금계좌의 최근거래일이 대시보드와 같다", () => {
-    const mismatched = MOCK_DASHBOARD_ACCOUNTS.filter(
-      (a) =>
-        overviewByAccountNo.get(a.accountNo)?.lastActivityDate !== a.lastTxDate,
-    )
     expect(mismatched).toEqual([])
   })
 

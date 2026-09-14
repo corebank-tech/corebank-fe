@@ -6,21 +6,7 @@ import { Checkbox } from "@/shared/ui/checkbox"
 import { Button } from "@/shared/ui/button"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { useSession } from "@/features/session"
-import {
-  resolveLoginFailure,
-  useLoginMutation,
-  type LoginFailureReason,
-} from "@/entities/auth"
-import { isApiError } from "@/shared/api/api-error"
-import { LOGIN_MAX_ATTEMPTS as MAX_ATTEMPTS } from "@/shared/config/policy"
-
-const FAILURE_MESSAGE: Record<
-  Exclude<LoginFailureReason, "UNKNOWN">,
-  string
-> = {
-  MISMATCH: "아이디 또는 비밀번호가 올바르지 않습니다.",
-  LOCKED: `비밀번호를 ${MAX_ATTEMPTS}회 연속 잘못 입력해 계정이 잠겼습니다. 잠금 해제는 고객센터를 통한 관리자 확인 후에만 가능합니다.`,
-}
+import { resolveLoginFailureMessage, useLoginMutation } from "@/entities/auth"
 
 export const A01Login = () => {
   const [userId, setUserId] = React.useState("")
@@ -45,15 +31,6 @@ export const A01Login = () => {
     setFailure(null)
   }
 
-  const toFailureMessage = (error: unknown): string => {
-    const reason = resolveLoginFailure(error)
-    if (reason !== "UNKNOWN") return FAILURE_MESSAGE[reason]
-    // 아이디·비밀번호와 무관한 실패(전송 실패·CSRF)는 서버 메시지를 그대로 보여준다.
-    return isApiError(error)
-      ? error.message
-      : "로그인 처리 중 오류가 발생했습니다."
-  }
-
   /**
    * 제출 상태를 mutation 의 isPending 이 아니라 여기서 든다.
    * mutate 의 per-call onSuccess 는 await 되지 않아(mutationObserver), 이어지는
@@ -67,7 +44,7 @@ export const A01Login = () => {
     try {
       await loginMutation.mutateAsync({ userId, password })
     } catch (error) {
-      setFailure(toFailureMessage(error))
+      setFailure(resolveLoginFailureMessage(error))
       setIsSubmitting(false)
       return
     }

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { logout as requestLogout } from "@/entities/auth"
+import { logout as requestLogout, readSessionAuthority } from "@/entities/auth"
 import {
   getCustomerProfileQueryKey,
   useCustomerProfileQuery,
@@ -36,6 +36,12 @@ export const SessionProvider = ({
 
   const hasSession = profile.data != null
   const isAuthenticated = hasSession && expiredReason == null
+
+  /** 역할·권한은 프로필 응답 하나에서 나온다. 판정은 entities/auth 에 한 곳뿐이다. */
+  const authority = React.useMemo(
+    () => readSessionAuthority(profile.data),
+    [profile.data],
+  )
 
   /** 만료 신호는 렌더 밖(구독 콜백)에서 판정해야 해서 현재 상태를 ref 로 따라둔다. */
   const isAuthenticatedRef = React.useRef(false)
@@ -157,6 +163,8 @@ export const SessionProvider = ({
       isAuthenticated,
       isBootstrapping: profile.isPending,
       customerName: profile.data?.userName ?? "",
+      role: authority.role,
+      canModify: authority.canModify,
       remainingSeconds,
       expiredReason,
       isLoggingOut,
@@ -169,6 +177,7 @@ export const SessionProvider = ({
       isAuthenticated,
       profile.isPending,
       profile.data,
+      authority,
       remainingSeconds,
       expiredReason,
       isLoggingOut,

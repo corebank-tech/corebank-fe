@@ -8,6 +8,7 @@ import { IconButton } from "@/shared/ui/icon-button"
 import { Button } from "@/shared/ui/button"
 import { Divider } from "@/shared/ui/divider"
 import { Logo } from "@/shared/ui/logo"
+import { formatSessionClock } from "@/shared/lib/format"
 
 type AppHeaderProps = {
   activeId?: string
@@ -23,12 +24,6 @@ type AppHeaderProps = {
   logoutPending?: boolean
   onOpenFullMenu?: () => void
   onOpenNotifications?: () => void
-}
-
-const formatSession = (seconds: number) => {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
 const ICON_BTN_CLASS =
@@ -144,7 +139,7 @@ export const AppHeader = ({
                 className="min-w-[5ch] text-center text-base text-ink-muted"
                 aria-live="off"
               >
-                {formatSession(remainingSeconds)}
+                {formatSessionClock(remainingSeconds)}
               </span>
 
               <button

@@ -1,10 +1,8 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
-import { BrowserRouter } from "react-router"
+import { RouterProvider } from "react-router"
 import { AppProviders } from "@/app/providers/app-providers"
-import App from "@/App"
-import { NotificationsProvider } from "@/features/notifications"
-import { SessionProvider } from "@/features/session"
+import { router } from "@/app/routes"
 import "@/globals.css"
 
 const enableMocking = async (): Promise<void> => {
@@ -19,13 +17,7 @@ enableMocking().then(() => {
   root.render(
     <React.StrictMode>
       <AppProviders>
-        <BrowserRouter>
-          <SessionProvider>
-            <NotificationsProvider>
-              <App />
-            </NotificationsProvider>
-          </SessionProvider>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </AppProviders>
     </React.StrictMode>,
   )

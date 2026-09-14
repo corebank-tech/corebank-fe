@@ -1,4 +1,5 @@
 import * as React from "react"
+import type { SessionRole } from "@/entities/auth"
 
 /**
  * 세션이 끝난 이유. 둘의 차이는 "서버 세션이 아직 살아 있는가"다.
@@ -13,6 +14,10 @@ export type SessionContextValue = {
   /** 서버 세션 복원(GET /customers/me) 응답 전. 이 동안은 로그인 여부가 미정이다. */
   isBootstrapping: boolean
   customerName: string
+  /** 접속 중인 채널. 관리자 라우트(`/admin/*`)가 이걸로 갈린다(PH-49). */
+  role: SessionRole
+  /** 직무분리(PH-49). false 면 변경 액션을 화면에 그리지 않는다. */
+  canModify: boolean
   remainingSeconds: number
   /** null 이 아니면 A-11 안내가 떠 있어야 하는 상태다. */
   expiredReason: SessionExpiredReason | null

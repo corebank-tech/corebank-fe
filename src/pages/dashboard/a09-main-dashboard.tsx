@@ -15,7 +15,10 @@ import {
   useLoginStatusQuery,
   type NotificationItem,
 } from "@/entities/dashboard"
-import { useDashboardAccounts, type DashboardAccount } from "@/entities/account"
+import {
+  useInquirableAccounts,
+  type InquirableAccount,
+} from "@/entities/account"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { useSession } from "@/features/session"
 import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
@@ -38,11 +41,11 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.balance
 
 type A09MainDashboardProps = {
-  accounts?: DashboardAccount[]
+  accounts?: InquirableAccount[]
   notifications?: NotificationItem[]
   shortcuts?: ShortcutLink[]
-  onInquiry?: (accountId: string) => void
-  onTransfer?: (accountId: string) => void
+  onInquiry?: (accountId: number) => void
+  onTransfer?: (accountId: number) => void
   onBrowseProducts?: () => void
   onSelectShortcut?: (id: string) => void
   onOpenInbox?: () => void
@@ -64,57 +67,62 @@ export const A09MainDashboard = ({
   const loginStatus = useLoginStatusQuery()
 
   const {
-    accounts: serverAccounts,
-    primaryAccount: serverPrimaryAccount,
-    totalAssets,
+    accounts: inquirableAccounts,
     isLoading: isAccountsLoading,
     isError: isAccountsError,
     error: accountsError,
-  } = useDashboardAccounts()
+  } = useInquirableAccounts()
 
   const usesAccountOverrides = accountOverrides !== undefined
-  const accounts = accountOverrides ?? serverAccounts
 
-  const primaryAccount = usesAccountOverrides
-    ? (accounts[0] ?? null)
-    : serverPrimaryAccount
+  const demandDepositAccounts = inquirableAccounts.filter(
+    (account) => account.groupCode === "DEMAND_DEPOSIT",
+  )
 
-  const totalBalance = usesAccountOverrides
-    ? accounts.reduce((sum, account) => sum + account.balance, 0)
-    : totalAssets
+  const accounts = accountOverrides ?? demandDepositAccounts
+  const primaryAccount = accounts[0] ?? null
+
+  const totalBalance = accounts.reduce(
+    (sum, account) => sum + account.balance,
+    0,
+  )
+
+  const accountErrorMessage = isAccountsError
+    ? toErrorMessage(accountsError)
+    : null
 
   const handleInquiry =
     onInquiry ??
-    ((accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId)
-      navigate(account ? `/inquiry?account=${account.accountNo}` : "/inquiry")
+    ((accountId: number) => {
+      navigate(`/inquiry?accountId=${accountId}`)
     })
   const handleTransfer =
     onTransfer ??
-    ((accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId)
+    ((accountId: number) => {
+      const account = accounts.find((a) => a.accountId === accountId)
+
       navigate(
         account
-          ? `/instant-transfer?from=${account.accountNo}`
+          ? `/instant-transfer?from=${account.accountNumber}`
           : "/instant-transfer",
       )
     })
   const handleBrowseProducts = onBrowseProducts ?? (() => navigate("/products"))
   const handleOpenInbox = onOpenInbox ?? (() => navigate("/notifications"))
 
-  const columns: DataGridColumn<DashboardAccount>[] = [
+  const columns: DataGridColumn<InquirableAccount>[] = [
     {
-      key: "alias",
+      key: "accountName",
       header: "계좌명",
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.alias,
     },
     {
-      key: "accountNo",
+      key: "accountNumber",
       header: "계좌번호",
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.accountNo,
-      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
+      render: (r) => <span>{formatAccountNo(r.accountNumber)}</span>,
     },
     {
       key: "openedDate",
@@ -124,12 +132,14 @@ export const A09MainDashboard = ({
       render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
-      key: "lastTxDate",
+      key: "lastTransactionAt",
       header: "최근거래일",
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.lastTxDate,
       render: (r) => (
-        <span>{r.lastTxDate ? formatDate(r.lastTxDate) : "-"}</span>
+        <span>
+          {r.lastTransactionAt ? formatDate(r.lastTransactionAt) : "-"}
+        </span>
       ),
     },
     {
@@ -151,15 +161,15 @@ export const A09MainDashboard = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => handleInquiry(r.id)}
+            onClick={() => handleInquiry(r.accountId)}
           >
             조회
           </Button>
-          {r.transferEnabled && (
+          {r.status === "ACTIVE" && r.transferEnabled && (
             <Button
               size="sm"
               variant="primary"
-              onClick={() => handleTransfer(r.id)}
+              onClick={() => handleTransfer(r.accountId)}
             >
               이체
             </Button>
@@ -200,9 +210,11 @@ export const A09MainDashboard = ({
               계좌 정보를 불러오는 중입니다.
             </div>
           ) : !usesAccountOverrides && isAccountsError ? (
-            <div className="p-6 text-base text-danger">
-              {toErrorMessage(accountsError)}
-            </div>
+            accountErrorMessage != null ? (
+              <div className="p-6 text-base text-danger">
+                {accountErrorMessage}
+              </div>
+            ) : null
           ) : accounts.length === 0 ? (
             <div className="border-t-2 border-b border-border border-t-navy">
               <EmptyState
@@ -221,10 +233,10 @@ export const A09MainDashboard = ({
                 <div className="mb-4 flex items-end justify-between gap-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-base font-bold text-ink-muted">
-                      기본 입출금계좌 · {primaryAccount.alias}
+                      기본 입출금계좌 · {primaryAccount.accountName}
                     </span>
                     <span className="text-base font-bold text-ink-muted">
-                      {formatAccountNo(primaryAccount.accountNo)}
+                      {formatAccountNo(primaryAccount.accountNumber)}
                     </span>
                   </div>
 
@@ -236,7 +248,7 @@ export const A09MainDashboard = ({
               <DataGrid
                 columns={columns}
                 rows={accounts}
-                rowKey={(r) => r.id}
+                rowKey={(r) => String(r.accountId)}
               />
               <SummaryRow
                 className="mt-3"

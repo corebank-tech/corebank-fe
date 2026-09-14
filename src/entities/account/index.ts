@@ -24,10 +24,6 @@ export {
   getAccountOverviewQueryKey,
   useAccountOverviewQuery,
 } from "@/entities/account/api/account-overview-query"
-export {
-  useDashboardAccounts,
-  type DashboardAccount,
-} from "@/entities/account/api/use-dashboard-accounts"
 export type {
   InquirableAccount,
   InquirableAccountGroupCode,

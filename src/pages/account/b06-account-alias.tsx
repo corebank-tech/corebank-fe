@@ -7,18 +7,39 @@ import { Alert } from "@/shared/ui/alert"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { formatAccountNo } from "@/shared/lib/format"
+import { useQueryClient } from "@tanstack/react-query"
+import { ApiError } from "@/shared/api/api-error"
 import {
-  MOCK_ALIAS_ACCOUNTS,
   ALIAS_KOREAN_MAX,
   ALIAS_ALNUM_MAX,
+  getAccountOverviewQueryKey,
   isAliasLengthValid,
+  toAliasAccounts,
+  useAccountOverviewQuery,
+  useDeleteAccountAliasMutation,
+  useUpdateAccountAliasMutation,
   type AliasAccount,
 } from "@/entities/account"
 
 /** REQ-ACCT-013: 계좌별명 등록·수정·삭제. 한글 12자 / 영문·숫자 24자 이내. */
 export const B06AccountAlias = () => {
-  const [accounts, setAccounts] = React.useState(MOCK_ALIAS_ACCOUNTS)
-  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const accountOverviewQuery = useAccountOverviewQuery()
+  const updateAliasMutation = useUpdateAccountAliasMutation()
+  const deleteAliasMutation = useDeleteAccountAliasMutation()
+
+  const accounts = React.useMemo(
+    () =>
+      toAliasAccounts(
+        (accountOverviewQuery.data?.items ?? []).flatMap(
+          (group) => group.accounts ?? [],
+        ),
+      ),
+    [accountOverviewQuery.data],
+  )
+
+  const [editingId, setEditingId] = React.useState<number | null>(null)
   const [draft, setDraft] = React.useState("")
   const [draftError, setDraftError] = React.useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<AliasAccount | null>(
@@ -28,9 +49,15 @@ export const B06AccountAlias = () => {
     null,
   )
 
+  const [actionError, setActionError] = React.useState<string | null>(null)
+
+  const isMutating =
+    updateAliasMutation.isPending || deleteAliasMutation.isPending
+
   const startEdit = (row: AliasAccount) => {
     setSuccessMessage(null)
-    setEditingId(row.id)
+    setActionError(null)
+    setEditingId(row.accountId)
     setDraft(row.alias ?? "")
     setDraftError(null)
   }
@@ -41,34 +68,77 @@ export const B06AccountAlias = () => {
     setDraftError(null)
   }
 
-  const saveEdit = (row: AliasAccount) => {
+  const saveEdit = async (row: AliasAccount) => {
     const value = draft.trim()
+
     if (value.length === 0) {
       setDraftError("별명을 입력하세요.")
       return
     }
+
     if (!isAliasLengthValid(value)) {
       setDraftError(
         `별명은 한글 ${ALIAS_KOREAN_MAX}자 또는 영문·숫자 ${ALIAS_ALNUM_MAX}자 이내로 입력하세요.`,
       )
       return
     }
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === row.id ? { ...a, alias: value } : a)),
-    )
-    setSuccessMessage(
-      `${row.productName}의 별명이 "${value}"(으)로 저장되었습니다.`,
-    )
-    cancelEdit()
+
+    setDraftError(null)
+    setActionError(null)
+    setSuccessMessage(null)
+
+    try {
+      await updateAliasMutation.mutateAsync({
+        accountId: row.accountId,
+        data: {
+          alias: value,
+        },
+      })
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      setSuccessMessage(
+        `${row.productName}의 별명이 "${value}"(으)로 저장되었습니다.`,
+      )
+
+      cancelEdit()
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌별명 저장 중 오류가 발생했습니다.",
+      )
+    }
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === deleteTarget.id ? { ...a, alias: null } : a)),
-    )
-    setSuccessMessage(`${deleteTarget.productName}의 별명이 삭제되었습니다.`)
+
+    const target = deleteTarget
+
     setDeleteTarget(null)
+    setSuccessMessage(null)
+    setActionError(null)
+
+    try {
+      await deleteAliasMutation.mutateAsync({
+        accountId: target.accountId,
+      })
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      setSuccessMessage(`${target.productName}의 별명이 삭제되었습니다.`)
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌별명 삭제 중 오류가 발생했습니다.",
+      )
+    }
   }
 
   const columns: DataGridColumn<AliasAccount>[] = [
@@ -84,7 +154,7 @@ export const B06AccountAlias = () => {
       header: "별명",
       width: 260,
       render: (r) =>
-        editingId === r.id ? (
+        editingId === r.accountId ? (
           <div className="flex flex-col gap-1 py-1">
             <Input
               value={draft}
@@ -116,9 +186,14 @@ export const B06AccountAlias = () => {
       align: "center",
       width: 160,
       render: (r) =>
-        editingId === r.id ? (
+        editingId === r.accountId ? (
           <div className="flex items-center justify-center gap-1.5">
-            <Button variant="primary" size="sm" onClick={() => saveEdit(r)}>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isMutating}
+              onClick={() => saveEdit(r)}
+            >
               저장
             </Button>
             <Button variant="secondary" size="sm" onClick={cancelEdit}>
@@ -127,24 +202,51 @@ export const B06AccountAlias = () => {
           </div>
         ) : r.alias ? (
           <div className="flex items-center justify-center gap-1.5">
-            <Button variant="secondary" size="sm" onClick={() => startEdit(r)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isMutating}
+              onClick={() => startEdit(r)}
+            >
               수정
             </Button>
             <Button
               variant="outline"
               size="sm"
+              disabled={isMutating}
               onClick={() => setDeleteTarget(r)}
             >
               삭제
             </Button>
           </div>
         ) : (
-          <Button variant="secondary" size="sm" onClick={() => startEdit(r)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={isMutating}
+            onClick={() => startEdit(r)}
+          >
             별명 등록
           </Button>
         ),
     },
   ]
+
+  if (accountOverviewQuery.isLoading) {
+    return (
+      <div className="p-6 text-base text-ink-muted">
+        계좌 정보를 불러오는 중입니다.
+      </div>
+    )
+  }
+
+  if (accountOverviewQuery.isError) {
+    return (
+      <div className="p-6 text-base text-danger">
+        계좌 정보를 불러오지 못했습니다.
+      </div>
+    )
+  }
 
   return (
     <QueryPageLayout
@@ -184,12 +286,13 @@ export const B06AccountAlias = () => {
       }
     >
       {successMessage && <Alert variant="success">{successMessage}</Alert>}
+      {actionError && <Alert variant="danger">{actionError}</Alert>}
 
       <FormSection title="계좌별명 관리" className="mb-0">
         <DataGrid
           columns={columns}
           rows={accounts}
-          rowKey={(r) => r.id}
+          rowKey={(r) => String(r.accountId)}
           emptyMessage="보유한 계좌가 없습니다."
         />
       </FormSection>

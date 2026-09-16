@@ -38,14 +38,13 @@ const OPERATION_ID: Record<string, string> = {
 
   "get /scheduled-transfers": "searchScheduledTransfers",
   "post /scheduled-transfers": "registerScheduledTransfer",
-  "post /scheduled-transfers/{scheduledTransferId}/cancel":
-    "cancelScheduledTransfer",
+  "post /scheduled-transfers/cancel": "cancelScheduledTransfers",
   "get /scheduled-transfers/executions": "searchScheduledTransferExecutions",
 
   "get /auto-transfers": "searchAutoTransfers",
   "post /auto-transfers": "registerAutoTransfer",
   "patch /auto-transfers/{autoTransferId}": "changeAutoTransfer",
-  "delete /auto-transfers/{autoTransferId}": "cancelAutoTransfer",
+  "post /auto-transfers/cancel": "cancelAutoTransfers",
   "get /auto-transfers/executions": "searchAutoTransferExecutions",
 }
 

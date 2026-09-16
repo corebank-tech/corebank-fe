@@ -95,6 +95,12 @@ export {
 } from "@/entities/transfer/lib/transfer-intent"
 export type { TransferIntent } from "@/entities/transfer/lib/transfer-intent"
 
+export {
+  getCancelFailureMessage,
+  toAutoTransferCancelRequest,
+  toScheduledTransferCancelRequest,
+} from "@/entities/transfer/lib/cancel-transfers"
+
 export { LimitModal } from "@/entities/transfer/ui/limit-modal"
 
 export {
@@ -104,7 +110,7 @@ export {
 
 export {
   useScheduledTransfers,
-  cancelScheduledTransfer,
+  cancelScheduledTransfers,
   useRegisterScheduledTransferMutation,
 } from "@/entities/transfer/api/use-scheduled-transfers"
 export type { SearchScheduledTransfersParams } from "@/entities/transfer/api/use-scheduled-transfers"
@@ -112,7 +118,7 @@ export type { SearchScheduledTransfersParams } from "@/entities/transfer/api/use
 export {
   useAutoTransfers,
   useRegisterAutoTransferMutation,
-  cancelAutoTransfer,
+  cancelAutoTransfers,
   changeAutoTransfer,
 } from "@/entities/transfer/api/use-auto-transfers"
 export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto-transfers"

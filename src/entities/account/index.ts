@@ -15,10 +15,7 @@ export {
   toAliasAccounts,
 } from "@/entities/account/api/b06-account-aliases"
 export type { OrderAccount } from "@/entities/account/api/b07-account-order"
-export {
-  MOCK_ORDER_ACCOUNTS,
-  sortByOpenedDateAsc,
-} from "@/entities/account/api/b07-account-order"
+export { toOrderAccounts } from "@/entities/account/api/b07-account-order"
 export { useWithdrawAccounts } from "@/entities/account/api/use-withdraw-accounts"
 export {
   getAccountOverviewQueryKey,

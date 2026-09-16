@@ -144,6 +144,11 @@ export const E04ReservationList = () => {
   const [cancelTarget, setCancelTarget] = React.useState<ReservationRow | null>(
     null,
   )
+  // 취소 요청 본문이자 OTP 발급 거래정보다. 서버가 둘을 대조하므로(OTP0102) 여기서
+  // 한 번만 만들어 양쪽에 같은 값을 넘긴다.
+  const cancelRequest = toScheduledTransferCancelRequest(
+    cancelTarget ? [cancelTarget.id] : [],
+  )
   const [cancelErrorMessage, setCancelErrorMessage] = React.useState<
     string | null
   >(null)
@@ -279,15 +284,13 @@ export const E04ReservationList = () => {
     setOtpOpen(false)
     // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
     // 건과 실행 대상이 갈릴 수 있다.
-    const target = cancelTarget
-    if (!target) return
+    if (!cancelTarget) return
     setIsCancelling(true)
     try {
       // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
       // 화면이 요청 전 상태를 계속 보여준다. 그래서 실패를 문구 값으로 옮긴다.
       // 취소 불가는 예외가 아니라 200 응답의 건별 ERROR로 오므로 응답도 판정한다.
-      const request = toScheduledTransferCancelRequest([target.id])
-      const failed = await cancelScheduledTransfers(request, {
+      const failed = await cancelScheduledTransfers(cancelRequest, {
         headers: {
           "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
           "Otp-Auth-Token": otpAuthToken,
@@ -296,7 +299,7 @@ export const E04ReservationList = () => {
         (response) =>
           getCancelFailureMessage(
             response.items,
-            request.scheduledTransferIds.length,
+            cancelRequest.scheduledTransferIds.length,
             CANCEL_FAILED_MESSAGE,
           ),
         (error: unknown) =>
@@ -457,14 +460,9 @@ export const E04ReservationList = () => {
             }}
             onConfirm={handleOtpConfirm}
             guide="예약이체 취소를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-            // 거래정보는 취소 요청 본문과 같은 { scheduledTransferIds } 다. 같은
-            // 함수로 만들어야 서버 대조(OTP0102)에서 어긋나지 않는다. 대상은 발급
-            // 직전에 잡아둔다.
             transaction={{
               type: OtpTransactionType.SCHEDULED_TRANSFER,
-              data: toScheduledTransferCancelRequest(
-                cancelTarget ? [cancelTarget.id] : [],
-              ),
+              data: cancelRequest,
             }}
           />
 

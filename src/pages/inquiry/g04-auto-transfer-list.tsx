@@ -97,6 +97,11 @@ export const G04AutoTransferList = () => {
   // 파생돼 재조회가 끼면 바뀌므로(refetchOnReconnect), 발급 직전의 대상을 잡아둔다.
   const [terminateTarget, setTerminateTarget] =
     React.useState<AutoTransferRow | null>(null)
+  // 해지 요청 본문이자 OTP 발급 거래정보다. 서버가 둘을 대조하므로(OTP0102) 여기서
+  // 한 번만 만들어 양쪽에 같은 값을 넘긴다.
+  const terminateRequest = toAutoTransferCancelRequest(
+    terminateTarget ? [terminateTarget.id] : [],
+  )
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
   >(null)
@@ -223,16 +228,14 @@ export const G04AutoTransferList = () => {
     setTerminateOtpOpen(false)
     // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
     // 건과 실행 대상이 갈릴 수 있다.
-    const target = terminateTarget
-    if (!target) return
+    if (!terminateTarget) return
     setIsTerminating(true)
     try {
       // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
       // 화면이 요청 전 상태를 계속 보여준다. 그래서 실패를 문구 값으로 옮긴다.
       // 해지 불가는 예외가 아니라 200 응답의 건별 ERROR로 오므로 응답도 판정한다.
       // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
-      const request = toAutoTransferCancelRequest([target.id])
-      const failure = await cancelAutoTransfers(request, {
+      const failure = await cancelAutoTransfers(terminateRequest, {
         headers: {
           "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
           "Otp-Auth-Token": otpAuthToken,
@@ -241,7 +244,7 @@ export const G04AutoTransferList = () => {
         (response) =>
           getCancelFailureMessage(
             response.items,
-            request.autoTransferIds.length,
+            terminateRequest.autoTransferIds.length,
             TERMINATE_FAILED_MESSAGE,
           ),
         (error: unknown) =>
@@ -475,13 +478,9 @@ export const G04AutoTransferList = () => {
               setTerminateTarget(null)
             }}
             onConfirm={handleTerminateOtpConfirm}
-            // 거래정보는 해지 요청 본문과 같은 { autoTransferIds } 다. 같은 함수로
-            // 만들어야 서버 대조(OTP0102)에서 어긋나지 않는다.
             transaction={{
               type: OtpTransactionType.AUTO_TRANSFER,
-              data: toAutoTransferCancelRequest(
-                terminateTarget ? [terminateTarget.id] : [],
-              ),
+              data: terminateRequest,
             }}
             guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           />

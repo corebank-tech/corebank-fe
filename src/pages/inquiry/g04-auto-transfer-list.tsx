@@ -31,6 +31,8 @@ import {
 } from "@/shared/lib/format"
 import {
   getAutoTransferStatusBadgeVariant,
+  getCancelFailureMessage,
+  toAutoTransferCancelRequest,
   toAutoTransferRow,
   AUTO_TRANSFER_CYCLE_LABEL as CYCLE_LABEL,
   type AutoTransferRow,
@@ -41,7 +43,7 @@ import { useQueryBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { G04AutoTransferEditFlow } from "@/pages/inquiry/g04-auto-transfer-edit-flow"
 import {
   useAutoTransfers,
-  cancelAutoTransfer,
+  cancelAutoTransfers,
   changeAutoTransfer,
 } from "@/entities/transfer"
 import { useWithdrawAccounts } from "@/entities/account"
@@ -62,6 +64,8 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 // TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. autotransfer
 // 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
 const TEMP_AUTH_TOKEN = "temp-auth-token"
+
+const TERMINATE_FAILED_MESSAGE = "자동이체 해지에 실패했습니다."
 
 export const G04AutoTransferList = () => {
   const TODAY = getToday()
@@ -89,10 +93,17 @@ export const G04AutoTransferList = () => {
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [multiSelectBlockedOpen, setMultiSelectBlockedOpen] =
     React.useState(false)
-  // OTP 토큰은 발급 시점의 autoTransferId 에 묶인다. selectedRows 는 조회 결과에서
+  // OTP 토큰은 발급 시점의 해지 대상 ID 에 묶인다. selectedRows 는 조회 결과에서
   // 파생돼 재조회가 끼면 바뀌므로(refetchOnReconnect), 발급 직전의 대상을 잡아둔다.
   const [terminateTarget, setTerminateTarget] =
     React.useState<AutoTransferRow | null>(null)
+  // 해지 요청 본문이자 OTP 발급 거래정보다. 서버가 둘을 대조하므로(OTP0102) 여기서
+  // 한 번만 만들어 양쪽에 같은 값을 넘긴다. 대상이 없으면 만들지 않는다 — 빈 배열은
+  // 서버가 받을 수 없는 요청이라 값으로 들고 다니지 않고, 이 null 이 아래 OTP 모달
+  // 렌더와 실행 가드를 함께 막는다.
+  const terminateRequest = terminateTarget
+    ? toAutoTransferCancelRequest([terminateTarget.id])
+    : null
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
   >(null)
@@ -197,9 +208,9 @@ export const G04AutoTransferList = () => {
       setBlockedOpen(true)
       return
     }
-    // OTP 인증 토큰은 autoTransferId 하나에 묶여 발급되고 1회만 소비된다
-    // (otp_integration_guide.md). 여러 건을 한 번의 인증으로 해지하면 토큰에 묶인
-    // 건만 처리되고 나머지는 OTP0102로 실패하므로, 한 건씩만 받는다.
+    // 서버는 여러 건을 OTP 한 번으로 해지할 수 있지만(corebank-server#330) 화면은
+    // 아직 한 건씩만 받는다 — 일부만 해지됐을 때 어느 건이 남았는지 보여주는 방식이
+    // 정해지지 않았다(#93).
     if (selectedRows.length > 1) {
       setMultiSelectBlockedOpen(true)
       return
@@ -217,23 +228,29 @@ export const G04AutoTransferList = () => {
   const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
     if (isTerminating) return
     setTerminateOtpOpen(false)
-    // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
-    // 건과 실행 대상이 갈릴 수 있다.
-    const target = terminateTarget
-    if (!target) return
+    // 발급 시점에 잡아둔 대상으로 만든 요청이다. 여기서 selectedRows 를 다시 읽으면
+    // 토큰이 묶인 건과 실행 대상이 갈릴 수 있다.
+    if (!terminateRequest) return
     setIsTerminating(true)
     try {
       // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
-      // 화면이 요청 전 상태를 계속 보여준다. 그래서 예외를 잡아 값으로 옮긴다.
+      // 화면이 요청 전 상태를 계속 보여준다. 그래서 실패를 문구 값으로 옮긴다.
+      // 해지 불가는 예외가 아니라 200 응답의 건별 ERROR로 오므로 응답도 판정한다.
       // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
-      const failure = await cancelAutoTransfer(Number(target.id), {
+      const failure = await cancelAutoTransfers(terminateRequest, {
         headers: {
           "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
           "Otp-Auth-Token": otpAuthToken,
         },
       }).then(
-        () => null,
-        (error: unknown) => error,
+        (response) =>
+          getCancelFailureMessage(
+            response.items,
+            terminateRequest.autoTransferIds.length,
+            TERMINATE_FAILED_MESSAGE,
+          ),
+        (error: unknown) =>
+          error instanceof ApiError ? error.message : TERMINATE_FAILED_MESSAGE,
       )
       clearSelection()
 
@@ -243,11 +260,7 @@ export const G04AutoTransferList = () => {
       // 응답을 그대로 들고 있어서 방금 해지한 건이 여전히 "정상"으로 보이는데,
       // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
       if (failure) {
-        setActionErrorMessage(
-          failure instanceof ApiError
-            ? failure.message
-            : "자동이체 해지에 실패했습니다.",
-        )
+        setActionErrorMessage(failure)
       } else if (refreshed.isError) {
         setActionErrorMessage(
           "해지 결과를 다시 불러오지 못했습니다. 목록을 다시 조회해 주세요.",
@@ -400,7 +413,7 @@ export const G04AutoTransferList = () => {
     <QueryPageLayout
       noticeItems={[
         "정상 상태이고 다음 실행 예정일 전일까지인 건만 해지할 수 있습니다.",
-        "OTP 인증은 한 건에만 유효하므로 해지는 한 건씩 진행합니다.",
+        "해지는 한 건씩 진행합니다.",
         "출금계좌, 입금계좌, 이체지정일은 변경할 수 없으며 해지 후 재등록해야 합니다.",
         "이체주기를 변경하면 다음 실행 예정일이 직전 실행 예정일 기준으로 다시 계산됩니다.",
       ]}
@@ -441,10 +454,7 @@ export const G04AutoTransferList = () => {
             open={multiSelectBlockedOpen}
             onClose={() => setMultiSelectBlockedOpen(false)}
             title="해지는 한 건씩 가능합니다"
-            messages={[
-              "OTP 인증은 자동이체 한 건에만 유효합니다.",
-              "해지할 건을 하나만 선택한 뒤 다시 시도하세요.",
-            ]}
+            messages={["해지할 건을 하나만 선택한 뒤 다시 시도하세요."]}
           />
 
           <ErrorDialog
@@ -463,19 +473,23 @@ export const G04AutoTransferList = () => {
             />
           )}
 
-          <OtpModal
-            open={terminateOtpOpen}
-            onClose={() => {
-              setTerminateOtpOpen(false)
-              setTerminateTarget(null)
-            }}
-            onConfirm={handleTerminateOtpConfirm}
-            transaction={{
-              type: OtpTransactionType.AUTO_TRANSFER,
-              data: { autoTransferId: Number(terminateTarget?.id ?? 0) },
-            }}
-            guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-          />
+          {/* 대상이 없으면 렌더하지 않는다. transaction 을 빼서 넘기면 모달이 조용히
+              mock 모드로 내려가 미검증 값이 그대로 통과한다(OtpModal 의 transaction 주석). */}
+          {terminateRequest && (
+            <OtpModal
+              open={terminateOtpOpen}
+              onClose={() => {
+                setTerminateOtpOpen(false)
+                setTerminateTarget(null)
+              }}
+              onConfirm={handleTerminateOtpConfirm}
+              transaction={{
+                type: OtpTransactionType.AUTO_TRANSFER,
+                data: terminateRequest,
+              }}
+              guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            />
+          )}
 
           <TextViewModal
             open={brailleOpen}

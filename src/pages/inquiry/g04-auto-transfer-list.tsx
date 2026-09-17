@@ -98,10 +98,12 @@ export const G04AutoTransferList = () => {
   const [terminateTarget, setTerminateTarget] =
     React.useState<AutoTransferRow | null>(null)
   // 해지 요청 본문이자 OTP 발급 거래정보다. 서버가 둘을 대조하므로(OTP0102) 여기서
-  // 한 번만 만들어 양쪽에 같은 값을 넘긴다.
-  const terminateRequest = toAutoTransferCancelRequest(
-    terminateTarget ? [terminateTarget.id] : [],
-  )
+  // 한 번만 만들어 양쪽에 같은 값을 넘긴다. 대상이 없으면 만들지 않는다 — 빈 배열은
+  // 서버가 받을 수 없는 요청이라 값으로 들고 다니지 않고, 이 null 이 아래 OTP 모달
+  // 렌더와 실행 가드를 함께 막는다.
+  const terminateRequest = terminateTarget
+    ? toAutoTransferCancelRequest([terminateTarget.id])
+    : null
   const [actionErrorMessage, setActionErrorMessage] = React.useState<
     string | null
   >(null)
@@ -226,9 +228,9 @@ export const G04AutoTransferList = () => {
   const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
     if (isTerminating) return
     setTerminateOtpOpen(false)
-    // 발급 시점에 잡아둔 대상이다. 여기서 selectedRows 를 다시 읽으면 토큰이 묶인
-    // 건과 실행 대상이 갈릴 수 있다.
-    if (!terminateTarget) return
+    // 발급 시점에 잡아둔 대상으로 만든 요청이다. 여기서 selectedRows 를 다시 읽으면
+    // 토큰이 묶인 건과 실행 대상이 갈릴 수 있다.
+    if (!terminateRequest) return
     setIsTerminating(true)
     try {
       // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
@@ -471,19 +473,23 @@ export const G04AutoTransferList = () => {
             />
           )}
 
-          <OtpModal
-            open={terminateOtpOpen}
-            onClose={() => {
-              setTerminateOtpOpen(false)
-              setTerminateTarget(null)
-            }}
-            onConfirm={handleTerminateOtpConfirm}
-            transaction={{
-              type: OtpTransactionType.AUTO_TRANSFER,
-              data: terminateRequest,
-            }}
-            guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
-          />
+          {/* 대상이 없으면 렌더하지 않는다. transaction 을 빼서 넘기면 모달이 조용히
+              mock 모드로 내려가 미검증 값이 그대로 통과한다(OtpModal 의 transaction 주석). */}
+          {terminateRequest && (
+            <OtpModal
+              open={terminateOtpOpen}
+              onClose={() => {
+                setTerminateOtpOpen(false)
+                setTerminateTarget(null)
+              }}
+              onConfirm={handleTerminateOtpConfirm}
+              transaction={{
+                type: OtpTransactionType.AUTO_TRANSFER,
+                data: terminateRequest,
+              }}
+              guide="자동이체 해지를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
+            />
+          )}
 
           <TextViewModal
             open={brailleOpen}

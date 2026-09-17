@@ -41,7 +41,6 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.balance
 
 type A09MainDashboardProps = {
-  accounts?: InquirableAccount[]
   notifications?: NotificationItem[]
   shortcuts?: ShortcutLink[]
   onInquiry?: (accountId: number) => void
@@ -52,7 +51,6 @@ type A09MainDashboardProps = {
 }
 
 export const A09MainDashboard = ({
-  accounts: accountOverrides,
   notifications = MOCK_NOTIFICATIONS,
   shortcuts,
   onInquiry,
@@ -73,13 +71,9 @@ export const A09MainDashboard = ({
     error: accountsError,
   } = useInquirableAccounts()
 
-  const usesAccountOverrides = accountOverrides !== undefined
-
-  const demandDepositAccounts = inquirableAccounts.filter(
+  const accounts = inquirableAccounts.filter(
     (account) => account.groupCode === "DEMAND_DEPOSIT",
   )
-
-  const accounts = accountOverrides ?? demandDepositAccounts
   const primaryAccount = accounts[0] ?? null
 
   const totalBalance = accounts.reduce(
@@ -205,11 +199,11 @@ export const A09MainDashboard = ({
       {/* [2] 대표계좌 요약 */}
       <div className="border border-border bg-surface-elevated p-6">
         <FormSection title="대표계좌" className="mb-0">
-          {!usesAccountOverrides && isAccountsLoading ? (
+          {isAccountsLoading ? (
             <div className="p-6 text-base text-ink-muted">
               계좌 정보를 불러오는 중입니다.
             </div>
-          ) : !usesAccountOverrides && isAccountsError ? (
+          ) : isAccountsError ? (
             accountErrorMessage != null ? (
               <div className="p-6 text-base text-danger">
                 {accountErrorMessage}

@@ -22,11 +22,3 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
-
-export const EmptyAccounts: Story = {
-  render: () => (
-    <PageShell breadcrumb={["개인", "메인", "대시보드"]} title="메인 대시보드">
-      <A09MainDashboard accounts={[]} />
-    </PageShell>
-  ),
-}

@@ -83,10 +83,15 @@ const DEV_ROUTES: DevRoute[] = [
     path: "/transfer/auto/history",
   },
 
+  // 관리자 채널. 고객 파트(A~G)와 화면ID 접두를 겹치지 않게 ADM 을 쓴다 —
+  // 아래 그룹 분류가 화면ID의 `-` 앞을 파트로 보기 때문에 `A-8` 로 두면
+  // 고객 A 파트에 섞인다.
+  { screenId: "ADM-01", label: "고객 계정 운영", path: "/admin/customers" },
+
   { screenId: "DS", label: "디자인 시스템", path: "/design-system" },
 ]
 
-const DEV_PARTS = ["A", "B", "C", "D", "E", "F", "G", "DS"] as const
+const DEV_PARTS = ["A", "B", "C", "D", "E", "F", "G", "ADM", "DS"] as const
 
 export const DevNav = () => {
   const location = useLocation()

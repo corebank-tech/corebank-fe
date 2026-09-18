@@ -56,8 +56,12 @@ export const F02NotificationInbox = () => {
       key: "occurredAt",
       header: "발생일시",
       width: 150,
-      sortable: true,
-      sortValue: (r) => r.occurredAt,
+      // 정렬을 켜지 않는다 — `DataGrid` 는 넘겨받은 rows 안에서만 정렬하는데 이 화면은
+      // 클라이언트에서 잘라낸 현재 페이지(`pageRows`)를 넘긴다. 켜면 그 페이지 안에서만
+      // 재배열되면서 사용자는 전체 정렬로 읽는다(#148).
+      //
+      // "전체 보기"를 고르면 `pageRows` 가 전체라 정렬이 맞게 돌지만, 기본값(10건)에서
+      // 틀리므로 선택지에 따라 맞았다 틀렸다 하는 컨트롤을 남기지 않는다.
       render: (r) => (
         <span className="text-ink-muted">{formatDateTime(r.occurredAt)}</span>
       ),

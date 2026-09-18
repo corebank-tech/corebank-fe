@@ -107,9 +107,14 @@ export const Adm01CustomerList = () => {
    * 내보내지 않는다. prop 을 더하는 방향은 택하지 않았다 — 이 그리드를 쓰는 파일이
    * 24곳이라 회귀 범위가 레포 전체로 열린다. 서버 정렬이 생기면 그때 붙인다.
    *
-   * 레포 안에 두 방식이 섞여 있다. `b03-transaction-inquiry.tsx`·`d04-transfer-history.tsx`·
-   * `g04-auto-transfer-list.tsx` 는 `sortable` 을 쓰지 않고, `e04`·`e05`·`g05` 는 쓰는데
-   * **셋 다 서버가 내려준 한 페이지를 넘겨서 같은 결함을 갖고 있다**(#148).
+   * 레포의 기준은 하나다 — **정렬을 켜는 화면은 `DataGrid` 에 전체 목록을 넘기는 곳뿐이다.**
+   * `b01-all-accounts.tsx`·`b02-deposit-accounts.tsx`·`a09-main-dashboard.tsx` 가 그렇고,
+   * 거기서는 정렬이 결과 전체를 대상으로 돌아 맞다.
+   *
+   * 한 페이지만 잘라 넘기는 화면은 정렬을 두지 않는다 — `b03-transaction-inquiry.tsx`·
+   * `d04-transfer-history.tsx`·`g04-auto-transfer-list.tsx` 는 원래 없었고,
+   * `e04`·`e05`·`g05`(서버 페이징)와 `f02`(클라이언트 슬라이싱)는 같은 결함이 있어
+   * #148 에서 제거했다.
    */
   const columns: DataGridColumn<AdminCustomer>[] = [
     {

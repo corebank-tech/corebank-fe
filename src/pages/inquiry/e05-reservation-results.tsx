@@ -159,8 +159,9 @@ export const E05ReservationResults = () => {
       header: "이체일자",
       align: "center",
       width: 110,
-      sortable: true,
-      sortValue: (r) => r.transferDate,
+      // 정렬을 켜지 않는다 — `DataGrid` 는 넘겨받은 rows 안에서만 정렬하는데 이 화면은
+      // 서버가 내려준 한 페이지를 넘긴다. 켜면 그 페이지 안에서만 재배열되면서
+      // 사용자는 전체 정렬로 읽는다(#148). 서버 정렬이 생기면 그때 붙인다.
       render: (r) => <span>{formatDate(r.transferDate)}</span>,
     },
     {

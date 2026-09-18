@@ -10,8 +10,12 @@ import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import {
+  EMPTY_ADMIN_CUSTOMER_CONDITION,
+  filterCustomers,
   readAdminCustomers,
   type AdminCustomer,
+  type AdminCustomerSearchCondition,
+  type AdminCustomerStatusFilter,
 } from "@/entities/admin-customer"
 import {
   formatDateTime,
@@ -27,70 +31,34 @@ import {
 /**
  * ADM-01 관리자 고객 계정 운영 — 검색·목록.
  *
- * 대응 서버 API(PH-97)가 아직 없어 목 데이터를 직접 필터링한다. 실 API가 오면
- * 조건을 요청 파라미터로 넘기고 페이징도 서버로 옮긴다 — 그때 바꿀 자리를
- * `filterCustomers` 와 페이지 슬라이스 두 곳으로 모아 뒀다.
+ * 대응 서버 API(PH-97)가 아직 없어 목 데이터를 직접 필터링한다. 조건과 필터링은
+ * `entities/admin-customer` 에 있고 이 파일은 그것을 화면에 붙이기만 한다 —
+ * 실 API가 오면 조건이 그대로 요청 파라미터가 되고 페이징도 서버로 옮긴다.
  *
  * 개인정보는 목록에서도 마스킹해 표시한다. 관리자가 대상을 특정하는 수단은
  * 검색 조건이지 화면에 찍힌 원본 값이 아니다.
  */
 
-/** 상태 필터. 잠김은 `status` 가 아니라 `accountLocked` 라 별도 선택지로 둔다. */
+/**
+ * 상태 선택지. `satisfies` 로 필터 타입에 묶어 둔다 — 필터 종류가 늘었는데
+ * 선택지를 안 만들거나 반대로 없는 값을 적으면 타입 오류로 드러난다.
+ */
 const STATUS_FILTER_OPTIONS = [
   { label: "전체", value: "all" },
   { label: "정상", value: "active" },
   { label: "정지", value: "suspended" },
   { label: "잠김", value: "locked" },
-] as const
-
-type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number]["value"]
-
-type SearchCondition = {
-  userId: string
-  userName: string
-  email: string
-  status: StatusFilter
-}
-
-const EMPTY_CONDITION: SearchCondition = {
-  userId: "",
-  userName: "",
-  email: "",
-  status: "all",
-}
-
-const matchesStatus = (
-  customer: AdminCustomer,
-  status: StatusFilter,
-): boolean => {
-  if (status === "all") return true
-  if (status === "locked") return customer.accountLocked
-  if (status === "suspended") return customer.status === "SUSPENDED"
-  // 정상 = 정지도 잠김도 아닌 계정. 둘 중 하나라도 걸리면 운영 대상이다.
-  return customer.status === "ACTIVE" && !customer.accountLocked
-}
-
-const filterCustomers = (
-  customers: AdminCustomer[],
-  condition: SearchCondition,
-): AdminCustomer[] => {
-  const userId = condition.userId.trim().toLowerCase()
-  const userName = condition.userName.trim()
-  const email = condition.email.trim().toLowerCase()
-
-  return customers.filter((customer) => {
-    if (userId && !customer.userId.toLowerCase().includes(userId)) return false
-    if (userName && !customer.userName.includes(userName)) return false
-    if (email && !customer.email.toLowerCase().includes(email)) return false
-    return matchesStatus(customer, condition.status)
-  })
-}
+] satisfies { label: string; value: AdminCustomerStatusFilter }[]
 
 export const Adm01CustomerList = () => {
   // 입력 중인 값과 [조회]로 확정한 값을 나눈다 — 타이핑하는 동안 목록이 따라
   // 바뀌면 조회 결과가 어느 조건의 것인지 화면에서 말할 수 없다.
-  const [draft, setDraft] = React.useState<SearchCondition>(EMPTY_CONDITION)
-  const [applied, setApplied] = React.useState<SearchCondition>(EMPTY_CONDITION)
+  const [draft, setDraft] = React.useState<AdminCustomerSearchCondition>(
+    EMPTY_ADMIN_CUSTOMER_CONDITION,
+  )
+  const [applied, setApplied] = React.useState<AdminCustomerSearchCondition>(
+    EMPTY_ADMIN_CUSTOMER_CONDITION,
+  )
   const [page, setPage] = React.useState(1)
 
   const rows = React.useMemo(
@@ -112,9 +80,9 @@ export const Adm01CustomerList = () => {
     page * QUERY_DEFAULT_PAGE_SIZE,
   )
 
-  const setField = <K extends keyof SearchCondition>(
+  const setField = <K extends keyof AdminCustomerSearchCondition>(
     key: K,
-    value: SearchCondition[K],
+    value: AdminCustomerSearchCondition[K],
   ) => {
     setDraft((prev) => ({ ...prev, [key]: value }))
   }
@@ -125,18 +93,25 @@ export const Adm01CustomerList = () => {
   }
 
   const handleReset = () => {
-    setDraft(EMPTY_CONDITION)
-    setApplied(EMPTY_CONDITION)
+    setDraft(EMPTY_ADMIN_CUSTOMER_CONDITION)
+    setApplied(EMPTY_ADMIN_CUSTOMER_CONDITION)
     setPage(1)
   }
 
+  /**
+   * 정렬 가능 컬럼을 두지 않는다. `DataGrid` 는 **넘겨받은 rows 안에서만** 정렬하는데
+   * 이 화면은 이미 잘라낸 현재 페이지를 넘기므로, 정렬을 켜면 페이지 안에서만
+   * 재배열되어 목록 전체 순서로 오인된다. 전체 정렬을 하려면 정렬 상태를 이 화면이
+   * 소유해야 하는데 `DataGrid` 가 밖으로 내보내지 않고, prop 을 더하면 같은 그리드를
+   * 쓰는 고객 화면 8곳이 회귀 범위에 들어온다. 서버 정렬이 생기면 그때 붙인다.
+   * (형제 서버 페이징 화면 `b03-transaction-inquiry.tsx`·`e04-reservation-list.tsx`
+   * 도 같은 이유로 `sortable` 을 쓰지 않는다.)
+   */
   const columns: DataGridColumn<AdminCustomer>[] = [
     {
       key: "userId",
       header: "아이디",
       width: 140,
-      sortable: true,
-      sortValue: (row) => row.userId,
       render: (row) => maskUserId(row.userId),
     },
     {
@@ -144,8 +119,6 @@ export const Adm01CustomerList = () => {
       header: "성명",
       align: "center",
       width: 90,
-      sortable: true,
-      sortValue: (row) => row.userName,
       render: (row) => maskName(row.userName),
     },
     // 생년월일·연락처는 목록에 두지 않는다. 마스킹하면(`1988.**.**`) 대상을
@@ -161,8 +134,6 @@ export const Adm01CustomerList = () => {
       header: "로그인 실패",
       align: "center",
       width: 100,
-      sortable: true,
-      sortValue: (row) => row.loginFailureCount,
       render: (row) => (
         <span className={row.loginFailureCount > 0 ? "text-danger" : undefined}>
           {row.loginFailureCount}/{LOGIN_MAX_ATTEMPTS}
@@ -190,8 +161,6 @@ export const Adm01CustomerList = () => {
       header: "최근 로그인",
       align: "center",
       width: 160,
-      sortable: true,
-      sortValue: (row) => row.lastLoginAt ?? "",
       render: (row) =>
         row.lastLoginAt ? (
           formatDateTime(row.lastLoginAt)
@@ -209,6 +178,9 @@ export const Adm01CustomerList = () => {
       render: (row) => (
         <Link
           to={`/admin/customers/${row.customerId}`}
+          // 링크 글자가 행마다 "상세"로 같아서, 이름이 없으면 스크린리더의 링크
+          // 목록에 "상세"만 열두 개 나열된다.
+          aria-label={`${maskName(row.userName)} 계정 상세`}
           className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           상세
@@ -257,7 +229,10 @@ export const Adm01CustomerList = () => {
               className="max-w-40"
               value={draft.status}
               onChange={(event) =>
-                setField("status", event.target.value as StatusFilter)
+                setField(
+                  "status",
+                  event.target.value as AdminCustomerStatusFilter,
+                )
               }
             >
               {STATUS_FILTER_OPTIONS.map((option) => (

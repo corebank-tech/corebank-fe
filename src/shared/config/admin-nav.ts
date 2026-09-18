@@ -22,4 +22,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     title: "관리",
     items: [{ label: "관리자 홈", path: "/admin" }],
   },
+  {
+    title: "고객",
+    items: [{ label: "고객 계정 운영", path: "/admin/customers" }],
+  },
 ]

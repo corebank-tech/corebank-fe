@@ -36,6 +36,22 @@ export const adminRoutes: RouteObject = {
             return { Component: AdminHome }
           },
         },
+        {
+          path: "customers",
+          handle: { title: "고객 계정 운영" },
+          lazy: async () => {
+            const { Adm01CustomerList } = await import("@/pages/admin")
+            return { Component: Adm01CustomerList }
+          },
+        },
+        {
+          path: "customers/:customerId",
+          handle: { title: "고객 계정 상세" },
+          lazy: async () => {
+            const { Adm01CustomerDetail } = await import("@/pages/admin")
+            return { Component: Adm01CustomerDetail }
+          },
+        },
       ],
     },
   ],

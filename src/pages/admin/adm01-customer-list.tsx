@@ -100,12 +100,16 @@ export const Adm01CustomerList = () => {
 
   /**
    * 정렬 가능 컬럼을 두지 않는다. `DataGrid` 는 **넘겨받은 rows 안에서만** 정렬하는데
-   * 이 화면은 이미 잘라낸 현재 페이지를 넘기므로, 정렬을 켜면 페이지 안에서만
-   * 재배열되어 목록 전체 순서로 오인된다. 전체 정렬을 하려면 정렬 상태를 이 화면이
-   * 소유해야 하는데 `DataGrid` 가 밖으로 내보내지 않고, prop 을 더하면 같은 그리드를
-   * 쓰는 고객 화면 8곳이 회귀 범위에 들어온다. 서버 정렬이 생기면 그때 붙인다.
-   * (형제 서버 페이징 화면 `b03-transaction-inquiry.tsx`·`e04-reservation-list.tsx`
-   * 도 같은 이유로 `sortable` 을 쓰지 않는다.)
+   * (`shared/ui/data-grid.tsx` 의 `sortedRows`) 이 화면은 이미 잘라낸 현재 페이지를
+   * 넘기므로, 정렬을 켜면 페이지 안에서만 재배열되어 목록 전체 순서로 오인된다.
+   *
+   * 전체 정렬을 하려면 정렬 상태를 이 화면이 소유해야 하는데 `DataGrid` 가 밖으로
+   * 내보내지 않는다. prop 을 더하는 방향은 택하지 않았다 — 이 그리드를 쓰는 파일이
+   * 24곳이라 회귀 범위가 레포 전체로 열린다. 서버 정렬이 생기면 그때 붙인다.
+   *
+   * 레포 안에 두 방식이 섞여 있다. `b03-transaction-inquiry.tsx`·`d04-transfer-history.tsx`·
+   * `g04-auto-transfer-list.tsx` 는 `sortable` 을 쓰지 않고, `e04`·`e05`·`g05` 는 쓰는데
+   * **셋 다 서버가 내려준 한 페이지를 넘겨서 같은 결함을 갖고 있다**(#148).
    */
   const columns: DataGridColumn<AdminCustomer>[] = [
     {

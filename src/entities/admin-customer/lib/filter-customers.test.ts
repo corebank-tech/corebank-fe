@@ -72,33 +72,33 @@ describe("filterCustomers — 상태 필터", () => {
 })
 
 describe("filterCustomers — 문자열 조건", () => {
-  const 홍길동 = customer(10, {
+  const hongGildong = customer(10, {
     userId: "honggildong",
     userName: "홍길동",
     email: "hong@corebank.example.com",
   })
-  const 박서준 = customer(11, {
+  const seojunPark = customer(11, {
     userId: "seojunpark",
     userName: "박서준",
     email: "seojun@corebank.example.com",
   })
-  const rows = [홍길동, 박서준]
+  const rows = [hongGildong, seojunPark]
 
   it("아이디는 부분일치이고 대소문자를 가리지 않는다", () => {
     expect(filterCustomers(rows, withCondition({ userId: "GILD" }))).toEqual([
-      홍길동,
+      hongGildong,
     ])
   })
 
   it("이메일도 부분일치이고 대소문자를 가리지 않는다", () => {
     expect(filterCustomers(rows, withCondition({ email: "SEOJUN" }))).toEqual([
-      박서준,
+      seojunPark,
     ])
   })
 
   it("성명은 부분일치한다", () => {
     expect(filterCustomers(rows, withCondition({ userName: "길동" }))).toEqual([
-      홍길동,
+      hongGildong,
     ])
   })
 
@@ -121,5 +121,20 @@ describe("filterCustomers — 문자열 조건", () => {
     expect(
       filterCustomers(rows, withCondition({ userId: "없는아이디" })),
     ).toEqual([])
+  })
+
+  it("상태 필터와 문자열 조건은 함께 걸린다", () => {
+    const lockedHong = customer(12, {
+      userId: "honggildong2",
+      userName: "홍길순",
+      accountLocked: true,
+    })
+
+    expect(
+      filterCustomers(
+        [...rows, lockedHong],
+        withCondition({ userId: "hong", status: "locked" }),
+      ),
+    ).toEqual([lockedHong])
   })
 })

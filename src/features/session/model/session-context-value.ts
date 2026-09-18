@@ -1,6 +1,5 @@
 import * as React from "react"
-import type { SessionRole } from "@/entities/auth"
-import type { AdminPermission } from "@/shared/types/admin-permission"
+import type { AdminPermission, SessionRole } from "@/entities/auth"
 
 /**
  * 세션이 끝난 이유. 둘의 차이는 "서버 세션이 아직 살아 있는가"다.

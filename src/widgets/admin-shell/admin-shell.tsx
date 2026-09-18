@@ -1,12 +1,13 @@
 import type * as React from "react"
 import { NavLink, useNavigate } from "react-router"
-import { hasAnyWritePermission, hasPermission } from "@/entities/auth"
+import { hasAnyWritePermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import { ADMIN_NAV } from "@/shared/config/admin-nav"
 import { formatSessionClock } from "@/shared/lib/format"
 import { cn } from "@/shared/lib/utils"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { visibleAdminNav } from "@/widgets/admin-shell/visible-nav"
 
 type AdminShellProps = {
   title?: React.ReactNode
@@ -29,6 +30,10 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
     extend,
   } = useSession()
 
+  // 거르는 규칙은 `visible-nav.ts` 에 있다 — 셸 안에 두면 그 분기를 테스트할 수 없다.
+  const navGroups = visibleAdminNav(ADMIN_NAV, permissions)
+  const canModifyAnything = hasAnyWritePermission(permissions)
+
   const handleLogout = async () => {
     await logout()
     navigate("/admin/login", { replace: true })
@@ -43,42 +48,33 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {ADMIN_NAV.map((group) => {
-            const items = group.items.filter(
-              (item) =>
-                !item.requiresPermission ||
-                hasPermission(permissions, item.requiresPermission),
-            )
-            if (items.length === 0) return null
-
-            return (
-              <div key={group.title} className="mb-4">
-                <p className="mb-1.5 px-2 text-[13px] font-bold text-ink-faint">
-                  {group.title}
-                </p>
-                <ul className="flex flex-col gap-0.5">
-                  {items.map((item) => (
-                    <li key={item.path}>
-                      <NavLink
-                        to={item.path}
-                        end
-                        className={({ isActive }) =>
-                          cn(
-                            "block rounded px-2 py-1.5 text-base",
-                            isActive
-                              ? "bg-primary-tint font-bold text-primary"
-                              : "text-ink-muted hover:bg-surface-2",
-                          )
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
+          {navGroups.map((group) => (
+            <div key={group.title} className="mb-4">
+              <p className="mb-1.5 px-2 text-[13px] font-bold text-ink-faint">
+                {group.title}
+              </p>
+              <ul className="flex flex-col gap-0.5">
+                {group.items.map((item) => (
+                  <li key={item.path}>
+                    <NavLink
+                      to={item.path}
+                      end
+                      className={({ isActive }) =>
+                        cn(
+                          "block rounded px-2 py-1.5 text-base",
+                          isActive
+                            ? "bg-primary-tint font-bold text-primary"
+                            : "text-ink-muted hover:bg-surface-2",
+                        )
+                      }
+                    >
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
       </aside>
 
@@ -113,12 +109,8 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
 
                 여기서는 기능을 특정하지 않으므로 "변경 권한을 하나라도 가졌는가"로
                 판정한다. 액션 버튼은 각자 자기 기능의 권한을 직접 묻는다. */}
-            <Badge
-              variant={
-                hasAnyWritePermission(permissions) ? "success" : "neutral"
-              }
-            >
-              {hasAnyWritePermission(permissions) ? "변경 가능" : "조회 전용"}
+            <Badge variant={canModifyAnything ? "success" : "neutral"}>
+              {canModifyAnything ? "변경 가능" : "조회 전용"}
             </Badge>
             <Button
               size="sm"

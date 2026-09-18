@@ -10,8 +10,9 @@
  * 의존 방향이 `entities → shared` 라 `shared` 가 `entities` 를 import 할 수 없다.
  * 같은 이유로 `shared/types/account.ts` 가 이미 있다.
  *
- * **판정은 여기 없다.** 세션 응답을 읽어 권한을 정하는 일은
- * `entities/auth/lib/session-role.ts` 한 곳뿐이다 — 여기 있는 것은 이름의 목록이다.
+ * **여기 있는 것은 이름의 목록뿐이다.** 권한을 읽고 판정하는 일(응답 파싱,
+ * 보유 여부, 변경 권한 여부)은 전부 `entities/auth/lib/session-role.ts` 에 있다.
+ * 상수가 함께 있는 이유는 타입이 그것에서 파생되기 때문이다.
  */
 export const ADMIN_PERMISSIONS = [
   "GL_READ",
@@ -22,10 +23,3 @@ export const ADMIN_PERMISSIONS = [
 ] as const
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]
-
-/**
- * 변경 권한인지. 접미사로 판정하는 이유는 집합이 늘어도 규칙이 유지되기 때문이다 —
- * 새 `*_WRITE` 가 생기면 자동으로 변경 권한으로 잡힌다.
- */
-export const isWritePermission = (permission: AdminPermission): boolean =>
-  permission.endsWith("_WRITE")

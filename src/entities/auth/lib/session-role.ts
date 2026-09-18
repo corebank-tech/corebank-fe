@@ -1,6 +1,5 @@
 import {
   ADMIN_PERMISSIONS,
-  isWritePermission,
   type AdminPermission,
 } from "@/shared/types/admin-permission"
 
@@ -26,6 +25,13 @@ type SessionAuthorityFields = {
 const isAdminPermission = (value: unknown): value is AdminPermission =>
   typeof value === "string" &&
   (ADMIN_PERMISSIONS as readonly string[]).includes(value)
+
+/**
+ * 변경 권한인지. 접미사로 판정하는 이유는 집합이 늘어도 규칙이 유지되기 때문이다 —
+ * 새 `*_WRITE` 가 생기면 자동으로 변경 권한으로 잡힌다.
+ */
+const isWritePermission = (permission: AdminPermission): boolean =>
+  permission.endsWith("_WRITE")
 
 /**
  * 배열과 CSV 문자열을 **둘 다** 받는다. DB 는 CSV 컬럼인데 응답이 어느 모양으로

@@ -79,6 +79,14 @@ describe("readSessionAuthority — 권한", () => {
     ).toEqual(["GL_READ"])
   })
 
+  it("빈 문자열은 빈 목록으로 읽는다", () => {
+    // CSV 컬럼이 비어 있으면 `""` 가 온다. `"".split(",")` 는 `[""]` 라
+    // 걸러지지 않으면 모르는 권한 하나가 들어온 것처럼 다뤄진다.
+    expect(
+      readSessionAuthority({ role: "ADMIN", permissions: "" }).permissions,
+    ).toEqual([])
+  })
+
   it("권한 필드가 배열도 문자열도 아니면 빈 목록이다", () => {
     expect(
       readSessionAuthority({ role: "ADMIN", permissions: { a: 1 } })

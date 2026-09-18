@@ -119,6 +119,64 @@ describe("세션 부트스트랩", () => {
   })
 })
 
+describe("세션 역할·권한", () => {
+  /** 관리자 역할·권한을 실은 프로필 응답으로 갈아끼운다. */
+  const respondAsAdmin = (permissions: unknown) =>
+    server.use(
+      http.get("*/customers/me", () =>
+        HttpResponse.json({
+          code: "0000",
+          message: "성공",
+          data: {
+            customerId: 2,
+            userName: "박*준",
+            role: "ADMIN",
+            permissions,
+          },
+        }),
+      ),
+    )
+
+  it("역할 필드가 없는 응답은 고객·권한 없음으로 떨어진다", async () => {
+    // 서버가 아직 필드를 내려주지 않는 상태(2026-09-18 기준)가 이 경우다.
+    // 여기서 권한이 새면 관리자 화면이 전원에게 열린다.
+    hasServerSession = true
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("CUSTOMER")
+    expect(result.current.permissions).toEqual([])
+  })
+
+  it("관리자 응답의 권한을 컨텍스트로 옮긴다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["CUSTOMER_READ", "CUSTOMER_WRITE"])
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("ADMIN")
+    expect(result.current.permissions).toEqual([
+      "CUSTOMER_READ",
+      "CUSTOMER_WRITE",
+    ])
+  })
+
+  it("CSV 문자열로 와도 컨텍스트까지 배열로 도착한다", async () => {
+    // 응답 모양이 확정되기 전이라 `readSessionAuthority` 가 둘 다 받는다(#147).
+    // 파싱은 그쪽 테스트가 덮고, 여기서는 그 결과가 컨텍스트까지 오는지를 본다.
+    hasServerSession = true
+    respondAsAdmin("GL_READ,AUDIT_READ")
+    const { result } = await renderSettledSession()
+
+    expect(result.current.permissions).toEqual(["GL_READ", "AUDIT_READ"])
+  })
+
+  it("세션이 없으면 권한도 없다", async () => {
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("CUSTOMER")
+    expect(result.current.permissions).toEqual([])
+  })
+})
+
 describe("세션 만료", () => {
   it("무조작 타이머가 끝나면 서버 세션까지 끊는다", async () => {
     hasServerSession = true

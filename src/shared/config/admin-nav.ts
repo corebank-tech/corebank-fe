@@ -39,4 +39,16 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       },
     ],
   },
+  {
+    title: "회계",
+    items: [
+      {
+        label: "시산표",
+        path: "/admin/trial-balance",
+        // 시산표는 조회 전용이다. `GL_WRITE` 는 결산·역분개가 붙을 때 쓰이는데
+        // 그 화면(#129)은 2차 범위 밖이라 이 그룹에 변경 항목이 없다.
+        requiresPermission: "GL_READ",
+      },
+    ],
+  },
 ]

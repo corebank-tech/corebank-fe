@@ -52,6 +52,14 @@ export const adminRoutes: RouteObject = {
             return { Component: Adm01CustomerDetail }
           },
         },
+        {
+          path: "trial-balance",
+          handle: { title: "시산표" },
+          lazy: async () => {
+            const { Adm02TrialBalance } = await import("@/pages/admin")
+            return { Component: Adm02TrialBalance }
+          },
+        },
       ],
     },
   ],

@@ -179,8 +179,10 @@ export const Adm01CustomerList = () => {
         <Link
           to={`/admin/customers/${row.customerId}`}
           // 링크 글자가 행마다 "상세"로 같아서, 이름이 없으면 스크린리더의 링크
-          // 목록에 "상세"만 열두 개 나열된다.
-          aria-label={`${maskName(row.userName)} 계정 상세`}
+          // 목록에 "상세"만 열두 개 나열된다. 성명이 아니라 아이디를 쓰는 이유는
+          // 마스킹하면 동명이인이 같은 접근명이 되기 때문이다(박서준·박상준 →
+          // 둘 다 "박*준"). 아이디는 유일하므로 행마다 반드시 갈린다.
+          aria-label={`${maskUserId(row.userId)} 계정 상세`}
           className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           상세

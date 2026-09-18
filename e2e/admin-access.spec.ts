@@ -1,13 +1,16 @@
 import { expect, test, type Page } from "@playwright/test"
 
 /**
- * 관리자 채널의 인증·인가 경계 검증(#126).
+ * 관리자 채널의 인증·인가 경계 검증(#126·#147).
  *
- * 역할은 MSW 가 `GET /customers/me` 에 실어 내려준다(src/mocks/handlers/admin.ts) —
- * 서버 스펙에 아직 역할 필드가 없어 목이 그 자리를 대신한다.
+ * 역할·권한은 MSW 가 `GET /customers/me` 에 실어 내려준다(src/mocks/handlers/admin.ts) —
+ * 서버 스펙에 아직 그 필드가 없어 목이 그 자리를 대신한다.
  */
 const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
+/** 전 권한 관리자. */
 const ADMIN = { userId: "seojunpark", password: "Corebank1!" }
+/** 조회 전용 관리자 — CUSTOMER_READ 는 있고 CUSTOMER_WRITE 가 없다. */
+const READONLY_ADMIN = { userId: "dayeonkim", password: "Corebank2!" }
 
 async function loginAsAdmin(
   page: Page,
@@ -78,7 +81,8 @@ test("관리자 계정은 관리자 홈에 들어가고 권한이 화면에 드�
 
   await expect(page).toHaveURL("/admin")
   await expect(page.getByRole("heading", { name: "관리자 홈" })).toBeVisible()
-  await expect(page.getByText("변경 가능")).toBeVisible()
+  // 조회 전용 시나리오와 같은 이유로 exact — 홈의 "변경 권한" 행과 구분한다.
+  await expect(page.getByText("변경 가능", { exact: true })).toBeVisible()
 })
 
 test("관리자 세션은 새로고침해도 유지된다", async ({ page }) => {
@@ -91,4 +95,72 @@ test("관리자 세션은 새로고침해도 유지된다", async ({ page }) => 
   // 세션 복원 전에 역할을 CUSTOMER 로 단정하면 새로고침마다 403 이 번쩍인다.
   await expect(page.getByText("접근 권한이 없습니다")).toBeHidden()
   await expect(page.getByRole("heading", { name: "관리자 홈" })).toBeVisible()
+})
+
+/* ------------------------------------------------------------------ */
+/* 직무분리(PH-49) — 권한이 없는 쪽                                     */
+/* ------------------------------------------------------------------ */
+
+test("조회 전용 관리자는 조회 전용으로 표시된다", async ({ page }) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, READONLY_ADMIN)
+
+  await expect(page).toHaveURL("/admin")
+  // `exact` 를 붙이는 이유는 관리자 홈이 "변경 권한: 없음 (조회 전용)" 행을 함께
+  // 그리기 때문이다. 부분일치로 찾으면 셸 배지와 그 행이 같이 잡혀 strict mode
+  // 위반이 난다 — 여기서 확인하려는 것은 **셸 배지** 쪽이다.
+  await expect(page.getByText("조회 전용", { exact: true })).toBeVisible()
+  // 변경 권한이 하나도 없으므로 "변경 가능" 배지가 뜨면 안 된다.
+  await expect(page.getByText("변경 가능", { exact: true })).toBeHidden()
+})
+
+test("조회 전용 관리자도 CUSTOMER_READ 가 있으면 고객 목록을 본다", async ({
+  page,
+}) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, READONLY_ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  // 메뉴가 보이는지부터 확인한다 — 권한 필터가 조회 권한까지 잘라내면
+  // 관리자가 아무것도 못 보게 된다.
+  await page.getByRole("link", { name: "고객 계정 운영" }).click()
+
+  await expect(page).toHaveURL(/\/admin\/customers/)
+  await expect(page.getByText("조회조건")).toBeVisible()
+})
+
+test("조회 전용 관리자에게 계정 운영 버튼이 보이지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, READONLY_ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  await page.goto("/admin/customers/3")
+
+  // 상세는 열리지만(CUSTOMER_READ) 변경 액션은 렌더링되지 않는다(CUSTOMER_WRITE 없음).
+  await expect(page.getByText("계정 정보")).toBeVisible()
+  await expect(page.getByRole("button", { name: "잠금 해제" })).toBeHidden()
+  await expect(
+    page.getByRole("button", { name: "비밀번호 초기화" }),
+  ).toBeHidden()
+  await expect(page.getByRole("button", { name: "계정 정지" })).toBeHidden()
+
+  // 왜 버튼이 없는지 화면에서 설명되지 않으면 결함으로 오인된다.
+  await expect(page.getByText("조회 전용 권한")).toBeVisible()
+})
+
+test("전 권한 관리자에게는 계정 운영 버튼이 보인다", async ({ page }) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  await page.goto("/admin/customers/3")
+
+  // 위 시나리오의 짝. 버튼이 아예 만들어지지 않은 것과 권한으로 숨긴 것을 구분한다.
+  await expect(page.getByRole("button", { name: "잠금 해제" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "비밀번호 초기화" }),
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: "계정 정지" })).toBeVisible()
 })

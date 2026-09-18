@@ -1,5 +1,6 @@
 import type * as React from "react"
 import { NavLink, useNavigate } from "react-router"
+import { hasAnyWritePermission, hasPermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import { ADMIN_NAV } from "@/shared/config/admin-nav"
 import { formatSessionClock } from "@/shared/lib/format"
@@ -21,7 +22,7 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
   const navigate = useNavigate()
   const {
     customerName,
-    canModify,
+    permissions,
     isLoggingOut,
     logout,
     remainingSeconds,
@@ -44,7 +45,9 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
         <nav className="flex-1 overflow-y-auto p-3">
           {ADMIN_NAV.map((group) => {
             const items = group.items.filter(
-              (item) => !item.requiresModify || canModify,
+              (item) =>
+                !item.requiresPermission ||
+                hasPermission(permissions, item.requiresPermission),
             )
             if (items.length === 0) return null
 
@@ -106,9 +109,16 @@ export const AdminShell = ({ title, children }: AdminShellProps) => {
               연장
             </Button>
             {/* 조회 전용 관리자에게 자기 권한을 계속 보이게 둔다 — 왜 버튼이
-                없는지 화면에서 설명되지 않으면 결함으로 오인된다. */}
-            <Badge variant={canModify ? "success" : "neutral"}>
-              {canModify ? "변경 가능" : "조회 전용"}
+                없는지 화면에서 설명되지 않으면 결함으로 오인된다.
+
+                여기서는 기능을 특정하지 않으므로 "변경 권한을 하나라도 가졌는가"로
+                판정한다. 액션 버튼은 각자 자기 기능의 권한을 직접 묻는다. */}
+            <Badge
+              variant={
+                hasAnyWritePermission(permissions) ? "success" : "neutral"
+              }
+            >
+              {hasAnyWritePermission(permissions) ? "변경 가능" : "조회 전용"}
             </Badge>
             <Button
               size="sm"

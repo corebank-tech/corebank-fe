@@ -36,6 +36,8 @@ export {
   useCompleteSignupMutation,
 } from "@/entities/auth/api/signup"
 export {
+  hasAnyWritePermission,
+  hasPermission,
   readSessionAuthority,
   type SessionAuthority,
   type SessionRole,

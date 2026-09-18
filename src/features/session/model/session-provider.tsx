@@ -164,7 +164,7 @@ export const SessionProvider = ({
       isBootstrapping: profile.isPending,
       customerName: profile.data?.userName ?? "",
       role: authority.role,
-      canModify: authority.canModify,
+      permissions: authority.permissions,
       remainingSeconds,
       expiredReason,
       isLoggingOut,

@@ -1,11 +1,16 @@
+import type { AdminPermission } from "@/shared/types/admin-permission"
+
 export type AdminNavItem = {
   label: string
   path: string
   /**
-   * 변경 권한이 있어야 보이는 항목. 직무분리(PH-49)에서 조회 전용 관리자에게는
+   * 이 항목을 보려면 필요한 권한. 직무분리(PH-49)에서 권한이 없는 관리자에게는
    * 메뉴 자체를 그리지 않는다 — 눌러서 서버 거부를 받는 건 이미 늦다.
+   *
+   * 불리언(`requiresModify`)이 아니라 **기능 단위 권한**을 적는다. "변경 권한이
+   * 있는가"만으로는 `GL_WRITE` 만 가진 관리자에게 고객 메뉴가 열린다.
    */
-  requiresModify?: boolean
+  requiresPermission?: AdminPermission
 }
 
 export type AdminNavGroup = {
@@ -24,6 +29,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
   {
     title: "고객",
-    items: [{ label: "고객 계정 운영", path: "/admin/customers" }],
+    items: [
+      {
+        label: "고객 계정 운영",
+        path: "/admin/customers",
+        // 조회 자체는 CUSTOMER_READ 로 충분하다. 변경 액션은 화면 안에서
+        // CUSTOMER_WRITE 를 따로 묻는다.
+        requiresPermission: "CUSTOMER_READ",
+      },
+    ],
   },
 ]

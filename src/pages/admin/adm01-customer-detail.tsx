@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router"
+import { hasPermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import {
   findAdminCustomer,
@@ -71,7 +72,10 @@ const issueTemporaryPassword = (): string => {
 export const Adm01CustomerDetail = () => {
   const { customerId } = useParams()
   const navigate = useNavigate()
-  const { canModify } = useSession()
+  const { permissions } = useSession()
+  // 기능 단위로 묻는다. "변경 권한이 있는가"로 물으면 `GL_WRITE` 만 가진
+  // 회계 관리자에게 고객 정지 버튼이 열린다.
+  const canOperateCustomer = hasPermission(permissions, "CUSTOMER_WRITE")
 
   const parsedId = Number(customerId)
   const [customer, setCustomer] = React.useState<AdminCustomer | undefined>(
@@ -241,7 +245,7 @@ export const Adm01CustomerDetail = () => {
 
       {/* 직무분리(PH-49). 변경 권한이 없으면 버튼을 그리지 않는다 — 눌러서 서버
           거부를 받는 건 이미 늦다. 왜 없는지는 설명해 둔다. */}
-      {canModify ? (
+      {canOperateCustomer ? (
         <Panel>
           <PanelHeader title="계정 운영" />
           <div className="flex flex-wrap gap-2 px-4 pt-1 pb-4">

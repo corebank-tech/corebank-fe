@@ -142,18 +142,30 @@ export const Adm02TrialBalance = () => {
       header: "분류",
       align: "center",
       width: 80,
-      render: (row) => (
-        <Badge variant="neutral">
-          {ACCOUNT_CLASS_LABELS[row.accountClass]}
-        </Badge>
-      ),
+      // 미등록 계정은 분류가 없다. 코드 첫 자리로 추측하면 `99999` 가 "자산"으로
+      // 찍혀, 이름은 빨갛게 미등록이라 말하면서 옆 배지는 멀쩡한 계정처럼 보인다.
+      render: (row) =>
+        row.accountClass ? (
+          <Badge variant="neutral">
+            {ACCOUNT_CLASS_LABELS[row.accountClass]}
+          </Badge>
+        ) : (
+          <Badge variant="danger">미등록</Badge>
+        ),
     },
     {
       key: "normalBalance",
       header: "정상잔액",
       align: "center",
       width: 90,
-      render: (row) => (row.normalBalance === "DEBIT" ? "차변" : "대변"),
+      render: (row) =>
+        row.normalBalance == null ? (
+          <span className="text-ink-faint">—</span>
+        ) : row.normalBalance === "DEBIT" ? (
+          "차변"
+        ) : (
+          "대변"
+        ),
     },
     {
       key: "debitTotal",

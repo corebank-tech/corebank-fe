@@ -60,18 +60,25 @@ test("조회기간을 넓히면 집계 대상 분개가 늘어난다", async ({ 
   await loginAsAdmin(page)
   await page.goto("/admin/trial-balance")
 
-  const summaryText = async () =>
-    (await page
-      .getByText(/분개 .*줄/)
-      .first()
-      .textContent()) ?? ""
+  // 요약 문구는 계정 수와 분개 줄 수를 함께 담는다. 문자열 전체를 비교하면 분개가
+  // **줄어도** 통과하므로 방향을 검증하지 못한다. 숫자를 뽑아 증가를 단언한다.
+  const journalEntryCount = async () => {
+    const text =
+      (await page
+        .getByText(/분개 .*줄/)
+        .first()
+        .textContent()) ?? ""
+    const matched = text.match(/분개\s+([\d,]+)줄/)
+    expect(matched).not.toBeNull()
+    return Number(matched![1].replaceAll(",", ""))
+  }
 
-  const before = await summaryText()
+  const before = await journalEntryCount()
 
   await page.getByRole("button", { name: "3개월" }).click()
   await page.getByRole("button", { name: "조회" }).click()
 
-  expect(await summaryText()).not.toBe(before)
+  expect(await journalEntryCount()).toBeGreaterThan(before)
 })
 
 test("역전된 조회기간에서는 조회가 막힌다", async ({ page }) => {

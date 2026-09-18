@@ -10,8 +10,15 @@ import {
 export type TrialBalanceRow = {
   accountCode: string
   accountName: string
-  accountClass: GlAccountClass
-  normalBalance: GlNormalBalance
+  /**
+   * 계정과목에 등록되지 않은 코드면 `null` 이다.
+   *
+   * **`GlAccountClass` 에 "UNKNOWN" 을 더하지 않는다.** 그 타입은 서버에 넘길 계약이고
+   * 미등록은 서버가 가질 상태가 아니라 화면이 해석하지 못한 상태다. 계약 enum 에 섞으면
+   * BE 가 없는 분류를 만들게 된다. 값이 없다는 사실은 `null` 로 말한다.
+   */
+  accountClass: GlAccountClass | null
+  normalBalance: GlNormalBalance | null
   debitTotal: number
   creditTotal: number
   /** 이 계정에 걸린 분개 줄 수. 합계가 이상할 때 어디를 볼지 알려준다. */
@@ -74,10 +81,11 @@ export const aggregateTrialBalance = (
     byCode.set(entry.accountCode, {
       accountCode: entry.accountCode,
       accountName: account?.name ?? UNKNOWN_ACCOUNT_NAME,
-      // 코드 첫 자리가 분류다(PH-20 대1·중2·세2). 등록되지 않은 계정도 분류만은
-      // 코드에서 읽을 수 있어야 화면이 행을 어디에 둘지 정할 수 있다.
-      accountClass: account?.accountClass ?? classOfCode(entry.accountCode),
-      normalBalance: account?.normalBalance ?? "DEBIT",
+      // 미등록 계정의 분류·정상잔액을 **지어내지 않는다.** 코드 첫 자리로 분류를
+      // 추측했더니 `99999` 가 "자산"으로 찍혔다 — 이름은 미등록이라 빨갛게 드러내면서
+      // 바로 옆 배지는 멀쩡한 계정처럼 보이는 상태였다. 모르는 것은 모른다고 둔다.
+      accountClass: account?.accountClass ?? null,
+      normalBalance: account?.normalBalance ?? null,
       debitTotal: entry.debit,
       creditTotal: entry.creditAmount,
       entryCount: 1,
@@ -104,14 +112,3 @@ export const aggregateTrialBalance = (
     journalEntryCount: inPeriod.length,
   }
 }
-
-const CLASS_BY_FIRST_DIGIT: Record<string, GlAccountClass> = {
-  "1": "ASSET",
-  "2": "LIABILITY",
-  "3": "EQUITY",
-  "4": "REVENUE",
-  "5": "EXPENSE",
-}
-
-const classOfCode = (code: string): GlAccountClass =>
-  CLASS_BY_FIRST_DIGIT[code[0]] ?? "ASSET"

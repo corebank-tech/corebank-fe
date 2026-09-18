@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  GL_ACCOUNTS,
   MOCK_JOURNAL_ENTRIES,
   type GlJournalEntry,
 } from "@/entities/gl/api/ph28-trial-balance"
@@ -20,7 +21,7 @@ const line = (
   tradeDate,
   txType: "TRANSFER",
   accountCode,
-  debit,
+  debitAmount: debit,
   creditAmount: credit,
 })
 
@@ -156,6 +157,35 @@ describe("aggregateTrialBalance", () => {
     // 그래도 금액은 총계에 들어간다 — 빼면 차대변이 맞는 것처럼 보인다.
     expect(result.creditGrandTotal).toBe(100)
     expect(result.balanced).toBe(true)
+  })
+
+  it("목 분개는 전표 단위로 차대변이 맞는다", () => {
+    // PH-21 의 핵심 규칙이고 지금까지 주석으로만 선언돼 있었다. 총계만 보는
+    // 테스트는 **서로 상쇄되는 두 전표의 오류**를 통과시킨다(전표 A 차변 +N,
+    // 전표 B 대변 +N) — 그게 이 화면이 잡으라고 존재하는 편측기표다.
+    const byVoucher = new Map<string, { debit: number; credit: number }>()
+    for (const entry of MOCK_JOURNAL_ENTRIES) {
+      const sum = byVoucher.get(entry.voucherNo) ?? { debit: 0, credit: 0 }
+      sum.debit += entry.debitAmount
+      sum.credit += entry.creditAmount
+      byVoucher.set(entry.voucherNo, sum)
+    }
+
+    for (const [voucherNo, sum] of byVoucher) {
+      // 전표번호를 같이 단언해 실패 메시지가 어느 전표인지 말하게 한다.
+      expect([voucherNo, sum.debit]).toEqual([voucherNo, sum.credit])
+    }
+  })
+
+  it("목 분개가 쓰는 계정코드는 전부 계정과목에 있다", () => {
+    // 두 상수는 서로를 import 하지 않아 한쪽만 고쳐도 아무것도 깨지지 않는다.
+    // `GL_ACCOUNTS` 에서 한 줄을 지우면 기본 화면이 "(계정과목 미등록)" 행을 띄운다.
+    const known = new Set(GL_ACCOUNTS.map((account) => account.code))
+    const used = [
+      ...new Set(MOCK_JOURNAL_ENTRIES.map((entry) => entry.accountCode)),
+    ]
+
+    expect(used.filter((code) => !known.has(code))).toEqual([])
   })
 
   it("계정 코드 순으로 정렬한다", () => {

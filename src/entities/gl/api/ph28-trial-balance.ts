@@ -90,8 +90,14 @@ export type GlJournalEntry = {
   tradeDate: string
   txType: GlTxType
   accountCode: string
-  /** 차변 금액. 반대편이면 0 — 한 줄이 양쪽을 동시에 갖지 않는다. */
-  debit: number
+  /**
+   * 차변 금액. 반대편이면 0 — 한 줄이 양쪽을 동시에 갖지 않는다.
+   *
+   * 접미사를 붙여 `creditAmount` 와 대칭을 맞춘다. 서버 스펙의 금액 필드가
+   * `<명사>Amount` 관용구(`successAmount`·`depositAmount`·`withdrawalAmount`)를
+   * 쓰고 `debit`·`credit` 이름은 아직 없어, 이 계약이 그 관용구를 따라간다.
+   */
+  debitAmount: number
   creditAmount: number
 }
 
@@ -108,6 +114,9 @@ const VOUCHER_PREFIX: Record<GlTxType, string> = {
  * 줄을 손으로 나열하면 전표번호를 줄마다 다시 적게 되고, 하나만 틀려도 전표가
  * 쪼개진 채 화면에서는 멀쩡해 보인다(합계는 같으므로). 전표 단위로 만들어야
  * **전표번호가 한 곳에서만 만들어진다.**
+ *
+ * 입력 줄은 `debit`·`credit` 짧은 이름을 쓴다 — 아래 분개표가 한 줄에 한 분개로
+ * 읽혀야 하기 때문이다. 내보내는 계약 필드는 `debitAmount`·`creditAmount` 다.
  */
 const voucher = (
   tradeDate: string,
@@ -120,7 +129,7 @@ const voucher = (
     tradeDate,
     txType,
     accountCode: line.accountCode,
-    debit: line.debit ?? 0,
+    debitAmount: line.debit ?? 0,
     creditAmount: line.credit ?? 0,
   }))
 
@@ -162,7 +171,7 @@ export const MOCK_JOURNAL_ENTRIES: GlJournalEntry[] = [
     { accountCode: "20100", debit: 780_000 },
     { accountCode: "20100", credit: 780_000 },
   ]),
-  ...voucher(daysAgo(2), "TRANSFER", 2, [
+  ...voucher(daysAgo(2), "TRANSFER", 1, [
     { accountCode: "20100", debit: 55_000 },
     { accountCode: "20100", credit: 55_000 },
   ]),

@@ -33,6 +33,13 @@ import { QUERY_MAX_RANGE_DAYS } from "@/shared/config/policy"
  * 계정과목 트리 · 전표/분개 목록·상세 · 분개 패턴 참조 화면은 범위 밖이고,
  * 조회 사유 게이트(PH-89)와 기준시점 표기(PH-84)도 대응 BE 가 2차에서 빠져 넣지 않는다.
  * 이슈 #128 본문의 완료 조건 중 그 둘을 요구하는 항목은 v3 정정 배너로 대체됐다.
+ *
+ * **집계 소요 표시도 넣지 않는다.** 이슈 #128 작업 내용에 "시산표 집계 시간 표시"가
+ * 있고 v3 배너가 그것까지 제외하지는 않았다. 넣지 않는 이유는 여기서 재는 값이
+ * 목 배열을 한 바퀴 도는 시간이라 **항상 0ms 에 가깝고, 실제로 재야 하는 수치가
+ * 아니기 때문**이다. 그 지표(`P3-회계정보계RAG.md:31` "시산표 집계 시간 600만 분개")는
+ * 서버가 네이티브 SQL 로 재는 것이고 FE 는 응답에 실려 오면 그때 표시하면 된다.
+ * PH-28 응답에 소요 필드를 넣을지는 스키마 선전달 때 함께 정한다.
  */
 
 const ACCOUNT_CLASS_LABELS: Record<GlAccountClass, string> = {
@@ -62,21 +69,33 @@ type Condition = {
   accountClass: ClassFilter
 }
 
+/**
+ * 기본 조회조건. **객체가 아니라 팩토리다.**
+ *
+ * 마운트 시점에 한 번 만들어 두면 자정을 넘겨 열어둔 탭에서 [초기화]가 어제 기준
+ * 기간을 되돌린다 — `shared/config/clock.ts` 가 상수 대신 함수를 쓰는 이유와 같다.
+ * 형제 조회화면도 초기화마다 팩토리를 다시 부른다(`e05-reservation-results.tsx:100`
+ * · `d04-transfer-history.tsx:182` · `b03-transaction-inquiry.tsx:348`).
+ *
+ * 기간 기본값은 조회화면 관용구(최근 1개월)를 빌린 것이고 **POL-021 을 적용한 것이
+ * 아니다** — 그 규정의 인수기준 화면은 B-03·D-04·E-05·G-05 로 전부 고객 조회화면이고,
+ * 관리자 화면에는 요구사항 자체가 없다(`docs/requirements.md` 확인). 근거가 생기면
+ * 그때 상수를 갈아끼운다.
+ */
+const createDefaultCondition = (): Condition => ({
+  period: recentPeriod(),
+  accountClass: "all",
+})
+
 export const Adm02TrialBalance = () => {
   const TODAY = getToday()
-  // 조회화면 관용구를 그대로 쓴다(최근 1개월). **POL-021 을 적용한 것이 아니다** —
-  // 그 규정의 인수기준 화면은 B-03·D-04·E-05·G-05 로 전부 고객 조회화면이고,
-  // 관리자 화면에는 요구사항 자체가 없다(`docs/requirements.md` 확인). 근거가 생기면
-  // 그때 상수를 갈아끼운다.
-  const defaultCondition = React.useMemo<Condition>(
-    () => ({ period: recentPeriod(), accountClass: "all" }),
-    [],
-  )
 
   // 입력 중인 값과 [조회]로 확정한 값을 나눈다 — 타이핑하는 동안 표가 따라 바뀌면
   // 화면에 찍힌 합계가 어느 기간의 것인지 말할 수 없다.
-  const [draft, setDraft] = React.useState<Condition>(defaultCondition)
-  const [applied, setApplied] = React.useState<Condition>(defaultCondition)
+  const [draft, setDraft] = React.useState<Condition>(createDefaultCondition)
+  const [applied, setApplied] = React.useState<Condition>(
+    createDefaultCondition,
+  )
 
   const result = React.useMemo(
     () => aggregateTrialBalance(MOCK_JOURNAL_ENTRIES, applied.period),
@@ -93,6 +112,19 @@ export const Adm02TrialBalance = () => {
       ? result.rows
       : result.rows.filter((row) => row.accountClass === applied.accountClass)
 
+  /**
+   * 요약 줄의 분개 수는 **표에 보이는 행 기준**이다. `result.journalEntryCount`
+   * (기간 전체)를 쓰면 한 문장 안에서 계정 수는 걸러진 값, 분개 수는 걸러지지 않은
+   * 값이 되어 표의 `분개 줄` 열을 더한 것과 맞지 않는다.
+   *
+   * 기간 전체의 크기는 아래 `SummaryRow` 의 차변·대변 **총계**가 말한다 — 그쪽은
+   * 분류 선택과 무관하게 기간 전체 기준이고, 그 사실은 하단 안내문구에 적혀 있다.
+   */
+  const visibleEntryCount = visibleRows.reduce(
+    (sum, row) => sum + row.entryCount,
+    0,
+  )
+
   const { incomplete, reversed, overLimit } = checkPeriodRange(
     draft.period.start,
     draft.period.end,
@@ -108,8 +140,10 @@ export const Adm02TrialBalance = () => {
   }
 
   const handleReset = () => {
-    setDraft(defaultCondition)
-    setApplied(defaultCondition)
+    // 얼어붙은 값을 되돌리지 않고 지금 기준으로 다시 만든다.
+    const next = createDefaultCondition()
+    setDraft(next)
+    setApplied(next)
   }
 
   /**
@@ -250,7 +284,7 @@ export const Adm02TrialBalance = () => {
             [{formatDate(result.fromDate)} ~ {formatDate(result.toDate)}]
           </span>{" "}
           계정 {visibleRows.length.toLocaleString("ko-KR")}개 · 분개{" "}
-          {result.journalEntryCount.toLocaleString("ko-KR")}줄
+          {visibleEntryCount.toLocaleString("ko-KR")}줄
         </p>
 
         {/* 총계는 언제나 기간 전체 기준이다. 분류를 걸러도 이 값은 변하지 않는다 —
@@ -301,7 +335,7 @@ export const Adm02TrialBalance = () => {
         items={[
           "시산표는 전표 단위로 차변과 대변이 일치해야 하며, 총계가 어긋나면 화면 상단에 불일치로 표시됩니다.",
           "합계는 분류 선택과 무관하게 조회기간 전체를 대상으로 집계합니다. 분류는 표시할 계정만 고릅니다.",
-          "계정과목에 등록되지 않은 코드가 분개에 있으면 해당 행을 빨간색으로 표시합니다.",
+          "계정과목에 등록되지 않은 코드가 분개에 있으면 계정과목과 분류를 빨간색으로 표시합니다.",
           "계정과목 상세와 전표·분개 조회 화면은 이번 범위에 포함되지 않습니다.",
           "서버 API 연동 전이라 현재 표시되는 값은 목업 데이터입니다.",
         ]}

@@ -72,7 +72,7 @@ export const aggregateTrialBalance = (
   for (const entry of inPeriod) {
     const existing = byCode.get(entry.accountCode)
     if (existing) {
-      existing.debitTotal += entry.debit
+      existing.debitTotal += entry.debitAmount
       existing.creditTotal += entry.creditAmount
       existing.entryCount += 1
       continue
@@ -86,7 +86,7 @@ export const aggregateTrialBalance = (
       // 바로 옆 배지는 멀쩡한 계정처럼 보이는 상태였다. 모르는 것은 모른다고 둔다.
       accountClass: account?.accountClass ?? null,
       normalBalance: account?.normalBalance ?? null,
-      debitTotal: entry.debit,
+      debitTotal: entry.debitAmount,
       creditTotal: entry.creditAmount,
       entryCount: 1,
     })

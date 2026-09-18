@@ -44,6 +44,25 @@ export const MOCK_MEMBERS: Member[] = [
     email: "seojun@corebank.example.com",
     loginPassword: "Corebank1!",
   },
+  /**
+   * 조회 전용 관리자(#147). 권한 없이 화면이 어떻게 보이는지 확인할 계정이 없어
+   * 직무분리(PH-49)의 절반을 검증할 수 없었다 — 권한은 `mocks/handlers/admin.ts` 가 준다.
+   *
+   * `accountNo` 는 계좌 픽스처(`MOCK_OVERVIEW_ACCOUNTS`)에 없는 번호여야 한다.
+   * 정본 첫 계좌번호와 겹치면 `MOCK_ACCOUNT_OWNER_ID` 가 이쪽을 집어 계좌 목의
+   * 소유자가 통째로 바뀐다(`mocks/handlers/accounts-api.ts`).
+   */
+  {
+    accountNo: "404112556677",
+    ownerName: "김다연",
+    birth: "971204",
+    accountPassword: "1111",
+    errorCount: 0,
+    status: "정상",
+    memberId: "dayeonkim",
+    email: "dayeon@corebank.example.com",
+    loginPassword: "Corebank2!",
+  },
 ]
 
 /** REQ-AUTH-003·004: 회원가입 1단계 약관(필수 2종). */

@@ -131,6 +131,11 @@ export const Adm02TrialBalance = () => {
     TODAY,
     QUERY_MAX_RANGE_DAYS,
   )
+  // 한도가 `QUERY_MAX_RANGE_DAYS` 인 것은 **POL-021 을 적용해서가 아니라 `PeriodField` 의
+  // `maxPeriodDays` 기본값이 그 값이기 때문**이다. 여기서 다른 값을 넘기면 안내문구는
+  // 초과라고 말하는데 버튼은 살아 있는 상태가 된다. 관리자 화면 고유의 한도 규정이
+  // 생기면 `PeriodField` 에도 같은 값을 넘겨 둘을 함께 옮긴다.
+  //
   // `PeriodField` 는 안내 문구만 그리고 조회를 막지는 않는다. 막는 책임은 화면에 있다.
   const periodInvalid = incomplete || reversed || overLimit
 

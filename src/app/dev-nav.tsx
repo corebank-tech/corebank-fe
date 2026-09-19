@@ -87,6 +87,7 @@ const DEV_ROUTES: DevRoute[] = [
   // 아래 그룹 분류가 화면ID의 `-` 앞을 파트로 보기 때문에 `A-8` 로 두면
   // 고객 A 파트에 섞인다.
   { screenId: "ADM-01", label: "고객 계정 운영", path: "/admin/customers" },
+  { screenId: "ADM-02", label: "시산표", path: "/admin/trial-balance" },
 
   { screenId: "DS", label: "디자인 시스템", path: "/design-system" },
 ]

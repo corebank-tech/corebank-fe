@@ -5,6 +5,8 @@ import { FormSection } from "@/shared/ui/form-section"
 import { FormRow } from "@/shared/ui/form-row"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
+import { Modal } from "@/shared/ui/modal"
+import { Input } from "@/shared/ui/input"
 import {
   GridToolbar,
   PeriodField,
@@ -45,6 +47,8 @@ import {
   cancelScheduledTransfers,
 } from "@/entities/transfer"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
+import { onlyDigits } from "@/shared/lib/input-filter"
+import { useVerifyAccountPasswordMutation } from "@/entities/account"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -73,12 +77,9 @@ const sortWaitingFirst = (rows: ReservationRow[]): ReservationRow[] => {
   return [...waiting, ...others]
 }
 
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
-// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
-const TEMP_AUTH_TOKEN = "temp-auth-token"
-
 const CANCEL_FAILED_MESSAGE = "예약이체 취소에 실패했습니다."
 
+const PASSWORD_LIMIT = 4
 /**
  * 예약이체는 미래 일자 건이라 형제 조회화면처럼 종료일을 오늘로 둘 수 없다.
  * 오늘을 가운데 두고 앞뒤 2개월을 기본 창으로 잡는다 — 최근 처리된 건과
@@ -136,6 +137,14 @@ export const E04ReservationList = () => {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
+  const [cancelPasswordOpen, setCancelPasswordOpen] = React.useState(false)
+  const [cancelPassword, setCancelPassword] = React.useState("")
+  const [cancelPasswordError, setCancelPasswordError] = React.useState<
+    string | null
+  >(null)
+  const [cancelPasswordAuthToken, setCancelPasswordAuthToken] = React.useState<
+    string | null
+  >(null)
   const [blockedOpen, setBlockedOpen] = React.useState(false)
   const [multiSelectBlockedOpen, setMultiSelectBlockedOpen] =
     React.useState(false)
@@ -159,6 +168,7 @@ export const E04ReservationList = () => {
   >(null)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
@@ -277,24 +287,93 @@ export const E04ReservationList = () => {
   /** REQ-RSV-008: 취소 확인 후 OTP 인증을 거쳐야 실제로 취소된다. */
   const handleConfirmCancel = () => {
     setConfirmOpen(false)
-    setCancelTarget(selectedRows[0] ?? null)
-    setOtpOpen(true)
+
+    const target = selectedRows[0] ?? null
+
+    if (target?.withdrawalAccountId == null) {
+      setCancelErrorMessage(
+        "출금계좌 정보를 확인할 수 없습니다. 목록을 다시 조회해 주세요.",
+      )
+      return
+    }
+
+    setCancelTarget(target)
+    setCancelPassword("")
+    setCancelPasswordError(null)
+    setCancelPasswordAuthToken(null)
+    setCancelPasswordOpen(true)
+  }
+
+  const handleCancelPasswordConfirm = async () => {
+    if (cancelTarget?.withdrawalAccountId == null) {
+      setCancelPasswordError(
+        "출금계좌 정보를 확인할 수 없습니다. 목록을 다시 조회해 주세요.",
+      )
+      return
+    }
+
+    if (cancelPassword.length !== PASSWORD_LIMIT) {
+      setCancelPasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
+      return
+    }
+
+    setCancelPasswordError(null)
+    setCancelPasswordAuthToken(null)
+
+    try {
+      const response = await verifyPasswordMutation.mutateAsync({
+        accountId: cancelTarget.withdrawalAccountId,
+        data: {
+          accountPassword: cancelPassword,
+        },
+      })
+
+      // 검증 직후 state와 mutation variables에서 평문 비밀번호를 제거한다.
+      setCancelPassword("")
+      verifyPasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setCancelPasswordError(
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
+        )
+        return
+      }
+
+      setCancelPasswordAuthToken(response.accountPasswordAuthToken)
+      setCancelPasswordOpen(false)
+      setOtpOpen(true)
+    } catch (error) {
+      setCancelPassword("")
+      verifyPasswordMutation.reset()
+
+      setCancelPasswordError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌비밀번호 인증에 실패했습니다.",
+      )
+    }
   }
 
   const handleOtpConfirm = async (otpAuthToken: string) => {
     if (isCancelling) return
+
     setOtpOpen(false)
-    // 발급 시점에 잡아둔 대상으로 만든 요청이다. 여기서 selectedRows 를 다시 읽으면
-    // 토큰이 묶인 건과 실행 대상이 갈릴 수 있다.
-    if (!cancelRequest) return
+
+    if (!cancelRequest || cancelPasswordAuthToken == null) {
+      setCancelErrorMessage(
+        "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도해 주세요.",
+      )
+      setCancelTarget(null)
+      setCancelPasswordAuthToken(null)
+      return
+    }
+
     setIsCancelling(true)
+
     try {
-      // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
-      // 화면이 요청 전 상태를 계속 보여준다. 그래서 실패를 문구 값으로 옮긴다.
-      // 취소 불가는 예외가 아니라 200 응답의 건별 ERROR로 오므로 응답도 판정한다.
       const failed = await cancelScheduledTransfers(cancelRequest, {
         headers: {
-          "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+          "Account-Password-Auth-Token": cancelPasswordAuthToken,
           "Otp-Auth-Token": otpAuthToken,
         },
       }).then(
@@ -307,13 +386,11 @@ export const E04ReservationList = () => {
         (error: unknown) =>
           error instanceof ApiError ? error.message : CANCEL_FAILED_MESSAGE,
       )
+
       clearSelection()
 
       const refreshed = await refetch()
 
-      // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
-      // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
-      // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
       if (failed) {
         setCancelErrorMessage(failed)
       } else if (refreshed.isError) {
@@ -322,8 +399,10 @@ export const E04ReservationList = () => {
         )
       }
     } finally {
+      // 최종 요청에 사용한 계좌비밀번호 토큰은 성공 여부와 관계없이 재사용하지 않는다.
       setIsCancelling(false)
       setCancelTarget(null)
+      setCancelPasswordAuthToken(null)
     }
   }
 
@@ -445,7 +524,7 @@ export const E04ReservationList = () => {
             title="예약이체 취소"
             messages={[
               "선택한 예약이체를 취소합니다.",
-              "취소 후에는 되돌릴 수 없으며, 확인을 누르면 OTP 인증으로 이어집니다.",
+              "취소 후에는 되돌릴 수 없으며, 확인을 누르면 계좌비밀번호 확인 후 OTP 인증으로 이어집니다.",
             ]}
             confirmLabel="취소하기"
             cancelLabel="닫기"
@@ -455,6 +534,90 @@ export const E04ReservationList = () => {
             }))}
           />
 
+          <Modal
+            open={cancelPasswordOpen}
+            onClose={() => {
+              setCancelPasswordOpen(false)
+              setCancelPassword("")
+              setCancelPasswordError(null)
+              setCancelPasswordAuthToken(null)
+              setCancelTarget(null)
+              verifyPasswordMutation.reset()
+            }}
+            title="계좌비밀번호 확인"
+            size="sm"
+            footer={
+              <>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="min-w-30"
+                  onClick={() => {
+                    setCancelPasswordOpen(false)
+                    setCancelPassword("")
+                    setCancelPasswordError(null)
+                    setCancelPasswordAuthToken(null)
+                    setCancelTarget(null)
+                    verifyPasswordMutation.reset()
+                  }}
+                >
+                  취소
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="min-w-30"
+                  disabled={verifyPasswordMutation.isPending}
+                  onClick={() => void handleCancelPasswordConfirm()}
+                >
+                  {verifyPasswordMutation.isPending ? "확인 중..." : "확인"}
+                </Button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-3">
+              <p className="text-base text-ink-muted">
+                예약이체 취소를 위해 출금계좌의 계좌비밀번호를 입력하세요.
+              </p>
+
+              {cancelTarget && (
+                <p className="text-base font-bold text-ink">
+                  {cancelTarget.fromAlias || "출금계좌"} /{" "}
+                  {cancelTarget.fromAccountNo}
+                </p>
+              )}
+
+              <Input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={PASSWORD_LIMIT}
+                value={cancelPassword}
+                invalid={cancelPasswordError != null}
+                disabled={verifyPasswordMutation.isPending}
+                onChange={(event) => {
+                  setCancelPassword(
+                    onlyDigits(event.target.value, PASSWORD_LIMIT),
+                  )
+
+                  if (cancelPasswordError) {
+                    setCancelPasswordError(null)
+                  }
+                }}
+                placeholder="계좌비밀번호 4자리"
+                className="text-center tracking-4"
+                autoFocus
+              />
+
+              {cancelPasswordError && (
+                <p role="alert" className="text-base font-bold text-danger">
+                  {cancelPasswordError}
+                </p>
+              )}
+            </div>
+          </Modal>
+
           {/* 대상이 없으면 렌더하지 않는다. transaction 을 빼서 넘기면 모달이 조용히
               mock 모드로 내려가 미검증 값이 그대로 통과한다(OtpModal 의 transaction 주석). */}
           {cancelRequest && (
@@ -463,6 +626,7 @@ export const E04ReservationList = () => {
               onClose={() => {
                 setOtpOpen(false)
                 setCancelTarget(null)
+                setCancelPasswordAuthToken(null)
               }}
               onConfirm={handleOtpConfirm}
               guide="예약이체 취소를 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."

@@ -43,6 +43,7 @@ export const toReservationRow = (
   item: ScheduledTransferListItemResponse,
 ): ReservationRow => ({
   id: String(item.scheduledTransferId ?? ""),
+  withdrawalAccountId: item.withdrawalAccountId ?? null,
   status: RESERVATION_STATUS_MAP[item.status ?? "WAITING"],
   scheduledDate: item.scheduledDate ?? "",
   registeredAt: item.registeredAt,

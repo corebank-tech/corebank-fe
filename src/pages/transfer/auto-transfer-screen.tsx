@@ -21,13 +21,12 @@ import { AutoTransferStep1 } from "@/pages/transfer/auto/g01-input"
 import { AutoTransferStep2 } from "@/pages/transfer/auto/g02-confirm"
 import { AutoTransferStep3 } from "@/pages/transfer/auto/g03-complete"
 import { useRegisterAutoTransferMutation } from "@/entities/transfer"
-import { useWithdrawAccounts } from "@/entities/account"
+import {
+  useVerifyAccountPasswordMutation,
+  useWithdrawAccounts,
+} from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
-
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
-// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
-const TEMP_AUTH_TOKEN = "temp-auth-token"
 
 export type AutoTransferForm = {
   fromAccount: string
@@ -89,8 +88,8 @@ const buildInitialForm = (searchParams: URLSearchParams): AutoTransferForm => {
 /**
  * G-01 ~ G-03 assembly. Holds the shared form state and step index; each step
  * is a pure presentation component that receives values and callbacks. The
- * 거래내용 확인(ConfirmDialog) → OTP(OtpModal) sequence required before
- * execution (REQ-AUTO-005, REQ-TRSF-031) is orchestrated here.
+ * 거래내용 확인(ConfirmDialog) → 계좌비밀번호 검증 → OTP(OtpModal) 인증 순서를
+ * 여기서 조립한다(REQ-AUTO-005, REQ-TRSF-031).
  */
 export const AutoTransferScreen = () => {
   const NOW = useBaseTime()
@@ -107,6 +106,8 @@ export const AutoTransferScreen = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
+    React.useState<string | null>(null)
   // 첫 실행 예정일은 서버가 산출한다(말일 보정 POL-034 포함). 등록 응답의 값을
   // 그대로 완료 화면에 보여준다 — 화면에서 다시 계산하면 배치 규칙과 어긋난다.
   const [nextExecDate, setNextExecDate] = React.useState<string | null>(null)
@@ -119,6 +120,7 @@ export const AutoTransferScreen = () => {
     isLoading: accountsLoading,
   } = useWithdrawAccounts()
   const registerMutation = useRegisterAutoTransferMutation()
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
 
   const setField = <K extends keyof AutoTransferForm>(
     key: K,
@@ -158,6 +160,11 @@ export const AutoTransferScreen = () => {
 
   const resetAll = () => {
     setForm(INITIAL_FORM)
+    setAccountPasswordAuthToken(null)
+    setErrorMessage(null)
+    setOtpOpen(false)
+    verifyPasswordMutation.reset()
+    registerMutation.reset()
     setStep(1)
   }
 
@@ -167,7 +174,7 @@ export const AutoTransferScreen = () => {
    * 한쪽만 고쳐도 조용히 어긋나므로 한 객체를 양쪽이 함께 쓴다.
    */
   const otpTransactionData =
-    selectedAccount == null
+    selectedAccount?.accountId == null
       ? null
       : {
           withdrawalAccountId: selectedAccount.accountId,
@@ -184,10 +191,16 @@ export const AutoTransferScreen = () => {
    * AUT0301로 거부한다. 화면에서 미리 걸러내지 않고 그 사유를 그대로 띄운다.
    */
   const handleRegisterConfirm = async (otpAuthToken: string) => {
-    // 출금계좌는 확인 다이얼로그에서 인증 전에 걸러낸다. 여기서는 타입을 좁히는
-    // 역할만 한다.
-    if (otpTransactionData == null) return
     setOtpOpen(false)
+
+    if (otpTransactionData == null || accountPasswordAuthToken == null) {
+      setErrorMessage(
+        "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도해 주세요.",
+      )
+      setAccountPasswordAuthToken(null)
+      return
+    }
+
     try {
       const registered = await registerMutation.mutateAsync({
         data: {
@@ -195,15 +208,72 @@ export const AutoTransferScreen = () => {
           payeeName: MOCK_PAYEE_NAME,
           myPassbookMemo: form.myMemo || undefined,
           recipientPassbookMemo: form.payeeMemo || undefined,
-          accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          accountPasswordAuthToken,
           otpAuthToken,
         },
       })
+
+      // 최종 요청에 사용한 인증 토큰은 재사용하지 않는다.
+      setAccountPasswordAuthToken(null)
       setNextExecDate(registered?.nextExecutionDate ?? null)
+      setErrorMessage(null)
       setStep(3)
-    } catch (e) {
+    } catch (error) {
+      // 서버가 토큰을 소비했을 가능성이 있으므로 실패해도 폐기한다.
+      setAccountPasswordAuthToken(null)
+      registerMutation.reset()
+
       setErrorMessage(
-        e instanceof ApiError ? e.message : "자동이체 등록에 실패했습니다.",
+        error instanceof ApiError
+          ? error.message
+          : "자동이체 등록에 실패했습니다.",
+      )
+    }
+  }
+
+  const handleAuthenticate = async () => {
+    setConfirmOpen(false)
+    setAccountPasswordAuthToken(null)
+
+    if (otpTransactionData == null) {
+      setErrorMessage(
+        "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
+      )
+      return
+    }
+
+    try {
+      const response = await verifyPasswordMutation.mutateAsync({
+        accountId: otpTransactionData.withdrawalAccountId,
+        data: {
+          accountPassword: form.password,
+        },
+      })
+
+      // 검증 직후 화면 state와 mutation variables에서 평문 비밀번호를 제거한다.
+      setField("password", "")
+      verifyPasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setErrorMessage(
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
+        )
+        return
+      }
+
+      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
+      setErrorMessage(null)
+      setOtpOpen(true)
+    } catch (error) {
+      // 실패한 경우에도 평문 비밀번호를 남기지 않는다.
+      setField("password", "")
+      verifyPasswordMutation.reset()
+      setAccountPasswordAuthToken(null)
+
+      setErrorMessage(
+        error instanceof ApiError
+          ? error.message
+          : "계좌비밀번호 인증에 실패했습니다.",
       )
     }
   }
@@ -243,22 +313,10 @@ export const AutoTransferScreen = () => {
         <ConfirmDialog
           open={confirmOpen}
           onClose={() => setConfirmOpen(false)}
-          onConfirm={() => {
-            setConfirmOpen(false)
-            // 인증을 시작하기 전에 막는다. OTP는 발급·검증이 실제 토큰을
-            // 소비하므로, 인증을 마친 뒤에 걸러내면 그 토큰이 그대로 버려진다.
-            // 출금계좌 목록은 백그라운드 재조회로 바뀔 수 있다.
-            if (otpTransactionData == null) {
-              setErrorMessage(
-                "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
-              )
-              return
-            }
-            setOtpOpen(true)
-          }}
+          onConfirm={() => void handleAuthenticate()}
           messages={[
             "아래 내용으로 자동이체를 등록합니다.",
-            "확인을 누르면 OTP 인증으로 이어집니다.",
+            "확인을 누르면 계좌비밀번호 확인 후 OTP 인증으로 이어집니다.",
           ]}
           confirmLabel="확인"
           items={[
@@ -283,7 +341,13 @@ export const AutoTransferScreen = () => {
         {otpTransactionData != null && (
           <OtpModal
             open={otpOpen}
-            onClose={() => setOtpOpen(false)}
+            onClose={() => {
+              setOtpOpen(false)
+              setAccountPasswordAuthToken(null)
+
+              // 비밀번호는 이미 검증 직후 제거됐으므로 다시 입력받는다.
+              setStep(1)
+            }}
             onConfirm={handleRegisterConfirm}
             guide="자동이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
             transaction={{
@@ -295,7 +359,10 @@ export const AutoTransferScreen = () => {
 
         <ErrorDialog
           open={errorMessage != null}
-          onClose={() => setErrorMessage(null)}
+          onClose={() => {
+            setErrorMessage(null)
+            setStep(1)
+          }}
           title="자동이체 등록 실패"
           messages={errorMessage ? [errorMessage] : []}
         />

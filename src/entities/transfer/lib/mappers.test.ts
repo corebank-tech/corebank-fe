@@ -168,6 +168,7 @@ describe("toAutoTransferRow", () => {
 
 const RESERVATION_ITEM: ScheduledTransferListItemResponse = {
   scheduledTransferId: 7,
+  withdrawalAccountId: 1,
   status: "WAITING",
   scheduledDate: "2026-08-24",
   registeredAt: "2026-08-20T10:12:00",
@@ -185,6 +186,7 @@ describe("toReservationRow", () => {
     const row = toReservationRow(RESERVATION_ITEM)
 
     expect(row.fromAccountNo).toBe("110******877")
+    expect(row.withdrawalAccountId).toBe(1)
     expect(row.toAccountNo).toBe("333******135")
     expect(row.payeeName).toBe("김*수")
   })

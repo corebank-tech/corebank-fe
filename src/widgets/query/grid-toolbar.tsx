@@ -132,7 +132,7 @@ export const GridToolbar = ({
           </label>
           <Select
             id="grid-page-size"
-            className="h-8 w-[108px] pr-8 text-base"
+            className="h-8 w-[108px] text-base"
             value={String(pageSize)}
             onChange={(e) => {
               const v = e.target.value

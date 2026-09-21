@@ -20,6 +20,11 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { FormRow } from "@/shared/ui/form-row"
 import { Input } from "@/shared/ui/input"
 import { Modal } from "@/shared/ui/modal"
+import { useVerifyAccountPasswordMutation } from "@/entities/account"
+import { ApiError } from "@/shared/api/api-error"
+import { onlyDigits } from "@/shared/lib/input-filter"
+
+const PASSWORD_LIMIT = 4
 
 /** 이체종료일은 시작일 이후부터 시작일 기준 최대 60개월 이내여야 한다. */
 const isEndDateValid = (
@@ -44,15 +49,21 @@ type EditForm = {
 
 type Props = {
   target: AutoTransferRow
+  accountId: number
   onClose: () => void
-  /** 변경 요청의 성공 여부를 돌려준다. 실패하면 모달을 닫지 않는다. */
   onSave: (
     updatedRow: AutoTransferRow,
+    accountPasswordAuthToken: string,
     otpAuthToken: string,
   ) => Promise<boolean>
 }
 
-export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
+export const G04AutoTransferEditFlow = ({
+  target,
+  accountId,
+  onClose,
+  onSave,
+}: Props) => {
   const [editForm, setEditForm] = React.useState<EditForm>({
     amount: String(target.amount),
     cycleMonths: target.cycleMonths,
@@ -62,10 +73,55 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false)
   const [isOtpOpen, setIsOtpOpen] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
+  const [password, setPassword] = React.useState("")
+  const [passwordError, setPasswordError] = React.useState<string | null>(null)
+  const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
+    React.useState<string | null>(null)
 
-  const handleConfirm = () => {
+  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+
+  const handleAuthenticate = async () => {
     setIsConfirmOpen(false)
-    setIsOtpOpen(true)
+    setAccountPasswordAuthToken(null)
+
+    if (password.length !== PASSWORD_LIMIT) {
+      setPasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
+      return
+    }
+
+    setPasswordError(null)
+
+    try {
+      const response = await verifyPasswordMutation.mutateAsync({
+        accountId,
+        data: {
+          accountPassword: password,
+        },
+      })
+
+      // 평문 비밀번호와 mutation variables를 즉시 제거한다.
+      setPassword("")
+      verifyPasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setPasswordError(
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
+        )
+        return
+      }
+
+      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
+      setIsOtpOpen(true)
+    } catch (error) {
+      setPassword("")
+      verifyPasswordMutation.reset()
+
+      setPasswordError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌비밀번호 인증에 실패했습니다.",
+      )
+    }
   }
 
   const updatedRow: AutoTransferRow = {
@@ -93,10 +149,22 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
   // 입력값이 이미 사라진 뒤에 에러만 뜨고, 사용자는 처음부터 다시 입력해야 한다.
   const handleOtpConfirm = async (otpAuthToken: string) => {
     if (isSaving) return
+    if (accountPasswordAuthToken == null) {
+      setPasswordError(
+        "인증 정보를 확인할 수 없습니다. 계좌비밀번호를 다시 입력해 주세요.",
+      )
+      setIsOtpOpen(false)
+      return
+    }
     setIsSaving(true)
-    const saved = await onSave(updatedRow, otpAuthToken)
+    const saved = await onSave(
+      updatedRow,
+      accountPasswordAuthToken,
+      otpAuthToken,
+    )
     setIsSaving(false)
-    // OTP는 이미 소진됐으므로 실패해도 OTP 모달은 닫고, 재시도는 새로 발급받는다.
+    // 최종 요청에 사용한 토큰은 성공 여부와 관계없이 재사용하지 않는다.
+    setAccountPasswordAuthToken(null)
     setIsOtpOpen(false)
     if (saved) onClose()
   }
@@ -124,6 +192,8 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
               className="min-w-30"
               disabled={
                 isSaving ||
+                password.length !== PASSWORD_LIMIT ||
+                verifyPasswordMutation.isPending ||
                 !(Number(editForm.amount) > 0) ||
                 !isEndDateValid(target.startDate, editForm.endDate)
               }
@@ -198,17 +268,49 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
               }
             />
           </FormRow>
+          <FormRow
+            label="계좌비밀번호"
+            htmlFor="g04-edit-password"
+            labelWidth={110}
+          >
+            <div className="flex w-full flex-col gap-2">
+              <Input
+                id="g04-edit-password"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={PASSWORD_LIMIT}
+                value={password}
+                invalid={passwordError != null}
+                disabled={verifyPasswordMutation.isPending || isSaving}
+                onChange={(event) => {
+                  setPassword(onlyDigits(event.target.value, PASSWORD_LIMIT))
+
+                  if (passwordError) {
+                    setPasswordError(null)
+                  }
+                }}
+                placeholder="계좌비밀번호 4자리"
+              />
+
+              {passwordError && (
+                <p role="alert" className="text-xs font-bold text-danger">
+                  {passwordError}
+                </p>
+              )}
+            </div>
+          </FormRow>
         </div>
       </Modal>
 
       <ConfirmDialog
         open={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleConfirm}
+        onConfirm={() => void handleAuthenticate()}
         title="자동이체 변경"
         messages={[
           "아래 내용으로 자동이체를 변경합니다.",
-          "확인을 누르면 OTP 인증으로 이어집니다.",
+          "확인을 누르면 계좌비밀번호 확인 후 OTP 인증으로 이어집니다.",
         ]}
         confirmLabel="변경하기"
         items={[
@@ -230,7 +332,10 @@ export const G04AutoTransferEditFlow = ({ target, onClose, onSave }: Props) => {
 
       <OtpModal
         open={isOtpOpen}
-        onClose={() => setIsOtpOpen(false)}
+        onClose={() => {
+          setIsOtpOpen(false)
+          setAccountPasswordAuthToken(null)
+        }}
         onConfirm={handleOtpConfirm}
         guide="자동이체 변경을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
         transaction={{

@@ -6,6 +6,9 @@ import { FormRow } from "@/shared/ui/form-row"
 import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
+import { Modal } from "@/shared/ui/modal"
+import { Input } from "@/shared/ui/input"
+import { onlyDigits } from "@/shared/lib/input-filter"
 import {
   GridToolbar,
   RadioRowField,
@@ -46,7 +49,10 @@ import {
   cancelAutoTransfers,
   changeAutoTransfer,
 } from "@/entities/transfer"
-import { useWithdrawAccounts } from "@/entities/account"
+import {
+  useVerifyAccountPasswordMutation,
+  useWithdrawAccounts,
+} from "@/entities/account"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 
 const STATUS_OPTIONS = [
@@ -61,10 +67,7 @@ const STATUS_TO_API: Record<string, string | undefined> = {
   해지: "TERMINATED",
 }
 
-// TODO: 계좌비밀번호 인증 API가 연동되면 그 결과 토큰으로 교체한다. autotransfer
-// 도메인의 토큰 검증이 아직 mock(빈 값만 아니면 통과)이라 지금은 임시 문자열을 쓴다.
-const TEMP_AUTH_TOKEN = "temp-auth-token"
-
+const PASSWORD_LIMIT = 4
 const TERMINATE_FAILED_MESSAGE = "자동이체 해지에 실패했습니다."
 
 export const G04AutoTransferList = () => {
@@ -84,6 +87,17 @@ export const G04AutoTransferList = () => {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [terminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false)
   const [terminateOtpOpen, setTerminateOtpOpen] = React.useState(false)
+  const [terminatePasswordOpen, setTerminatePasswordOpen] =
+    React.useState(false)
+  const [terminatePassword, setTerminatePassword] = React.useState("")
+  const [terminatePasswordError, setTerminatePasswordError] = React.useState<
+    string | null
+  >(null)
+  const [terminateAccountId, setTerminateAccountId] = React.useState<
+    number | null
+  >(null)
+  const [terminatePasswordAuthToken, setTerminatePasswordAuthToken] =
+    React.useState<string | null>(null)
   // 해지 요청이 도는 동안 OTP 모달은 이미 닫혀 있고 선택도 응답 뒤에야 비워져서,
   // 목록과 "선택 해지" 버튼이 활성인 채로 노출된다. 이 플래그가 없으면 같은 건에
   // 두 번째 해지 요청이 나간다 — 멱등키는 요청마다 새로 붙어 막아주지 않는다.
@@ -115,6 +129,7 @@ export const G04AutoTransferList = () => {
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
+  const verifyTerminatePasswordMutation = useVerifyAccountPasswordMutation()
 
   // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
   // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
@@ -221,8 +236,72 @@ export const G04AutoTransferList = () => {
   /** REQ-AUTO-011: 해지 확인 후 OTP 인증을 거쳐야 실제로 해지된다. */
   const handleConfirmTerminate = () => {
     setTerminateConfirmOpen(false)
-    setTerminateTarget(selectedRows[0] ?? null)
-    setTerminateOtpOpen(true)
+
+    const target = selectedRows[0] ?? null
+
+    if (target == null || appliedAccountId == null) {
+      setActionErrorMessage(
+        "출금계좌 정보를 확인할 수 없습니다. 목록을 다시 조회해 주세요.",
+      )
+      return
+    }
+
+    setTerminateTarget(target)
+    setTerminateAccountId(appliedAccountId)
+    setTerminatePassword("")
+    setTerminatePasswordError(null)
+    setTerminatePasswordAuthToken(null)
+    setTerminatePasswordOpen(true)
+  }
+
+  const handleTerminatePasswordConfirm = async () => {
+    if (terminateAccountId == null) {
+      setTerminatePasswordError(
+        "출금계좌 정보를 확인할 수 없습니다. 목록을 다시 조회해 주세요.",
+      )
+      return
+    }
+
+    if (terminatePassword.length !== PASSWORD_LIMIT) {
+      setTerminatePasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
+      return
+    }
+
+    setTerminatePasswordError(null)
+    setTerminatePasswordAuthToken(null)
+
+    try {
+      const response = await verifyTerminatePasswordMutation.mutateAsync({
+        accountId: terminateAccountId,
+        data: {
+          accountPassword: terminatePassword,
+        },
+      })
+
+      // 평문 비밀번호와 mutation variables를 검증 직후 제거한다.
+      setTerminatePassword("")
+      verifyTerminatePasswordMutation.reset()
+
+      if (!response.accountPasswordAuthToken) {
+        setTerminatePasswordError(
+          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
+        )
+        return
+      }
+
+      setTerminatePasswordAuthToken(response.accountPasswordAuthToken)
+      setTerminatePasswordOpen(false)
+      setTerminateOtpOpen(true)
+    } catch (error) {
+      setTerminatePassword("")
+      verifyTerminatePasswordMutation.reset()
+
+      setTerminatePasswordError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌비밀번호 인증에 실패했습니다.",
+      )
+    }
   }
 
   const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
@@ -230,7 +309,15 @@ export const G04AutoTransferList = () => {
     setTerminateOtpOpen(false)
     // 발급 시점에 잡아둔 대상으로 만든 요청이다. 여기서 selectedRows 를 다시 읽으면
     // 토큰이 묶인 건과 실행 대상이 갈릴 수 있다.
-    if (!terminateRequest) return
+    if (!terminateRequest || terminatePasswordAuthToken == null) {
+      setActionErrorMessage(
+        "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도해 주세요.",
+      )
+      setTerminateTarget(null)
+      setTerminateAccountId(null)
+      setTerminatePasswordAuthToken(null)
+      return
+    }
     setIsTerminating(true)
     try {
       // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
@@ -239,7 +326,7 @@ export const G04AutoTransferList = () => {
       // 멱등키는 customFetch가 쓰기 메서드마다 새로 넣어준다.
       const failure = await cancelAutoTransfers(terminateRequest, {
         headers: {
-          "Account-Password-Auth-Token": TEMP_AUTH_TOKEN,
+          "Account-Password-Auth-Token": terminatePasswordAuthToken,
           "Otp-Auth-Token": otpAuthToken,
         },
       }).then(
@@ -269,6 +356,8 @@ export const G04AutoTransferList = () => {
     } finally {
       setIsTerminating(false)
       setTerminateTarget(null)
+      setTerminateAccountId(null)
+      setTerminatePasswordAuthToken(null)
     }
   }
 
@@ -284,6 +373,7 @@ export const G04AutoTransferList = () => {
    */
   const handleEditSave = async (
     updatedRow: AutoTransferRow,
+    accountPasswordAuthToken: string,
     otpAuthToken: string,
   ): Promise<boolean> => {
     try {
@@ -292,7 +382,7 @@ export const G04AutoTransferList = () => {
         cycleMonths: updatedRow.cycleMonths,
         endDate: updatedRow.endDate,
         myPassbookMemo: updatedRow.memo,
-        accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+        accountPasswordAuthToken,
         otpAuthToken,
       })
     } catch (error) {
@@ -430,7 +520,7 @@ export const G04AutoTransferList = () => {
             title="자동이체 해지"
             messages={[
               "선택한 자동이체를 해지합니다.",
-              "해지 후에는 이후 회차가 실행되지 않으며, 확인을 누르면 OTP 인증으로 이어집니다.",
+              "해지 후에는 이후 회차가 실행되지 않으며, 확인을 누르면 계좌비밀번호 확인 후 OTP 인증으로 이어집니다.",
             ]}
             confirmLabel="해지하기"
             cancelLabel="닫기"
@@ -439,6 +529,87 @@ export const G04AutoTransferList = () => {
               value: `${r.fromAlias || maskAccountNo(r.fromAccountNo)} → ${maskName(r.payeeName)} / ${formatAmount(r.amount)}`,
             }))}
           />
+
+          <Modal
+            open={terminatePasswordOpen}
+            onClose={() => {
+              setTerminatePasswordOpen(false)
+              setTerminatePassword("")
+              setTerminatePasswordError(null)
+              setTerminateTarget(null)
+              setTerminateAccountId(null)
+              setTerminatePasswordAuthToken(null)
+              verifyTerminatePasswordMutation.reset()
+            }}
+            title="계좌비밀번호 확인"
+            size="sm"
+            footer={
+              <>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="min-w-30"
+                  onClick={() => {
+                    setTerminatePasswordOpen(false)
+                    setTerminatePassword("")
+                    setTerminatePasswordError(null)
+                    setTerminateTarget(null)
+                    setTerminateAccountId(null)
+                    setTerminatePasswordAuthToken(null)
+                    verifyTerminatePasswordMutation.reset()
+                  }}
+                >
+                  취소
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="min-w-30"
+                  disabled={verifyTerminatePasswordMutation.isPending}
+                  onClick={() => void handleTerminatePasswordConfirm()}
+                >
+                  {verifyTerminatePasswordMutation.isPending
+                    ? "확인 중..."
+                    : "확인"}
+                </Button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-3">
+              <p className="text-base text-ink-muted">
+                자동이체 해지를 위해 출금계좌의 계좌비밀번호를 입력하세요.
+              </p>
+
+              <Input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={PASSWORD_LIMIT}
+                value={terminatePassword}
+                invalid={terminatePasswordError != null}
+                disabled={verifyTerminatePasswordMutation.isPending}
+                onChange={(event) => {
+                  setTerminatePassword(
+                    onlyDigits(event.target.value, PASSWORD_LIMIT),
+                  )
+
+                  if (terminatePasswordError) {
+                    setTerminatePasswordError(null)
+                  }
+                }}
+                placeholder="계좌비밀번호 4자리"
+                className="text-center tracking-4"
+                autoFocus
+              />
+
+              {terminatePasswordError && (
+                <p role="alert" className="text-base font-bold text-danger">
+                  {terminatePasswordError}
+                </p>
+              )}
+            </div>
+          </Modal>
 
           <ErrorDialog
             open={blockedOpen}
@@ -464,10 +635,11 @@ export const G04AutoTransferList = () => {
             messages={actionErrorMessage ? [actionErrorMessage] : []}
           />
 
-          {editTarget && (
+          {editTarget && appliedAccountId != null && (
             <G04AutoTransferEditFlow
               key={editTarget.id}
               target={editTarget}
+              accountId={appliedAccountId}
               onClose={() => setEditTarget(null)}
               onSave={handleEditSave}
             />
@@ -481,6 +653,8 @@ export const G04AutoTransferList = () => {
               onClose={() => {
                 setTerminateOtpOpen(false)
                 setTerminateTarget(null)
+                setTerminateAccountId(null)
+                setTerminatePasswordAuthToken(null)
               }}
               onConfirm={handleTerminateOtpConfirm}
               transaction={{

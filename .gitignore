@@ -33,7 +33,11 @@ storybook-static
 # 로컬 전용 문서
 *.xlsx
 *.xls
-/docs/
+/docs/*
 /prompt
+
+# 예외 — 관리자 요구사항 정의서는 팀이 읽어야 한다 (#156).
+# 1차 요구사항정의서에 관리자 화면이 0건이라 이 문서가 유일한 정본이다.
+!/docs/requirements-admin.md
 
 e2e/**/*-snapshots/

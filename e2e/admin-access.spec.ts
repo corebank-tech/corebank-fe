@@ -11,6 +11,8 @@ const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
 const ADMIN = { userId: "seojunpark", password: "Corebank1!" }
 /** 조회 전용 관리자 — CUSTOMER_READ 는 있고 CUSTOMER_WRITE 가 없다. */
 const READONLY_ADMIN = { userId: "dayeonkim", password: "Corebank2!" }
+/** 회계 전용 관리자 — GL_READ 하나뿐이라 고객 화면 자체가 막힌다(#156). */
+const GL_ONLY_ADMIN = { userId: "minjunlee", password: "Corebank3!" }
 
 async function loginAsAdmin(
   page: Page,
@@ -163,4 +165,53 @@ test("전 권한 관리자에게는 계정 운영 버튼이 보인다", async ({
     page.getByRole("button", { name: "비밀번호 초기화" }),
   ).toBeVisible()
   await expect(page.getByRole("button", { name: "계정 정지" })).toBeVisible()
+})
+
+/* ------------------------------------------------------------------ */
+/* 화면 단위 권한 게이트(REQ-ADM-004) — 주소창으로 들어오는 경로         */
+/* ------------------------------------------------------------------ */
+
+test("권한 없는 화면은 URL 로 직접 들어가도 열리지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, GL_ONLY_ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  // 메뉴에서는 이미 빠져 있다. 그것만으로는 아래 직접 접근을 막지 못한다.
+  await expect(page.getByRole("link", { name: "고객 계정 운영" })).toBeHidden()
+
+  await page.goto("/admin/customers")
+
+  await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeVisible()
+  // 무엇이 필요한지 말하지 않으면 관리자가 할 수 있는 일이 없다.
+  await expect(page.getByText("고객 조회(CUSTOMER_READ)")).toBeVisible()
+  // 목록이 그려지지 않아야 한다 — 이 게이트가 생기기 전에는 그려졌다.
+  await expect(page.getByText("조회조건")).toBeHidden()
+  // 가드가 셸 안쪽에 서므로 네비는 남는다. 막힌 화면에서 갇히지 않는다.
+  await expect(page.getByRole("link", { name: "시산표" })).toBeVisible()
+})
+
+test("상세 경로도 같은 게이트에 걸린다", async ({ page }) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, GL_ONLY_ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  // 목록만 막고 상세를 열어 두면 개인정보가 그대로 노출된다.
+  await page.goto("/admin/customers/3")
+
+  await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeVisible()
+  await expect(page.getByText("계정 정보")).toBeHidden()
+})
+
+test("게이트는 권한 있는 화면까지 막지는 않는다", async ({ page }) => {
+  await page.goto("/admin/login")
+  await loginAsAdmin(page, GL_ONLY_ADMIN)
+  await expect(page).toHaveURL("/admin")
+
+  // 위 두 시나리오의 짝. 이게 없으면 "전부 막는 가드"도 통과해 버린다.
+  await page.goto("/admin/trial-balance")
+
+  await expect(page.getByText("조회조건")).toBeVisible()
+  await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeHidden()
 })

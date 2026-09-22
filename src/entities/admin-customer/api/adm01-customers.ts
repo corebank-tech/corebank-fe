@@ -212,4 +212,22 @@ export const MOCK_ADMIN_CUSTOMERS: AdminCustomer[] = [
     lastLoginAt: `${daysAgo(9)}T11:36:20`,
     joinedAt: `${daysAgo(150)}T09:20:00`,
   },
+  /**
+   * 회계 전용 관리자(#156)의 짝. 이 화면의 시나리오에 필요해서 넣은 것이 아니라,
+   * `MOCK_MEMBERS` 전원이 여기 같은 성명·생년월일로 있어야 한다는 규칙
+   * (`adm01-customers.test.ts`)을 지키기 위한 항목이다.
+   */
+  {
+    customerId: 13,
+    userId: "minjunlee",
+    userName: "이민준",
+    birthDate: "1995-03-08",
+    email: "minjun@corebank.example.com",
+    phoneNumber: "01055667788",
+    loginFailureCount: 0,
+    accountLocked: false,
+    status: "ACTIVE",
+    lastLoginAt: `${daysAgo(3)}T15:08:44`,
+    joinedAt: `${daysAgo(240)}T11:10:00`,
+  },
 ]

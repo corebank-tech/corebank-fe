@@ -1,4 +1,4 @@
-import { hasAnyWritePermission, type AdminPermission } from "@/entities/auth"
+import { ADMIN_PERMISSION_LABELS, hasAnyWritePermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import { LabelValueRow } from "@/shared/ui/label-value-row"
 import { NoticeBox } from "@/shared/ui/notice-box"
@@ -10,20 +10,10 @@ import { Panel, PanelHeader } from "@/shared/ui/panel"
  *
  * 권한을 **목록 그대로** 보여준다. "조회 전용 / 변경 가능" 한 줄로 요약하면
  * 어느 기능에 대한 권한인지가 사라져, 메뉴가 왜 안 보이는지 설명되지 않는다.
+ *
+ * 권한 한글 표기는 `entities/auth` 로 옮겼다 — 권한 부족 안내(`AdminForbidden`)가
+ * 같은 표기를 쓰게 되면서 두 벌이 될 자리였다.
  */
-
-/**
- * 권한 코드의 화면 표기. 코드만 띄우면 관리자가 `GL_READ` 가 무엇인지 알 수 없다.
- * 한 화면에서만 쓰므로 공용으로 빼지 않는다 — 다른 화면이 같은 표기를 필요로 할 때
- * `entities` 로 옮긴다.
- */
-const PERMISSION_LABELS: Record<AdminPermission, string> = {
-  GL_READ: "회계 조회",
-  GL_WRITE: "회계 변경",
-  CUSTOMER_READ: "고객 조회",
-  CUSTOMER_WRITE: "고객 변경",
-  AUDIT_READ: "감사 조회",
-}
 
 export const AdminHome = () => {
   const { customerName, role, permissions } = useSession()
@@ -41,7 +31,7 @@ export const AdminHome = () => {
               ? permissions
                   .map(
                     (permission) =>
-                      `${PERMISSION_LABELS[permission]}(${permission})`,
+                      `${ADMIN_PERMISSION_LABELS[permission]}(${permission})`,
                   )
                   .join(" · ")
               : "부여된 권한 없음"

@@ -42,6 +42,7 @@ export {
   type SessionAuthority,
   type SessionRole,
 } from "@/entities/auth/lib/session-role"
+export { ADMIN_PERMISSION_LABELS } from "@/entities/auth/lib/permission-label"
 /**
  * 권한 타입은 `shared/types` 가 원본이지만(네비 설정이 shared 라 그쪽에 둬야 한다)
  * 소비자가 출처를 둘로 나눠 기억하지 않도록 여기서도 내보낸다.

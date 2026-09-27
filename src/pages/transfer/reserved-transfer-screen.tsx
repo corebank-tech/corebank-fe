@@ -55,8 +55,8 @@ const INITIAL_FORM: ReservedTransferForm = {
 /**
  * E-01 ~ E-03 assembly. Holds the shared form state and step index; each step
  * is a pure presentation component that receives values and callbacks. The
- * 거래내용 확인(ConfirmDialog) → OTP(OtpModal) sequence required before
- * execution (REQ-RSV-005, REQ-TRSF-031) is orchestrated here.
+ * 거래내용 확인(ConfirmDialog) → 계좌비밀번호 검증 → OTP(OtpModal) 인증 순서를
+ * 여기서 조립한다(REQ-RSV-005, REQ-TRSF-031).
  */
 export const ReservedTransferScreen = () => {
   const NOW = useBaseTime()

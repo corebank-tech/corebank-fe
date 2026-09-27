@@ -91,8 +91,6 @@ export const G04AutoTransferEditFlow = ({
 
     setPasswordError(null)
 
-    setPasswordError(null)
-
     const result = await passwordVerification.verify({
       accountId,
       accountPassword: password,

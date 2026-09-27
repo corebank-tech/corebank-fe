@@ -25,7 +25,7 @@ import { ReservedTransferStep2 } from "@/pages/transfer/reserved/e02-confirm"
 import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
 import { useRegisterScheduledTransferMutation } from "@/entities/transfer"
 import {
-  useVerifyAccountPasswordMutation,
+  useAccountPasswordVerification,
   useWithdrawAccounts,
 } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
@@ -72,7 +72,7 @@ export const ReservedTransferScreen = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
     React.useState<string | null>(null)
-  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const passwordVerification = useAccountPasswordVerification()
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
 
@@ -161,39 +161,20 @@ export const ReservedTransferScreen = () => {
       return
     }
 
-    try {
-      const response = await verifyPasswordMutation.mutateAsync({
-        accountId: selectedAccount.accountId,
-        data: {
-          accountPassword: form.password,
-        },
-      })
+    const result = await passwordVerification.verify({
+      accountId: selectedAccount.accountId,
+      accountPassword: form.password,
+      clearPassword: () => setField("password", ""),
+    })
 
-      // 평문 비밀번호 및 mutation variables 제거
-      setField("password", "")
-      verifyPasswordMutation.reset()
-
-      if (!response.accountPasswordAuthToken) {
-        setErrorMessage(
-          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
-        )
-        return
-      }
-
-      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
-      setErrorMessage(null)
-      setOtpOpen(true)
-    } catch (error) {
-      setField("password", "")
-      verifyPasswordMutation.reset()
-      setAccountPasswordAuthToken(null)
-
-      setErrorMessage(
-        error instanceof ApiError
-          ? error.message
-          : "계좌비밀번호 인증에 실패했습니다.",
-      )
+    if (!result.ok) {
+      setErrorMessage(result.message)
+      return
     }
+
+    setAccountPasswordAuthToken(result.token)
+    setErrorMessage(null)
+    setOtpOpen(true)
   }
 
   if (accountsLoading) {

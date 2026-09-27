@@ -22,7 +22,7 @@ import { AutoTransferStep2 } from "@/pages/transfer/auto/g02-confirm"
 import { AutoTransferStep3 } from "@/pages/transfer/auto/g03-complete"
 import { useRegisterAutoTransferMutation } from "@/entities/transfer"
 import {
-  useVerifyAccountPasswordMutation,
+  useAccountPasswordVerification,
   useWithdrawAccounts,
 } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
@@ -120,7 +120,7 @@ export const AutoTransferScreen = () => {
     isLoading: accountsLoading,
   } = useWithdrawAccounts()
   const registerMutation = useRegisterAutoTransferMutation()
-  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const passwordVerification = useAccountPasswordVerification()
 
   const setField = <K extends keyof AutoTransferForm>(
     key: K,
@@ -163,7 +163,7 @@ export const AutoTransferScreen = () => {
     setAccountPasswordAuthToken(null)
     setErrorMessage(null)
     setOtpOpen(false)
-    verifyPasswordMutation.reset()
+    passwordVerification.reset()
     registerMutation.reset()
     setStep(1)
   }
@@ -193,6 +193,8 @@ export const AutoTransferScreen = () => {
   const handleRegisterConfirm = async (otpAuthToken: string) => {
     setOtpOpen(false)
 
+    // 출금계좌는 확인 다이얼로그에서 인증 전에 걸러낸다. 여기서는 발급 시점에
+    // 잡아둔 거래정보와 계좌비밀번호 인증 토큰이 남아 있는지만 확인한다.
     if (otpTransactionData == null || accountPasswordAuthToken == null) {
       setErrorMessage(
         "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도해 주세요.",
@@ -235,6 +237,9 @@ export const AutoTransferScreen = () => {
     setConfirmOpen(false)
     setAccountPasswordAuthToken(null)
 
+    // 인증을 시작하기 전에 막는다. 계좌비밀번호 검증과 OTP 발급·검증은 실제
+    // 토큰을 발급·소비하므로, 인증을 마친 뒤에 걸러내면 토큰이 그대로 버려진다.
+    // 출금계좌 목록은 백그라운드 재조회로 바뀔 수 있다.
     if (otpTransactionData == null) {
       setErrorMessage(
         "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
@@ -242,40 +247,20 @@ export const AutoTransferScreen = () => {
       return
     }
 
-    try {
-      const response = await verifyPasswordMutation.mutateAsync({
-        accountId: otpTransactionData.withdrawalAccountId,
-        data: {
-          accountPassword: form.password,
-        },
-      })
+    const result = await passwordVerification.verify({
+      accountId: otpTransactionData.withdrawalAccountId,
+      accountPassword: form.password,
+      clearPassword: () => setField("password", ""),
+    })
 
-      // 검증 직후 화면 state와 mutation variables에서 평문 비밀번호를 제거한다.
-      setField("password", "")
-      verifyPasswordMutation.reset()
-
-      if (!response.accountPasswordAuthToken) {
-        setErrorMessage(
-          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
-        )
-        return
-      }
-
-      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
-      setErrorMessage(null)
-      setOtpOpen(true)
-    } catch (error) {
-      // 실패한 경우에도 평문 비밀번호를 남기지 않는다.
-      setField("password", "")
-      verifyPasswordMutation.reset()
-      setAccountPasswordAuthToken(null)
-
-      setErrorMessage(
-        error instanceof ApiError
-          ? error.message
-          : "계좌비밀번호 인증에 실패했습니다.",
-      )
+    if (!result.ok) {
+      setErrorMessage(result.message)
+      return
     }
+
+    setAccountPasswordAuthToken(result.token)
+    setErrorMessage(null)
+    setOtpOpen(true)
   }
 
   const periodLabel = `${formatDate(form.startDate)} ~ ${formatDate(form.endDate)}`

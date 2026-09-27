@@ -50,7 +50,7 @@ import {
   changeAutoTransfer,
 } from "@/entities/transfer"
 import {
-  useVerifyAccountPasswordMutation,
+  useAccountPasswordVerification,
   useWithdrawAccounts,
 } from "@/entities/account"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
@@ -129,7 +129,7 @@ export const G04AutoTransferList = () => {
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   const { accounts: withdrawAccounts } = useWithdrawAccounts()
-  const verifyTerminatePasswordMutation = useVerifyAccountPasswordMutation()
+  const terminatePasswordVerification = useAccountPasswordVerification()
 
   // 계좌 목록은 비동기로 도착하므로, 아직 사용자가 고르지 않았다면 첫 계좌를
   // 렌더링 중에 파생값으로 기본 선택한다(useEffect + setState 대신).
@@ -190,6 +190,16 @@ export const G04AutoTransferList = () => {
   const selectedRows = pageRows.filter((r) => selectedIds.includes(r.id))
 
   const clearSelection = () => setSelectedIds([])
+
+  const closeTerminatePasswordModal = () => {
+    setTerminatePasswordOpen(false)
+    setTerminatePassword("")
+    setTerminatePasswordError(null)
+    setTerminateTarget(null)
+    setTerminateAccountId(null)
+    setTerminatePasswordAuthToken(null)
+    terminatePasswordVerification.reset()
+  }
 
   const handleReset = () => {
     clearSelection()
@@ -270,38 +280,20 @@ export const G04AutoTransferList = () => {
     setTerminatePasswordError(null)
     setTerminatePasswordAuthToken(null)
 
-    try {
-      const response = await verifyTerminatePasswordMutation.mutateAsync({
-        accountId: terminateAccountId,
-        data: {
-          accountPassword: terminatePassword,
-        },
-      })
+    const result = await terminatePasswordVerification.verify({
+      accountId: terminateAccountId,
+      accountPassword: terminatePassword,
+      clearPassword: () => setTerminatePassword(""),
+    })
 
-      // 평문 비밀번호와 mutation variables를 검증 직후 제거한다.
-      setTerminatePassword("")
-      verifyTerminatePasswordMutation.reset()
-
-      if (!response.accountPasswordAuthToken) {
-        setTerminatePasswordError(
-          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
-        )
-        return
-      }
-
-      setTerminatePasswordAuthToken(response.accountPasswordAuthToken)
-      setTerminatePasswordOpen(false)
-      setTerminateOtpOpen(true)
-    } catch (error) {
-      setTerminatePassword("")
-      verifyTerminatePasswordMutation.reset()
-
-      setTerminatePasswordError(
-        error instanceof ApiError
-          ? error.message
-          : "계좌비밀번호 인증에 실패했습니다.",
-      )
+    if (!result.ok) {
+      setTerminatePasswordError(result.message)
+      return
     }
+
+    setTerminatePasswordAuthToken(result.token)
+    setTerminatePasswordOpen(false)
+    setTerminateOtpOpen(true)
   }
 
   const handleTerminateOtpConfirm = async (otpAuthToken: string) => {
@@ -532,15 +524,7 @@ export const G04AutoTransferList = () => {
 
           <Modal
             open={terminatePasswordOpen}
-            onClose={() => {
-              setTerminatePasswordOpen(false)
-              setTerminatePassword("")
-              setTerminatePasswordError(null)
-              setTerminateTarget(null)
-              setTerminateAccountId(null)
-              setTerminatePasswordAuthToken(null)
-              verifyTerminatePasswordMutation.reset()
-            }}
+            onClose={closeTerminatePasswordModal}
             title="계좌비밀번호 확인"
             size="sm"
             footer={
@@ -549,15 +533,7 @@ export const G04AutoTransferList = () => {
                   variant="secondary"
                   size="lg"
                   className="min-w-30"
-                  onClick={() => {
-                    setTerminatePasswordOpen(false)
-                    setTerminatePassword("")
-                    setTerminatePasswordError(null)
-                    setTerminateTarget(null)
-                    setTerminateAccountId(null)
-                    setTerminatePasswordAuthToken(null)
-                    verifyTerminatePasswordMutation.reset()
-                  }}
+                  onClick={closeTerminatePasswordModal}
                 >
                   취소
                 </Button>
@@ -566,10 +542,10 @@ export const G04AutoTransferList = () => {
                   variant="primary"
                   size="lg"
                   className="min-w-30"
-                  disabled={verifyTerminatePasswordMutation.isPending}
+                  disabled={terminatePasswordVerification.isPending}
                   onClick={() => void handleTerminatePasswordConfirm()}
                 >
-                  {verifyTerminatePasswordMutation.isPending
+                  {terminatePasswordVerification.isPending
                     ? "확인 중..."
                     : "확인"}
                 </Button>
@@ -588,7 +564,7 @@ export const G04AutoTransferList = () => {
                 maxLength={PASSWORD_LIMIT}
                 value={terminatePassword}
                 invalid={terminatePasswordError != null}
-                disabled={verifyTerminatePasswordMutation.isPending}
+                disabled={terminatePasswordVerification.isPending}
                 onChange={(event) => {
                   setTerminatePassword(
                     onlyDigits(event.target.value, PASSWORD_LIMIT),

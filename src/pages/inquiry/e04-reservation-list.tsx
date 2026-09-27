@@ -48,7 +48,7 @@ import {
 } from "@/entities/transfer"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 import { onlyDigits } from "@/shared/lib/input-filter"
-import { useVerifyAccountPasswordMutation } from "@/entities/account"
+import { useAccountPasswordVerification } from "@/entities/account"
 
 const STATUS_OPTIONS = [
   { label: "전체", value: "all" },
@@ -168,7 +168,15 @@ export const E04ReservationList = () => {
   >(null)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
-  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const passwordVerification = useAccountPasswordVerification()
+  const closePasswordModal = () => {
+    setCancelPasswordOpen(false)
+    setCancelPassword("")
+    setCancelPasswordError(null)
+    setCancelPasswordAuthToken(null)
+    setCancelTarget(null)
+    passwordVerification.reset()
+  }
   const [brailleOpen, setBrailleOpen] = React.useState(false)
 
   // 툴바에서 "전체 보기"를 내렸으므로(showAllOption={false}) "all"은 도달하지
@@ -320,38 +328,20 @@ export const E04ReservationList = () => {
     setCancelPasswordError(null)
     setCancelPasswordAuthToken(null)
 
-    try {
-      const response = await verifyPasswordMutation.mutateAsync({
-        accountId: cancelTarget.withdrawalAccountId,
-        data: {
-          accountPassword: cancelPassword,
-        },
-      })
+    const result = await passwordVerification.verify({
+      accountId: cancelTarget.withdrawalAccountId,
+      accountPassword: cancelPassword,
+      clearPassword: () => setCancelPassword(""),
+    })
 
-      // 검증 직후 state와 mutation variables에서 평문 비밀번호를 제거한다.
-      setCancelPassword("")
-      verifyPasswordMutation.reset()
-
-      if (!response.accountPasswordAuthToken) {
-        setCancelPasswordError(
-          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
-        )
-        return
-      }
-
-      setCancelPasswordAuthToken(response.accountPasswordAuthToken)
-      setCancelPasswordOpen(false)
-      setOtpOpen(true)
-    } catch (error) {
-      setCancelPassword("")
-      verifyPasswordMutation.reset()
-
-      setCancelPasswordError(
-        error instanceof ApiError
-          ? error.message
-          : "계좌비밀번호 인증에 실패했습니다.",
-      )
+    if (!result.ok) {
+      setCancelPasswordError(result.message)
+      return
     }
+
+    setCancelPasswordAuthToken(result.token)
+    setCancelPasswordOpen(false)
+    setOtpOpen(true)
   }
 
   const handleOtpConfirm = async (otpAuthToken: string) => {
@@ -371,6 +361,9 @@ export const E04ReservationList = () => {
     setIsCancelling(true)
 
     try {
+      // 실패해도 선택을 비우고 재조회한다 — 실패 사유만 띄우고 목록을 그대로 두면
+      // 화면이 요청 전 상태를 계속 보여준다. 그래서 실패를 문구 값으로 옮긴다.
+      // 취소 불가는 예외가 아니라 200 응답의 건별 ERROR로 오므로 응답도 판정한다.
       const failed = await cancelScheduledTransfers(cancelRequest, {
         headers: {
           "Account-Password-Auth-Token": cancelPasswordAuthToken,
@@ -391,6 +384,9 @@ export const E04ReservationList = () => {
 
       const refreshed = await refetch()
 
+      // 취소 실패 사유가 우선이다. 재조회까지 실패하면 React Query가 직전 성공
+      // 응답을 그대로 들고 있어서 방금 취소한 건이 여전히 "대기"로 보이는데,
+      // 목록이 비어 있지 않으니 그리드의 빈 목록 안내로도 드러나지 않는다.
       if (failed) {
         setCancelErrorMessage(failed)
       } else if (refreshed.isError) {
@@ -536,14 +532,7 @@ export const E04ReservationList = () => {
 
           <Modal
             open={cancelPasswordOpen}
-            onClose={() => {
-              setCancelPasswordOpen(false)
-              setCancelPassword("")
-              setCancelPasswordError(null)
-              setCancelPasswordAuthToken(null)
-              setCancelTarget(null)
-              verifyPasswordMutation.reset()
-            }}
+            onClose={closePasswordModal}
             title="계좌비밀번호 확인"
             size="sm"
             footer={
@@ -552,14 +541,7 @@ export const E04ReservationList = () => {
                   variant="secondary"
                   size="lg"
                   className="min-w-30"
-                  onClick={() => {
-                    setCancelPasswordOpen(false)
-                    setCancelPassword("")
-                    setCancelPasswordError(null)
-                    setCancelPasswordAuthToken(null)
-                    setCancelTarget(null)
-                    verifyPasswordMutation.reset()
-                  }}
+                  onClick={closePasswordModal}
                 >
                   취소
                 </Button>
@@ -568,10 +550,10 @@ export const E04ReservationList = () => {
                   variant="primary"
                   size="lg"
                   className="min-w-30"
-                  disabled={verifyPasswordMutation.isPending}
+                  disabled={passwordVerification.isPending}
                   onClick={() => void handleCancelPasswordConfirm()}
                 >
-                  {verifyPasswordMutation.isPending ? "확인 중..." : "확인"}
+                  {passwordVerification.isPending ? "확인 중..." : "확인"}
                 </Button>
               </>
             }
@@ -595,7 +577,7 @@ export const E04ReservationList = () => {
                 maxLength={PASSWORD_LIMIT}
                 value={cancelPassword}
                 invalid={cancelPasswordError != null}
-                disabled={verifyPasswordMutation.isPending}
+                disabled={passwordVerification.isPending}
                 onChange={(event) => {
                   setCancelPassword(
                     onlyDigits(event.target.value, PASSWORD_LIMIT),

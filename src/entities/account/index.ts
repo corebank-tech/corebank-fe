@@ -44,3 +44,4 @@ export {
   useResetAccountDisplayOrderMutation,
   useSaveAccountDisplayOrderMutation,
 } from "@/entities/account/api/account-display-order-mutations"
+export { useAccountPasswordVerification } from "@/entities/account/api/use-account-password-verification"

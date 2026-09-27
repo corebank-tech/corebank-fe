@@ -20,9 +20,8 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { FormRow } from "@/shared/ui/form-row"
 import { Input } from "@/shared/ui/input"
 import { Modal } from "@/shared/ui/modal"
-import { useVerifyAccountPasswordMutation } from "@/entities/account"
-import { ApiError } from "@/shared/api/api-error"
 import { onlyDigits } from "@/shared/lib/input-filter"
+import { useAccountPasswordVerification } from "@/entities/account"
 
 const PASSWORD_LIMIT = 4
 
@@ -51,6 +50,7 @@ type Props = {
   target: AutoTransferRow
   accountId: number
   onClose: () => void
+  /** 변경 요청의 성공 여부를 돌려준다. 실패하면 모달을 닫지 않는다. */
   onSave: (
     updatedRow: AutoTransferRow,
     accountPasswordAuthToken: string,
@@ -78,7 +78,7 @@ export const G04AutoTransferEditFlow = ({
   const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
     React.useState<string | null>(null)
 
-  const verifyPasswordMutation = useVerifyAccountPasswordMutation()
+  const passwordVerification = useAccountPasswordVerification()
 
   const handleAuthenticate = async () => {
     setIsConfirmOpen(false)
@@ -91,37 +91,21 @@ export const G04AutoTransferEditFlow = ({
 
     setPasswordError(null)
 
-    try {
-      const response = await verifyPasswordMutation.mutateAsync({
-        accountId,
-        data: {
-          accountPassword: password,
-        },
-      })
+    setPasswordError(null)
 
-      // 평문 비밀번호와 mutation variables를 즉시 제거한다.
-      setPassword("")
-      verifyPasswordMutation.reset()
+    const result = await passwordVerification.verify({
+      accountId,
+      accountPassword: password,
+      clearPassword: () => setPassword(""),
+    })
 
-      if (!response.accountPasswordAuthToken) {
-        setPasswordError(
-          "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도해 주세요.",
-        )
-        return
-      }
-
-      setAccountPasswordAuthToken(response.accountPasswordAuthToken)
-      setIsOtpOpen(true)
-    } catch (error) {
-      setPassword("")
-      verifyPasswordMutation.reset()
-
-      setPasswordError(
-        error instanceof ApiError
-          ? error.message
-          : "계좌비밀번호 인증에 실패했습니다.",
-      )
+    if (!result.ok) {
+      setPasswordError(result.message)
+      return
     }
+
+    setAccountPasswordAuthToken(result.token)
+    setIsOtpOpen(true)
   }
 
   const updatedRow: AutoTransferRow = {
@@ -163,7 +147,8 @@ export const G04AutoTransferEditFlow = ({
       otpAuthToken,
     )
     setIsSaving(false)
-    // 최종 요청에 사용한 토큰은 성공 여부와 관계없이 재사용하지 않는다.
+    // OTP는 이미 소진됐고 계좌비밀번호 인증 토큰도 재사용하지 않으므로,
+    // 실패해도 OTP 모달은 닫고 재시도는 새 인증부터 시작한다.
     setAccountPasswordAuthToken(null)
     setIsOtpOpen(false)
     if (saved) onClose()
@@ -193,7 +178,7 @@ export const G04AutoTransferEditFlow = ({
               disabled={
                 isSaving ||
                 password.length !== PASSWORD_LIMIT ||
-                verifyPasswordMutation.isPending ||
+                passwordVerification.isPending ||
                 !(Number(editForm.amount) > 0) ||
                 !isEndDateValid(target.startDate, editForm.endDate)
               }
@@ -282,7 +267,7 @@ export const G04AutoTransferEditFlow = ({
                 maxLength={PASSWORD_LIMIT}
                 value={password}
                 invalid={passwordError != null}
-                disabled={verifyPasswordMutation.isPending || isSaving}
+                disabled={passwordVerification.isPending || isSaving}
                 onChange={(event) => {
                   setPassword(onlyDigits(event.target.value, PASSWORD_LIMIT))
 

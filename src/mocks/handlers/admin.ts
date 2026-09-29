@@ -5,7 +5,7 @@ import type { SessionAuthority } from "@/entities/auth"
  * 대신한다(PH-49a 구현 10/8, #147).
  *
  * 확정 계약은 `role` + `permissions` 고정 집합 5종이다
- * (`corebank-server/plans/260916-corebank-phase2-v3/00-프로젝트-개요.md` §7).
+ * (`corebank-server/docs/phase2/README.md` §3-4).
  *
  * `MOCK_MEMBERS` 를 건드리지 않고 별도 표로 둔 이유는 그쪽이 A-07·A-08 화면의
  * 고정 데이터라, 권한을 섞으면 무관한 화면의 기대값이 흔들리기 때문이다.

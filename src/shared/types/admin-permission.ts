@@ -1,9 +1,9 @@
 /**
  * 관리자 기능 권한. 2차 확정 계약의 고정 집합이다
- * (`corebank-server/plans/260916-corebank-phase2-v3/00-프로젝트-개요.md` §7).
+ * (`corebank-server/docs/phase2/README.md` §3-4).
  *
- * > 관리자 인증 — `customer.role`(CUSTOMER/ADMIN) + `permissions` CSV 컬럼
- * > (고정 집합 `GL_READ·GL_WRITE·CUSTOMER_READ·CUSTOMER_WRITE·AUDIT_READ`)
+ * > 모델: `customer.role` + `permissions` CSV. 권한은 고정 5종
+ * > (`GL_READ · GL_WRITE · CUSTOMER_READ · CUSTOMER_WRITE · AUDIT_READ`)이다.
  *
  * **`entities/auth` 가 아니라 `shared/types` 에 둔다.** 관리자 네비 설정
  * (`shared/config/admin-nav.ts`)이 항목마다 필요한 권한을 선언하는데, FSD-lite 의

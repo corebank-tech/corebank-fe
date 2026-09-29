@@ -9,11 +9,14 @@ import {
   it,
   vi,
 } from "vitest"
-import { act, renderHook, waitFor } from "@testing-library/react"
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
-import { SESSION_TIMEOUT_SECONDS } from "@/shared/config/policy"
+import {
+  ADMIN_SESSION_TIMEOUT_SECONDS,
+  SESSION_TIMEOUT_SECONDS,
+} from "@/shared/config/policy"
 import { SessionProvider } from "@/features/session/model/session-provider"
 import { useSession } from "@/features/session/model/use-session"
 
@@ -48,6 +51,23 @@ const serverHandlers = [
   }),
 ]
 
+/** 관리자로 응답하게 바꾼다. 역할·만료 두 describe 가 같이 쓴다. */
+const respondAsAdmin = (permissions: unknown) =>
+  server.use(
+    http.get("*/customers/me", () =>
+      HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: {
+          customerId: 2,
+          userName: "박*준",
+          role: "ADMIN",
+          permissions,
+        },
+      }),
+    ),
+  )
+
 beforeAll(() => {
   vi.stubEnv("VITE_API_BASE_URL", "")
   server.listen({ onUnhandledRequest: "error" })
@@ -62,6 +82,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // 이 레포는 `globals: false` 라(`vite.config.ts`) Testing Library 자동 정리가
+  // 걸리지 않는다. 안 내려주면 만료 전 세션을 들고 있는 Provider 가 살아남아,
+  // 다음 테스트가 시계를 돌릴 때 같이 만료되며 로그아웃을 한 번 더 부른다.
+  cleanup()
   vi.useRealTimers()
   server.resetHandlers()
 })
@@ -121,21 +145,6 @@ describe("세션 부트스트랩", () => {
 
 describe("세션 역할·권한", () => {
   /** 관리자 역할·권한을 실은 프로필 응답으로 갈아끼운다. */
-  const respondAsAdmin = (permissions: unknown) =>
-    server.use(
-      http.get("*/customers/me", () =>
-        HttpResponse.json({
-          code: "0000",
-          message: "성공",
-          data: {
-            customerId: 2,
-            userName: "박*준",
-            role: "ADMIN",
-            permissions,
-          },
-        }),
-      ),
-    )
 
   it("역할 필드가 없는 응답은 고객·권한 없음으로 떨어진다", async () => {
     // 서버가 아직 필드를 내려주지 않는 상태(2026-09-18 기준)가 이 경우다.
@@ -220,6 +229,50 @@ describe("세션 만료", () => {
     expect(result.current.expiredReason).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
     expect(logoutCallCount).toBe(0)
+  })
+})
+
+describe("관리자 세션 만료 (POL-A01)", () => {
+  it("관리자 세션은 30분으로 센다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    // 역할은 프로필이 도착해야 정해진다. 만료 길이를 상태로 들고 나중에 맞추는
+    // 구조였다면 프로필 도착 직전 리셋이 고객 길이로 잡혀 여기서 600 이 나온다.
+    await waitFor(() =>
+      expect(result.current.remainingSeconds).toBe(
+        ADMIN_SESSION_TIMEOUT_SECONDS,
+      ),
+    )
+  })
+
+  it("고객 만료 시간이 지나도 관리자 세션은 살아 있다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    await act(async () => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_SECONDS * 1000)
+    })
+
+    expect(result.current.expiredReason).toBeNull()
+    expect(result.current.isAuthenticated).toBe(true)
+    expect(logoutCallCount).toBe(0)
+  })
+
+  it("30분이 지나면 관리자도 서버 세션까지 끊는다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    await act(async () => {
+      vi.advanceTimersByTime(ADMIN_SESSION_TIMEOUT_SECONDS * 1000)
+    })
+
+    await waitFor(() => expect(result.current.expiredReason).toBe("timer"))
+    await waitFor(() => expect(logoutCallCount).toBe(1))
+    expect(result.current.isAuthenticated).toBe(false)
   })
 })
 

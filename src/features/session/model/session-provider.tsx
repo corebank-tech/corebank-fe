@@ -5,7 +5,10 @@ import {
   getCustomerProfileQueryKey,
   useCustomerProfileQuery,
 } from "@/entities/customer"
-import { SESSION_TIMEOUT_SECONDS as SESSION_SECONDS } from "@/shared/config/policy"
+import {
+  ADMIN_SESSION_TIMEOUT_SECONDS,
+  SESSION_TIMEOUT_SECONDS,
+} from "@/shared/config/policy"
 import { onApiActivity, onSessionExpired } from "@/shared/api/session-events"
 import {
   SessionContext,
@@ -28,8 +31,21 @@ export const SessionProvider = ({
    * 달라진다.
    */
   const profile = useCustomerProfileQuery()
-  const [remainingSeconds, setRemainingSeconds] =
-    React.useState(SESSION_SECONDS)
+  /**
+   * 남은 시간을 **깎아서 들고 있지 않는다.** 마지막 활동 시각과 현재 시각을
+   * 들고 매 렌더 빼서 쓴다.
+   *
+   * 남은 초를 상태로 들면 만료 길이가 바뀔 때(역할이 정해지는 순간) 그 값을
+   * 다시 채워 넣어야 하는데, 그 재설정이 프로필 도착보다 늘 한 박자 빨라서
+   * 관리자가 고객 길이로 끊긴다. 뺄셈으로 두면 길이가 바뀌는 순간 남은 시간이
+   * 저절로 따라오므로 맞출 것이 없다.
+   *
+   * 벽시계 기준이라 생기는 이득이 하나 더 있다. 브라우저는 백그라운드 탭의
+   * 1초 타이머를 늦추기 때문에, 째깍인 횟수로 세면 탭을 묻어둔 동안 시간이
+   * 덜 흐른 것으로 계산돼 만료가 늦는다.
+   */
+  const [lastActivityAt, setLastActivityAt] = React.useState(() => Date.now())
+  const [nowMs, setNowMs] = React.useState(() => Date.now())
   const [expiredReason, setExpiredReason] =
     React.useState<SessionExpiredReason | null>(null)
   const [isLoggingOut, setIsLoggingOut] = React.useState(false)
@@ -41,6 +57,24 @@ export const SessionProvider = ({
   const authority = React.useMemo(
     () => readSessionAuthority(profile.data),
     [profile.data],
+  )
+
+  /**
+   * POL-A01: 관리자 세션은 30분, 고객은 10분(POL-001)이다.
+   *
+   * 판정 키는 보고 있는 경로가 아니라 **세션의 역할**이다. 관리자가 고객 화면을
+   * 잠깐 열었다고 만료 시간이 바뀌면 한 번의 로그인 안에서 규칙이 흔들린다.
+   * 만료 뒤 도착지가 경로를 보는 것(`app/session-expired-gate.tsx`)과는 다른
+   * 질문이다 — 그쪽은 "보던 화면으로 돌려보낸다"라서 경로가 맞다.
+   */
+  const timeoutSeconds =
+    authority.role === "ADMIN"
+      ? ADMIN_SESSION_TIMEOUT_SECONDS
+      : SESSION_TIMEOUT_SECONDS
+
+  const remainingSeconds = Math.max(
+    0,
+    timeoutSeconds - Math.floor((nowMs - lastActivityAt) / 1000),
   )
 
   /** 만료 신호는 렌더 밖(구독 콜백)에서 판정해야 해서 현재 상태를 ref 로 따라둔다. */
@@ -77,9 +111,15 @@ export const SessionProvider = ({
     queryClient.clear()
   }, [queryClient])
 
-  // POL-001 은 "마지막 요청 이후" 기준이므로 요청이 나갈 때마다 다시 센다.
+  // POL-001·POL-A01 은 "마지막 요청 이후" 기준이므로 요청이 나갈 때마다 다시 센다.
+  // 현재 시각도 같이 당겨야 다음 째깍을 기다리지 않고 바로 가득 찬 값이 보인다.
   React.useEffect(
-    () => onApiActivity(() => setRemainingSeconds(SESSION_SECONDS)),
+    () =>
+      onApiActivity(() => {
+        const at = Date.now()
+        setLastActivityAt(at)
+        setNowMs(at)
+      }),
     [],
   )
 
@@ -93,19 +133,23 @@ export const SessionProvider = ({
     [],
   )
 
+  // 째깍임은 화면 표시를 갱신하는 일만 한다. 만료 판정은 표시값이 아니라
+  // 마지막 활동 이후 실제로 흐른 시간으로 한다 — 째깍을 몇 번 놓쳐도 늦지 않는다.
   React.useEffect(() => {
     if (!isAuthenticated) return
+    // 만료는 한 번만 쏜다. 조건이 시각 비교라 한 번 지나면 이후 모든 틱에서
+    // 참이고, 그때마다 쏘면 정리 절차(서버 로그아웃)가 여러 번 돈다.
+    let hasExpired = false
     const id = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          setExpiredReason("timer")
-          return 0
-        }
-        return prev - 1
-      })
+      const at = Date.now()
+      setNowMs(at)
+      if (!hasExpired && at - lastActivityAt >= timeoutSeconds * 1000) {
+        hasExpired = true
+        setExpiredReason("timer")
+      }
     }, 1000)
     return () => clearInterval(id)
-  }, [isAuthenticated])
+  }, [isAuthenticated, lastActivityAt, timeoutSeconds])
 
   // 만료가 확정되면 안내 확인을 기다리지 않고 바로 정리한다 — 공용 PC 를 전제로 한다.
   React.useEffect(() => {
@@ -133,7 +177,9 @@ export const SessionProvider = ({
 
   const setSession = React.useCallback(async () => {
     setExpiredReason(null)
-    setRemainingSeconds(SESSION_SECONDS)
+    const at = Date.now()
+    setLastActivityAt(at)
+    setNowMs(at)
     return refreshProfile()
   }, [refreshProfile])
 

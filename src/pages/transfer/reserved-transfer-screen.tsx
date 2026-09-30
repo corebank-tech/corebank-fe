@@ -24,7 +24,10 @@ import { ReservedTransferStep1 } from "@/pages/transfer/reserved/e01-input"
 import { ReservedTransferStep2 } from "@/pages/transfer/reserved/e02-confirm"
 import { ReservedTransferStep3 } from "@/pages/transfer/reserved/e03-complete"
 import { useRegisterScheduledTransferMutation } from "@/entities/transfer"
-import { useWithdrawAccounts } from "@/entities/account"
+import {
+  useAccountPasswordVerification,
+  useWithdrawAccounts,
+} from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
 
 export type ReservedTransferForm = {
@@ -49,15 +52,11 @@ const INITIAL_FORM: ReservedTransferForm = {
   myMemo: "",
 }
 
-// TODO: 계좌비밀번호(POST /accounts/{id}/password/verify) 실제 발급 API가
-// 연동되면 그 결과 토큰으로 교체한다. OTP는 실제 토큰으로 교체했다.
-const TEMP_AUTH_TOKEN = "temp-auth-token"
-
 /**
  * E-01 ~ E-03 assembly. Holds the shared form state and step index; each step
  * is a pure presentation component that receives values and callbacks. The
- * 거래내용 확인(ConfirmDialog) → OTP(OtpModal) sequence required before
- * execution (REQ-RSV-005, REQ-TRSF-031) is orchestrated here.
+ * 거래내용 확인(ConfirmDialog) → 계좌비밀번호 검증 → OTP(OtpModal) 인증 순서를
+ * 여기서 조립한다(REQ-RSV-005, REQ-TRSF-031).
  */
 export const ReservedTransferScreen = () => {
   const NOW = useBaseTime()
@@ -71,6 +70,9 @@ export const ReservedTransferScreen = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
+    React.useState<string | null>(null)
+  const passwordVerification = useAccountPasswordVerification()
 
   const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
 
@@ -111,12 +113,19 @@ export const ReservedTransferScreen = () => {
 
   const resetAll = () => {
     setForm(INITIAL_FORM)
+    setAccountPasswordAuthToken(null)
+    setErrorMessage(null)
     setStep(1)
   }
 
   const handleRegisterConfirm = async (otpAuthToken: string) => {
     setOtpOpen(false)
-    if (!selectedAccount) return
+    if (!selectedAccount || accountPasswordAuthToken == null) {
+      setErrorMessage(
+        "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도해 주세요.",
+      )
+      return
+    }
     try {
       await registerMutation.mutateAsync({
         data: {
@@ -127,16 +136,45 @@ export const ReservedTransferScreen = () => {
           scheduledDate: form.scheduledDate,
           myPassbookMemo: form.myMemo || undefined,
           recipientPassbookMemo: form.payeeMemo || undefined,
-          accountPasswordAuthToken: TEMP_AUTH_TOKEN,
+          accountPasswordAuthToken,
           otpAuthToken,
         },
       })
+      setAccountPasswordAuthToken(null)
       setStep(3)
     } catch (e) {
+      setAccountPasswordAuthToken(null)
       setErrorMessage(
         e instanceof ApiError ? e.message : "예약이체 등록에 실패했습니다.",
       )
     }
+  }
+
+  const handleAuthenticate = async () => {
+    setConfirmOpen(false)
+    setAccountPasswordAuthToken(null)
+
+    if (selectedAccount?.accountId == null) {
+      setErrorMessage(
+        "출금계좌 정보를 확인할 수 없습니다. 이전 단계에서 다시 선택해 주세요.",
+      )
+      return
+    }
+
+    const result = await passwordVerification.verify({
+      accountId: selectedAccount.accountId,
+      accountPassword: form.password,
+      clearPassword: () => setField("password", ""),
+    })
+
+    if (!result.ok) {
+      setErrorMessage(result.message)
+      return
+    }
+
+    setAccountPasswordAuthToken(result.token)
+    setErrorMessage(null)
+    setOtpOpen(true)
   }
 
   if (accountsLoading) {
@@ -171,13 +209,10 @@ export const ReservedTransferScreen = () => {
         <ConfirmDialog
           open={confirmOpen}
           onClose={() => setConfirmOpen(false)}
-          onConfirm={() => {
-            setConfirmOpen(false)
-            setOtpOpen(true)
-          }}
+          onConfirm={() => void handleAuthenticate()}
           messages={[
             "아래 내용으로 예약이체를 등록합니다.",
-            "확인을 누르면 OTP 인증으로 이어집니다.",
+            "확인을 누르면 계좌비밀번호 확인 후 OTP 인증으로 이어집니다.",
           ]}
           confirmLabel="확인"
           items={[
@@ -201,7 +236,11 @@ export const ReservedTransferScreen = () => {
 
         <OtpModal
           open={otpOpen}
-          onClose={() => setOtpOpen(false)}
+          onClose={() => {
+            setOtpOpen(false)
+            setAccountPasswordAuthToken(null)
+            setStep(1)
+          }}
           onConfirm={handleRegisterConfirm}
           guide="예약이체 등록을 위해 OTP를 발급한 뒤 화면에 표시된 6자리 번호를 입력하세요."
           transaction={{
@@ -217,7 +256,10 @@ export const ReservedTransferScreen = () => {
 
         <ErrorDialog
           open={errorMessage != null}
-          onClose={() => setErrorMessage(null)}
+          onClose={() => {
+            setErrorMessage(null)
+            setStep(1)
+          }}
           title="예약이체 등록 실패"
           messages={errorMessage ? [errorMessage] : []}
         />

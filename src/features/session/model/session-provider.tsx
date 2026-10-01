@@ -137,14 +137,10 @@ export const SessionProvider = ({
   // 마지막 활동 이후 실제로 흐른 시간으로 한다 — 째깍을 몇 번 놓쳐도 늦지 않는다.
   React.useEffect(() => {
     if (!isAuthenticated) return
-    // 만료는 한 번만 쏜다. 조건이 시각 비교라 한 번 지나면 이후 모든 틱에서
-    // 참이고, 그때마다 쏘면 정리 절차(서버 로그아웃)가 여러 번 돈다.
-    let hasExpired = false
     const id = setInterval(() => {
       const at = Date.now()
       setNowMs(at)
-      if (!hasExpired && at - lastActivityAt >= timeoutSeconds * 1000) {
-        hasExpired = true
+      if (at - lastActivityAt >= timeoutSeconds * 1000) {
         setExpiredReason("timer")
       }
     }, 1000)

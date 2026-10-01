@@ -103,8 +103,8 @@
 
 | 정책ID | 분류 | 항목 | 기준값 | 상태 | 근거 |
 |---|---|---|---|---|---|
-| POL-A01 | 세션 | 관리자 무조작 만료 | **30분** | 확정 | PH-49a ① 결정 4 (tasks.md `PH-49a`). 고객 10분(POL-001)과 다르다. 반영 완료 — `ADMIN_SESSION_TIMEOUT_SECONDS = 1800`(`src/shared/config/policy.ts`), 판정은 경로가 아니라 세션의 역할로 한다(#136). 참고로 Apache Fineract 백오피스는 채널 구분 없이 15분이다(`fineract-backoffice-ui` `src/app/core/services/idle.service.ts`) — 우리 관리자 값이 그보다 길다 |
-| POL-A02 | 세션 | 세션 연장 | 서버 요청 1회로 재설정, 횟수 제한 없음 | 확정 | 고객 POL-002와 동일. `extend`가 `refreshProfile()`을 보내고 응답이 타이머를 리셋한다(`src/features/session/model/session-provider.tsx:150-155`) |
+| POL-A01 | 세션 | 관리자 무조작 만료 | **30분** | 확정 | PH-49a ① 결정 4 (tasks.md `PH-49a`). 고객 10분(POL-001)과 다르다. 반영 완료 — `ADMIN_SESSION_TIMEOUT_SECONDS = 1800`(`src/shared/config/policy.ts`), 판정은 경로가 아니라 세션의 역할로 한다(#136). **서버는 아직 10분이다** — `corebank-server` `application.yml:5` `session.timeout: 10m`. PH-49a-②(10/8)가 30분을 넣기 전까지는 화면이 잔여 30분을 보여도 서버가 10분 무조작에 401을 줘 "서버 만료" 안내가 먼저 뜬다. 10/16 릴리스에 양쪽이 같이 나가면 해소된다. 참고로 Apache Fineract 백오피스는 채널 구분 없이 15분이다(`fineract-backoffice-ui` `src/app/core/services/idle.service.ts`) — 우리 관리자 값이 그보다 길다 |
+| POL-A02 | 세션 | 세션 연장 | 서버 요청 1회로 재설정, 횟수 제한 없음 | 확정 | 고객 POL-002와 동일. `extend`가 `refreshProfile()`을 보내고 응답이 타이머를 리셋한다(`src/features/session/model/session-provider.tsx:192-197`) |
 | POL-A03 | 세션 | 만료 시 도착지 | `/admin/login` | 확정 | 채널별 분기(`src/app/session-expired-gate.tsx:23-39`). 고객은 `/` |
 | POL-A04 | 인증 | 관리자 로그인 실패 문구 | 고객과 동일 문구 사용 | 확정 | 권한 없음을 따로 알리지 않는다(계정 열거 차단, REQ-AUTH-023 취지). `src/entities/auth/lib/login-failure-message.ts:12,:21` |
 | POL-A05 | 개인정보 | 관리자 화면 마스킹 범위 | 성명·아이디·이메일·연락처·생년월일 **전부 마스킹**. 해제 수단 없음 | 확정 | 1차 `format.ts` 6종 재사용(#127 범위 정정 코멘트). 적용 위치는 §4 REQ-ADM-005 |

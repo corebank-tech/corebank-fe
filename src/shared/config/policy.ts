@@ -1,5 +1,6 @@
 /**
- * `docs/requirements.md` §2 정책정의(POL)의 수치 단일 출처.
+ * `docs/requirements.md` §2 정책정의(POL)와 `docs/requirements-admin.md` §3
+ * 관리자 정책정의(POL-A)의 수치 단일 출처.
  * 화면·컴포넌트는 이 상수만 참조하고 값을 직접 다시 적지 않는다.
  * 같은 값이라도 서로 다른 POL 규칙이면 별도 상수로 유지한다 —
  * 우연히 값이 같을 뿐 한쪽이 바뀌어도 다른 쪽은 바뀌지 않아야 하는 별개 규칙이기 때문이다.
@@ -7,6 +8,13 @@
 
 /** POL-001: 세션 타임아웃 10분(600초). POL-002: 연장 시에도 동일하게 재설정된다. */
 export const SESSION_TIMEOUT_SECONDS = 600
+
+/**
+ * POL-A01: 관리자 세션 타임아웃 30분(1800초). 출처는 `docs/requirements-admin.md` §3.
+ * 고객(POL-001)과 값이 다를 뿐 아니라 별개 규칙이라, 한쪽이 바뀌어도 다른 쪽은
+ * 따라가지 않는다.
+ */
+export const ADMIN_SESSION_TIMEOUT_SECONDS = 1800
 
 /** POL-003: 로그인 연속 5회 실패 시 계정 잠금. */
 export const LOGIN_MAX_ATTEMPTS = 5

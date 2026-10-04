@@ -3,6 +3,7 @@ import {
   GL_ACCOUNTS,
   MOCK_JOURNAL_ENTRIES,
   type GlJournalEntry,
+  type JournalDirection,
 } from "@/entities/gl/api/ph28-trial-balance"
 import {
   aggregateTrialBalance,
@@ -14,24 +15,24 @@ const WIDE = { start: "2000-01-01", end: "2999-12-31" }
 const line = (
   tradeDate: string,
   accountCode: string,
-  debit: number,
-  credit: number,
+  drCr: JournalDirection,
+  amount: number,
 ): GlJournalEntry => ({
-  voucherNo: "T-0001",
+  voucherNo: "T-000001",
   tradeDate,
   txType: "TRANSFER",
   accountCode,
-  debitAmount: debit,
-  creditAmount: credit,
+  drCr,
+  amount,
 })
 
 describe("aggregateTrialBalance", () => {
   it("기간 밖 분개를 빼고 집계한다", () => {
     const entries = [
-      line("2026-01-10", "10100", 100, 0),
-      line("2026-01-10", "20100", 0, 100),
-      line("2026-03-10", "10100", 500, 0),
-      line("2026-03-10", "20100", 0, 500),
+      line("2026-01-10", "10100", "DEBIT", 100),
+      line("2026-01-10", "20100", "CREDIT", 100),
+      line("2026-03-10", "10100", "DEBIT", 500),
+      line("2026-03-10", "20100", "CREDIT", 500),
     ]
 
     const result = aggregateTrialBalance(entries, {
@@ -44,7 +45,7 @@ describe("aggregateTrialBalance", () => {
   })
 
   it("기간 경계일의 분개를 포함한다", () => {
-    const entries = [line("2026-01-31", "10100", 100, 0)]
+    const entries = [line("2026-01-31", "10100", "DEBIT", 100)]
 
     const result = aggregateTrialBalance(entries, {
       start: "2026-01-01",
@@ -57,8 +58,8 @@ describe("aggregateTrialBalance", () => {
   it("같은 계정의 차변·대변을 각각 누적한다", () => {
     // 당행 이체는 예수금이 양변에 서므로, 한쪽으로 상계하면 거래가 사라진다.
     const entries = [
-      line("2026-01-10", "20100", 1000, 0),
-      line("2026-01-10", "20100", 0, 1000),
+      line("2026-01-10", "20100", "DEBIT", 1000),
+      line("2026-01-10", "20100", "CREDIT", 1000),
     ]
 
     const [row] = aggregateTrialBalance(entries, WIDE).rows
@@ -70,8 +71,8 @@ describe("aggregateTrialBalance", () => {
 
   it("움직임이 없는 계정은 행으로 두지 않는다", () => {
     const entries = [
-      line("2026-01-10", "10100", 100, 0),
-      line("2026-01-10", "20100", 0, 100),
+      line("2026-01-10", "10100", "DEBIT", 100),
+      line("2026-01-10", "20100", "CREDIT", 100),
     ]
 
     const codes = aggregateTrialBalance(entries, WIDE).rows.map(
@@ -83,7 +84,7 @@ describe("aggregateTrialBalance", () => {
 
   it("계정과목 이름·분류·정상잔액 방향을 붙인다", () => {
     const [row] = aggregateTrialBalance(
-      [line("2026-01-10", "20100", 0, 100)],
+      [line("2026-01-10", "20100", "CREDIT", 100)],
       WIDE,
     ).rows
 
@@ -117,9 +118,9 @@ describe("aggregateTrialBalance", () => {
   it("편측기표가 섞이면 불일치를 드러낸다", () => {
     // PH-28b 결함 주입 4종 중 하나. 대변 줄이 통째로 빠진 상태다.
     const entries = [
-      line("2026-01-10", "10100", 100, 0),
-      line("2026-01-10", "20100", 0, 100),
-      line("2026-01-11", "10100", 70, 0),
+      line("2026-01-10", "10100", "DEBIT", 100),
+      line("2026-01-10", "20100", "CREDIT", 100),
+      line("2026-01-11", "10100", "DEBIT", 70),
     ]
 
     const result = aggregateTrialBalance(entries, WIDE)
@@ -130,8 +131,8 @@ describe("aggregateTrialBalance", () => {
 
   it("금액변조가 섞이면 차액이 변조분과 같다", () => {
     const entries = [
-      line("2026-01-10", "10100", 130, 0),
-      line("2026-01-10", "20100", 0, 100),
+      line("2026-01-10", "10100", "DEBIT", 130),
+      line("2026-01-10", "20100", "CREDIT", 100),
     ]
 
     const result = aggregateTrialBalance(entries, WIDE)
@@ -142,8 +143,8 @@ describe("aggregateTrialBalance", () => {
   it("계정과목에 없는 코드를 버리지 않고 드러낸다", () => {
     // 조용히 건너뛰면 그 줄의 금액이 총계에서 빠져 차대변이 맞는 것처럼 보인다.
     const entries = [
-      line("2026-01-10", "10100", 100, 0),
-      line("2026-01-10", "99999", 0, 100),
+      line("2026-01-10", "10100", "DEBIT", 100),
+      line("2026-01-10", "99999", "CREDIT", 100),
     ]
 
     const result = aggregateTrialBalance(entries, WIDE)
@@ -159,6 +160,38 @@ describe("aggregateTrialBalance", () => {
     expect(result.balanced).toBe(true)
   })
 
+  it("목 분개 한 줄은 서버 제약을 지킨다 — 금액은 양수, 전표번호는 6자리 일련", () => {
+    // 서버 `gl_journal_entry` 가 `CHECK (amount > 0)` 이고 전표번호는
+    // `yyyyMMdd-TTT-NNNNNN` 다(`gl_journal_patterns.md` §1). 목이 그 제약을 어기면
+    // PH-28 실연동 때 같은 데이터가 적재 자체를 못 한다.
+    for (const entry of MOCK_JOURNAL_ENTRIES) {
+      expect([entry.voucherNo, entry.amount > 0]).toEqual([
+        entry.voucherNo,
+        true,
+      ])
+      expect(entry.voucherNo).toMatch(/^\d{8}-(OPN|TRF|SUB|INT)-\d{6}$/)
+    }
+  })
+
+  it("내부 이동 전표는 양변이 모두 예수금이다", () => {
+    // 당행 이체와 상품가입 초입금은 고객 계좌 사이의 내부 이동이라 외부에서 현금이
+    // 들어오지 않는다(`gl_journal_patterns.md` §3-2·§3-3). 상품가입을
+    // `차 현금성 / 대 예수금` 으로 적어 둔 적이 있는데, **차대변은 맞아서 어떤
+    // 테스트도 잡지 못했다**(#158). 계정 자체를 단언해야 걸린다.
+    const internal = MOCK_JOURNAL_ENTRIES.filter(
+      (entry) =>
+        entry.txType === "TRANSFER" || entry.txType === "PRODUCT_SUBSCRIPTION",
+    )
+
+    expect(internal.length).toBeGreaterThan(0)
+    for (const entry of internal) {
+      expect([entry.voucherNo, entry.accountCode]).toEqual([
+        entry.voucherNo,
+        "20100",
+      ])
+    }
+  })
+
   it("목 분개는 전표 단위로 차대변이 맞는다", () => {
     // PH-21 의 핵심 규칙이고 지금까지 주석으로만 선언돼 있었다. 총계만 보는
     // 테스트는 **서로 상쇄되는 두 전표의 오류**를 통과시킨다(전표 A 차변 +N,
@@ -166,8 +199,8 @@ describe("aggregateTrialBalance", () => {
     const byVoucher = new Map<string, { debit: number; credit: number }>()
     for (const entry of MOCK_JOURNAL_ENTRIES) {
       const sum = byVoucher.get(entry.voucherNo) ?? { debit: 0, credit: 0 }
-      sum.debit += entry.debitAmount
-      sum.credit += entry.creditAmount
+      if (entry.drCr === "DEBIT") sum.debit += entry.amount
+      else sum.credit += entry.amount
       byVoucher.set(entry.voucherNo, sum)
     }
 
@@ -190,9 +223,9 @@ describe("aggregateTrialBalance", () => {
 
   it("계정 코드 순으로 정렬한다", () => {
     const entries = [
-      line("2026-01-10", "50100", 100, 0),
-      line("2026-01-10", "10100", 100, 0),
-      line("2026-01-10", "20100", 0, 200),
+      line("2026-01-10", "50100", "DEBIT", 100),
+      line("2026-01-10", "10100", "DEBIT", 100),
+      line("2026-01-10", "20100", "CREDIT", 200),
     ]
 
     const codes = aggregateTrialBalance(entries, WIDE).rows.map(

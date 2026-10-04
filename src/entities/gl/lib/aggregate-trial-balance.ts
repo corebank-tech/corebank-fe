@@ -6,7 +6,13 @@ import {
   type GlNormalBalance,
 } from "@/entities/gl/api/ph28-trial-balance"
 
-/** 시산표 한 행 = 기간 안에서 그 계정이 받은 차변·대변 합계. */
+/**
+ * 시산표 한 행 = 기간 안에서 그 계정이 받은 차변·대변 합계.
+ *
+ * 분개 줄은 `drCr` + `amount` 한 칸인데 이 행은 차변·대변 두 칸을 갖는다. 모양이
+ * 다른 것이 맞다 — 줄은 한 변에만 서지만 계정은 기간 안에 양변을 다 받는다.
+ * 서버 PH-28 응답도 계정별 집계라 같은 모양이다.
+ */
 export type TrialBalanceRow = {
   accountCode: string
   accountName: string
@@ -72,8 +78,8 @@ export const aggregateTrialBalance = (
   for (const entry of inPeriod) {
     const existing = byCode.get(entry.accountCode)
     if (existing) {
-      existing.debitTotal += entry.debitAmount
-      existing.creditTotal += entry.creditAmount
+      if (entry.drCr === "DEBIT") existing.debitTotal += entry.amount
+      else existing.creditTotal += entry.amount
       existing.entryCount += 1
       continue
     }
@@ -86,8 +92,8 @@ export const aggregateTrialBalance = (
       // 바로 옆 배지는 멀쩡한 계정처럼 보이는 상태였다. 모르는 것은 모른다고 둔다.
       accountClass: account?.accountClass ?? null,
       normalBalance: account?.normalBalance ?? null,
-      debitTotal: entry.debitAmount,
-      creditTotal: entry.creditAmount,
+      debitTotal: entry.drCr === "DEBIT" ? entry.amount : 0,
+      creditTotal: entry.drCr === "CREDIT" ? entry.amount : 0,
       entryCount: 1,
     })
   }

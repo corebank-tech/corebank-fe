@@ -3,24 +3,26 @@ import { compactDate, daysAgo } from "@/shared/lib/mock-date"
 /**
  * ADM-02 시산표(#128) 목업 데이터 — 계정과목 시드와 분개 원본.
  *
- * 대응 서버 API(PH-28, S2 2주차)가 아직 없다. **GL 스키마 자체가 서버에 없다** —
- * `gl_account`·`gl_voucher`·`gl_journal_entry` Flyway 는 PH-20(10/1 머지) 예정이고
- * 현재 마이그레이션 최신은 `V202609081402` 다. 그래서 이 파일은 단순한 목이 아니라
- * **화면이 먼저 제안하는 계약**이다 — 필드명·코드 체계·분개 방향을 여기서 정해
- * BE 가 그대로 받는다(`P3-회계정보계RAG.md` PH-28 "스키마는 S1 말 FE 선전달").
+ * 대응 서버 API(PH-28, S2 2주차)는 아직 없다. 다만 **GL 스키마와 분개 패턴은 서버에
+ * 확정됐다** — `gl_account`·`gl_voucher`·`gl_journal_entry` Flyway 가 PH-20(PR #478,
+ * 9/25 머지)으로 들어갔고 분개 패턴표가 PH-21(PR #491, 9/27 머지)로 나왔다.
  *
- * 그래서 이름을 임의로 짓지 않았다. 계정과목 체계와 분개 패턴은 전부 계획 문서의
+ * **그래서 이 파일은 더 이상 계약을 제안하지 않는다.** 처음에는 서버에 스키마가 없어
+ * 화면이 먼저 모양을 제안했지만(그 제안은 선전달로 받아들여졌다), 지금 정본은 서버
+ * `docs/schema_reference.md` 와 `docs/phase2/gl_journal_patterns.md` 다.
+ * 이 목은 그 둘을 따라간다 — 어긋나면 이쪽을 고친다.
+ *
+ * 그래서 이름을 임의로 짓지 않았다. 계정과목 체계와 분개 패턴은 전부 서버 정본의
  * 원문에서 가져왔고, 출처가 없는 항목은 아래 "넣지 않은 것"에 사유와 함께 남긴다.
  *
  * **집계된 표를 목으로 두지 않는다.** 분개 원본을 두고 화면이 기간으로 걸러 합산한다.
  * 미리 합산한 표를 들고 있으면 기간 조건이 화면에서 아무 일도 하지 않아, 조회기간이
  * 동작하는지 만들면서 확인할 수 없다. 서버 PH-28 도 같은 일(네이티브 SQL 집계)을 한다.
  *
- * **넣지 않은 것 — 타행 미결제 2패턴.** `P4-이체코어타행이체.md` 는 미결제타점권을
- * "자금이 머무는 **자산** 계정"이라 규정하는데, 출금 측을 자산 증가(차변)로 세우면
- * 상대 계정도 차변이 되어 전표가 성립하지 않는다. 방향을 제가 임의로 정하면 틀린
- * 계약이 그대로 BE 에 전달된다. 패턴 소유자는 P4(PH-33, S2 말~S3)이므로 그때 받는다.
- * 계정 자체는 PH-20 이 시드 포함을 지시했으므로 계정과목에는 남겨 둔다.
+ * **넣지 않은 것 — 타행 미결제 2패턴.** 서버 정본도 `10200` 미결제타점권의 차대 방향을
+ * 아직 정하지 않았다(`gl_journal_patterns.md` §3-4, 소유 P4 PH-33, S2 말~S3). 방향을
+ * 임의로 정하면 틀린 분개가 화면에 남는다. 계정 자체는 시드 15개에 들어 있으므로
+ * 계정과목에는 남겨 둔다.
  */
 
 /** 계정 5분류(PH-20). 코드 첫 자리와 1:1 로 대응한다. */
@@ -83,22 +85,33 @@ export const GL_ACCOUNTS: GlAccount[] = [
 export type GlTxType =
   "OPENING" | "TRANSFER" | "PRODUCT_SUBSCRIPTION" | "INTEREST"
 
+/**
+ * 분개 한 줄의 차대 구분(`gl_journal_entry.dr_cr`).
+ *
+ * 값이 `GlNormalBalance` 와 같지만 타입을 따로 둔다. 저쪽은 **계정의 성질**이고
+ * 이쪽은 **이 줄이 어느 변에 섰는가**라, 한쪽이 바뀌어도 다른 쪽은 따라가지 않는다.
+ * 서버도 `GlNormalBalance` 와 `JournalDirection` 을 따로 갖는다.
+ */
+export type JournalDirection = "DEBIT" | "CREDIT"
+
 export type GlJournalEntry = {
-  /** 전표번호. **영업일 + 유형 + 일련**(PH-21 채번 규칙). */
+  /** 전표번호 `yyyyMMdd-TTT-NNNNNN`(`gl_journal_patterns.md` §1). */
   voucherNo: string
   /** 거래일자 `yyyy-MM-dd`. 시산표 기간 필터의 기준이다. */
   tradeDate: string
   txType: GlTxType
   accountCode: string
   /**
-   * 차변 금액. 반대편이면 0 — 한 줄이 양쪽을 동시에 갖지 않는다.
+   * 차변인지 대변인지. **한 줄은 한 변에만 선다.**
    *
-   * 접미사를 붙여 `creditAmount` 와 대칭을 맞춘다. 서버 스펙의 금액 필드가
-   * `<명사>Amount` 관용구(`successAmount`·`depositAmount`·`withdrawalAmount`)를
-   * 쓰고 `debit`·`credit` 이름은 아직 없어, 이 계약이 그 관용구를 따라간다.
+   * 차변칸·대변칸 두 개를 두고 안 쓰는 쪽을 0 으로 채우던 모양을 버렸다. 서버
+   * `gl_journal_entry` 가 `dr_cr` + `amount` 단일 금액이고(Apache Fineract
+   * `acc_gl_journal_entry` 의 `type_enum` + `amount` 와 같은 꼴), 금액에
+   * `CHECK (amount > 0)` 가 걸려 있어 0 짜리 반대편을 표현할 자리가 없다.
    */
-  debitAmount: number
-  creditAmount: number
+  drCr: JournalDirection
+  /** 항상 양수다(서버 `CHECK (amount > 0)`). */
+  amount: number
 }
 
 const VOUCHER_PREFIX: Record<GlTxType, string> = {
@@ -116,21 +129,29 @@ const VOUCHER_PREFIX: Record<GlTxType, string> = {
  * **전표번호가 한 곳에서만 만들어진다.**
  *
  * 입력 줄은 `debit`·`credit` 짧은 이름을 쓴다 — 아래 분개표가 한 줄에 한 분개로
- * 읽혀야 하기 때문이다. 내보내는 계약 필드는 `debitAmount`·`creditAmount` 다.
+ * 읽혀야 하기 때문이다. 내보내는 계약 필드는 `drCr` + `amount` 다.
+ *
+ * 입력 타입을 합집합으로 둬 **둘 다 적거나 둘 다 빠뜨리는 것을 타입이 막는다.**
+ * 서버가 금액을 한 칸만 갖는 이상 양쪽을 적을 방법이 없어야 한다.
  */
+type VoucherLine =
+  | { accountCode: string; debit: number }
+  | { accountCode: string; credit: number }
+
 const voucher = (
   tradeDate: string,
   txType: GlTxType,
   seq: number,
-  lines: { accountCode: string; debit?: number; credit?: number }[],
+  lines: VoucherLine[],
 ): GlJournalEntry[] =>
   lines.map((line) => ({
-    voucherNo: `${compactDate(tradeDate)}-${VOUCHER_PREFIX[txType]}-${String(seq).padStart(4, "0")}`,
+    voucherNo: `${compactDate(tradeDate)}-${VOUCHER_PREFIX[txType]}-${String(seq).padStart(6, "0")}`,
     tradeDate,
     txType,
     accountCode: line.accountCode,
-    debitAmount: line.debit ?? 0,
-    creditAmount: line.credit ?? 0,
+    ...("debit" in line
+      ? { drCr: "DEBIT" as const, amount: line.debit }
+      : { drCr: "CREDIT" as const, amount: line.credit }),
   }))
 
 /**
@@ -148,10 +169,12 @@ const voucher = (
  * 보여줬다. 차대변은 여전히 맞아 테스트로는 드러나지 않는다 — 수동 검산만 어긋난다.
  * 28 은 최소 창의 시작일에 정확히 앉으므로 여유를 두고 25 로 잡는다.
  *
- * 분개 방향은 전부 계획 문서 원문이다.
- * - 개시 잔액 — "차 현금성 / 대 예수금 + 상대 개시잔액 계정"(PH-21)
- * - 당행 이체 — "차 예수금(출금) / 대 예수금(입금)"(PH-21 패턴표)
- * - 이자 지급 — "차 이자비용 / 대 예수금 · 차 예수금 / 대 원천세예수금"(P2 PH-14)
+ * 분개 방향의 정본은 서버 `docs/phase2/gl_journal_patterns.md` 다.
+ * - 개시 잔액 — 차 `10100` / 대 `20100` + 대 `30100`(차액). §3-1
+ * - 당행 이체 — 차 `20100`(출금) / 대 `20100`(입금). §3-2
+ * - 상품가입 초입금 — 당행 이체와 같은 계정 구성. `tx_type` 만 다르다. §3-3
+ * - 이자 지급 — 차 `50100` / 대 `20100`, 차 `20100` / 대 `20200`. **아직 미확정**이다
+ *   (§3-4, 소유 P2 PH-14 S2). 확정되면 이 목도 따라 고친다.
  */
 export const MOCK_JOURNAL_ENTRIES: GlJournalEntry[] = [
   // 개시 잔액 — 장부 시작. 상대 계정 없이 만들면 시산표가 처음부터 안 맞는다.
@@ -183,17 +206,18 @@ export const MOCK_JOURNAL_ENTRIES: GlJournalEntry[] = [
     { accountCode: "20100", credit: 55_000 },
   ]),
 
-  // 상품가입 초입금 — 고객 자금이 들어와 현금성이 늘고 예수금(부채)이 는다.
+  // 상품가입 초입금 — 고객의 기존 출금계좌에서 신규 예적금계좌로 가는 내부 이동이라
+  // 당행 이체와 계정 구성이 같다. 외부에서 현금이 들어오는 거래가 아니다.
   ...voucher(daysAgo(40), "PRODUCT_SUBSCRIPTION", 1, [
-    { accountCode: "10100", debit: 10_000_000 },
+    { accountCode: "20100", debit: 10_000_000 },
     { accountCode: "20100", credit: 10_000_000 },
   ]),
   ...voucher(daysAgo(18), "PRODUCT_SUBSCRIPTION", 1, [
-    { accountCode: "10100", debit: 3_000_000 },
+    { accountCode: "20100", debit: 3_000_000 },
     { accountCode: "20100", credit: 3_000_000 },
   ]),
   ...voucher(daysAgo(6), "PRODUCT_SUBSCRIPTION", 1, [
-    { accountCode: "10100", debit: 25_000_000 },
+    { accountCode: "20100", debit: 25_000_000 },
     { accountCode: "20100", credit: 25_000_000 },
   ]),
 

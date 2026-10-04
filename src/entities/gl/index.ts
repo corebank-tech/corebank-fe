@@ -4,6 +4,7 @@ export type {
   GlJournalEntry,
   GlNormalBalance,
   GlTxType,
+  JournalDirection,
 } from "@/entities/gl/api/ph28-trial-balance"
 export {
   GL_ACCOUNTS,

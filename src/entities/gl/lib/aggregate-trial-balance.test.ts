@@ -173,6 +173,20 @@ describe("aggregateTrialBalance", () => {
     }
   })
 
+  it("개시 잔액 전표는 차 현금성 / 대 예수금 + 대 개시잔액이다", () => {
+    // §3-1 의 확정 패턴이다. 내부 이동 두 유형만 잠그면 같은 모양의 실수가
+    // 개시 전표에서 났을 때 그대로 통과한다 — 차대변은 어차피 맞기 때문이다.
+    const opening = MOCK_JOURNAL_ENTRIES.filter(
+      (entry) => entry.txType === "OPENING",
+    )
+
+    expect(opening.map((entry) => [entry.accountCode, entry.drCr])).toEqual([
+      ["10100", "DEBIT"],
+      ["20100", "CREDIT"],
+      ["30100", "CREDIT"],
+    ])
+  })
+
   it("내부 이동 전표는 양변이 모두 예수금이다", () => {
     // 당행 이체와 상품가입 초입금은 고객 계좌 사이의 내부 이동이라 외부에서 현금이
     // 들어오지 않는다(`gl_journal_patterns.md` §3-2·§3-3). 상품가입을

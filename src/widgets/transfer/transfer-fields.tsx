@@ -81,14 +81,12 @@ type AccountPasswordFieldProps = {
   id?: string
   value: string
   onChange: (value: string) => void
-  onCheckErrorCount?: () => void
 }
 
 export const AccountPasswordField = ({
   id,
   value,
   onChange,
-  onCheckErrorCount,
 }: AccountPasswordFieldProps) => {
   const refs = React.useRef<(HTMLInputElement | null)[]>([])
   const digits = value.padEnd(4, " ").slice(0, 4).split("")
@@ -137,9 +135,6 @@ export const AccountPasswordField = ({
           />
         ))}
       </div>
-      <Button variant="secondary" size="md" onClick={onCheckErrorCount}>
-        오류횟수 조회
-      </Button>
     </div>
   )
 }

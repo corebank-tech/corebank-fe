@@ -6,7 +6,13 @@ import {
   type GlNormalBalance,
 } from "@/entities/gl/api/ph28-trial-balance"
 
-/** 시산표 한 행 = 기간 안에서 그 계정이 받은 차변·대변 합계. */
+/**
+ * 시산표 한 행 = 기간 안에서 그 계정이 받은 차변·대변 합계.
+ *
+ * 분개 줄은 `drCr` + `amount` 한 칸인데 이 행은 차변·대변 두 칸을 갖는다. 모양이
+ * 다른 것이 맞다 — 줄은 한 변에만 서지만 계정은 기간 안에 양변을 다 받는다.
+ * 서버 PH-28 응답도 계정별 집계라 같은 모양이다.
+ */
 export type TrialBalanceRow = {
   accountCode: string
   accountName: string
@@ -50,6 +56,19 @@ export type TrialBalancePeriod = { start: string; end: string }
 export const UNKNOWN_ACCOUNT_NAME = "(계정과목 미등록)"
 
 /**
+ * 분개 한 줄을 차변·대변 두 칸으로 편다.
+ *
+ * **판정을 한 곳에만 둔다.** 처음 보는 계정과 이미 본 계정은 따로 처리하지만 방향
+ * 판정은 공유한다. 두 벌로 두면 한쪽이 모르는 값을 버리게 되기 쉬운데, 버리면 그
+ * 금액이 총계에서 빠지면서 차대변이 맞는 것처럼 보인다 — 아래 `UNKNOWN_ACCOUNT_NAME`
+ * 이 금지하는 것과 같은 일이다.
+ */
+const splitByDirection = (entry: GlJournalEntry) =>
+  entry.drCr === "DEBIT"
+    ? { debitTotal: entry.amount, creditTotal: 0 }
+    : { debitTotal: 0, creditTotal: entry.amount }
+
+/**
  * 기간 안의 분개를 계정별로 합산해 시산표를 만든다.
  *
  * 화면이 아니라 여기 두는 이유는 **차대변 불일치 분기를 테스트할 수 있어야** 해서다.
@@ -70,10 +89,11 @@ export const aggregateTrialBalance = (
 
   const byCode = new Map<string, TrialBalanceRow>()
   for (const entry of inPeriod) {
+    const { debitTotal, creditTotal } = splitByDirection(entry)
     const existing = byCode.get(entry.accountCode)
     if (existing) {
-      existing.debitTotal += entry.debitAmount
-      existing.creditTotal += entry.creditAmount
+      existing.debitTotal += debitTotal
+      existing.creditTotal += creditTotal
       existing.entryCount += 1
       continue
     }
@@ -86,8 +106,8 @@ export const aggregateTrialBalance = (
       // 바로 옆 배지는 멀쩡한 계정처럼 보이는 상태였다. 모르는 것은 모른다고 둔다.
       accountClass: account?.accountClass ?? null,
       normalBalance: account?.normalBalance ?? null,
-      debitTotal: entry.debitAmount,
-      creditTotal: entry.creditAmount,
+      debitTotal,
+      creditTotal,
       entryCount: 1,
     })
   }

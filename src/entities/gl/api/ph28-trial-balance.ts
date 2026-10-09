@@ -7,10 +7,8 @@ import { compactDate, daysAgo } from "@/shared/lib/mock-date"
  * 확정됐다** — `gl_account`·`gl_voucher`·`gl_journal_entry` Flyway 가 PH-20(PR #478,
  * 9/25 머지)으로 들어갔고 분개 패턴표가 PH-21(PR #491, 9/27 머지)로 나왔다.
  *
- * **그래서 이 파일은 더 이상 계약을 제안하지 않는다.** 처음에는 서버에 스키마가 없어
- * 화면이 먼저 모양을 제안했지만(그 제안은 선전달로 받아들여졌다), 지금 정본은 서버
- * `docs/schema_reference.md` 와 `docs/phase2/gl_journal_patterns.md` 다.
- * 이 목은 그 둘을 따라간다 — 어긋나면 이쪽을 고친다.
+ * **정본은 서버다.** `docs/schema_reference.md` 와 `docs/phase2/gl_journal_patterns.md`
+ * 가 계정 체계와 분개 패턴을 정하고, 이 목은 그 둘을 따라간다 — 어긋나면 이쪽을 고친다.
  *
  * 그래서 이름을 임의로 짓지 않았다. 계정과목 체계와 분개 패턴은 전부 서버 정본의
  * 원문에서 가져왔고, 출처가 없는 항목은 아래 "넣지 않은 것"에 사유와 함께 남긴다.
@@ -130,13 +128,15 @@ const VOUCHER_PREFIX: Record<GlTxType, string> = {
  *
  * 입력 줄은 `debit`·`credit` 짧은 이름을 쓴다 — 아래 분개표가 한 줄에 한 분개로
  * 읽혀야 하기 때문이다. 내보내는 계약 필드는 `drCr` + `amount` 다.
- *
- * 입력 타입을 합집합으로 둬 **둘 다 적거나 둘 다 빠뜨리는 것을 타입이 막는다.**
- * 서버가 금액을 한 칸만 갖는 이상 양쪽을 적을 방법이 없어야 한다.
+ */
+/**
+ * 한 줄은 차변이거나 대변이다. 반대편 칸을 `never` 로 막아 **둘 다 적는 것과 둘 다
+ * 빠뜨리는 것을 타입이 둘 다 거른다.** 서버가 금액을 한 칸만 갖는 이상 양쪽을 적을
+ * 방법이 없어야 한다.
  */
 type VoucherLine =
-  | { accountCode: string; debit: number }
-  | { accountCode: string; credit: number }
+  | { accountCode: string; debit: number; credit?: never }
+  | { accountCode: string; credit: number; debit?: never }
 
 const voucher = (
   tradeDate: string,
@@ -149,7 +149,7 @@ const voucher = (
     tradeDate,
     txType,
     accountCode: line.accountCode,
-    ...("debit" in line
+    ...(line.debit !== undefined
       ? { drCr: "DEBIT" as const, amount: line.debit }
       : { drCr: "CREDIT" as const, amount: line.credit }),
   }))

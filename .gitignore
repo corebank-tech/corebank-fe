@@ -44,4 +44,7 @@ storybook-static
 # 스냅샷을 누가 언제 갱신하는지가 이 문서에만 있다.
 !/docs/api-codegen.md
 
+# 로컬 전용 — 스냅샷 갱신 스크립트 통합 테스트 (pnpm test 의 include 밖)
+scripts/*.test.mjs
+
 e2e/**/*-snapshots/

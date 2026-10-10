@@ -22,6 +22,19 @@ if (!response.ok) {
 }
 
 const spec = await response.json()
+
+const isOpenApiDocument =
+  spec != null &&
+  typeof spec === "object" &&
+  !Array.isArray(spec) &&
+  typeof spec.openapi === "string" &&
+  (spec.paths == null || typeof spec.paths === "object")
+
+if (!isOpenApiDocument) {
+  console.error(`OpenAPI 문서가 아닙니다 — 스냅샷을 그대로 둡니다: ${SPEC_URL}`)
+  process.exit(1)
+}
+
 writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(spec, null, 2)}\n`)
 
 console.log(`${SNAPSHOT_PATH} 갱신 — ${SPEC_URL}`)

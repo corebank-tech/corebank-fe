@@ -40,4 +40,11 @@ storybook-static
 # 1차 요구사항정의서에 관리자 화면이 0건이라 이 문서가 유일한 정본이다.
 !/docs/requirements-admin.md
 
+# 예외 — codegen 규약은 팀이 읽어야 한다 (#170).
+# 스냅샷을 누가 언제 갱신하는지가 이 문서에만 있다.
+!/docs/api-codegen.md
+
+# 로컬 전용 — 스냅샷 갱신 스크립트 통합 테스트 (pnpm test 의 include 밖)
+scripts/*.test.mjs
+
 e2e/**/*-snapshots/

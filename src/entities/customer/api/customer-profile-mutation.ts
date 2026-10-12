@@ -1,5 +1,6 @@
 import {
   IssueEmailVerificationRequestPurpose,
+  useChangeLoginPassword,
   useIssueEmailVerification,
   useUpdateMe,
   useVerifyEmail,
@@ -17,3 +18,7 @@ export const useCustomerEmailVerificationMutation = () => useVerifyEmail()
 
 export const CUSTOMER_EMAIL_CHANGE_PURPOSE =
   IssueEmailVerificationRequestPurpose.EMAIL_CHANGE
+
+/** F-01 로그인 고객의 로그인 비밀번호 변경. */
+export const useCustomerLoginPasswordChangeMutation = () =>
+  useChangeLoginPassword()

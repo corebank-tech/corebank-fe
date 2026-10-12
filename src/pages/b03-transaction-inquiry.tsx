@@ -22,12 +22,13 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
-  getAccountStatusBadgeVariant,
   toTransactionRows,
   useAccountTransactionQuery,
   type Transaction,
 } from "@/entities/transaction"
 import {
+  getAccountStatusBadgeVariant,
+  getAccountStatusLabel,
   useAccountDetailQuery,
   useInquirableAccounts,
 } from "@/entities/account"
@@ -285,12 +286,7 @@ export const B03TransactionInquiry = () => {
   const totalCount = transactionData?.totalCount ?? 0
   const totalPages = transactionData?.totalPages ?? 0
 
-  const accountStatus =
-    accountDetail?.status === "SUSPENDED"
-      ? "거래정지"
-      : accountDetail?.status === "CLOSED"
-        ? "해지"
-        : "정상"
+  const accountStatus = getAccountStatusLabel(accountDetail?.status)
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",

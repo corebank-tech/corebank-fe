@@ -13,7 +13,7 @@ export type InquirableAccount = {
   lastTransactionAt: string | null
   maturityDate: string | null
   transferEnabled: boolean
-  status: "ACTIVE" | "SUSPENDED"
+  status: "ACTIVE" | "SUSPENDED" | "MATURED"
 }
 
 export const useInquirableAccounts = () => {
@@ -40,7 +40,11 @@ export const useInquirableAccounts = () => {
           return []
         }
 
-        if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
+        if (
+          account.status !== "ACTIVE" &&
+          account.status !== "SUSPENDED" &&
+          account.status !== "MATURED"
+        ) {
           return []
         }
 

@@ -45,3 +45,9 @@ export {
   useSaveAccountDisplayOrderMutation,
 } from "@/entities/account/api/account-display-order-mutations"
 export { useAccountPasswordVerification } from "@/entities/account/api/use-account-password-verification"
+
+export {
+  getAccountStatusLabel,
+  getAccountStatusBadgeVariant,
+  type AccountStatusLabel,
+} from "@/entities/account/lib/account-status"

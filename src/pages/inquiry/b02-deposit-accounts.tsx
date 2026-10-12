@@ -13,9 +13,14 @@ import {
   formatDate,
   formatDateTime,
 } from "@/shared/lib/format"
-import { useAccountOverviewQuery } from "@/entities/account"
 import { cn } from "@/shared/lib/utils"
 import { useDisclosure } from "@/shared/lib/hooks/use-disclosure"
+import { Badge } from "@/shared/ui/badge"
+import {
+  getAccountStatusBadgeVariant,
+  getAccountStatusLabel,
+  useAccountOverviewQuery,
+} from "@/entities/account"
 
 type DepositAccountRow = {
   accountId: number
@@ -24,7 +29,7 @@ type DepositAccountRow = {
   balance: number
   openedDate: string
   maturityDate: string | null
-  status: "ACTIVE" | "SUSPENDED"
+  status: "ACTIVE" | "SUSPENDED" | "MATURED"
 }
 
 /** REQ-INQR-001·004: 예금/적금 계좌만 대상으로 한 전체계좌조회(B-01)의 부분 화면. */
@@ -56,8 +61,12 @@ export const B02DepositAccounts = () => {
       }
 
       // BE는 CLOSED 계좌를 overview에서 제외하지만,
-      // 화면 모델은 ACTIVE/SUSPENDED만 허용하도록 방어적으로 좁힌다.
-      if (account.status !== "ACTIVE" && account.status !== "SUSPENDED") {
+      // 화면 모델은 ACTIVE/MATURED/SUSPENDED만 허용하도록 방어적으로 좁힌다.
+      if (
+        account.status !== "ACTIVE" &&
+        account.status !== "SUSPENDED" &&
+        account.status !== "MATURED"
+      ) {
         return []
       }
 
@@ -110,6 +119,19 @@ export const B02DepositAccounts = () => {
           {r.maturityDate ? formatDate(r.maturityDate) : "-"}
         </span>
       ),
+    },
+    {
+      key: "status",
+      header: "상태",
+      align: "center",
+      width: 90,
+      render: (r) => {
+        const status = getAccountStatusLabel(r.status)
+
+        return (
+          <Badge variant={getAccountStatusBadgeVariant(status)}>{status}</Badge>
+        )
+      },
     },
     {
       key: "balance",

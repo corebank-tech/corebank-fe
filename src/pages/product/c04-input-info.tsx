@@ -255,10 +255,11 @@ export const C04InputInfo = () => {
             <FormRow label="만기 시 처리방법" labelWidth={220}>
               <div className="flex flex-col gap-1">
                 <span className="text-base font-bold text-ink">
-                  만기해지(원리금 지급)
+                  만기 도달 후 만기해지
                 </span>
                 <p className="text-2xs text-ink-faint">
-                  ※ 재예치는 제공하지 않습니다.
+                  ※ 만기일 도달 시 계좌는 만기 상태로 전환되며, 만기해지 시
+                  원리금이 지급됩니다. 재예치는 제공하지 않습니다.
                 </p>
               </div>
             </FormRow>

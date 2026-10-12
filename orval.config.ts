@@ -1,18 +1,18 @@
 import { defineConfig } from "orval"
 
-/** springdoc 이 내려주는 스펙 위치. 로컬 백엔드로 맞추려면 OPENAPI_SPEC_URL 을 넘긴다. */
-const SPEC_URL =
-  process.env.OPENAPI_SPEC_URL ??
-  "https://api.corebank.cloud/api/v1/v3/api-docs"
+/**
+ * codegen 입력. 기본은 저장소에 커밋된 스냅샷이고, 서버나 로컬 백엔드의 최신 스펙으로
+ * 맞춰 보려면 OPENAPI_SPEC_URL 을 넘긴다.
+ */
+// 빈 문자열도 스냅샷으로 떨어뜨린다. `??` 로 두면 `OPENAPI_SPEC_URL=` 가 그대로
+// 입력이 되어 orval 이 디렉터리를 읽으려 한다(EISDIR).
+const SPEC = process.env.OPENAPI_SPEC_URL || "./openapi.snapshot.json"
 
 export default defineConfig({
   corebank: {
     // REQ-NFR-013: 스펙 우선. 이 파일이 단일 계약 출처다.
-    // openapi.yaml 이 저장소에 도착하기 전까지 `pnpm codegen` 은 의도적으로 실패한다.
     input: {
-      // 스펙은 저장소에 두지 않고 서버가 내려주는 것을 그대로 읽는다.
-      // 로컬 백엔드로 맞추려면 OPENAPI_SPEC_URL 로 덮어쓴다.
-      target: SPEC_URL,
+      target: SPEC,
       // 서버 스냅샷의 한글 태그·불안정한 operationId 를 정리한다.
       override: { transformer: "./openapi-transformer.ts" },
     },

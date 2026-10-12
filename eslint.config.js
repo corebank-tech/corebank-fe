@@ -212,6 +212,7 @@ export default tseslint.config(
       "eslint.config.js",
       "orval.config.ts",
       "playwright.config.ts",
+      "scripts/**/*.mjs",
     ],
     languageOptions: { globals: globals.node },
   },

@@ -1,0 +1,65 @@
+name: api-drift
+
+# 커밋된 스냅샷이 서버 스펙과 어긋났는지 매일 확인한다. 스냅샷은 서버 변경을
+# 자동으로 따라가지 않으므로, 누구도 갱신하지 않으면 FE 가 없는 API 를 상대로
+# 개발하게 된다. 이 점검이 그 공백을 메운다.
+on:
+  schedule:
+    # 09:00 KST
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: api-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 서버 스펙으로 스냅샷 갱신 시도
+        run: pnpm snapshot:update
+
+      - name: 어긋났는지 판정
+        id: drift
+        run: |
+          if git diff --quiet -- openapi.snapshot.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 바뀐 엔드포인트·스키마 정리
+        if: steps.drift.outputs.changed == 'true'
+        run: node scripts/summarize-openapi-drift.mjs > drift.md
+
+      - name: 이슈로 알림
+        if: steps.drift.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 열린 이슈를 하나로 유지한다. 매일 새 이슈가 쌓이면 아무도 보지 않는다.
+          existing=$(gh issue list --label api-drift --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file drift.md
+          else
+            gh issue create --label api-drift \
+              --title "스냅샷이 서버 스펙과 어긋났습니다" \
+              --body-file drift.md
+          fi

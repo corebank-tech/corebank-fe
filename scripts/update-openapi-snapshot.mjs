@@ -23,12 +23,20 @@ if (!response.ok) {
 
 const spec = await response.json()
 
+/** 배열도 `typeof` 가 `"object"` 라서 따로 걸러야 한다. */
+const isPlainObject = (value) =>
+  value != null && typeof value === "object" && !Array.isArray(value)
+
 const isOpenApiDocument =
-  spec != null &&
-  typeof spec === "object" &&
-  !Array.isArray(spec) &&
+  isPlainObject(spec) &&
   typeof spec.openapi === "string" &&
-  (spec.paths == null || typeof spec.paths === "object")
+  isPlainObject(spec.info) &&
+  typeof spec.info.title === "string" &&
+  typeof spec.info.version === "string" &&
+  (spec.paths == null || isPlainObject(spec.paths)) &&
+  // components 와 그 안의 schemas 는 OpenAPI 3.1 에서 선택 항목이다.
+  (spec.components == null || isPlainObject(spec.components)) &&
+  (spec.components?.schemas == null || isPlainObject(spec.components.schemas))
 
 if (!isOpenApiDocument) {
   console.error(`OpenAPI 문서가 아닙니다 — 스냅샷을 그대로 둡니다: ${SPEC_URL}`)

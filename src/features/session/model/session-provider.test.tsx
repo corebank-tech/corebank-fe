@@ -9,7 +9,7 @@ import {
   it,
   vi,
 } from "vitest"
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
@@ -82,10 +82,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // 이 레포는 `globals: false` 라(`vite.config.ts`) Testing Library 자동 정리가
-  // 걸리지 않는다. 안 내려주면 만료 전 세션을 들고 있는 Provider 가 살아남아,
-  // 다음 테스트가 시계를 돌릴 때 같이 만료되며 로그아웃을 한 번 더 부른다.
-  cleanup()
   vi.useRealTimers()
   server.resetHandlers()
 })

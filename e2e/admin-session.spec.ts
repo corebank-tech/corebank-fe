@@ -37,6 +37,9 @@ async function loginAsCustomer(page: Page) {
   await page.getByLabel("비밀번호").fill(CUSTOMER.password)
   await page.getByRole("button", { name: "로그인" }).click()
   await page.waitForURL("**/dashboard")
+  // 대시보드가 띄우는 조회가 끝난 뒤에 시계를 만져야 한다. 응답이 늦게 도착하면
+  // `customFetch` 가 `lastActivityAt` 을 그 시점으로 밀어, 경계 단언이 흔들린다.
+  await page.waitForLoadState("networkidle")
 }
 
 async function loginAsAdmin(page: Page) {
@@ -45,6 +48,7 @@ async function loginAsAdmin(page: Page) {
   await page.getByLabel("비밀번호").fill(ADMIN.password)
   await page.getByRole("button", { name: "로그인" }).click()
   await page.waitForURL("**/admin")
+  await page.waitForLoadState("networkidle")
 }
 
 test("관리자 세션은 30분 경계에서 끊긴다", async ({ page }) => {

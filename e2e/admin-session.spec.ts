@@ -18,6 +18,10 @@ import { expect, test, type Page } from "@playwright/test"
  *   깎는 카운트다운이었다면 `runFor` 로 1800틱을 돌려야 했다.
  * - `clock.install()` 은 페이지를 열기 전에 해야 하고, 설치한 뒤에도 로그인·MSW·쿼리가
  *   정상 동작한다.
+ *
+ * **경계 양쪽을 다 본다.** "11분 뒤 살아 있음 · 31분 뒤 만료" 로는 30분이 고정되지 않는다 —
+ * 20분으로 바꿔도 둘 다 통과한다(실측). 29:59 에 살아 있고 30:01 에 끊기는 것을 함께
+ * 봐야 짧아지는 변경과 길어지는 변경을 모두 잡는다.
  */
 
 const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
@@ -43,41 +47,35 @@ async function loginAsAdmin(page: Page) {
   await page.waitForURL("**/admin")
 }
 
-test("관리자는 30분 무조작 뒤 끊기고 관리자 로그인으로 간다", async ({
-  page,
-}) => {
+test("관리자 세션은 30분 경계에서 끊긴다", async ({ page }) => {
   await page.clock.install()
   await loginAsAdmin(page)
 
-  await page.clock.fastForward("31:00")
+  // 29:59 에는 아직 살아 있어야 한다. 이 단언이 만료를 30분보다 **짧게** 잡는 변경을
+  // 잡는다 — 20분으로 줄여도 "31분 뒤 만료" 만 보면 그대로 통과한다.
+  await page.clock.fastForward("29:59")
+  await expect(page.getByText(EXPIRED_MESSAGE)).toBeHidden()
+  await expect(page).toHaveURL(/\/admin$/)
 
+  // 2초 더 당겨 30분을 넘긴다. 이쪽이 **길게** 잡는 변경을 잡는다.
+  await page.clock.fastForward("00:02")
   await expect(page.getByText(EXPIRED_MESSAGE)).toBeVisible()
+
   await page.getByRole("button", { name: "다시 로그인" }).click()
   await expect(page).toHaveURL(/\/admin\/login$/)
 })
 
-test("고객은 10분 무조작 뒤 끊기고 고객 시작 지점으로 간다", async ({
-  page,
-}) => {
+test("고객 세션은 10분 경계에서 끊긴다", async ({ page }) => {
   await page.clock.install()
   await loginAsCustomer(page)
 
-  await page.clock.fastForward("11:00")
+  await page.clock.fastForward("09:59")
+  await expect(page.getByText(EXPIRED_MESSAGE)).toBeHidden()
 
+  await page.clock.fastForward("00:02")
   await expect(page.getByText(EXPIRED_MESSAGE)).toBeVisible()
+
   await page.getByRole("button", { name: "다시 로그인" }).click()
   // POL-A03: 만료 도착지는 보고 있던 채널을 따른다. 고객은 `/` 다.
   await expect(page).toHaveURL(/\/$/)
-})
-
-// POL-A01 회귀 방지. 관리자 만료를 고객과 같은 길이로 되돌리면 이 테스트만 잡는다 —
-// 위 두 테스트는 둘 다 통과한 채로 남는다.
-test("고객 만료 시간이 지나도 관리자 세션은 살아 있다", async ({ page }) => {
-  await page.clock.install()
-  await loginAsAdmin(page)
-
-  await page.clock.fastForward("11:00")
-
-  await expect(page.getByText(EXPIRED_MESSAGE)).toBeHidden()
-  await expect(page).toHaveURL(/\/admin$/)
 })

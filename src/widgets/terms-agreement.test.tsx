@@ -75,7 +75,6 @@ const agree = (index: number) => {
   fireEvent.click(screen.getByRole("button", { name: "동의" }))
 }
 
-// vitest 설정이 globals: false 라 RTL 자동 정리가 걸리지 않는다.
 describe("TermsAgreement", () => {
   it("terms·콜백을 렌더마다 새로 만드는 소비자에서도 통지가 폭주하지 않는다", async () => {
     renderStep()

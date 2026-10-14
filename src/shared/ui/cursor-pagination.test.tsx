@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { CursorPagination } from "@/shared/ui/cursor-pagination"
 
 /**
@@ -7,8 +7,6 @@ import { CursorPagination } from "@/shared/ui/cursor-pagination"
  * 장치는 걸러지지 않은 채 남기 쉬우므로 — 실제로 관리자 네비 권한 필터가 그렇게
  * 방치된 전례가 있다(#147) — 동작을 여기서 고정한다.
  */
-afterEach(cleanup)
-
 const renderWith = (props: Partial<Parameters<typeof CursorPagination>[0]>) => {
   const onPrevious = vi.fn()
   const onNext = vi.fn()

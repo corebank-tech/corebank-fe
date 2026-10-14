@@ -1,12 +1,6 @@
 import * as React from "react"
-import { afterEach, describe, expect, it } from "vitest"
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router"
 import { TermsAgreement } from "@/widgets/terms-agreement"
 
@@ -80,9 +74,6 @@ const agree = (index: number) => {
   fireEvent.click(within(item).getByRole("button", { name: "보기" }))
   fireEvent.click(screen.getByRole("button", { name: "동의" }))
 }
-
-// vitest 설정이 globals: false 라 RTL 자동 정리가 걸리지 않는다.
-afterEach(cleanup)
 
 describe("TermsAgreement", () => {
   it("terms·콜백을 렌더마다 새로 만드는 소비자에서도 통지가 폭주하지 않는다", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { RouteError } from "@/app/route-error"
 
@@ -33,7 +33,6 @@ describe("RouteError", () => {
   })
 
   afterEach(() => {
-    cleanup()
     vi.restoreAllMocks()
   })
 

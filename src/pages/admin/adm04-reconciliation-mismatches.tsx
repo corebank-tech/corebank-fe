@@ -40,28 +40,58 @@ export const Adm04ReconciliationMismatches = () => {
   // 바뀌면 지금 보이는 목록이 어느 영업일 것인지 말할 수 없다.
   const [draftDate, setDraftDate] = React.useState("")
   const [appliedDate, setAppliedDate] = React.useState<string | null>(null)
+  // 영업일을 비운 조회는 서버가 요청마다 최신 영업일을 다시 고른다. 쪽을 넘기는 사이
+  // 다음 COB 결과가 저장되면 같은 목록의 2쪽이 아니라 다른 영업일의 2쪽을 받는다.
+  // 그래서 첫 응답의 영업일을 여기 고정해 쪽 이동 요청에 싣는다.
+  const [pinnedDate, setPinnedDate] = React.useState<string | null>(null)
   const [page, setPage] = React.useState(1)
 
-  const { mismatchPage, isFetching, isError, error } =
-    useReconciliationMismatches({
-      businessDate: appliedDate,
-      page,
-      size: QUERY_DEFAULT_PAGE_SIZE,
-    })
+  const requestedDate = appliedDate ?? pinnedDate
 
-  const handleSearch = () => {
-    setAppliedDate(draftDate || null)
+  const {
+    mismatchPage,
+    isFetching,
+    isPlaceholderData,
+    isError,
+    error,
+    refetch,
+  } = useReconciliationMismatches({
+    businessDate: requestedDate,
+    page,
+    size: QUERY_DEFAULT_PAGE_SIZE,
+  })
+
+  /** [조회]·[초기화] — 고정을 풀고 1쪽부터 다시 묻는다. */
+  const startSearch = (nextDate: string | null) => {
+    // 조건이 지금과 같으면 상태가 바뀌지 않아 요청도 나가지 않는다. 화면을 열어 둔
+    // 사이 새 대사 결과가 생겼을 수 있으니(창 포커스 재조회는 꺼져 있다) 직접 다시 부른다.
+    if (nextDate === requestedDate && page === 1) void refetch()
+    setAppliedDate(nextDate)
+    setPinnedDate(null)
     setPage(1)
   }
+
+  const handleSearch = () => startSearch(draftDate || null)
 
   const handleReset = () => {
     setDraftDate("")
-    setAppliedDate(null)
-    setPage(1)
+    startSearch(null)
   }
 
-  // 0건이면 응답에서 영업일을 알 수 없다. 지정한 영업일이 있으면 그것을 쓴다.
-  const shownDate = mismatchPage?.businessDate ?? appliedDate
+  const handlePageChange = (next: number) => {
+    // 직전 조건의 응답(placeholder)이 보이는 동안에는 그 영업일로 고정하지 않는다.
+    if (
+      requestedDate == null &&
+      !isPlaceholderData &&
+      mismatchPage?.businessDate
+    ) {
+      setPinnedDate(mismatchPage.businessDate)
+    }
+    setPage(next)
+  }
+
+  // 0건이면 응답에서 영업일을 알 수 없다. 요청에 실은 영업일이 있으면 그것을 쓴다.
+  const shownDate = mismatchPage?.businessDate ?? requestedDate
 
   /**
    * 0건 안내에 "일치"라는 말을 쓰지 않는다. 테이블은 불일치만 담아서, 대사가 돌았는데
@@ -69,8 +99,8 @@ export const Adm04ReconciliationMismatches = () => {
    */
   const emptyMessage = isError
     ? (toErrorMessage(error) ?? "")
-    : appliedDate
-      ? `${formatDate(appliedDate)} 영업일에 기록된 불일치가 없습니다. 대사가 실행되지 않은 날도 같은 결과가 나옵니다.`
+    : requestedDate
+      ? `${formatDate(requestedDate)} 영업일에 기록된 불일치가 없습니다. 대사가 실행되지 않은 날도 같은 결과가 나옵니다.`
       : "기록된 대사 불일치가 없습니다."
 
   const columns: DataGridColumn<ReconciliationMismatch>[] = [
@@ -169,7 +199,7 @@ export const Adm04ReconciliationMismatches = () => {
         <Pagination
           page={page}
           totalPages={isError ? 0 : (mismatchPage?.totalPages ?? 0)}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
         />
       </FormSection>
 

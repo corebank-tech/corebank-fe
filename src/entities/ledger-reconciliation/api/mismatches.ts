@@ -55,6 +55,8 @@ export const toMismatchPage = (
  * ADM-04 대사 불일치 목록(`GET /admin/ledger-reconciliation/mismatches`, PH-38).
  *
  * `businessDate` 가 `null` 이면 서버가 가장 최근에 불일치가 기록된 영업일을 고른다.
+ * **요청마다 다시 고른다**(서버 `LedgerReconciliationMismatchQueryService.find`) — 쪽을
+ * 넘길 때도 `null` 로 보내면 그 사이 저장된 다음 영업일의 쪽을 받을 수 있다.
  * `page` 는 화면 기준 1부터다(서버는 0부터).
  */
 export const useReconciliationMismatches = (params: {
@@ -62,7 +64,7 @@ export const useReconciliationMismatches = (params: {
   page: number
   size: number
 }) => {
-  const { data, isFetching, isError, error } =
+  const { data, isFetching, isPlaceholderData, isError, error, refetch } =
     useGetLedgerReconciliationMismatches(
       {
         ...(params.businessDate ? { businessDate: params.businessDate } : {}),
@@ -75,7 +77,10 @@ export const useReconciliationMismatches = (params: {
   return {
     mismatchPage: data ? toMismatchPage(data) : undefined,
     isFetching,
+    /** `mismatchPage` 가 이번 조건의 응답이 아니라 직전 조건의 것인가(keepPreviousData). */
+    isPlaceholderData,
     isError,
     error,
+    refetch,
   }
 }

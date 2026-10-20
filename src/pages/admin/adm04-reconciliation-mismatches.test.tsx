@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
@@ -8,18 +14,41 @@ import { Adm04ReconciliationMismatches } from "@/pages/admin/adm04-reconciliatio
 
 /**
  * 응답을 바꿔 끼워 화면 분기를 본다 — 차액 방향(REQ-ADM-041), 0건 안내(REQ-ADM-042),
- * 조회 실패. 메뉴 진입·페이지 이동은 e2e(`e2e/admin-reconciliation.spec.ts`)가 본다.
+ * 쪽 이동 중 영업일 고정과 같은 조건 재조회(REQ-ADM-040), 조회 실패. 메뉴 진입과 목
+ * 데이터로 쪽을 넘기는 흐름은 e2e(`e2e/admin-reconciliation.spec.ts`)가 본다.
  */
 
-let lastQuery: URLSearchParams | null = null
+let requests: URLSearchParams[] = []
+const lastQuery = () => requests.at(-1)
 
-const respond = (data: PageResponseLedgerReconciliationMismatchResponse) =>
+const respondWith = (
+  reply: (
+    query: URLSearchParams,
+  ) => PageResponseLedgerReconciliationMismatchResponse,
+) =>
   server.use(
     http.get("*/admin/ledger-reconciliation/mismatches", ({ request }) => {
-      lastQuery = new URL(request.url).searchParams
-      return HttpResponse.json({ code: "0000", message: "성공", data })
+      const query = new URL(request.url).searchParams
+      requests.push(query)
+      return HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: reply(query),
+      })
     }),
   )
+
+const respond = (data: PageResponseLedgerReconciliationMismatchResponse) =>
+  respondWith(() => data)
+
+const mismatchOn = (businessDate: string, accountId: number) => ({
+  businessDate,
+  accountId,
+  ledgerBalance: 1_000_000,
+  accountBalance: 900_000,
+  difference: 100_000,
+  detectedAt: `${businessDate}T23:31:05+09:00`,
+})
 
 const EMPTY = { page: 0, size: 10, totalCount: 0, totalPages: 0, items: [] }
 
@@ -37,7 +66,7 @@ const renderPage = () => {
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
 afterEach(() => {
   server.resetHandlers()
-  lastQuery = null
+  requests = []
 })
 afterAll(() => server.close())
 
@@ -107,7 +136,54 @@ describe("Adm04ReconciliationMismatches", () => {
         "2026.10.10 영업일에 기록된 불일치가 없습니다. 대사가 실행되지 않은 날도 같은 결과가 나옵니다.",
       ),
     ).toBeInTheDocument()
-    expect(lastQuery?.get("businessDate")).toBe("2026-10-10")
+    expect(lastQuery()?.get("businessDate")).toBe("2026-10-10")
+  })
+
+  it("영업일을 비운 조회는 쪽을 넘겨도 첫 응답의 영업일을 유지한다", async () => {
+    // 서버는 영업일이 비면 요청마다 최신 영업일을 다시 고른다. 첫 응답 뒤에 다음
+    // 영업일(10/14) 결과가 저장된 상황을 만든다.
+    respondWith((query) => {
+      const date =
+        query.get("businessDate") ??
+        (requests.length === 1 ? "2026-10-13" : "2026-10-14")
+      const page = Number(query.get("page"))
+      return {
+        ...EMPTY,
+        page,
+        totalCount: 11,
+        totalPages: 2,
+        items: page === 0 ? [mismatchOn(date, 1001)] : [mismatchOn(date, 1011)],
+      }
+    })
+    renderPage()
+    await screen.findByText("[2026.10.13 영업일]")
+
+    fireEvent.click(screen.getByRole("button", { name: "2" }))
+
+    await screen.findByText("1011")
+    expect(lastQuery()?.get("businessDate")).toBe("2026-10-13")
+    expect(lastQuery()?.get("page")).toBe("1")
+    expect(screen.getByText("[2026.10.13 영업일]")).toBeInTheDocument()
+
+    // [조회]는 고정을 풀고 다시 최근 영업일을 묻는다.
+    fireEvent.click(screen.getByRole("button", { name: "조회" }))
+
+    expect(await screen.findByText("[2026.10.14 영업일]")).toBeInTheDocument()
+    expect(lastQuery()?.has("businessDate")).toBe(false)
+    expect(lastQuery()?.get("page")).toBe("0")
+  })
+
+  it("조건을 바꾸지 않고 [조회]·[초기화]를 눌러도 다시 요청한다", async () => {
+    respond(EMPTY)
+    renderPage()
+    await screen.findByText("기록된 대사 불일치가 없습니다.")
+    expect(requests).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole("button", { name: "조회" }))
+    await waitFor(() => expect(requests).toHaveLength(2))
+
+    fireEvent.click(screen.getByRole("button", { name: "초기화" }))
+    await waitFor(() => expect(requests).toHaveLength(3))
   })
 
   it("조회에 실패하면 오류를 표시하고 영업일 제목을 그리지 않는다", async () => {

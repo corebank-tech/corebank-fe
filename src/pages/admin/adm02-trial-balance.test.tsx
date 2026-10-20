@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
@@ -8,15 +8,18 @@ import { Adm02TrialBalance } from "@/pages/admin/adm02-trial-balance"
 
 /**
  * 정상 목 데이터로는 실행되지 않는 분기를 서버 응답을 바꿔 끼워 확인한다 — 미등록
- * 계정(REQ-ADM-024), 차대변 불일치(REQ-ADM-022), 조회 실패. 정상 경로는 e2e
+ * 계정(REQ-ADM-024), 차대변 불일치(REQ-ADM-022), 조회 실패, 같은 기간 재조회. 정상 경로는 e2e
  * (`e2e/admin-trial-balance.spec.ts`)가 본다.
  */
 
+let requestCount = 0
+
 const respond = (data: TrialBalanceResponse) =>
   server.use(
-    http.get("*/admin/trial-balance", () =>
-      HttpResponse.json({ code: "0000", message: "성공", data }),
-    ),
+    http.get("*/admin/trial-balance", () => {
+      requestCount += 1
+      return HttpResponse.json({ code: "0000", message: "성공", data })
+    }),
   )
 
 const BASE: TrialBalanceResponse = {
@@ -52,7 +55,10 @@ const renderPage = () => {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  requestCount = 0
+})
 afterAll(() => server.close())
 
 describe("Adm02TrialBalance", () => {
@@ -94,6 +100,20 @@ describe("Adm02TrialBalance", () => {
       await screen.findByText("차변 총계와 대변 총계가 일치하지 않습니다"),
     ).toBeInTheDocument()
     expect(screen.queryByText("일치")).not.toBeInTheDocument()
+  })
+
+  it("기간을 바꾸지 않고 [조회]·[초기화]를 눌러도 다시 요청한다", async () => {
+    // 화면을 열어 둔 사이 새 분개가 들어올 수 있어 [조회]가 새로고침 역할도 한다.
+    respond(BASE)
+    renderPage()
+    await screen.findByText("예수금")
+    expect(requestCount).toBe(1)
+
+    fireEvent.click(screen.getByRole("button", { name: "조회" }))
+    await waitFor(() => expect(requestCount).toBe(2))
+
+    fireEvent.click(screen.getByRole("button", { name: "초기화" }))
+    await waitFor(() => expect(requestCount).toBe(3))
   })
 
   it("조회에 실패하면 총계와 일치 배지를 그리지 않고 오류를 표시한다", async () => {

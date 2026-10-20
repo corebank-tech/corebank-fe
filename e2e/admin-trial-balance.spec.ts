@@ -5,9 +5,9 @@ import { expect, test, type Page } from "@playwright/test"
  *
  * 화면 컴포넌트에만 있는 불변식을 지킨다 — **분류 필터를 집계 뒤에 건다**는 결정이
  * 그것이다. 앞에 걸면 걸러진 계정의 금액이 총계에서 빠져 차대변이 맞지 않게 나오는데,
- * 그건 장부가 틀린 게 아니라 화면이 자른 결과다. 집계 자체는 단위 테스트가 보지만
- * (`entities/gl/lib/aggregate-trial-balance.test.ts`) 화면이 어느 값을 총계 자리에
- * 넘기는지는 여기서만 드러난다.
+ * 그건 장부가 틀린 게 아니라 화면이 자른 결과다. 집계는 서버(목은
+ * `mocks/handlers/gl-api.ts`)가 하지만 화면이 어느 값을 총계 자리에 넘기는지는
+ * 여기서만 드러난다.
  */
 
 const ADMIN = { userId: "seojunpark", password: "Corebank1!" }
@@ -62,23 +62,25 @@ test("조회기간을 넓히면 집계 대상 분개가 늘어난다", async ({ 
 
   // 요약 문구는 계정 수와 분개 줄 수를 함께 담는다. 문자열 전체를 비교하면 분개가
   // **줄어도** 통과하므로 방향을 검증하지 못한다. 숫자를 뽑아 증가를 단언한다.
+  // 정규식에 숫자를 넣는 이유: 표 헤더 "분개 줄"도 `/분개 .*줄/` 에 걸린다.
+  const summary = page.getByText(/분개\s+[\d,]+줄/)
   const journalEntryCount = async () => {
-    const text =
-      (await page
-        .getByText(/분개 .*줄/)
-        .first()
-        .textContent()) ?? ""
-    const matched = text.match(/분개\s+([\d,]+)줄/)
+    const matched = ((await summary.textContent()) ?? "").match(
+      /분개\s+([\d,]+)줄/,
+    )
     expect(matched).not.toBeNull()
     return Number(matched![1].replaceAll(",", ""))
   }
 
+  await expect(summary).toBeVisible()
   const before = await journalEntryCount()
 
   await page.getByRole("button", { name: "3개월" }).click()
   await page.getByRole("button", { name: "조회" }).click()
 
-  expect(await journalEntryCount()).toBeGreaterThan(before)
+  // 다시 조회하는 동안 이전 결과가 남아 있다(keepPreviousData). 바로 읽으면 이전
+  // 숫자를 읽으므로 바뀔 때까지 다시 읽는다.
+  await expect.poll(journalEntryCount).toBeGreaterThan(before)
 })
 
 test("역전된 조회기간에서는 조회가 막힌다", async ({ page }) => {

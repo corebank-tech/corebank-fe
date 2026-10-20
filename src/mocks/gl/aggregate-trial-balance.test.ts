@@ -4,11 +4,8 @@ import {
   MOCK_JOURNAL_ENTRIES,
   type GlJournalEntry,
   type JournalDirection,
-} from "@/entities/gl/api/ph28-trial-balance"
-import {
-  aggregateTrialBalance,
-  UNKNOWN_ACCOUNT_NAME,
-} from "@/entities/gl/lib/aggregate-trial-balance"
+} from "@/mocks/gl/journal-entries"
+import { aggregateTrialBalance } from "@/mocks/gl/aggregate-trial-balance"
 
 const WIDE = { start: "2000-01-01", end: "2999-12-31" }
 
@@ -150,7 +147,7 @@ describe("aggregateTrialBalance", () => {
     const result = aggregateTrialBalance(entries, WIDE)
     const unknown = result.rows.find((row) => row.accountCode === "99999")
 
-    expect(unknown?.accountName).toBe(UNKNOWN_ACCOUNT_NAME)
+    expect(unknown?.accountName).toBeNull()
     // 분류·정상잔액을 지어내지 않는다. 코드 첫 자리로 추측하면 `99999` 가 화면에서
     // "자산 / 차변"으로 찍혀 멀쩡한 계정처럼 보인다.
     expect(unknown?.accountClass).toBeNull()

@@ -11,12 +11,11 @@ import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { PeriodField } from "@/widgets/query"
 import { checkPeriodRange } from "@/entities/transaction"
 import {
-  aggregateTrialBalance,
-  MOCK_JOURNAL_ENTRIES,
-  UNKNOWN_ACCOUNT_NAME,
+  useTrialBalanceQuery,
   type GlAccountClass,
   type TrialBalanceRow,
 } from "@/entities/gl"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate } from "@/shared/lib/format"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
@@ -25,10 +24,8 @@ import { QUERY_MAX_RANGE_DAYS } from "@/shared/config/policy"
 /**
  * ADM-02 시산표(#128) — 기간별 계정별 차변·대변 합계.
  *
- * 대응 서버 API(PH-28)가 아직 없어 목 분개를 화면이 직접 집계한다. GL 스키마와 분개
- * 패턴은 서버에 확정됐고(PH-20·PH-21) 목이 그것을 따른다(`entities/gl`). 집계는 거기
- * 있고 이 파일은 화면에 붙이기만 한다 — 실 API가 오면 조건이 그대로 요청 파라미터가
- * 되고 집계는 서버 네이티브 SQL 로 옮긴다.
+ * 집계는 서버가 한다(PH-28 `GET /admin/trial-balance`, #180). 이 화면은 조회기간을
+ * 요청 파라미터로 넘기고, 분류 필터는 받은 행에만 건다(REQ-ADM-023).
  *
  * **범위는 "시산표 한 장"이다**(서버 `docs/phase2/tasks.md` 의 `FE ADM-02` 절).
  * 계정과목 트리 · 전표/분개 목록·상세 · 분개 패턴 참조 화면은 범위 밖이다.
@@ -38,11 +35,8 @@ import { QUERY_MAX_RANGE_DAYS } from "@/shared/config/policy"
  * 표기(PH-84)도 대응 BE 가 빠져 넣지 않는다(POL-A10 은 정보계 조회에 한해 필수다).
  *
  * **집계 소요 표시도 넣지 않는다.** 이슈 #128 작업 내용에 "시산표 집계 시간 표시"가
- * 있다. 넣지 않는 이유는 여기서 재는 값이 목 배열을 한 바퀴 도는 시간이라 **항상
- * 0ms 에 가깝고, 실제로 재야 하는 수치가 아니기 때문**이다. 그 지표(분개 600만 줄
- * 집계 — 서버 `docs/phase2/gl_journal_patterns.md` §1 이 거래 300만 · 분개 600만 줄의
- * 근거를 적고 있다)는 서버가 네이티브 SQL 로 재는 것이고, FE 는 응답에 실려 오면
- * 그때 표시하면 된다. PH-28 응답에 소요 필드를 넣을지는 그 API 설계에서 정한다.
+ * 있었으나 PH-28 응답에 소요 필드가 없다. 브라우저에서 잰 왕복 시간은 네트워크가
+ * 섞여 서버 집계 성능(분개 600만 줄, 서버 `gl_journal_patterns.md` §1)을 말하지 못한다.
  */
 
 const ACCOUNT_CLASS_LABELS: Record<GlAccountClass, string> = {
@@ -66,6 +60,9 @@ const CLASS_FILTER_OPTIONS = [
 ] satisfies { label: string; value: GlAccountClass | "all" }[]
 
 type ClassFilter = GlAccountClass | "all"
+
+/** 서버가 `accountName: null` 로 내려주는 미등록 계정의 표시 이름(REQ-ADM-024). */
+const UNKNOWN_ACCOUNT_NAME = "(계정과목 미등록)"
 
 type Condition = {
   period: { start: string; end: string }
@@ -100,20 +97,20 @@ export const Adm02TrialBalance = () => {
     createDefaultCondition,
   )
 
-  const result = React.useMemo(
-    () => aggregateTrialBalance(MOCK_JOURNAL_ENTRIES, applied.period),
-    [applied.period],
+  const { trialBalance, isFetching, isError, error } = useTrialBalanceQuery(
+    applied.period,
   )
 
   /**
-   * 분류 필터는 집계 **뒤에** 건다. 앞에 걸면 걸러진 계정의 금액이 총계에서 빠져
-   * 차대변이 맞지 않게 나오는데, 그건 장부가 틀린 게 아니라 화면이 자른 결과다.
-   * 시산표의 총계는 언제나 기간 전체를 대상으로 해야 한다.
+   * 분류 필터는 서버 집계 **뒤에** 화면에서 건다. 분류를 요청 파라미터로 넘기면 걸러진
+   * 계정의 금액이 총계에서 빠져 차대변이 맞지 않게 나오는데, 그건 장부가 틀린 게
+   * 아니라 화면이 자른 결과다. 시산표의 총계는 언제나 기간 전체를 대상으로 한다.
    */
+  const rows = trialBalance?.rows ?? []
   const visibleRows =
     applied.accountClass === "all"
-      ? result.rows
-      : result.rows.filter((row) => row.accountClass === applied.accountClass)
+      ? rows
+      : rows.filter((row) => row.accountClass === applied.accountClass)
 
   /**
    * 요약 줄의 분개 수는 **표에 보이는 행 기준**이다. `result.journalEntryCount`
@@ -171,10 +168,10 @@ export const Adm02TrialBalance = () => {
       key: "accountName",
       header: "계정과목",
       render: (row) =>
-        row.accountName === UNKNOWN_ACCOUNT_NAME ? (
+        row.accountName == null ? (
           // 계정과목에 없는 코드가 분개에 섞인 상태다. 조용히 지나가면 시산표가
           // 숨겨야 할 것을 숨긴다.
-          <span className="font-bold text-danger">{row.accountName}</span>
+          <span className="font-bold text-danger">{UNKNOWN_ACCOUNT_NAME}</span>
         ) : (
           row.accountName
         ),
@@ -287,55 +284,71 @@ export const Adm02TrialBalance = () => {
       </FormSection>
 
       <FormSection title="조회결과" className="mb-0">
-        <p className="mb-2 text-base text-ink">
-          <span className="font-bold text-primary">
-            [{formatDate(result.fromDate)} ~ {formatDate(result.toDate)}]
-          </span>{" "}
-          계정 {visibleRows.length.toLocaleString("ko-KR")}개 · 분개{" "}
-          {visibleEntryCount.toLocaleString("ko-KR")}줄
-        </p>
+        {/* 응답이 없으면(첫 조회 중·오류) 요약과 총계를 그리지 않는다. 0원끼리 비교한
+            "일치"를 띄우면 장부를 확인하지 못한 상태를 맞는 장부로 보여준다. */}
+        {trialBalance && !isError && (
+          <>
+            <p className="mb-2 text-base text-ink">
+              <span className="font-bold text-primary">
+                [{formatDate(trialBalance.fromDate)} ~{" "}
+                {formatDate(trialBalance.toDate)}]
+              </span>{" "}
+              계정 {visibleRows.length.toLocaleString("ko-KR")}개 · 분개{" "}
+              {visibleEntryCount.toLocaleString("ko-KR")}줄
+            </p>
 
-        {/* 총계는 언제나 기간 전체 기준이다. 분류를 걸러도 이 값은 변하지 않는다 —
-            차대변 일치는 장부의 성질이지 화면이 보여주는 범위의 성질이 아니다. */}
-        <SummaryRow
-          className="mb-2"
-          items={[
-            { label: "차변 총계", value: formatAmount(result.debitGrandTotal) },
-            {
-              label: "대변 총계",
-              value: formatAmount(result.creditGrandTotal),
-            },
-            {
-              label: "차대변",
-              value: result.balanced ? (
-                <Badge variant="success">일치</Badge>
-              ) : (
-                <Badge variant="danger">
-                  불일치 {formatAmount(result.difference)}
-                </Badge>
-              ),
-              numeric: false,
-            },
-          ]}
-        />
+            {/* 총계는 언제나 기간 전체 기준이다. 분류를 걸러도 이 값은 변하지 않는다 —
+                차대변 일치는 장부의 성질이지 화면이 보여주는 범위의 성질이 아니다. */}
+            <SummaryRow
+              className="mb-2"
+              items={[
+                {
+                  label: "차변 총계",
+                  value: formatAmount(trialBalance.debitGrandTotal),
+                },
+                {
+                  label: "대변 총계",
+                  value: formatAmount(trialBalance.creditGrandTotal),
+                },
+                {
+                  label: "차대변",
+                  value: trialBalance.balanced ? (
+                    <Badge variant="success">일치</Badge>
+                  ) : (
+                    <Badge variant="danger">
+                      불일치 {formatAmount(trialBalance.difference)}
+                    </Badge>
+                  ),
+                  numeric: false,
+                },
+              ]}
+            />
 
-        {!result.balanced && (
-          <Alert
-            variant="danger"
-            className="mb-2"
-            title="차변 총계와 대변 총계가 일치하지 않습니다"
-          >
-            전표 단위 차대변 일치가 깨진 상태입니다. 차액{" "}
-            {formatAmount(result.difference)}. 분개 누락·편측기표·금액변조 중
-            하나일 수 있으므로 해당 기간의 전표를 확인해야 합니다.
-          </Alert>
+            {!trialBalance.balanced && (
+              <Alert
+                variant="danger"
+                className="mb-2"
+                title="차변 총계와 대변 총계가 일치하지 않습니다"
+              >
+                전표 단위 차대변 일치가 깨진 상태입니다. 차액{" "}
+                {formatAmount(trialBalance.difference)}. 분개
+                누락·편측기표·금액변조 중 하나일 수 있으므로 해당 기간의 전표를
+                확인해야 합니다.
+              </Alert>
+            )}
+          </>
         )}
 
         <DataGrid
           columns={columns}
-          rows={visibleRows}
+          rows={isError ? [] : visibleRows}
+          loading={isFetching}
           rowKey={(row) => row.accountCode}
-          emptyMessage="해당 기간에 발생한 분개가 없습니다."
+          emptyMessage={
+            isError
+              ? (toErrorMessage(error) ?? "")
+              : "해당 기간에 발생한 분개가 없습니다."
+          }
         />
       </FormSection>
 
@@ -345,7 +358,6 @@ export const Adm02TrialBalance = () => {
           "합계는 분류 선택과 무관하게 조회기간 전체를 대상으로 집계합니다. 분류는 표시할 계정만 고릅니다.",
           "계정과목에 등록되지 않은 코드가 분개에 있으면 계정과목과 분류를 빨간색으로 표시합니다.",
           "계정과목 상세와 전표·분개 조회 화면은 이번 범위에 포함되지 않습니다.",
-          "서버 API 연동 전이라 현재 표시되는 값은 목업 데이터입니다.",
         ]}
       />
     </div>

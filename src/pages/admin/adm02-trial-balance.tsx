@@ -97,9 +97,23 @@ export const Adm02TrialBalance = () => {
     createDefaultCondition,
   )
 
-  const { trialBalance, isFetching, isError, error } = useTrialBalanceQuery(
-    applied.period,
-  )
+  const { trialBalance, isFetching, isError, error, refetch } =
+    useTrialBalanceQuery(applied.period)
+
+  /**
+   * [조회]·[초기화]로 조건을 확정한다. 기간이 그대로면 쿼리 키가 같아 요청이 나가지
+   * 않는데, 화면을 열어 둔 사이 새 분개가 들어올 수 있고 창 포커스 재조회는 꺼져
+   * 있다. 그래서 이때는 직접 다시 부른다 — [조회]는 새로고침 역할도 한다.
+   */
+  const applyCondition = (next: Condition) => {
+    if (
+      next.period.start === applied.period.start &&
+      next.period.end === applied.period.end
+    ) {
+      void refetch()
+    }
+    setApplied(next)
+  }
 
   /**
    * 분류 필터는 서버 집계 **뒤에** 화면에서 건다. 분류를 요청 파라미터로 넘기면 걸러진
@@ -141,14 +155,14 @@ export const Adm02TrialBalance = () => {
 
   const handleSearch = () => {
     if (periodInvalid) return
-    setApplied(draft)
+    applyCondition(draft)
   }
 
   const handleReset = () => {
     // 얼어붙은 값을 되돌리지 않고 지금 기준으로 다시 만든다.
     const next = createDefaultCondition()
     setDraft(next)
-    setApplied(next)
+    applyCondition(next)
   }
 
   /**

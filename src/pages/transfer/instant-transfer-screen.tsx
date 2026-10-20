@@ -517,7 +517,7 @@ export const InstantTransferScreen = () => {
       },
       {
         key: "payeeName",
-        header: "받는분",
+        header: "예금주",
         align: "center",
         width: 90,
         render: (r) => maskName(r.payeeName),

@@ -26,16 +26,22 @@ const COLUMNS: DataGridColumn<ReservedCompleteRow>[] = [
   { key: "scheduledDate", header: "이체예정일자", align: "center", width: 120 },
   { key: "fromAccount", header: "출금계좌", align: "center" },
   { key: "toAccount", header: "입금계좌", align: "center" },
-  { key: "payeeName", header: "받는분", align: "center", width: 90 },
+  { key: "payeeName", header: "예금주", align: "center", width: 90 },
   { key: "amount", header: "이체금액(원)", align: "right", width: 130 },
   { key: "fee", header: "수수료(원)", align: "right", width: 100 },
   {
-    key: "payeeMemo",
-    header: "받는 분 통장 표시내용",
+    // REQ-RSV-016 은 "통장 표시내용" 한 항목이다. 두 메모를 한 칸에 쌓는 것은
+    // D-02 확인 화면과 같다 — 열을 둘로 나누면 표가 패널 폭을 넘는다.
+    key: "memo",
+    header: "통장 표시내용",
     align: "center",
-    width: 170,
+    render: (row) => (
+      <div className="flex flex-col gap-0.5 text-left text-xs">
+        <span>받는 분 통장 {row.payeeMemo}</span>
+        <span>내 통장 {row.myMemo}</span>
+      </div>
+    ),
   },
-  { key: "myMemo", header: "내 통장 표시내용", align: "center", width: 140 },
 ]
 
 /** E-03 예약이체 등록 3단계 · 완료 */

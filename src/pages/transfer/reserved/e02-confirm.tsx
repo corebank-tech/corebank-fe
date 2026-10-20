@@ -67,7 +67,7 @@ export const ReservedTransferStep2 = ({
             { label: "이체예정일자", value: scheduledDate },
             { label: "출금계좌", value: fromAccount },
             { label: "입금계좌", value: toAccount },
-            { label: "받는분", value: payeeName },
+            { label: "예금주", value: payeeName },
             { label: "이체금액(원)", value: amount, emphasis: true },
             { label: "수수료(원)", value: fee },
             { label: "받는 분 통장 표시내용", value: payeeMemo },

@@ -7,7 +7,7 @@ import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
 
-/** 서버 `TrialBalanceQueryService.MAX_PERIOD_DAYS`. FE `QUERY_MAX_RANGE_DAYS` 와 같다. */
+/** 서버 `TrialBalanceQueryService.MAX_PERIOD_DAYS`. 목은 서버 값을 따른다. */
 const MAX_PERIOD_DAYS = 365
 
 const DAY_MS = 86_400_000

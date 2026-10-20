@@ -42,11 +42,19 @@ test("영업일을 비우고 조회하면 결과 제목에 영업일을 밝히�
   await expect(page.locator("tbody tr")).toHaveCount(2)
 })
 
-test("감사 권한이 없는 관리자에게는 메뉴가 보이지 않는다", async ({ page }) => {
+test("감사 권한이 없는 관리자에게는 메뉴가 보이지 않고, 주소로 들어와도 막는다", async ({
+  page,
+}) => {
   await loginAs(page, GL_ONLY_ADMIN)
 
   await expect(page.getByRole("link", { name: "시산표" })).toBeVisible()
   await expect(
     page.getByRole("link", { name: "대사 불일치 목록" }),
   ).toHaveCount(0)
+
+  // 메뉴만 숨기면 주소를 아는 사람은 들어온다. 막는 것은 라우트 권한 게이트다.
+  await page.goto("/admin/ledger-reconciliation")
+
+  await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeVisible()
+  await expect(page.getByText(/불일치 \d+건/)).toHaveCount(0)
 })

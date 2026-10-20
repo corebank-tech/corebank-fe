@@ -29,8 +29,13 @@ const COLUMNS: DataGridColumn<ReservedCompleteRow>[] = [
   { key: "payeeName", header: "받는분", align: "center", width: 90 },
   { key: "amount", header: "이체금액(원)", align: "right", width: 130 },
   { key: "fee", header: "수수료(원)", align: "right", width: 100 },
-  { key: "payeeMemo", header: "받는통장 메모", align: "center", width: 120 },
-  { key: "myMemo", header: "내통장 메모", align: "center", width: 120 },
+  {
+    key: "payeeMemo",
+    header: "받는 분 통장 표시내용",
+    align: "center",
+    width: 170,
+  },
+  { key: "myMemo", header: "내 통장 표시내용", align: "center", width: 140 },
 ]
 
 /** E-03 예약이체 등록 3단계 · 완료 */

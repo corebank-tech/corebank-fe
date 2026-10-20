@@ -73,7 +73,7 @@ export const AutoTransferStep2 = ({
             { label: "이체주기", value: cycle },
             { label: "이체지정일", value: dayOfMonth },
             { label: "이체기간", value: period },
-            { label: "받는통장 메모", value: payeeMemo },
+            { label: "받는 분 통장 표시내용", value: payeeMemo },
           ]}
         />
         <p className="mt-2 text-2xs text-ink-faint">

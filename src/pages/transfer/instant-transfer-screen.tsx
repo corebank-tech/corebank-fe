@@ -538,7 +538,7 @@ export const InstantTransferScreen = () => {
       },
       {
         key: "balanceAfter",
-        header: "이체후잔액(원)",
+        header: "거래후잔액(원)",
         align: "right",
         width: 140,
         render: (r) =>

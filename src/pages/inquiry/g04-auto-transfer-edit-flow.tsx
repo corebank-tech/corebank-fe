@@ -233,7 +233,7 @@ export const G04AutoTransferEditFlow = ({
               }
             />
           </FormRow>
-          <FormRow label="이체종료일" htmlFor="g04-edit-end" labelWidth={110}>
+          <FormRow label="이체 종료일" htmlFor="g04-edit-end" labelWidth={110}>
             <TransferEndDateField
               id="g04-edit-end"
               value={editForm.endDate}
@@ -306,7 +306,7 @@ export const G04AutoTransferEditFlow = ({
             value: CYCLE_LABEL[editForm.cycleMonths],
           },
           {
-            label: "이체종료일",
+            label: "이체 종료일",
             value: formatDate(editForm.endDate),
           },
           { label: "표시내용", value: editForm.memo },

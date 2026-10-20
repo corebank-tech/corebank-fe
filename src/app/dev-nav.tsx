@@ -88,6 +88,11 @@ const DEV_ROUTES: DevRoute[] = [
   // 고객 A 파트에 섞인다.
   { screenId: "ADM-01", label: "고객 계정 운영", path: "/admin/customers" },
   { screenId: "ADM-02", label: "시산표", path: "/admin/trial-balance" },
+  {
+    screenId: "ADM-04",
+    label: "대사 불일치 목록",
+    path: "/admin/ledger-reconciliation",
+  },
 
   { screenId: "DS", label: "디자인 시스템", path: "/design-system" },
 ]

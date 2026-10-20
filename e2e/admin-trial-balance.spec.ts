@@ -52,8 +52,12 @@ test("분류를 걸러도 총계는 기간 전체 기준을 유지한다", async
   await page.getByLabel("계정분류").selectOption("LIABILITY")
   await page.getByRole("button", { name: "조회" }).click()
 
+  // [조회]는 기간이 같아도 다시 요청하고, 그동안 표는 로딩 행을 그린다. 바로 세면
+  // 로딩 행을 세므로 줄어들 때까지 다시 읽는다.
+  await expect
+    .poll(() => page.locator("tbody tr").count())
+    .toBeLessThan(rowsBefore)
   expect(await summaryValue(page, "차변 총계").textContent()).toBe(debitBefore)
-  expect(await page.locator("tbody tr").count()).toBeLessThan(rowsBefore)
 })
 
 test("조회기간을 넓히면 집계 대상 분개가 늘어난다", async ({ page }) => {

@@ -174,6 +174,8 @@
 
 대응 API는 `GET /admin/ledger-reconciliation/mismatches`(서버 #613, PH-38)다. COB 대사가 찾은 불일치 계좌를 영업일 단위로 돌려준다. 응답 한 건은 `businessDate`(대사한 영업일) · `accountId` · `ledgerBalance`(원장 누적 합계) · `accountBalance`(대사 시점 계좌 잔액) · `difference`(원장 − 잔액) · `detectedAt`이다. 계좌번호는 응답에 없다.
 
+**이 응답의 `ledgerBalance`는 용어표(서버 `glossary.md` §1)의 `ledgerBalance`가 아니다.** 용어표의 `ledgerBalance`(화면 라벨 "잔액")는 `account.balance`이고, 이 응답에서는 그 값이 `accountBalance`다. 여기서 `ledgerBalance`는 원장을 다시 합산한 값이라 화면은 "원장 합계" · "계좌 잔액"으로 쓴다(용어표 §1 사용처 열의 "원장 합계 vs 계좌 잔액"). 필드명만 보고 "잔액"으로 매핑하지 않는다.
+
 **테이블은 불일치만 담는다.** 대사가 돌았는데 불일치가 없던 날과 대사가 돌지 않은 날을 응답으로 구분할 수 없다. 서버 COB 스텝이 저장을 부르는 연결(#605 뒤 후속 PR)이 들어오기 전까지는 테이블이 비어 있다.
 
 | ID | 요구사항명 | 상세 | 인수기준 |

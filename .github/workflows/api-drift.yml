@@ -60,6 +60,6 @@ jobs:
             gh issue comment "$existing" --body-file drift.md
           else
             gh issue create --label api-drift \
-              --title "스냅샷이 서버 스펙과 어긋났습니다" \
+              --title "[fix/api] codegen 스냅샷이 서버 스펙과 어긋남" \
               --body-file drift.md
           fi

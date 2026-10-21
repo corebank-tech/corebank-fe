@@ -49,7 +49,7 @@ const section = (title, diff) => {
 }
 
 const out = [
-  "## 스냅샷이 서버 스펙과 어긋났습니다",
+  "## 어긋난 내용",
   "",
   `감지: ${new Date().toISOString()}`,
   "",
@@ -67,6 +67,8 @@ const out = [
   "",
   "타입이 바뀌어 깨진 호출부는 **같은 PR 에서 함께 고친다.**",
   "스냅샷만 올리면 `dev` 가 빨개진다 — `docs/api-codegen.md` 참고.",
+  "",
+  "cc @YounaJ00",
 ]
 
 console.log(out.join("\n"))

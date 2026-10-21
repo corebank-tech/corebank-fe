@@ -122,13 +122,13 @@ export const AutoTransferStep1 = ({
                 </p>
               </div>
             </FormRow>
-            <FormRow label="받는분 통장 표시내용" htmlFor="at-memo-payee">
+            <FormRow label="받는 분 통장 표시내용" htmlFor="at-memo-payee">
               <div className="flex w-full flex-col gap-1">
                 <MemoField
                   id="at-memo-payee"
                   value={form.payeeMemo}
                   onChange={(v) => onChange("payeeMemo", v)}
-                  placeholder="받는분 통장에 표시 (7자 이내)"
+                  placeholder="받는 분 통장에 표시 (7자 이내)"
                 />
                 <p className="text-2xs text-ink-muted">
                   ※ 미입력 시 받는 분 표시내용은 본인 예금주명, 내 표시내용은

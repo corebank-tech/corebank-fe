@@ -517,7 +517,7 @@ export const InstantTransferScreen = () => {
       },
       {
         key: "payeeName",
-        header: "받는분",
+        header: "예금주",
         align: "center",
         width: 90,
         render: (r) => maskName(r.payeeName),
@@ -538,7 +538,7 @@ export const InstantTransferScreen = () => {
       },
       {
         key: "balanceAfter",
-        header: "이체후잔액(원)",
+        header: "거래후잔액(원)",
         align: "right",
         width: 140,
         render: (r) =>

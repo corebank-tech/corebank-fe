@@ -146,9 +146,9 @@ export const D05LimitChangeForm = ({
           </FormRow>
         </div>
         <p className="mt-2 text-2xs text-ink-muted">
-          ※ 1회 한도는 최대 {formatAmount(PER_TRANSFER_MAX)}, 1일 한도는 최대{" "}
-          {formatAmount(PER_DAY_MAX)}까지 변경할 수 있으며, 1회 한도는 1일
-          한도를 초과할 수 없습니다.
+          ※ 1회 이체한도는 최대 {formatAmount(PER_TRANSFER_MAX)}, 1일 이체한도는
+          최대 {formatAmount(PER_DAY_MAX)}까지 변경할 수 있으며, 1회 이체한도는
+          1일 이체한도를 초과할 수 없습니다.
         </p>
 
         <div className="mt-4 border-t border-border pt-4">

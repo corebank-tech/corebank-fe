@@ -215,7 +215,7 @@ type AmountFieldProps = {
   onChange: (value: number | null) => void
   /** 1회 이체한도 */
   perTransferLimit: number
-  /** 1일 잔여한도 */
+  /** 당일 잔여 이체가능금액 */
   dailyRemaining: number
   /** Amount applied by the 전액 chip (e.g. withdrawable balance). */
   fullAmount?: number
@@ -307,8 +307,8 @@ export const AmountField = ({
       {!isLimitUnavailable && (
         <p className="text-2xs text-ink-muted">
           {showDailyLimit
-            ? `1회 한도 ${formatAmount(perTransferLimit)} · 1일 잔여한도 ${formatAmount(dailyRemaining)}`
-            : `1회 한도 ${formatAmount(perTransferLimit)}`}
+            ? `1회 이체한도 ${formatAmount(perTransferLimit)} · 당일 잔여 이체가능금액 ${formatAmount(dailyRemaining)}`
+            : `1회 이체한도 ${formatAmount(perTransferLimit)}`}
         </p>
       )}
 
@@ -316,7 +316,7 @@ export const AmountField = ({
         <p className="text-xs font-bold text-danger">
           {!showDailyLimit || overPer
             ? `1회 이체한도 ${formatAmount(perTransferLimit)}를 초과했습니다. 금액을 낮춰 다시 입력하세요.`
-            : `1일 잔여한도 ${formatAmount(dailyRemaining)}를 초과했습니다. 금액을 낮춰 다시 입력하세요.`}
+            : `당일 잔여 이체가능금액 ${formatAmount(dailyRemaining)}를 초과했습니다. 금액을 낮춰 다시 입력하세요.`}
         </p>
       )}
     </div>

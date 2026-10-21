@@ -31,7 +31,7 @@ describe("isSameTransferIntent", () => {
     ["입금계좌", { depositAccountNumber: "444401122938" }],
     ["이체금액", { amount: 5_000_000 }],
     ["내 통장 표시내용", { myPassbookMemo: "월세" }],
-    ["받는분 통장 표시내용", { recipientPassbookMemo: "월세" }],
+    ["받는 분 통장 표시내용", { recipientPassbookMemo: "월세" }],
   ])("%s가 바뀌면 다른 거래다", (_label, changed) => {
     expect(isSameTransferIntent(intent(), intent(changed))).toBe(false)
   })

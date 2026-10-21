@@ -49,7 +49,7 @@ export const InstantTransferStep2 = ({
       title="즉시이체"
       notice={[
         "아래 이체 내용을 확인한 뒤 [이체하기]를 누르면 거래내용 확인, 계좌비밀번호 검증, OTP 인증 순으로 진행됩니다.",
-        "받는분과 이체금액이 맞는지 다시 확인하세요. 이체 후에는 취소할 수 없습니다.",
+        "예금주와 이체금액이 맞는지 다시 확인하세요. 이체 후에는 취소할 수 없습니다.",
       ]}
       footer={
         <>
@@ -87,7 +87,7 @@ export const InstantTransferStep2 = ({
               label: "표시내용",
               value: (
                 <div className="flex flex-col gap-0.5 text-left text-xs">
-                  <span>받는분 {payeeMemo}</span>
+                  <span>받는 분 통장 {payeeMemo}</span>
                   <span>내 통장 {myMemo}</span>
                 </div>
               ),

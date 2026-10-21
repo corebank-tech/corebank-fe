@@ -535,7 +535,7 @@ export const B03TransactionInquiry = () => {
               gridCols="grid-cols-3"
               items={[
                 {
-                  term: "계좌잔액",
+                  term: "잔액",
                   desc: renderAccountDetailValue(
                     accountDetail?.balance != null
                       ? formatAmount(accountDetail.balance)
@@ -671,7 +671,7 @@ export const B03TransactionInquiry = () => {
         className="mt-8"
         items={[
           "조회기간은 시작일 기준 최대 1년 이내로 지정할 수 있으며, 시작일이 종료일보다 늦으면 조회되지 않습니다.",
-          "거래 후 잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
+          "거래후잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
           "파일저장은 현재 표시 중인 페이지의 거래내역을 CSV로 저장하며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}

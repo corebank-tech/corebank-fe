@@ -67,7 +67,7 @@
 | `GL_WRITE` | 회계 변경 | 결산·역분개 — **2차에 쓰는 화면이 없다**(#129 범위 밖) |
 | `CUSTOMER_READ` | 고객 조회 | 고객 검색·상세 |
 | `CUSTOMER_WRITE` | 고객 변경 | 잠금 해제·비밀번호 초기화·상태 변경 |
-| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — **현재 이 권한을 검사하는 코드가 없다** |
+| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:61` · 라우트 게이트 `admin-routes.tsx:97`) |
 
 구현: `src/shared/types/admin-permission.ts:17-25`(이름 집합) · `src/entities/auth/lib/session-role.ts`(판정 단일 출처).
 

@@ -63,7 +63,7 @@ export const adminRoutes: RouteObject = {
             return { Component: AdminHome }
           },
         },
-        // 아래 세 화면은 권한 게이트를 지난다. 관리자 홈(index)은 권한 조건이
+        // 아래 화면은 전부 권한 게이트를 지난다. 관리자 홈(index)은 권한 조건이
         // 없어 감싸지 않는다 — `shared/config/admin-nav.ts` 의 "관리" 그룹과 같다.
         // 여기 적은 권한은 네비 설정의 `requiresPermission` 과 같아야 한다.
         {
@@ -89,6 +89,15 @@ export const adminRoutes: RouteObject = {
           lazy: guardedLazy("GL_READ", async () => {
             const { Adm02TrialBalance } = await import("@/pages/admin")
             return Adm02TrialBalance
+          }),
+        },
+        {
+          path: "ledger-reconciliation",
+          handle: { title: "대사 불일치 목록" },
+          lazy: guardedLazy("AUDIT_READ", async () => {
+            const { Adm04ReconciliationMismatches } =
+              await import("@/pages/admin")
+            return Adm04ReconciliationMismatches
           }),
         },
       ],

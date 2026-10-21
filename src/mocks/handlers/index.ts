@@ -3,6 +3,7 @@ import { accountsApiHandlers } from "@/mocks/handlers/accounts-api"
 import { accountHandlers } from "@/mocks/handlers/account"
 import { authHandlers } from "@/mocks/handlers/auth"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
+import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconciliation-api"
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
 import { productSubscriptionsApiHandlers } from "@/mocks/handlers/product-subscriptions-api"
 import { productsApiHandlers } from "@/mocks/handlers/products-api"
@@ -18,6 +19,7 @@ export const handlers = [
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,
   ...glApiHandlers,
+  ...ledgerReconciliationApiHandlers,
   ...accountHandlers,
   ...authHandlers,
 ]

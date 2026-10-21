@@ -51,4 +51,15 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       },
     ],
   },
+  {
+    title: "감사",
+    items: [
+      {
+        label: "대사 불일치 목록",
+        path: "/admin/ledger-reconciliation",
+        // 권한은 서버 `tasks.md` FE ADM-04 절이 정했다. 조회 전용이라 변경 권한이 없다.
+        requiresPermission: "AUDIT_READ",
+      },
+    ],
+  },
 ]

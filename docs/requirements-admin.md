@@ -30,7 +30,7 @@
 | ADM-01 | 고객 계정 운영 (목록·상세) | `/admin/customers`, `/admin/customers/:customerId` | REQ-ADM-010~018 | `CUSTOMER_READ` 조회 · `CUSTOMER_WRITE` 변경 | PH-97 (P3) | S0 | 완료 (#144·PR #145) |
 | ADM-02 | 시산표 | `/admin/trial-balance` | REQ-ADM-020~025 | `GL_READ` | PH-28 (P3) | S2 | 화면 완료 (#128·PR #152), 실연동 (#180) |
 | ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` (제안) | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 미착수 (#146) |
-| ADM-04 | 대사 불일치 목록 | 미정 | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 미착수 (#130-①, 담당 P3) |
+| ADM-04 | 대사 불일치 목록 | `/admin/ledger-reconciliation` | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 완료 (#130-①) |
 | ADM-90 | [공통] 관리자 셸 — 사이드바·헤더·세션 | 전 관리자 화면 | REQ-ADM-001~006 | — | — | S0 | 완료 (#126·PR #138) |
 | ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 화면 완료, 엔드포인트 교체 대기 (#136) |
 | ADM-92 | [공통] 접근 권한 없음 | 라우트 없음 — 진입 URL 유지 | REQ-ADM-009 | — | — | S0 | 완료 |
@@ -43,6 +43,7 @@
 |---|---|
 | ADM-01 | `src/pages/admin/adm01-customer-list.tsx`, `adm01-customer-detail.tsx` |
 | ADM-02 | `src/pages/admin/adm02-trial-balance.tsx` |
+| ADM-04 | `src/pages/admin/adm04-reconciliation-mismatches.tsx` |
 | ADM-90 | `src/widgets/admin-shell/admin-shell.tsx`, `src/app/layouts/admin-shell-layout.tsx`, `src/app/require-admin.tsx` |
 | ADM-91 | `src/pages/admin/admin-login.tsx` |
 | ADM-92 | `src/pages/admin/admin-forbidden.tsx` |
@@ -66,7 +67,7 @@
 | `GL_WRITE` | 회계 변경 | 결산·역분개 — **2차에 쓰는 화면이 없다**(#129 범위 밖) |
 | `CUSTOMER_READ` | 고객 조회 | 고객 검색·상세 |
 | `CUSTOMER_WRITE` | 고객 변경 | 잠금 해제·비밀번호 초기화·상태 변경 |
-| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — **현재 이 권한을 검사하는 코드가 없다** |
+| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:61` · 라우트 게이트 `admin-routes.tsx:97`) |
 
 구현: `src/shared/types/admin-permission.ts:17-25`(이름 집합) · `src/entities/auth/lib/session-role.ts`(판정 단일 출처).
 
@@ -79,7 +80,7 @@
 | ADM-01 | `CUSTOMER_READ` | `CUSTOMER_READ` | `CUSTOMER_WRITE` | `admin-nav.ts:38` · `adm01-customer-detail.tsx:78` |
 | ADM-02 | `GL_READ` | `GL_READ` | 없음(조회 전용) | `admin-nav.ts:50` |
 | ADM-03 | `GL_READ` | `GL_READ` | 없음(조회 전용) | D-09 |
-| ADM-04 | `AUDIT_READ` | 동 | 없음(조회 전용) | D-04 · tasks.md `FE ADM-04` |
+| ADM-04 | `AUDIT_READ` | `AUDIT_READ` | 없음(조회 전용) | `admin-nav.ts:61` · tasks.md `FE ADM-04` |
 
 **ADM-03에 딱 맞는 권한이 고정 5종에 없었다.** 정보계 대시보드는 회계(GL)도 고객(CUSTOMER)도 감사(AUDIT)도 아니다. FE가 세 안(`GL_READ` 대용 / 권한 조건 없음 / 6번째 권한 신설)을 올렸고, **최종안 D-09가 `GL_READ`로 확정**했다 — 권한 집합 5종은 늘리지 않는다. 서버 PH-77도 같은 권한을 쓴다.
 
@@ -169,11 +170,19 @@
 | REQ-ADM-032 | 기준시점 없는 응답 | 기준시점이 없는 응답은 값을 표시하지 않고 안내를 표시한다 | 응답에서 기준시점을 제거하면 그 지표 자리에 값 대신 안내가 뜬다 |
 | REQ-ADM-033 | 개인정보 미포함 | 집계 응답에 개인 식별 정보가 포함되지 않는다 | 응답 필드에 고객 식별자가 없다 (PH-75 "마트 PII 0건") |
 
-### 4-5. ADM-04 대사 불일치 목록 (미착수)
+### 4-5. ADM-04 대사 불일치 목록
 
-담당은 P3로 확정됐다(D-04). **요구사항을 아직 채우지 않은 이유는 읽을 데이터가 없어서다** — 서버 PH-38은 S1에 불일치를 ERROR 로그로만 남기고, 불일치 저장 테이블과 목록 API는 S2(10/16)에 나온다(tasks.md `PH-38`). 응답 스키마가 확정되면 REQ-ADM-040~042를 채운다.
+대응 API는 `GET /admin/ledger-reconciliation/mismatches`(서버 #613, PH-38)다. COB 대사가 찾은 불일치 계좌를 영업일 단위로 돌려준다. 응답 한 건은 `businessDate`(대사한 영업일) · `accountId` · `ledgerBalance`(원장 누적 합계) · `accountBalance`(대사 시점 계좌 잔액) · `difference`(원장 − 잔액) · `detectedAt`이다. 계좌번호는 응답에 없다.
 
-지금 확정된 것은 둘이다 — 진입 권한은 `AUDIT_READ`이고, 화면은 #127 관리자 골격 위에 올린다.
+**이 응답의 `ledgerBalance`는 용어표(서버 `glossary.md` §1)의 `ledgerBalance`가 아니다.** 용어표의 `ledgerBalance`(화면 라벨 "잔액")는 `account.balance`이고, 이 응답에서는 그 값이 `accountBalance`다. 여기서 `ledgerBalance`는 원장을 다시 합산한 값이라 화면은 "원장 합계" · "계좌 잔액"으로 쓴다(용어표 §1 사용처 열의 "원장 합계 vs 계좌 잔액"). 필드명만 보고 "잔액"으로 매핑하지 않는다.
+
+**테이블은 불일치만 담는다.** 대사가 돌았는데 불일치가 없던 날과 대사가 돌지 않은 날을 응답으로 구분할 수 없다. 서버 COB 스텝이 저장을 부르는 연결(#605 뒤 후속 PR)이 들어오기 전까지는 테이블이 비어 있다.
+
+| ID | 요구사항명 | 상세 | 인수기준 |
+|---|---|---|---|
+| REQ-ADM-040 | 영업일별 불일치 목록 | 영업일을 지정해 그 영업일 대사의 불일치 계좌를 계좌 ID 오름차순으로 표시한다. 열은 계좌 ID · 원장 합계 · 계좌 잔액 · 차액 · 확인 시각이다. 영업일을 비우면 가장 최근에 불일치가 기록된 영업일을 표시하고, **그 영업일을 결과 제목에 밝힌다.** 서버는 영업일이 비면 요청마다 최신 영업일을 다시 고르므로, **쪽을 넘길 때는 첫 응답의 영업일을 요청에 실어 고정한다.** [조회]·[초기화]는 고정을 풀고, 조건이 같아도 다시 조회한다. 페이지 크기는 10건 고정(POL-A06) | 영업일을 비우고 조회하면 결과 제목에 응답의 영업일이 표시된다 (`admin-reconciliation.spec.ts:29`). 첫 응답 뒤 최신 영업일이 바뀌어도 2쪽 요청에는 첫 응답의 영업일이 들어가고, [조회]·[초기화]는 같은 조건에서도 요청을 다시 보낸다 (`adm04-reconciliation-mismatches.test.tsx`) |
+| REQ-ADM-041 | 차액 방향 표기 | 차액 옆에 방향을 글로 적는다 — 양수는 "잔액 부족"(잔액이 원장보다 적다), 음수는 "잔액 초과". 부호만으로 읽게 두지 않는다. **정정·수정 액션을 두지 않는다** — 대사는 보고만 하고 자동 정정은 하지 않는다(서버 `glossary.md` 정정 체인) | 양수 차액 행에 "잔액 부족", 음수 차액 행에 "잔액 초과"가 표시되고, 화면에 변경 버튼이 없다 (`adm04-reconciliation-mismatches.test.tsx`) |
+| REQ-ADM-042 | 기록 없음 안내 | 결과가 0건이면 "일치"라고 말하지 않는다. 영업일을 지정했으면 「그 영업일에 기록된 불일치가 없다 — 대사가 실행되지 않은 날도 같다」고, 비웠으면 「기록된 불일치가 없다」고 안내한다 | 0건 응답에서 "일치"라는 말이 화면에 없다 (`adm04-reconciliation-mismatches.test.tsx`) |
 
 ---
 
@@ -242,3 +251,4 @@
 | 2026-10-15 | PH-75 정보계 마트 설계 반영. REQ-ADM-031 기준시점 예시를 마감 기준일 형식으로, POL-A10 근거를 `info_mart.md` §5-4로 교체 |
 | 2026-10-19 | REQ-ADM-031 `asOf` 정의를 서버 리뷰 반영(corebank-server#634, 연속 적재 기준일)에 맞춤 |
 | 2026-10-20 | ADM-02 실연동(#180). 집계가 서버 PH-28로 넘어가 REQ-ADM-022·024 검증을 화면 테스트로 옮김 |
+| 2026-10-20 | ADM-04 REQ-ADM-040~042 작성(#130). 서버 #613 응답 스키마 기준. 경로 `/admin/ledger-reconciliation` 확정 |

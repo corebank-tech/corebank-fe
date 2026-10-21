@@ -1,4 +1,8 @@
 import * as React from "react"
+import {
+  isConfirmedTransferStatus,
+  type TransferResponseStatus,
+} from "@/entities/transfer"
 import { Button } from "@/shared/ui/button"
 import { StepLayout } from "@/shared/ui/step-layout"
 
@@ -8,10 +12,14 @@ type InstantTransferStep3Props = {
   resultSlot?: React.ReactNode
   actionError?: string | null
   /**
-   * 결과가 확정된 건만 새 이체를 열어준다. 미확정 건에서 폼을 비워주면 고객이
-   * 같은 이체를 다시 넣어 이중 출금이 날 수 있다(REQ-TRSF-017).
+   * 서버가 답한 이체 처리상태. 결과가 확정된 건에만 새 이체를 열어준다 — 미확정
+   * 건에서 폼을 비워주면 고객이 같은 이체를 다시 넣어 두 번 입금될 수 있다
+   * (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
+   *
+   * 허용 여부를 불리언으로 받지 않고 상태를 받아 여기서 판정한다. 버튼을 가진 쪽이
+   * 판정하지 않으면 호출부의 전달 한 줄이 어긋나도 드러나지 않는다.
    */
-  canStartNewTransfer: boolean
+  status?: TransferResponseStatus
   onNewTransfer: () => void
 }
 
@@ -20,7 +28,7 @@ export const InstantTransferStep3 = ({
   steps,
   actionError,
   resultSlot,
-  canStartNewTransfer,
+  status,
   onNewTransfer,
 }: InstantTransferStep3Props) => {
   return (
@@ -29,7 +37,7 @@ export const InstantTransferStep3 = ({
       currentStep={3}
       title="즉시이체"
       footer={
-        canStartNewTransfer ? (
+        isConfirmedTransferStatus(status) ? (
           <Button
             variant="primary"
             size="lg"

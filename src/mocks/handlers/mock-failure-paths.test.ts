@@ -482,3 +482,29 @@ describe("상품가입 목 — 서버 ProductSubscriptionValidation·ExecuteServ
     ).toBe("INVALID")
   })
 })
+
+describe("시산표 목 — 서버 AdminTrialBalanceController·TrialBalanceQueryService", () => {
+  // 전 권한 관리자(`src/mocks/handlers/admin.ts`).
+  beforeEach(() => sessionStorage.setItem(SESSION_KEY, "seojunpark"))
+
+  it.each([
+    ["시작일 누락", "CMN0002", "?toDate=2026-10-20"],
+    ["빈 종료일", "CMN0002", "?fromDate=2026-10-01&toDate="],
+    ["날짜 형식 오류", "CMN0001", "?fromDate=2026-13-99&toDate=2026-10-20"],
+    ["날짜가 아닌 값", "CMN0001", "?fromDate=2026-10-01&toDate=abc"],
+    ["기간 역전", "CMN0003", "?fromDate=2026-10-20&toDate=2026-10-01"],
+    ["365일 초과", "CMN0004", "?fromDate=2025-10-01&toDate=2026-10-20"],
+  ])("%s이면 400 %s", async (_case, code, query) => {
+    const { status, body } = await call("GET", `/admin/trial-balance${query}`)
+    expect(status).toBe(400)
+    expect(body.code).toBe(code)
+  })
+
+  it("올바른 기간이면 200 이다", async () => {
+    const { status } = await call(
+      "GET",
+      "/admin/trial-balance?fromDate=2026-10-01&toDate=2026-10-20",
+    )
+    expect(status).toBe(200)
+  })
+})

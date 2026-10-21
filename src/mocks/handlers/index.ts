@@ -2,6 +2,7 @@ import { accountPasswordApiHandlers } from "@/mocks/handlers/account-password-ap
 import { accountsApiHandlers } from "@/mocks/handlers/accounts-api"
 import { accountHandlers } from "@/mocks/handlers/account"
 import { authHandlers } from "@/mocks/handlers/auth"
+import { glApiHandlers } from "@/mocks/handlers/gl-api"
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
 import { productSubscriptionsApiHandlers } from "@/mocks/handlers/product-subscriptions-api"
 import { productsApiHandlers } from "@/mocks/handlers/products-api"
@@ -16,6 +17,7 @@ export const handlers = [
   ...productsApiHandlers,
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,
+  ...glApiHandlers,
   ...accountHandlers,
   ...authHandlers,
 ]

@@ -65,6 +65,10 @@
       "description": "회원가입 단계별 인증·입력 검증·가입 완료 API"
     },
     {
+      "name": "관리자 시산표",
+      "description": "기간별·계정별 차변/대변 합계와 차대변 일치 판정 API"
+    },
+    {
       "name": "계좌",
       "description": "계좌 조회 및 계좌비밀번호 인증 API"
     },
@@ -75,6 +79,10 @@
     {
       "name": "출금계좌",
       "description": "출금계좌 관리 API"
+    },
+    {
+      "name": "관리자 원장 대사",
+      "description": "원장-잔액 대사 불일치 조회 API"
     },
     {
       "name": "이체",
@@ -985,7 +993,7 @@
           {
             "name": "status",
             "in": "query",
-            "description": "처리상태 필터. SUCCESS/ERROR, 미지정 또는 ALL이면 전체",
+            "description": "처리상태 필터. SUCCESS/ERROR/TIMEOUT, 미지정 또는 ALL이면 전체",
             "required": false,
             "schema": {
               "type": "string"
@@ -1137,7 +1145,7 @@
         },
         "responses": {
           "200": {
-            "description": "이체 요청이 처리됨. 실행 자체의 성공 여부와 이체 성공 여부는 다르다 — 응답 본문의 status로 판단한다. status=ERROR면 errorCode에 `TRF0001`(등록되지 않은 출금계좌) · `TRF0002`(출금·입금계좌 동일) · `TRF0004`(입금 불가 상품유형) · `TRF0201`(입금계좌를 찾을 수 없음) · `TRF0301`/`TRF0304`(거래정지·해지 상태의 입금/출금계좌) · `TRF0303`(출금계좌 잔액 부족) · `OTP0101`(OTP 인증 토큰 무효) · `OTP0102`(인증한 거래 내용과 요청 내용 불일치) 중 하나가 담긴다.",
+            "description": "이체 요청이 처리됨. 실행 자체의 성공 여부와 이체 성공 여부는 다르다 — 응답 본문의 status로 판단한다. status=TIMEOUT이면 처리 불명(대외 응답 없음)이라 실패가 아니다 — 재시도하지 않는다. status=ERROR면 errorCode에 `TRF0001`(등록되지 않은 출금계좌) · `TRF0002`(출금·입금계좌 동일) · `TRF0004`(입금 불가 상품유형) · `TRF0201`(입금계좌를 찾을 수 없음) · `TRF0301`/`TRF0304`(거래정지·해지 상태의 입금/출금계좌) · `TRF0303`(출금계좌 잔액 부족) · `OTP0101`(OTP 인증 토큰 무효) · `OTP0102`(인증한 거래 내용과 요청 내용 불일치) 중 하나가 담긴다.",
             "content": {
               "*/*": {
                 "schema": {
@@ -3605,7 +3613,7 @@
           {
             "name": "status",
             "in": "query",
-            "description": "처리상태 필터. SUCCESS/ERROR, 미지정 또는 ALL이면 전체",
+            "description": "처리상태 필터. SUCCESS/ERROR/TIMEOUT, 미지정 또는 ALL이면 전체",
             "required": false,
             "schema": {
               "type": "string"
@@ -4277,6 +4285,182 @@
           },
           "400": {
             "description": "CMN0001 X-Signup-Token 누락·무효·만료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/trial-balance": {
+      "get": {
+        "tags": [
+          "관리자 시산표"
+        ],
+        "summary": "관리자 시산표 조회",
+        "description": "거래일이 조회기간(양 끝 포함) 안인 분개를 계정별로 합산한다. 조회기간은 최대 1년(종료일 - 시작일 365일)이다.\n분류 필터는 받지 않는다 — 총계는 항상 기간 전체 기준이고 행 필터는 화면이 한다(REQ-ADM-023).\n계정과목에 없는 코드의 분개도 행으로 남기고 계정명·분류·정상잔액을 null 로 내린다(REQ-ADM-024).\n",
+        "operationId": "getAdminTrialBalance",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "조회 시작일(포함)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-09-01"
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "description": "조회 종료일(포함)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-09-30"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공. 분개가 없으면 rows 가 빈 배열이고 balanced=true",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTrialBalanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`CMN0002` fromDate·toDate 누락 · `CMN0001` 날짜 형식 오류 · `CMN0003` 조회 시작일이 종료일보다 늦음 · `CMN0004` 조회기간이 최대 1년(365일) 초과",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`CMN0102` 관리자 허용 목록 밖",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ledger-reconciliation/mismatches": {
+      "get": {
+        "tags": [
+          "관리자 원장 대사"
+        ],
+        "summary": "대사 불일치 목록 조회",
+        "description": "COB 대사가 찾은 원장-잔액 불일치 계좌를 영업일별로 조회한다. 계좌 ID 오름차순이다. businessDate를 빼면 가장 최근에 불일치가 기록된 영업일을 보여준다. 기록이 없으면 items가 빈 배열이다.",
+        "operationId": "getLedgerReconciliationMismatches",
+        "parameters": [
+          {
+            "name": "businessDate",
+            "in": "query",
+            "description": "조회할 영업일(YYYY-MM-DD). 생략 시 가장 최근 영업일",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-10-13"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "페이지 번호(0부터 시작). all=true면 무시됨",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "example": 0
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "페이지 크기. 5/10/20/30/50 중 하나. all=true면 무시됨",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            },
+            "example": 10
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "description": "true면 그 영업일 전체를 반환(최대 100건)",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseLedgerReconciliationMismatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`CMN0001` 날짜 형식 오류 · `CMN0005` 지원하지 않는 페이지 크기 · `CMN0006` 전체조회(all=true) 결과 100건 초과",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`CMN0102` 관리자 허용 목록 밖",
             "content": {
               "*/*": {
                 "schema": {
@@ -5197,41 +5381,42 @@
         "properties": {
           "status": {
             "type": "string",
-            "description": "이체 처리 결과. SUCCESS 또는 ERROR",
+            "description": "이체 처리 결과. SUCCESS · ERROR · TIMEOUT. TIMEOUT은 처리 불명(대외 응답 없음)으로 실패가 아니다 — 재시도하지 말고 결과 확인 중으로 안내한다",
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "transactionNumber": {
             "type": "string",
-            "description": "거래번호. 채번(순번 발급) 이후 시도부터 채워짐 — status=SUCCESS이거나 채번 후 실패면 값이 있고, 채번 전 실패(예: 등록되지 않은 출금계좌)면 비어있음",
+            "description": "거래번호. 채번(순번 발급) 이후 시도부터 채워짐 — status=SUCCESS·TIMEOUT이거나 채번 후 실패면 값이 있고, 채번 전 실패(예: 등록되지 않은 출금계좌)면 비어있음. TIMEOUT 건은 이 값으로 결과를 다시 조회한다",
             "example": "202608190000001"
           },
           "transferredAt": {
             "type": "string",
             "format": "date-time",
-            "description": "이체 처리 시각. status=SUCCESS일 때만 채워짐"
+            "description": "이체 처리 시각. status=SUCCESS일 때만 채워짐 (TIMEOUT이면 null)"
           },
           "errorCode": {
             "type": [
               "string",
               "null"
             ],
-            "description": "실패 코드. status=ERROR일 때만 채워짐 (예: TRF0303)"
+            "description": "실패 코드. status=ERROR일 때만 채워짐 (예: TRF0303). TIMEOUT이면 null"
           },
           "errorMessage": {
             "type": [
               "string",
               "null"
             ],
-            "description": "실패 메시지. status=ERROR일 때만 채워짐"
+            "description": "실패 메시지. status=ERROR일 때만 채워짐. TIMEOUT이면 null"
           },
           "withdrawalBalanceAfter": {
             "type": "integer",
             "format": "int64",
-            "description": "이체 후 출금계좌 잔액. status=SUCCESS일 때만 채워짐"
+            "description": "이체 후 출금계좌 잔액. status=SUCCESS일 때만 채워짐 (TIMEOUT이면 null)"
           }
         }
       },
@@ -5461,7 +5646,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "canceledAt": {
@@ -5676,7 +5862,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "transactionNumber": {
@@ -6159,7 +6346,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "terminatedAt": {
@@ -7234,7 +7422,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "executedAt": {
@@ -7354,7 +7543,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "accountNumber": {
@@ -8411,7 +8601,8 @@
             "enum": [
               "SUCCESS",
               "ERROR",
-              "PROCESSING"
+              "PROCESSING",
+              "TIMEOUT"
             ]
           },
           "executedAt": {
@@ -8623,6 +8814,218 @@
             "type": "string",
             "description": "마스킹된 이메일",
             "example": "user****@mail.com"
+          }
+        }
+      },
+      "ApiResponseTrialBalanceResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TrialBalanceResponse"
+          }
+        }
+      },
+      "Row": {
+        "type": "object",
+        "properties": {
+          "accountCode": {
+            "type": "string",
+            "description": "계정과목 코드",
+            "example": "20100"
+          },
+          "accountName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "계정과목명. 계정과목에 없는 코드면 null",
+            "example": "예수금"
+          },
+          "accountClass": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "계정 분류. ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE. 미등록 코드면 null",
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "REVENUE",
+              "EXPENSE"
+            ],
+            "example": "LIABILITY"
+          },
+          "normalBalance": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "정상잔액 방향. DEBIT / CREDIT. 미등록 코드면 null",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "example": "CREDIT"
+          },
+          "debitTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "기간 안 차변 합계(원)",
+            "example": 1000000
+          },
+          "creditTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "기간 안 대변 합계(원)",
+            "example": 1000000
+          },
+          "entryCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "이 계정에 걸린 분개 줄 수",
+            "example": 2
+          }
+        }
+      },
+      "TrialBalanceResponse": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date",
+            "description": "조회 시작일(포함)",
+            "example": "2026-09-01"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date",
+            "description": "조회 종료일(포함)",
+            "example": "2026-09-30"
+          },
+          "rows": {
+            "type": "array",
+            "description": "계정별 집계 행. 계정코드 오름차순. 분개가 없는 계정은 없다",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            }
+          },
+          "debitGrandTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "차변 총계(원)",
+            "example": 1000000
+          },
+          "creditGrandTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "대변 총계(원)",
+            "example": 1000000
+          },
+          "difference": {
+            "type": "integer",
+            "format": "int64",
+            "description": "차변 총계 - 대변 총계(원). 0 이 아니면 장부가 틀렸다",
+            "example": 0
+          },
+          "balanced": {
+            "type": "boolean",
+            "description": "차대변 일치 여부",
+            "example": true
+          },
+          "journalEntryCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "집계한 분개 줄 수",
+            "example": 2
+          }
+        }
+      },
+      "ApiResponsePageResponseLedgerReconciliationMismatchResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseLedgerReconciliationMismatchResponse"
+          }
+        }
+      },
+      "LedgerReconciliationMismatchResponse": {
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date",
+            "description": "대사한 COB의 마감 대상 영업일",
+            "example": "2026-10-13"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "불일치 계좌 내부 식별자",
+            "example": 1001
+          },
+          "ledgerBalance": {
+            "type": "integer",
+            "format": "int64",
+            "description": "원장 누적 합계(입금 - 출금). 원장이 없는 계좌는 0",
+            "example": 1000000
+          },
+          "accountBalance": {
+            "type": "integer",
+            "format": "int64",
+            "description": "대사 시점 계좌 잔액",
+            "example": 900000
+          },
+          "difference": {
+            "type": "integer",
+            "format": "int64",
+            "description": "원장 - 잔액. 양수면 잔액이 원장보다 적다",
+            "example": 100000
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "대사가 불일치를 확인한 시각",
+            "example": "2026-10-13T23:31:05+09:00"
+          }
+        }
+      },
+      "PageResponseLedgerReconciliationMismatchResponse": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerReconciliationMismatchResponse"
+            }
           }
         }
       },
@@ -8907,6 +9310,23 @@
             "type": "boolean",
             "description": "이체 가능 여부",
             "example": true
+          },
+          "ledgerBalance": {
+            "type": "integer",
+            "format": "int64",
+            "description": "원장잔액(원). balance와 동일",
+            "example": 2500000
+          },
+          "availableBalance": {
+            "type": "integer",
+            "format": "int64",
+            "description": "출금가능액(원). ACTIVE 계좌는 원장잔액에서 보류액을 차감하며 그 외 상태는 0. 비밀번호 잠금 여부와 무관하며 passwordLocked로 별도 판단한다.",
+            "example": 70000
+          },
+          "passwordLocked": {
+            "type": "boolean",
+            "description": "계좌비밀번호 잠금 여부",
+            "example": false
           }
         }
       },
@@ -9016,11 +9436,17 @@
             "description": "현재 잔액(원)",
             "example": 1500000
           },
+          "ledgerBalance": {
+            "type": "integer",
+            "format": "int64",
+            "description": "원장잔액(원). balance와 동일",
+            "example": 1500000
+          },
           "availableBalance": {
             "type": "integer",
             "format": "int64",
-            "description": "출금 가능 잔액(원). 출금 제한 시 0",
-            "example": 1500000
+            "description": "출금가능액(원). ACTIVE 계좌는 원장잔액에서 보류액을 차감하며 그 외 상태는 0",
+            "example": 70000
           },
           "openedDate": {
             "type": "string",

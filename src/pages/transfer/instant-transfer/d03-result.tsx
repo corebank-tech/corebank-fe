@@ -7,6 +7,11 @@ type InstantTransferStep3Props = {
   /** ResultPanel slot (delivered by a later chunk). */
   resultSlot?: React.ReactNode
   actionError?: string | null
+  /**
+   * 결과가 확정된 건만 새 이체를 열어준다. 미확정 건에서 폼을 비워주면 고객이
+   * 같은 이체를 다시 넣어 이중 출금이 날 수 있다(REQ-TRSF-017).
+   */
+  canStartNewTransfer: boolean
   onNewTransfer: () => void
 }
 
@@ -15,6 +20,7 @@ export const InstantTransferStep3 = ({
   steps,
   actionError,
   resultSlot,
+  canStartNewTransfer,
   onNewTransfer,
 }: InstantTransferStep3Props) => {
   return (
@@ -23,14 +29,16 @@ export const InstantTransferStep3 = ({
       currentStep={3}
       title="즉시이체"
       footer={
-        <Button
-          variant="primary"
-          size="lg"
-          className="min-w-40"
-          onClick={onNewTransfer}
-        >
-          새 이체하기
-        </Button>
+        canStartNewTransfer ? (
+          <Button
+            variant="primary"
+            size="lg"
+            className="min-w-40"
+            onClick={onNewTransfer}
+          >
+            새 이체하기
+          </Button>
+        ) : null
       }
     >
       {actionError != null && (

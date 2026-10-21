@@ -322,9 +322,13 @@ export const InstantTransferScreen = () => {
 
         const settled = executed.status === TransferResponseStatus.SUCCESS
         const failed = executed.status === TransferResponseStatus.ERROR
+        // 대외 응답이 없어 결과를 모르는 상태. 같은 이체를 다시 보내면 이중 출금이
+        // 날 수 있어 재이체를 막아야 한다(REQ-TRSF-017).
+        const timedOut = executed.status === TransferResponseStatus.TIMEOUT
         if (
           !settled &&
           !failed &&
+          !timedOut &&
           executed.status !== TransferResponseStatus.PROCESSING
         ) {
           console.error("알 수 없는 이체 처리상태", executed.status)
@@ -579,6 +583,7 @@ export const InstantTransferScreen = () => {
       <InstantTransferStep3
         steps={STEPS}
         actionError={favoriteError}
+        canStartNewTransfer={!isPending}
         onNewTransfer={() => {
           setForm(INITIAL_FORM)
           setResult(null)

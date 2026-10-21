@@ -5,10 +5,13 @@ import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
 import type { TrialBalanceResponse } from "@/shared/api/generated"
 import { Adm02TrialBalance } from "@/pages/admin/adm02-trial-balance"
+import { getToday } from "@/shared/config/clock"
+import { addDays } from "@/shared/lib/date"
 
 /**
  * 정상 목 데이터로는 실행되지 않는 분기를 서버 응답을 바꿔 끼워 확인한다 — 미등록
- * 계정(REQ-ADM-024), 차대변 불일치(REQ-ADM-022), 조회 실패, 같은 기간 재조회. 정상 경로는 e2e
+ * 계정(REQ-ADM-024), 차대변 불일치(REQ-ADM-022), 조회 실패, 같은 기간 재조회, 기간 한도
+ * (REQ-ADM-021). 정상 경로는 e2e
  * (`e2e/admin-trial-balance.spec.ts`)가 본다.
  */
 
@@ -114,6 +117,36 @@ describe("Adm02TrialBalance", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "초기화" }))
     await waitFor(() => expect(requestCount).toBe(3))
+  })
+
+  it("1년보다 오래된 구간도 폭이 365일 이내면 조회할 수 있고, 폭이 넘으면 막는다", async () => {
+    // 관리자 시산표는 폭만 제한한다(POL-A07, 서버 TrialBalanceQueryService). 고객 화면의
+    // 시작일 소급 1년(REQ-INQR-010)을 적용하면 지난해 구간을 FE가 막는다.
+    respond(BASE)
+    renderPage()
+    await screen.findByText("예수금")
+
+    const start = addDays(getToday(), -800)
+    fireEvent.change(screen.getByLabelText("조회 시작일"), {
+      target: { value: start },
+    })
+    fireEvent.change(screen.getByLabelText("조회 종료일"), {
+      target: { value: addDays(start, 365) },
+    })
+
+    expect(screen.getByRole("button", { name: "조회" })).toBeEnabled()
+    expect(screen.queryByText(/조회기간은 최대/)).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText("조회 종료일"), {
+      target: { value: addDays(start, 366) },
+    })
+
+    expect(screen.getByRole("button", { name: "조회" })).toBeDisabled()
+    expect(
+      screen.getByText(
+        "조회기간은 최대 1년 이내여야 합니다. 기간을 다시 선택하세요.",
+      ),
+    ).toBeInTheDocument()
   })
 
   it("조회에 실패하면 총계와 일치 배지를 그리지 않고 오류를 표시한다", async () => {

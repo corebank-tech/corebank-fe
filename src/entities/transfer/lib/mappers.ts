@@ -154,6 +154,7 @@ const AUTO_TRANSFER_RESULT_MAP: Record<string, AutoTransferResult> = {
   // 배치가 실행 중인 짧은 순간의 상태. 정상·오류 중 하나로 뭉개면 확정되지 않은
   // 회차를 확정된 것처럼 보여주게 된다.
   PROCESSING: "처리중",
+  TIMEOUT: "처리중",
 }
 
 const toAutoTransferResult = (
@@ -192,6 +193,9 @@ const TRANSFER_STATUS_MAP: Record<string, TransferStatus> = {
   SUCCESS: "정상",
   ERROR: "오류",
   PROCESSING: "처리중",
+  // 대외 무응답으로 처리 결과를 모르는 상태. 실패가 아니므로 '오류'로 보여주지
+  // 않고, 화면 처리상태는 3종만 쓰므로(POL-025) '처리중'과 같이 둔다.
+  TIMEOUT: "처리중",
 }
 
 /**

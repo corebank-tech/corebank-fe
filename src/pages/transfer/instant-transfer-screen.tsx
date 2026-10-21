@@ -15,6 +15,7 @@ import {
   useFavoriteAccountsQuery,
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
+  isConfirmedTransferStatus,
   isSameTransferIntent,
   toOtpTransactionData,
   toTransferRequest,
@@ -60,7 +61,11 @@ export type InstantTransferForm = {
 }
 
 type InstantTransferResultState = {
-  variant: ResultVariant
+  /**
+   * 서버가 답한 처리상태를 그대로 둔다. 화면 종류·버튼 노출은 여기서 파생시킨다 —
+   * 파생값을 저장하면 확정 판정과 표시가 따로 갈린다.
+   */
+  status?: TransferResponseStatus
   row: TransferResultRow
   errorCode?: string
   failReason?: string
@@ -322,9 +327,14 @@ export const InstantTransferScreen = () => {
 
         const settled = executed.status === TransferResponseStatus.SUCCESS
         const failed = executed.status === TransferResponseStatus.ERROR
+        // 대외 응답이 없어 결과를 모르는 상태. 같은 이체를 다시 보내면 상대 은행이
+        // 두 번 입금할 수 있어 재이체를 막아야 한다
+        // (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
+        const timedOut = executed.status === TransferResponseStatus.TIMEOUT
         if (
           !settled &&
           !failed &&
+          !timedOut &&
           executed.status !== TransferResponseStatus.PROCESSING
         ) {
           console.error("알 수 없는 이체 처리상태", executed.status)
@@ -349,7 +359,7 @@ export const InstantTransferScreen = () => {
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
         if (failed) {
           setResult({
-            variant: "fail",
+            status: executed.status,
             row,
             errorCode: executed.errorCode ?? undefined,
             failReason:
@@ -357,10 +367,10 @@ export const InstantTransferScreen = () => {
               "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
           })
         } else if (settled) {
-          setResult({ variant: "success", row })
+          setResult({ status: executed.status, row })
         } else {
           setResult({
-            variant: "pending",
+            status: executed.status,
             row,
             failReason:
               "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
@@ -389,7 +399,7 @@ export const InstantTransferScreen = () => {
         setStep(1)
         return
       }
-      // 서버가 SUCCESS·ERROR·PROCESSING 으로 답했으면 요청이 접수된 것이다.
+      // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 으로 답했으면 요청이 접수된 것이다.
       // 다음 이체는 새 키를 쓴다.
       setIdempotencyKey("")
       setKeyedIntent(null)
@@ -469,8 +479,13 @@ export const InstantTransferScreen = () => {
   }
 
   if (step === 3 && result) {
-    const isSuccess = result.variant === "success"
-    const isPending = result.variant === "pending"
+    const isSuccess = result.status === TransferResponseStatus.SUCCESS
+    const isPending = !isConfirmedTransferStatus(result.status)
+    const variant: ResultVariant = isSuccess
+      ? "success"
+      : isPending
+        ? "pending"
+        : "fail"
     const row = result.row
 
     const columns: DataGridColumn<TransferResultRow>[] = [
@@ -579,6 +594,7 @@ export const InstantTransferScreen = () => {
       <InstantTransferStep3
         steps={STEPS}
         actionError={favoriteError}
+        status={result.status}
         onNewTransfer={() => {
           setForm(INITIAL_FORM)
           setResult(null)
@@ -590,7 +606,7 @@ export const InstantTransferScreen = () => {
         }}
         resultSlot={
           <ResultPanel
-            variant={result.variant}
+            variant={variant}
             message={
               isSuccess
                 ? "이체가 완료되었습니다."

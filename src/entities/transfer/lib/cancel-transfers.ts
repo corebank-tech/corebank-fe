@@ -41,7 +41,7 @@ type CancelItemResult =
  * 취소·해지 불가(예정일 당일, 이미 종료된 건 등)는 예외가 아니라 200 응답의 건별
  * `status: ERROR` 로 온다. 예외만 실패로 보면 거부된 건을 성공으로 처리한다.
  *
- * SUCCESS 가 아니면 전부 실패로 본다. 스펙 enum 의 PROCESSING 은 서버가 공용
+ * SUCCESS 가 아니면 전부 실패로 본다. 스펙 enum 의 PROCESSING·TIMEOUT 은 서버가 공용
  * `ProcessResultStatus` 를 재사용해서 드러난 값이고 취소·해지 결과로는 만들지
  * 않지만, 온다면 반영됐다고 확정할 수 없다. 요청한 건수보다 결과가 적을 때도 같다.
  */

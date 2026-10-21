@@ -101,6 +101,8 @@ export {
   toScheduledTransferCancelRequest,
 } from "@/entities/transfer/lib/cancel-transfers"
 
+export { isConfirmedTransferStatus } from "@/entities/transfer/lib/transfer-result"
+
 export { LimitModal } from "@/entities/transfer/ui/limit-modal"
 
 export {

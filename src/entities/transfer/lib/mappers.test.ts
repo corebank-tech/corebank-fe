@@ -4,12 +4,14 @@ import {
   toReservationRow,
   toAutoTransferResultRow,
   toReservationResultRow,
+  toTransferHistoryRow,
 } from "@/entities/transfer/lib/mappers"
 import type {
   AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
+  TransferHistoryItemResponse,
 } from "@/shared/api/generated"
 
 const FROM_ACCOUNT_NO = "110632892336"
@@ -270,6 +272,7 @@ describe("toAutoTransferResultRow", () => {
     ["SUCCESS", "정상"],
     ["ERROR", "오류"],
     ["PROCESSING", "처리중"],
+    ["TIMEOUT", "처리중"],
   ])("실행결과 %s를 %s로 옮긴다", (apiStatus, expected) => {
     const row = toAutoTransferResultRow(
       {
@@ -395,6 +398,40 @@ describe("toReservationResultRow", () => {
     const row = toReservationResultRow({ ...BASE_RESULT, status: "WAITING" })
 
     expect(row.result).toBe("처리중")
+    expect(spy).toHaveBeenCalledOnce()
+    spy.mockRestore()
+  })
+})
+
+describe("toTransferHistoryRow", () => {
+  const BASE_HISTORY: TransferHistoryItemResponse = {
+    transactionNumber: "T20261020000001",
+    status: "SUCCESS",
+    executedAt: "2026-10-20T10:00:00",
+    accountNumber: "110220093412",
+    payeeName: "김*지",
+    amount: 10_000,
+  }
+
+  it.each([
+    ["SUCCESS", "정상"],
+    ["ERROR", "오류"],
+    ["PROCESSING", "처리중"],
+    ["TIMEOUT", "처리중"],
+  ])("처리상태 %s를 %s로 옮긴다", (apiStatus, expected) => {
+    const row = toTransferHistoryRow({
+      ...BASE_HISTORY,
+      status: apiStatus as TransferHistoryItemResponse["status"],
+    })
+    expect(row.status).toBe(expected)
+  })
+
+  it("모르는 처리상태는 콘솔에 남기고 '처리중'으로 폴백한다", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const row = toTransferHistoryRow({ ...BASE_HISTORY, status: undefined })
+
+    expect(row.status).toBe("처리중")
     expect(spy).toHaveBeenCalledOnce()
     spy.mockRestore()
   })

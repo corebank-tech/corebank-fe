@@ -50,6 +50,21 @@ describe("checkPeriodRange", () => {
     })
   })
 
+  describe("소급 한도를 끄면(null) 폭만 본다 — ADM-02 시산표(POL-A07)", () => {
+    it("오래된 구간도 폭이 1년 이내면 통과한다", () => {
+      expect(
+        checkPeriodRange("2019-01-01", "2019-12-31", TODAY, MAX, null),
+      ).toEqual(OK)
+    })
+
+    it("폭이 1년을 넘으면 여전히 걸린다", () => {
+      expect(
+        checkPeriodRange("2019-01-01", "2020-01-02", TODAY, MAX, null)
+          .overLimit,
+      ).toBe(true)
+    })
+  })
+
   it("종료일이 미래여도 시작일과 폭이 한도 안이면 통과한다 (E-04 예약이체 조회)", () => {
     expect(checkPeriodRange("2026-06-21", "2026-10-21", TODAY, MAX)).toEqual(OK)
   })

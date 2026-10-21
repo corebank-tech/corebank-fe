@@ -19,7 +19,6 @@ import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate } from "@/shared/lib/format"
 import { getToday } from "@/shared/config/clock"
 import { recentPeriod } from "@/shared/config/query-period"
-import { QUERY_MAX_RANGE_DAYS } from "@/shared/config/policy"
 
 /**
  * ADM-02 시산표(#128) — 기간별 계정별 차변·대변 합계.
@@ -68,6 +67,19 @@ type Condition = {
   period: { start: string; end: string }
   accountClass: ClassFilter
 }
+
+/**
+ * 조회기간 한도 — **한 번에 조회하는 폭만 365일로 제한하고, 시작일이 얼마나 과거인지는
+ * 묻지 않는다**(POL-A07 최대 1년, REQ-ADM-021). 서버 `TrialBalanceQueryService` 도
+ * `toDate` 가 `fromDate + 365일` 보다 뒤일 때만 거부한다. 고객 조회화면은 시작일 소급
+ * 1년도 함께 재는데(REQ-INQR-010), 그 규칙을 여기 적용하면 지난해 1년치 같은 정상
+ * 구간을 FE가 막는다.
+ */
+const PERIOD_LIMIT = {
+  /** 서버 `TrialBalanceQueryService.MAX_PERIOD_DAYS`. */
+  maxPeriodDays: 365,
+  maxLookbackDays: null,
+} as const
 
 /**
  * 기본 조회조건. **객체가 아니라 팩토리다.**
@@ -143,14 +155,12 @@ export const Adm02TrialBalance = () => {
     draft.period.start,
     draft.period.end,
     TODAY,
-    QUERY_MAX_RANGE_DAYS,
+    PERIOD_LIMIT.maxPeriodDays,
+    PERIOD_LIMIT.maxLookbackDays,
   )
-  // 한도가 `QUERY_MAX_RANGE_DAYS` 인 것은 **POL-021 을 적용해서가 아니라 `PeriodField` 의
-  // `maxPeriodDays` 기본값이 그 값이기 때문**이다. 여기서 다른 값을 넘기면 안내문구는
-  // 초과라고 말하는데 버튼은 살아 있는 상태가 된다. 관리자 화면 고유의 한도 규정이
-  // 생기면 `PeriodField` 에도 같은 값을 넘겨 둘을 함께 옮긴다.
-  //
   // `PeriodField` 는 안내 문구만 그리고 조회를 막지는 않는다. 막는 책임은 화면에 있다.
+  // 두 곳에 같은 `PERIOD_LIMIT` 을 넘긴다 — 갈라지면 문구는 초과라고 말하는데 버튼은
+  // 살아 있거나, 그 반대가 된다.
   const periodInvalid = incomplete || reversed || overLimit
 
   const handleSearch = () => {
@@ -253,6 +263,7 @@ export const Adm02TrialBalance = () => {
               end={draft.period.end}
               onChange={(period) => setDraft((prev) => ({ ...prev, period }))}
               today={TODAY}
+              {...PERIOD_LIMIT}
             />
           </FormRow>
           <FormRow label="계정분류" htmlFor="adm-tb-class">

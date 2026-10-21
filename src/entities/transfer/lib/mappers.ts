@@ -60,7 +60,6 @@ const RESERVATION_RESULT_MAP: Record<string, ReservationResult> = {
   SUCCESS: "정상",
   FAILED: "오류",
   CANCELED: "취소",
-  TIMEOUT: "처리중",
 }
 
 const toReservationResult = (status: string | undefined): ReservationResult => {

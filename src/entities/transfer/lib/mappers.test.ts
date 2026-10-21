@@ -357,7 +357,6 @@ describe("toReservationResultRow", () => {
     ["SUCCESS", "정상"],
     ["FAILED", "오류"],
     ["CANCELED", "취소"],
-    ["TIMEOUT", "처리중"],
   ])("상태 %s를 %s로 옮긴다", (apiStatus, expected) => {
     const row = toReservationResultRow({
       ...BASE_RESULT,

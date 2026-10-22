@@ -18,7 +18,6 @@ import {
   isConfirmedTransferStatus,
   isSameTransferIntent,
   toOtpTransactionData,
-  toTransferRequest,
   getTransferLimitQueryKey,
   type TransferIntent,
   type TransferResultRow,
@@ -320,7 +319,7 @@ export const InstantTransferScreen = () => {
       const executedAt = transactionAt ?? getNow()
       try {
         const executed = await executeMutation.mutateAsync({
-          request: toTransferRequest(currentIntent),
+          intent: currentIntent,
           accountPasswordAuthToken: passwordAuthToken,
           otpAuthToken,
           idempotencyKey,

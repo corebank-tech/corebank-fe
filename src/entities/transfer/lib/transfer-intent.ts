@@ -9,7 +9,10 @@
  * 판정을 특정 setter 가 아니라 거래 내용 자체에 붙인다. 폼을 고치는 자리가 늘어도
  * 이 비교를 지나가므로 규칙이 새로 뚫리지 않는다.
  */
-import type { TransferRequest } from "@/shared/api/generated"
+import type {
+  InterbankTransferRequest,
+  TransferRequest,
+} from "@/shared/api/generated"
 
 export type TransferIntent = {
   withdrawalAccountId: number | null
@@ -33,6 +36,17 @@ export const toTransferRequest = (intent: TransferIntent): TransferRequest => ({
   amount: intent.amount ?? undefined,
   myPassbookMemo: intent.myPassbookMemo || undefined,
   recipientPassbookMemo: intent.recipientPassbookMemo || undefined,
+})
+
+/**
+ * 타행 실행 요청 본문. 당행 본문에 은행코드를 더한 모양이다(서버 interbank_transfer_fe_handoff.md §4-2).
+ * 당행·타행 중 무엇을 보낼지는 호출부가 `payeeBankCode` 로 고른다 — 이 함수는 고르지 않는다.
+ */
+export const toInterbankTransferRequest = (
+  intent: TransferIntent,
+): InterbankTransferRequest => ({
+  ...toTransferRequest(intent),
+  payeeBankCode: intent.payeeBankCode ?? undefined,
 })
 
 /**

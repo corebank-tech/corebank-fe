@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   isSameTransferIntent,
+  toInterbankTransferRequest,
   toOtpTransactionData,
   toTransferRequest,
   type TransferIntent,
@@ -61,6 +62,24 @@ describe("toTransferRequest", () => {
     )
     expect(request.myPassbookMemo).toBeUndefined()
     expect(request.recipientPassbookMemo).toBeUndefined()
+  })
+})
+
+describe("toInterbankTransferRequest", () => {
+  // 서버 interbank_transfer_fe_handoff.md §4-2: 당행 본문에 은행코드를 더한 모양이다.
+  it("당행 본문에 은행코드를 더한다", () => {
+    expect(
+      toInterbankTransferRequest(
+        intent({ payeeBankCode: "004", depositAccountNumber: "1234567890123" }),
+      ),
+    ).toEqual({
+      withdrawalAccountId: 1,
+      payeeBankCode: "004",
+      depositAccountNumber: "1234567890123",
+      amount: 500_000,
+      myPassbookMemo: "생활비",
+      recipientPassbookMemo: "생활비",
+    })
   })
 })
 

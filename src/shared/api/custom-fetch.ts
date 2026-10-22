@@ -11,6 +11,7 @@ import {
   emitApiActivity,
   emitSessionExpired,
 } from "@/shared/api/session-events"
+import { createCorrelationId } from "@/shared/api/correlation-id"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const REQUEST_TIMEOUT_MS = 30_000
@@ -20,6 +21,7 @@ const CONTENT_TYPE_HEADER = "Content-Type"
 const JSON_CONTENT_TYPE = "application/json"
 const CSRF_COOKIE_NAME = "XSRF-TOKEN"
 const CSRF_HEADER = "X-XSRF-TOKEN"
+const CORRELATION_ID_HEADER = "X-Correlation-Id"
 /** REQ-CMN-014: 상태를 바꾸지 않는 메서드만 멱등키를 생략한다. */
 const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
@@ -56,6 +58,10 @@ const buildHeaders = (method: string, init: RequestInit): Headers => {
   // 호출자가 이미 키를 넣었다면 존중한다 — 재시도 시 같은 키를 써야 하기 때문이다.
   if (!READ_ONLY_METHODS.has(method) && !headers.has(IDEMPOTENCY_KEY_HEADER)) {
     headers.set(IDEMPOTENCY_KEY_HEADER, crypto.randomUUID())
+  }
+  // 조회도 추적 대상이라 메서드를 가리지 않는다. 호출자가 넣은 값은 존중한다.
+  if (!headers.has(CORRELATION_ID_HEADER)) {
+    headers.set(CORRELATION_ID_HEADER, createCorrelationId())
   }
   // 상태변경 요청은 CookieCsrfTokenRepository가 요구하는 CSRF 헤더가 없으면 403(CMN0102)으로 거부된다.
   if (!READ_ONLY_METHODS.has(method) && !headers.has(CSRF_HEADER)) {

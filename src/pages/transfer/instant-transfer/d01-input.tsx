@@ -11,6 +11,7 @@ import {
   MemoField,
 } from "@/widgets/transfer"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
+import { Select } from "@/shared/ui/select"
 import { formatAccountNo, maskName } from "@/shared/lib/format"
 import type { AccountOption } from "@/shared/types/account"
 import type {
@@ -18,6 +19,12 @@ import type {
   RecentTransferAccount,
 } from "@/entities/transfer"
 import type { InstantTransferForm } from "@/pages/transfer/instant-transfer-screen"
+
+/** 입금은행 선택지. `bankCode` 가 `null` 이면 당행이다. */
+export type BankOption = { bankCode: string | null; bankName: string }
+
+/** `<select>` 값은 문자열이라 당행(`null`)을 빈 문자열로 싣는다. */
+const OWN_BANK_VALUE = ""
 
 type InstantTransferStep1Props = {
   steps: string[]
@@ -35,6 +42,11 @@ type InstantTransferStep1Props = {
   /** 한도·계좌 조회가 끝나지 않았거나 실패했을 때 보여줄 안내. */
   notice?: string | null
   onNext: () => void
+  /** FE B-8: 당행을 맨 앞에 둔 입금은행 선택지. */
+  bankOptions: BankOption[]
+  /** 은행 목록을 못 받았을 때의 안내. 당행 이체는 그대로 된다. */
+  bankNotice?: string | null
+  onChangeBank: (bankCode: string | null) => void
   /** 입력된 입금계좌번호로 예금주를 조회한다(REQ-TRSF-004·007·030). */
   onConfirmAccount: () => void
   /** 자주 쓰는 계좌 · 최근 이체계좌 선택 시 입금계좌번호를 채우고 즉시 조회한다. */
@@ -55,6 +67,9 @@ export const InstantTransferStep1 = ({
   isLimitUnavailable = false,
   canSubmit,
   onNext,
+  bankOptions,
+  bankNotice,
+  onChangeBank,
   onConfirmAccount,
   onSelectQuickAccount,
   frequentAccounts,
@@ -112,6 +127,37 @@ export const InstantTransferStep1 = ({
 
         <FormSection title="입금정보">
           <div>
+            <FormRow label="입금은행" required htmlFor="it-bank">
+              <div className="flex w-full flex-col gap-1">
+                <div className="max-w-xs">
+                  <Select
+                    id="it-bank"
+                    value={form.payeeBankCode ?? OWN_BANK_VALUE}
+                    onChange={(e) =>
+                      onChangeBank(
+                        e.target.value === OWN_BANK_VALUE
+                          ? null
+                          : e.target.value,
+                      )
+                    }
+                  >
+                    {bankOptions.map((bank) => (
+                      <option
+                        key={bank.bankCode ?? OWN_BANK_VALUE}
+                        value={bank.bankCode ?? OWN_BANK_VALUE}
+                      >
+                        {bank.bankName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                {bankNotice != null && (
+                  <p role="alert" className="text-xs font-bold text-danger">
+                    {bankNotice}
+                  </p>
+                )}
+              </div>
+            </FormRow>
             <FormRow label="입금계좌번호" required htmlFor="it-to">
               <div className="flex w-full flex-col gap-2">
                 <AccountNumberField

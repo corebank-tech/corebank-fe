@@ -43,7 +43,7 @@ export const NAV: NavCategory[] = [
       {
         title: "즉시이체",
         items: [
-          { label: "당행이체", screenId: "D-01", path: "/instant-transfer" },
+          { label: "계좌이체", screenId: "D-01", path: "/instant-transfer" },
           {
             label: "이체결과조회",
             screenId: "D-04",

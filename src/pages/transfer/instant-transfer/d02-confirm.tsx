@@ -98,7 +98,7 @@ export const InstantTransferStep2 = ({
           ]}
         />
         <p className="mt-2 text-2xs text-ink-faint">
-          ※ 당행이체는 수수료가 발생하지 않습니다.
+          ※ 이체 수수료는 당행·타행 모두 발생하지 않습니다.
         </p>
         <p className="mt-1 text-2xs text-ink-faint">
           ※ 이체예정일시는 인증 완료 후 실제 처리 시각으로 확정됩니다.

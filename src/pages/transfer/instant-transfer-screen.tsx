@@ -193,9 +193,11 @@ export const InstantTransferScreen = () => {
     bankCode ??
     OWN_BANK_LABEL
   const payeeBankName = bankNameOf(form.payeeBankCode)
-  const bankNotice = banksQuery.isError
-    ? `다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다. (${toErrorMessage(banksQuery.error)})`
-    : null
+  // 재조회가 실패해도 받아 둔 목록은 남는다 — 목록이 없을 때만 당행 이체만 된다고 알린다.
+  const bankNotice =
+    banksQuery.isError && banksQuery.data == null
+      ? `다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다. (${toErrorMessage(banksQuery.error)})`
+      : null
   const dailyRemaining = limit?.dailyRemainingAmount ?? 0
   const perTransferLimit = limit?.oneTimeLimit ?? 0
   const effectiveLimit = Math.min(perTransferLimit, dailyRemaining)
@@ -683,7 +685,11 @@ export const InstantTransferScreen = () => {
                 ? "※ 이체 후 출금계좌 잔액은 이체결과조회에서 다시 확인할 수 있습니다."
                 : isPending
                   ? "※ 결과가 확정되기 전까지 잔액과 거래내역이 달라질 수 있습니다. 같은 이체를 다시 실행하지 마세요."
-                  : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
+                  : result.payeeBankCode != null
+                    ? // 타행은 보낸 뒤 실패하면 출금을 되돌린다 — 잔액은 같지만 거래내역에
+                      // 출금·되돌림 두 줄이 남는다(서버 #658, 인계 문서 §5-1).
+                      "※ 출금됐던 금액은 되돌려져 잔액은 이체 전과 같습니다. 실패 시점에 따라 거래내역에 출금과 되돌림이 함께 보일 수 있으며, 이체 이력에는 오류 상태로 기록됩니다."
+                    : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
             }
             columns={columns}
             row={row}

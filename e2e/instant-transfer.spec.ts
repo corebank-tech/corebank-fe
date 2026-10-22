@@ -16,6 +16,7 @@ const INTERBANK = {
   NOT_FOUND: "1234567890001",
   SUSPENDED: "1234567890002",
   UNCONFIRMED: "1234567890009",
+  NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
 } as const
 
@@ -122,6 +123,27 @@ test("타행 TIMEOUT 이면 결과 확인 중 안내가 뜨고 새 이체를 열
   await expect(newTransferButton(page)).toHaveCount(0)
 })
 
+// 타행은 보낸 뒤 실패하면 출금을 되돌린다 — "거래내역이 변동하지 않는다"는 당행 안내를
+// 쓰면 거짓이 된다(서버 #658, 인계 문서 §5-1).
+test("타행 실패면 오류코드와 출금 되돌림 안내를 보여준다", async ({ page }) => {
+  await confirmPayee(page, OTHER_BANK, INTERBANK.NOT_PROCESSED)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+
+  await expect(page.getByText("이체가 처리되지 않았습니다.")).toBeVisible()
+  await expect(
+    page.getByText("오류코드 TRF0308", { exact: false }),
+  ).toBeVisible()
+  await expect(
+    page.getByText("출금됐던 금액은 되돌려져 잔액은 이체 전과 같습니다.", {
+      exact: false,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByText("잔액과 거래내역이 변동하지 않습니다", { exact: false }),
+  ).toHaveCount(0)
+})
+
 // REQ-TRSF-004 · corebank-server#680: 실패는 구분된 문구로 안내하고 다음 단계를 막는다.
 for (const [label, accountNo, message] of [
   ["계좌 없음", INTERBANK.NOT_FOUND, "입금계좌를 찾을 수 없습니다."],
@@ -157,6 +179,26 @@ test("은행을 바꾸면 앞서 확인한 예금주를 지우고 다시 확인�
   await expect(page.getByRole("button", { name: "다음" })).toBeEnabled()
 
   await page.locator("#it-bank").selectOption({ label: "우리은행" })
+
+  await expect(holderName(page, "박*준")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()
+})
+
+// 조회 중에 은행을 바꾸면 늦게 온 응답이 바뀐 은행을 "확인됨"으로 덮으면 안 된다 —
+// 그대로 두면 확인하지 않은 은행·계좌로 [다음]이 열린다.
+test("계좌확인 응답이 오기 전에 은행을 바꾸면 늦은 응답을 반영하지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/instant-transfer")
+  await page.locator("#it-bank").selectOption({ label: OTHER_BANK })
+  await fillAccountPassword(page)
+  await page.locator("#it-amount").fill("30000")
+  await page.locator("#it-to").fill(INTERBANK.OK)
+
+  const lateResponse = page.waitForResponse("**/transfers/interbank/payee**")
+  await page.getByRole("button", { name: "계좌확인" }).click()
+  await page.locator("#it-bank").selectOption({ label: "우리은행" })
+  await lateResponse
 
   await expect(holderName(page, "박*준")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()

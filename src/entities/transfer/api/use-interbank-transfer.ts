@@ -1,8 +1,5 @@
 import { customFetch } from "@/shared/api/custom-fetch"
 import { useGetInterbankBanks } from "@/shared/api/generated"
-import type { InterbankBankResponse } from "@/shared/api/generated"
-
-export type InterbankBank = InterbankBankResponse
 
 /**
  * D-01 입금은행 목록(FE B-8). 서버가 `bankCode` 오름차순으로 준다. 당행(088)은 목록에

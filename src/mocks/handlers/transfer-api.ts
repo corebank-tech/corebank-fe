@@ -34,6 +34,7 @@ const MOCK_LATENCY_MS = 200
  * | `1234567890001` | `TRF0201` 404 (상대 `1001`) | — |
  * | `1234567890002` | `TRF0301` 409 (상대 `1002`) | — |
  * | `1234567890009` | `TRF0309` 409 (상대 무응답, corebank-server#680) | — |
+ * | `1234567890006` | 정상, 1초 늦게 (늦은 응답 장면) | 200 + `SUCCESS` |
  * | `1234567890007` | 정상 | 200 + `ERROR` `TRF0308` |
  * | `1234567890008` | 정상 | 200 + `TIMEOUT` |
  * | 그 밖의 숫자 1~16자리 | 정상 | 200 + `SUCCESS` |
@@ -103,11 +104,15 @@ const INTERBANK_SCENARIO = {
   NOT_FOUND: "1234567890001",
   SUSPENDED: "1234567890002",
   UNCONFIRMED: "1234567890009",
+  SLOW: "1234567890006",
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
 } as const
 
 const INTERBANK_PAYEE_NAME = "박*준"
+
+/** 늦은 응답 장면에서 응답이 오기 전에 입력을 바꿀 여유. 화면 조작 몇 번이면 끝나는 시간보다 길게 둔다. */
+const SLOW_PAYEE_LATENCY_MS = 1000
 
 const isInterbankAccountNumber = (value: string) => /^\d{1,16}$/.test(value)
 const isSupportedBank = (bankCode: string | undefined) =>
@@ -240,6 +245,9 @@ export const transferApiHandlers = [
     if (accountNumber === INTERBANK_SCENARIO.UNCONFIRMED) {
       await delay(MOCK_LATENCY_MS)
       return fail(...TRANSFER_ERROR.INTERBANK_PAYEE_UNCONFIRMED)
+    }
+    if (accountNumber === INTERBANK_SCENARIO.SLOW) {
+      await delay(SLOW_PAYEE_LATENCY_MS)
     }
     return ok({ payeeName: INTERBANK_PAYEE_NAME })
   }),

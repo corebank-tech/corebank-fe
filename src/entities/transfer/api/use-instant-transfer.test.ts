@@ -153,6 +153,8 @@ describe("executeTransferIntent", () => {
       status: "SUCCESS",
       payeeName: "김*수",
       withdrawalBalanceAfter: 950_000,
+      // 인계 문서 §5: 타행만 오프셋이 붙는다. 당행과 같은 KST 벽시계 모양으로 맞춘다.
+      transferredAt: "2026-10-23T10:30:16",
     })
   })
 

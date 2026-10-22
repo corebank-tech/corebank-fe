@@ -13,6 +13,7 @@ const OTHER_BANK = "KB국민은행"
 
 const INTERBANK = {
   OK: "1234567890123",
+  SLOW: "1234567890006",
   NOT_FOUND: "1234567890001",
   SUSPENDED: "1234567890002",
   UNCONFIRMED: "1234567890009",
@@ -196,12 +197,24 @@ test("계좌확인 응답이 오기 전에 은행을 바꾸면 늦은 응답을 
   await page.locator("#it-bank").selectOption({ label: OTHER_BANK })
   await fillAccountPassword(page)
   await page.locator("#it-amount").fill("30000")
-  await page.locator("#it-to").fill(INTERBANK.OK)
+  // 목은 이 번호에 1초 늦게 답한다 — 은행을 바꾸는 조작이 응답보다 먼저 끝난다.
+  await page.locator("#it-to").fill(INTERBANK.SLOW)
 
   const lateResponse = page.waitForResponse("**/transfers/interbank/payee**")
   await page.getByRole("button", { name: "계좌확인" }).click()
   await page.locator("#it-bank").selectOption({ label: "우리은행" })
-  await lateResponse
+  await (await lateResponse).finished()
+  // 응답을 받은 뒤 화면이 그 결과를 반영할 때까지 기다린다(JSON 해석 → setState → 렌더).
+  // 반영하지 않는 것이 기대값이라 바뀐 DOM 을 기다릴 수 없어서, 작업 큐를 두 번 비운다.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        setTimeout(
+          () => requestAnimationFrame(() => setTimeout(resolve, 0)),
+          0,
+        ),
+      ),
+  )
 
   await expect(holderName(page, "박*준")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()

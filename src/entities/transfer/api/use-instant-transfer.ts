@@ -29,7 +29,7 @@ export type InstantTransferResult = Pick<
   | "errorMessage"
   | "withdrawalBalanceAfter"
 > & {
-  /** 타행 응답은 오프셋(+09:00)이 붙고 실패·TIMEOUT 이면 `null` 이다. */
+  /** 오프셋 없는 KST 시각(당행 응답과 같은 모양). 실패·TIMEOUT 이면 비어 있다. */
   transferredAt?: string | null
   payeeName: string | null
 }
@@ -40,6 +40,14 @@ export type ExecuteTransferVariables = {
   otpAuthToken: string
   idempotencyKey: string
 }
+
+/**
+ * 타행 응답 시각의 `+09:00` 을 떼어 당행과 같은 오프셋 없는 KST 시각으로 맞춘다(서버
+ * interbank_transfer_fe_handoff.md §5 — 당행 응답은 오프셋이 없어 같은 파서를 쓰지 않는다).
+ * 그대로 두면 기기 시간대가 KST 가 아닐 때 당행은 KST 벽시계, 타행은 기기 시각으로 보인다.
+ */
+const toKstLocalDateTime = (value: string | null | undefined) =>
+  value?.replace(/\+09:00$/, "") ?? value
 
 /** D-01 당행 수취인 조회(REQ-TRSF-004). 계좌번호 입력을 마친 시점에만 부른다. */
 export const fetchPayee = (accountNumber: string): Promise<PayeeResponse> =>
@@ -91,7 +99,7 @@ export const executeTransferIntent = async ({
   return {
     status: response.status,
     transactionNumber: response.transactionNumber,
-    transferredAt: response.transferredAt,
+    transferredAt: toKstLocalDateTime(response.transferredAt),
     errorCode: response.errorCode,
     errorMessage: response.errorMessage,
     withdrawalBalanceAfter: response.withdrawalBalanceAfter ?? undefined,

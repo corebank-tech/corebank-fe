@@ -126,12 +126,10 @@ export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto
 
 export {
   TransferResponseStatus,
-  fetchPayee,
   fetchPayeeFor,
   useExecuteTransferMutation,
 } from "@/entities/transfer/api/use-instant-transfer"
 export { useInterbankBanksQuery } from "@/entities/transfer/api/use-interbank-transfer"
-export type { InterbankBank } from "@/entities/transfer/api/use-interbank-transfer"
 export type {
   InstantTransferResult,
   Payee,

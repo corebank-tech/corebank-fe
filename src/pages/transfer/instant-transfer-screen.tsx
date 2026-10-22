@@ -179,6 +179,7 @@ export const InstantTransferScreen = () => {
    */
   const currentIntent: TransferIntent = {
     withdrawalAccountId: selectedAccountId ?? null,
+    payeeBankCode: null,
     depositAccountNumber: form.toAccount,
     amount: form.amount,
     myPassbookMemo: form.myMemo,

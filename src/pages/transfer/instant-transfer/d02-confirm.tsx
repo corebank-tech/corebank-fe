@@ -8,6 +8,8 @@ type InstantTransferStep2Props = {
   steps: string[]
   scheduledAt: React.ReactNode
   fromAccount: React.ReactNode
+  /** FE B-8: 입금은행명. 당행도 이름으로 받는다. */
+  payeeBank: React.ReactNode
   toAccount: React.ReactNode
   payeeName: React.ReactNode
   amount: React.ReactNode
@@ -31,6 +33,7 @@ export const InstantTransferStep2 = ({
   steps,
   scheduledAt,
   fromAccount,
+  payeeBank,
   toAccount,
   payeeName,
   amount,
@@ -77,7 +80,7 @@ export const InstantTransferStep2 = ({
           columns={[
             { label: "이체예정일시", value: scheduledAt },
             { label: "출금계좌", value: fromAccount },
-            { label: "입금은행", value: "당행" },
+            { label: "입금은행", value: payeeBank },
             { label: "입금계좌", value: toAccount },
             { label: "예금주", value: payeeName },
             { label: "이체금액(원)", value: amount, emphasis: true },

@@ -47,6 +47,7 @@ import {
 } from "@/pages/transfer/instant-transfer/d01-input"
 import {
   OWN_BANK_LABEL,
+  formatDepositAccountNo,
   resolveDepositTarget,
 } from "@/pages/transfer/instant-transfer/deposit-target"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
@@ -184,6 +185,11 @@ export const InstantTransferScreen = () => {
         : [],
     ),
   ]
+  const payeeBankName =
+    bankOptions.find((bank) => bank.bankCode === form.payeeBankCode)
+      ?.bankName ??
+    form.payeeBankCode ??
+    OWN_BANK_LABEL
   const bankNotice = banksQuery.isError
     ? `다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다. (${toErrorMessage(banksQuery.error)})`
     : null
@@ -445,7 +451,12 @@ export const InstantTransferScreen = () => {
               {formatAccountNo(displayForm.fromAccount)}
             </span>
           }
-          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
+          payeeBank={payeeBankName}
+          toAccount={
+            <span>
+              {formatDepositAccountNo(form.payeeBankCode, form.toAccount)}
+            </span>
+          }
           payeeName={maskName(form.payeeName)}
           amount={formatAmount(amount, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
@@ -479,12 +490,13 @@ export const InstantTransferScreen = () => {
               label: "3. 출금계좌번호",
               value: formatAccountNo(displayForm.fromAccount),
             },
+            { label: "4. 입금은행", value: payeeBankName },
             {
-              label: "4. 입금계좌번호",
-              value: formatAccountNo(form.toAccount),
+              label: "5. 입금계좌번호",
+              value: formatDepositAccountNo(form.payeeBankCode, form.toAccount),
             },
-            { label: "5. 수취인성명", value: maskName(form.payeeName) },
-            { label: "6. 이체금액", value: formatAmount(amount) },
+            { label: "6. 수취인성명", value: maskName(form.payeeName) },
+            { label: "7. 이체금액", value: formatAmount(amount) },
           ]}
         />
 

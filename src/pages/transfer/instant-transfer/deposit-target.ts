@@ -1,5 +1,6 @@
 import { fetchPayeeFor } from "@/entities/transfer"
 import { ApiError } from "@/shared/api/api-error"
+import { formatAccountNo } from "@/shared/lib/format"
 
 /** 당행 선택지 표기. 은행 목록 응답에는 당행이 없다(서버 interbank_transfer_fe_handoff.md §3). */
 export const OWN_BANK_LABEL = "CoreBank(당행)"
@@ -7,6 +8,15 @@ export const OWN_BANK_LABEL = "CoreBank(당행)"
 const DOMESTIC_ACCOUNT_LENGTH = 12
 /** 타행 계좌번호 최대 자릿수. 전문 계좌번호 칸 크기다(인계 문서 §4-2). */
 const INTERBANK_ACCOUNT_MAX_LENGTH = 16
+
+/**
+ * 입금계좌번호 표시. 타행은 은행마다 자리 체계가 달라 숫자를 그대로 둔다 —
+ * `formatAccountNo` 의 3-3-나머지 분할은 당행 12자리 체계다.
+ */
+export const formatDepositAccountNo = (
+  payeeBankCode: string | null,
+  accountNo: string,
+) => (payeeBankCode == null ? formatAccountNo(accountNo) : accountNo)
 
 export type DepositTargetCheck = {
   toConfirmed: boolean

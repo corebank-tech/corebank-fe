@@ -135,9 +135,12 @@ test("타행 실패면 오류코드와 출금 되돌림 안내를 보여준다",
     page.getByText("오류코드 TRF0308", { exact: false }),
   ).toBeVisible()
   await expect(
-    page.getByText("출금됐던 금액은 되돌려져 잔액은 이체 전과 같습니다.", {
-      exact: false,
-    }),
+    page.getByText(
+      "출금된 금액이 있으면 되돌려지므로 잔액은 이체 전과 같습니다.",
+      {
+        exact: false,
+      },
+    ),
   ).toBeVisible()
   await expect(
     page.getByText("잔액과 거래내역이 변동하지 않습니다", { exact: false }),

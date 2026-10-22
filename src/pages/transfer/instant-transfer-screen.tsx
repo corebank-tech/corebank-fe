@@ -75,6 +75,8 @@ type InstantTransferResultState = {
    * 파생값을 저장하면 확정 판정과 표시가 따로 갈린다.
    */
   status?: TransferResponseStatus
+  /** 실행한 거래의 입금 은행코드(`null` = 당행). 결과 표시와 자주 쓰는 계좌 등록이 이것을 본다. */
+  payeeBankCode: string | null
   row: TransferResultRow
   errorCode?: string
   failReason?: string
@@ -185,11 +187,12 @@ export const InstantTransferScreen = () => {
         : [],
     ),
   ]
-  const payeeBankName =
-    bankOptions.find((bank) => bank.bankCode === form.payeeBankCode)
-      ?.bankName ??
-    form.payeeBankCode ??
+  /** 은행코드 → 표시 이름. 목록에 없으면(조회 실패 등) 코드를 그대로 보인다. */
+  const bankNameOf = (bankCode: string | null) =>
+    bankOptions.find((bank) => bank.bankCode === bankCode)?.bankName ??
+    bankCode ??
     OWN_BANK_LABEL
+  const payeeBankName = bankNameOf(form.payeeBankCode)
   const bankNotice = banksQuery.isError
     ? `다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다. (${toErrorMessage(banksQuery.error)})`
     : null
@@ -378,7 +381,9 @@ export const InstantTransferScreen = () => {
           processedAt: settled ? (executed.transferredAt ?? executedAt) : "",
           fromAccountNo: displayForm.fromAccount,
           toAccountNo: form.toAccount,
-          payeeName: form.payeeName,
+          // 타행은 상대 은행이 돌려준 이름이 있으면 그것을 쓴다(인계 문서 §5). 실패·TIMEOUT 이면
+          // 응답에 이름이 없어 이체 전에 확인한 이름을 둔다.
+          payeeName: executed.payeeName ?? form.payeeName,
           amount,
           fee: 0,
           memo: form.payeeMemo || "-",
@@ -387,10 +392,12 @@ export const InstantTransferScreen = () => {
           balanceAfter: executed.withdrawalBalanceAfter ?? 0,
         }
 
+        const payeeBankCode = currentIntent.payeeBankCode
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
         if (failed) {
           setResult({
             status: executed.status,
+            payeeBankCode,
             row,
             errorCode: executed.errorCode ?? undefined,
             failReason:
@@ -398,13 +405,17 @@ export const InstantTransferScreen = () => {
               "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
           })
         } else if (settled) {
-          setResult({ status: executed.status, row })
+          setResult({ status: executed.status, payeeBankCode, row })
         } else {
           setResult({
             status: executed.status,
+            payeeBankCode,
             row,
+            // 타행 TIMEOUT 은 상대 은행 무응답이다 — 문구는 서버 인계 문서 §5-1 을 따른다.
             failReason:
-              "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+              timedOut && payeeBankCode != null
+                ? "상대 은행의 응답이 늦어 결과를 확인하고 있습니다. 이체 내역에서 결과를 확인해 주세요."
+                : "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
           })
         }
 
@@ -565,7 +576,13 @@ export const InstantTransferScreen = () => {
         key: "toAccountNo",
         header: "입금계좌",
         align: "center",
-        render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
+        render: (r) => (
+          <span>
+            {result.payeeBankCode != null &&
+              `${bankNameOf(result.payeeBankCode)} `}
+            {formatDepositAccountNo(result.payeeBankCode, r.toAccountNo)}
+          </span>
+        ),
       },
       {
         key: "payeeName",
@@ -680,7 +697,8 @@ export const InstantTransferScreen = () => {
                 >
                   이체결과조회
                 </Button>
-                {isSuccess && (
+                {/* 타행 계좌는 자주 쓰는 계좌로 등록할 수 없다(서버 인계 문서 §8). */}
+                {isSuccess && result.payeeBankCode == null && (
                   <Button
                     variant={
                       alreadyFrequent || frequentFull ? "secondary" : "primary"

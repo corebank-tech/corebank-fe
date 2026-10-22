@@ -11,6 +11,7 @@ import {
   MemoField,
 } from "@/widgets/transfer"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
+import { Select } from "@/shared/ui/select"
 import { formatAccountNo, maskName } from "@/shared/lib/format"
 import type { AccountOption } from "@/shared/types/account"
 import type {
@@ -18,6 +19,12 @@ import type {
   RecentTransferAccount,
 } from "@/entities/transfer"
 import type { InstantTransferForm } from "@/pages/transfer/instant-transfer-screen"
+
+/** 입금은행 선택지. `bankCode` 가 `null` 이면 당행이다. */
+export type BankOption = { bankCode: string | null; bankName: string }
+
+/** `<select>` 값은 문자열이라 당행(`null`)을 빈 문자열로 싣는다. */
+const OWN_BANK_VALUE = ""
 
 type InstantTransferStep1Props = {
   steps: string[]
@@ -35,6 +42,11 @@ type InstantTransferStep1Props = {
   /** 한도·계좌 조회가 끝나지 않았거나 실패했을 때 보여줄 안내. */
   notice?: string | null
   onNext: () => void
+  /** FE B-8: 당행을 맨 앞에 둔 입금은행 선택지. */
+  bankOptions: BankOption[]
+  /** 은행 목록을 못 받았을 때의 안내. 당행 이체는 그대로 된다. */
+  bankNotice?: string | null
+  onChangeBank: (bankCode: string | null) => void
   /** 입력된 입금계좌번호로 예금주를 조회한다(REQ-TRSF-004·007·030). */
   onConfirmAccount: () => void
   /** 자주 쓰는 계좌 · 최근 이체계좌 선택 시 입금계좌번호를 채우고 즉시 조회한다. */
@@ -55,6 +67,9 @@ export const InstantTransferStep1 = ({
   isLimitUnavailable = false,
   canSubmit,
   onNext,
+  bankOptions,
+  bankNotice,
+  onChangeBank,
   onConfirmAccount,
   onSelectQuickAccount,
   frequentAccounts,
@@ -69,8 +84,8 @@ export const InstantTransferStep1 = ({
         currentStep={1}
         title="즉시이체"
         notice={[
-          "당행 계좌 간 이체만 가능하며, 입금은 즉시 반영됩니다.",
-          "입금계좌번호를 정확히 입력한 뒤 계좌확인으로 예금주명을 확인하세요.",
+          "당행과 다른 은행 계좌로 보낼 수 있으며, 당행 입금은 즉시 반영됩니다.",
+          "입금은행과 입금계좌번호를 입력한 뒤 계좌확인으로 예금주명을 확인하세요.",
           "이체한도를 초과하는 금액은 이체할 수 없습니다.",
         ]}
         footer={
@@ -112,6 +127,37 @@ export const InstantTransferStep1 = ({
 
         <FormSection title="입금정보">
           <div>
+            <FormRow label="입금은행" required htmlFor="it-bank">
+              <div className="flex w-full flex-col gap-1">
+                <div className="max-w-xs">
+                  <Select
+                    id="it-bank"
+                    value={form.payeeBankCode ?? OWN_BANK_VALUE}
+                    onChange={(e) =>
+                      onChangeBank(
+                        e.target.value === OWN_BANK_VALUE
+                          ? null
+                          : e.target.value,
+                      )
+                    }
+                  >
+                    {bankOptions.map((bank) => (
+                      <option
+                        key={bank.bankCode ?? OWN_BANK_VALUE}
+                        value={bank.bankCode ?? OWN_BANK_VALUE}
+                      >
+                        {bank.bankName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                {bankNotice != null && (
+                  <p role="alert" className="text-xs font-bold text-danger">
+                    {bankNotice}
+                  </p>
+                )}
+              </div>
+            </FormRow>
             <FormRow label="입금계좌번호" required htmlFor="it-to">
               <div className="flex w-full flex-col gap-2">
                 <AccountNumberField
@@ -219,10 +265,10 @@ export const InstantTransferStep1 = ({
       <NoticeBoxFooter
         className="mt-8"
         items={[
-          "이체는 당행 계좌 간 원화 이체만 제공하며, 타행이체는 제공하지 않습니다.",
+          "이체는 원화만 제공하며, 다른 은행은 입금은행 목록에 있는 은행으로만 보낼 수 있습니다.",
           "출금계좌와 입금계좌가 동일하면 이체할 수 없습니다.",
           "정기예금 계좌는 입금계좌로 지정할 수 없으며, 입출금계좌와 정기적금계좌만 입금계좌로 지정할 수 있습니다.",
-          "당행이체는 수수료가 발생하지 않습니다.",
+          "이체 수수료는 당행·타행 모두 발생하지 않습니다.",
           "이체 실행 전 계좌비밀번호와 OTP 인증이 필요합니다.",
         ]}
       />

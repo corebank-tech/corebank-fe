@@ -9,16 +9,15 @@ import { ResultPanel, type ResultVariant } from "@/widgets/transfer"
 import type { DataGridColumn } from "@/shared/ui/data-grid"
 import {
   MOCK_RECENT_TRANSFER_ACCOUNTS,
-  fetchPayee,
   getFavoriteAccountsQueryKey,
   useExecuteTransferMutation,
   useFavoriteAccountsQuery,
+  useInterbankBanksQuery,
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   isConfirmedTransferStatus,
   isSameTransferIntent,
   toOtpTransactionData,
-  toTransferRequest,
   getTransferLimitQueryKey,
   type TransferIntent,
   type TransferResultRow,
@@ -42,13 +41,23 @@ import {
 import { getNow } from "@/shared/config/clock"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 import { TRANSFER_STEPS as STEPS } from "@/pages/transfer/transfer-steps"
-import { InstantTransferStep1 } from "@/pages/transfer/instant-transfer/d01-input"
+import {
+  InstantTransferStep1,
+  type BankOption,
+} from "@/pages/transfer/instant-transfer/d01-input"
+import {
+  OWN_BANK_LABEL,
+  formatDepositAccountNo,
+  resolveDepositTarget,
+} from "@/pages/transfer/instant-transfer/deposit-target"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
 import { InstantTransferStep3 } from "@/pages/transfer/instant-transfer/d03-result"
 
 export type InstantTransferForm = {
   fromAccount: string
   password: string
+  /** FE B-8: 입금 은행코드. `null` 이면 당행이다. */
+  payeeBankCode: string | null
   toAccount: string
   toConfirmed: boolean
   /** REQ-TRSF-004: 계좌확인으로 조회된 예금주명. */
@@ -66,6 +75,8 @@ type InstantTransferResultState = {
    * 파생값을 저장하면 확정 판정과 표시가 따로 갈린다.
    */
   status?: TransferResponseStatus
+  /** 실행한 거래의 입금 은행코드(`null` = 당행). 결과 표시와 자주 쓰는 계좌 등록이 이것을 본다. */
+  payeeBankCode: string | null
   row: TransferResultRow
   errorCode?: string
   failReason?: string
@@ -74,6 +85,7 @@ type InstantTransferResultState = {
 const INITIAL_FORM: InstantTransferForm = {
   fromAccount: "",
   password: "",
+  payeeBankCode: null,
   toAccount: "",
   toConfirmed: false,
   payeeName: "",
@@ -109,6 +121,7 @@ export const InstantTransferScreen = () => {
     error: limitError,
   } = useTransferLimitQuery()
   const favoriteAccountsQuery = useFavoriteAccountsQuery()
+  const banksQuery = useInterbankBanksQuery()
   const registerFavoriteMutation = useRegisterFavoriteAccountMutation()
   const verifyPasswordMutation = useVerifyAccountPasswordMutation()
   const executeMutation = useExecuteTransferMutation()
@@ -157,6 +170,34 @@ export const InstantTransferScreen = () => {
     : isLimitUnavailable
       ? toErrorMessage(limitError)
       : null
+  /**
+   * FE B-8: 입금은행 선택지. 당행을 맨 앞에 두고 서버 목록을 그대로 잇는다. 목록을 못
+   * 받아도 당행 이체는 막지 않는다 — 타행만 못 고른다는 사실을 알린다.
+   */
+  const bankOptions: BankOption[] = [
+    { bankCode: null, bankName: OWN_BANK_LABEL },
+    ...(banksQuery.data ?? []).flatMap((bank) =>
+      bank.bankCode
+        ? [
+            {
+              bankCode: bank.bankCode,
+              bankName: bank.bankName ?? bank.bankCode,
+            },
+          ]
+        : [],
+    ),
+  ]
+  /** 은행코드 → 표시 이름. 목록에 없으면(조회 실패 등) 코드를 그대로 보인다. */
+  const bankNameOf = (bankCode: string | null) =>
+    bankOptions.find((bank) => bank.bankCode === bankCode)?.bankName ??
+    bankCode ??
+    OWN_BANK_LABEL
+  const payeeBankName = bankNameOf(form.payeeBankCode)
+  // 재조회가 실패해도 받아 둔 목록은 남는다 — 목록이 없을 때만 당행 이체만 된다고 알린다.
+  const bankNotice =
+    banksQuery.isError && banksQuery.data == null
+      ? `다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다. (${toErrorMessage(banksQuery.error)})`
+      : null
   const dailyRemaining = limit?.dailyRemainingAmount ?? 0
   const perTransferLimit = limit?.oneTimeLimit ?? 0
   const effectiveLimit = Math.min(perTransferLimit, dailyRemaining)
@@ -179,57 +220,52 @@ export const InstantTransferScreen = () => {
    */
   const currentIntent: TransferIntent = {
     withdrawalAccountId: selectedAccountId ?? null,
+    payeeBankCode: form.payeeBankCode,
     depositAccountNumber: form.toAccount,
     amount: form.amount,
     myPassbookMemo: form.myMemo,
     recipientPassbookMemo: form.payeeMemo,
   }
 
-  /** REQ-TRSF-004·007·030: 입금계좌번호를 조회해 예금주·계좌유형·동일계좌 여부를 검증한다. */
-  const resolveToAccount = async (accountNo: string) => {
-    if (accountNo.length !== 12) {
-      setForm((f) => ({
-        ...f,
-        toAccount: accountNo,
-        toConfirmed: false,
-        payeeName: "",
-        toAccountError: "입금계좌번호 12자리를 정확히 입력하세요.",
-      }))
-      return
-    }
-    if (accountNo === displayForm.fromAccount) {
-      setForm((f) => ({
-        ...f,
-        toAccount: accountNo,
-        toConfirmed: false,
-        payeeName: "",
-        toAccountError:
-          "출금계좌와 입금계좌가 동일합니다. 다른 계좌를 입력하세요.",
-      }))
-      return
-    }
-    try {
-      const payee = await fetchPayee(accountNo)
-      setForm((f) => ({
-        ...f,
-        toAccount: accountNo,
-        toConfirmed: true,
-        payeeName: payee.payeeName ?? "",
-        toAccountError: null,
-      }))
-    } catch (error) {
-      setForm((f) => ({
-        ...f,
-        toAccount: accountNo,
-        toConfirmed: false,
-        payeeName: "",
-        toAccountError:
-          error instanceof ApiError
-            ? error.message
-            : "입금계좌를 조회하지 못했습니다. 계좌번호를 확인하세요.",
-      }))
-    }
+  /**
+   * REQ-TRSF-004·007·030, FE B-8: 입금계좌번호를 고른 은행으로 조회해 예금주를 확인한다.
+   *
+   * 응답이 왔을 때 은행·계좌번호가 요청 때와 같을 때만 반영한다. 조회 중에 사용자가 은행이나
+   * 번호를 바꿨으면 늦게 온 응답이 바뀐 입력을 "확인됨"으로 덮어 다른 계좌로 보내게 된다.
+   */
+  const resolveToAccount = async (
+    accountNo: string,
+    payeeBankCode: string | null,
+  ) => {
+    setForm((f) => ({
+      ...f,
+      payeeBankCode,
+      toAccount: accountNo,
+      toConfirmed: false,
+      payeeName: "",
+      toAccountError: null,
+    }))
+    const checked = await resolveDepositTarget(
+      payeeBankCode,
+      accountNo,
+      displayForm.fromAccount,
+    )
+    setForm((f) =>
+      f.toAccount === accountNo && f.payeeBankCode === payeeBankCode
+        ? { ...f, ...checked }
+        : f,
+    )
   }
+
+  /** 은행을 바꾸면 다른 계좌다 — 앞서 확인한 예금주를 지운다. */
+  const changePayeeBank = (payeeBankCode: string | null) =>
+    setForm((f) => ({
+      ...f,
+      payeeBankCode,
+      toConfirmed: false,
+      payeeName: "",
+      toAccountError: null,
+    }))
 
   const canSubmit =
     !isLimitUnavailable &&
@@ -319,7 +355,7 @@ export const InstantTransferScreen = () => {
       const executedAt = transactionAt ?? getNow()
       try {
         const executed = await executeMutation.mutateAsync({
-          request: toTransferRequest(currentIntent),
+          intent: currentIntent,
           accountPasswordAuthToken: passwordAuthToken,
           otpAuthToken,
           idempotencyKey,
@@ -347,7 +383,9 @@ export const InstantTransferScreen = () => {
           processedAt: settled ? (executed.transferredAt ?? executedAt) : "",
           fromAccountNo: displayForm.fromAccount,
           toAccountNo: form.toAccount,
-          payeeName: form.payeeName,
+          // 타행은 상대 은행이 돌려준 이름이 있으면 그것을 쓴다(인계 문서 §5). 실패·TIMEOUT 이면
+          // 응답에 이름이 없어 이체 전에 확인한 이름을 둔다.
+          payeeName: executed.payeeName ?? form.payeeName,
           amount,
           fee: 0,
           memo: form.payeeMemo || "-",
@@ -356,10 +394,12 @@ export const InstantTransferScreen = () => {
           balanceAfter: executed.withdrawalBalanceAfter ?? 0,
         }
 
+        const payeeBankCode = currentIntent.payeeBankCode
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
         if (failed) {
           setResult({
             status: executed.status,
+            payeeBankCode,
             row,
             errorCode: executed.errorCode ?? undefined,
             failReason:
@@ -367,13 +407,17 @@ export const InstantTransferScreen = () => {
               "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
           })
         } else if (settled) {
-          setResult({ status: executed.status, row })
+          setResult({ status: executed.status, payeeBankCode, row })
         } else {
           setResult({
             status: executed.status,
+            payeeBankCode,
             row,
+            // 타행 TIMEOUT 은 상대 은행 무응답이다 — 문구는 서버 인계 문서 §5-1 을 따른다.
             failReason:
-              "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+              timedOut && payeeBankCode != null
+                ? "상대 은행의 응답이 늦어 결과를 확인하고 있습니다. 이체 내역에서 결과를 확인해 주세요."
+                : "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
           })
         }
 
@@ -420,7 +464,12 @@ export const InstantTransferScreen = () => {
               {formatAccountNo(displayForm.fromAccount)}
             </span>
           }
-          toAccount={<span>{formatAccountNo(form.toAccount)}</span>}
+          payeeBank={payeeBankName}
+          toAccount={
+            <span>
+              {formatDepositAccountNo(form.payeeBankCode, form.toAccount)}
+            </span>
+          }
           payeeName={maskName(form.payeeName)}
           amount={formatAmount(amount, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
@@ -454,12 +503,13 @@ export const InstantTransferScreen = () => {
               label: "3. 출금계좌번호",
               value: formatAccountNo(displayForm.fromAccount),
             },
+            { label: "4. 입금은행", value: payeeBankName },
             {
-              label: "4. 입금계좌번호",
-              value: formatAccountNo(form.toAccount),
+              label: "5. 입금계좌번호",
+              value: formatDepositAccountNo(form.payeeBankCode, form.toAccount),
             },
-            { label: "5. 수취인성명", value: maskName(form.payeeName) },
-            { label: "6. 이체금액", value: formatAmount(amount) },
+            { label: "6. 수취인성명", value: maskName(form.payeeName) },
+            { label: "7. 이체금액", value: formatAmount(amount) },
           ]}
         />
 
@@ -528,7 +578,13 @@ export const InstantTransferScreen = () => {
         key: "toAccountNo",
         header: "입금계좌",
         align: "center",
-        render: (r) => <span>{formatAccountNo(r.toAccountNo)}</span>,
+        render: (r) => (
+          <span>
+            {result.payeeBankCode != null &&
+              `${bankNameOf(result.payeeBankCode)} `}
+            {formatDepositAccountNo(result.payeeBankCode, r.toAccountNo)}
+          </span>
+        ),
       },
       {
         key: "payeeName",
@@ -629,7 +685,11 @@ export const InstantTransferScreen = () => {
                 ? "※ 이체 후 출금계좌 잔액은 이체결과조회에서 다시 확인할 수 있습니다."
                 : isPending
                   ? "※ 결과가 확정되기 전까지 잔액과 거래내역이 달라질 수 있습니다. 같은 이체를 다시 실행하지 마세요."
-                  : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
+                  : result.payeeBankCode != null
+                    ? // 타행은 보낸 뒤 실패하면 출금을 되돌린다(잔액 부족처럼 출금 전에 거부되면 출금이 없다) — 잔액은 같지만 거래내역에
+                      // 출금·되돌림 두 줄이 남는다(서버 #658, 인계 문서 §5-1).
+                      "※ 출금된 금액이 있으면 되돌려지므로 잔액은 이체 전과 같습니다. 실패 시점에 따라 거래내역에 출금과 되돌림이 함께 보일 수 있으며, 이체 이력에는 오류 상태로 기록됩니다."
+                    : "※ 실패한 이체는 원장에 반영되지 않으며, 잔액과 거래내역이 변동하지 않습니다. 이체 이력에는 오류 상태로 기록됩니다."
             }
             columns={columns}
             row={row}
@@ -643,7 +703,8 @@ export const InstantTransferScreen = () => {
                 >
                   이체결과조회
                 </Button>
-                {isSuccess && (
+                {/* 타행 계좌는 자주 쓰는 계좌로 등록할 수 없다(서버 인계 문서 §8). */}
+                {isSuccess && result.payeeBankCode == null && (
                   <Button
                     variant={
                       alreadyFrequent || frequentFull ? "secondary" : "primary"
@@ -691,8 +752,16 @@ export const InstantTransferScreen = () => {
         setAuthError(null)
         setStep(2)
       }}
-      onConfirmAccount={() => void resolveToAccount(form.toAccount)}
-      onSelectQuickAccount={(accountNo) => void resolveToAccount(accountNo)}
+      bankOptions={bankOptions}
+      bankNotice={bankNotice}
+      onChangeBank={changePayeeBank}
+      onConfirmAccount={() =>
+        void resolveToAccount(form.toAccount, form.payeeBankCode)
+      }
+      // 자주 쓰는·최근 계좌는 당행 계좌뿐이다(서버 인계 문서 §8 — 타행 즐겨찾기는 범위 밖).
+      onSelectQuickAccount={(accountNo) =>
+        void resolveToAccount(accountNo, null)
+      }
       frequentAccounts={frequentAccounts}
       recentAccounts={MOCK_RECENT_TRANSFER_ACCOUNTS}
     />

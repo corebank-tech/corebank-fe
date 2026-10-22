@@ -45,6 +45,10 @@
       "description": "로그인 고객의 기본정보 조회·변경 API"
     },
     {
+      "name": "관리자 인증",
+      "description": "관리자 로그인 API"
+    },
+    {
       "name": "자주 쓰는 계좌",
       "description": "즐겨찾기 계좌 등록, 목록 조회, 별칭 수정 및 삭제 API"
     },
@@ -1156,6 +1160,87 @@
           },
           "400": {
             "description": "`TRF0003` 이체금액 형식 오류 · `TRF0005` 통장 표시내용 길이 초과 (요청 파싱 단계에서 즉시 거부됨)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`CMN0301`/`CMN0302` 멱등키 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transfers/interbank": {
+      "post": {
+        "tags": [
+          "이체"
+        ],
+        "summary": "타행이체 실행",
+        "description": "다른 은행 계좌로 이체한다. 당행 이체(POST /transfers)와 계좌번호 검증·OTP 대조 데이터가 달라 따로 둔다. OTP 발급 때 transactionData에 payeeBankCode를 더한다. 동일한 Idempotency-Key와 동일한 요청 내용으로 재요청하면 새로 처리하지 않고 저장된 응답을 그대로 반환한다.",
+        "operationId": "executeInterbankTransfer",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키. 동일 키로 재요청 시 재처리 없이 저장된 응답을 반환",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Account-Password-Auth-Token",
+            "in": "header",
+            "description": "계좌 비밀번호 인증 완료 후 발급되는 1회성 인증 토큰",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Otp-Auth-Token",
+            "in": "header",
+            "description": "OTP 인증 완료 후 발급되는 1회성 인증 토큰",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterbankTransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "이체 요청이 처리됨. 결과는 응답 본문의 status로 본다. status=TIMEOUT이면 상대 은행 응답이 없어 처리 불명이다 — 다시 보내지 않는다(상대가 이미 입금했을 수 있다). 결과는 서버가 조회거래로 확인하고 이체 상세에서 다시 본다. status=ERROR면 errorCode에 `TRF0001` · `TRF0304` · `TRF0303`/`LMT0001` · `LMT0002` · `LMT0003` · `OTP0101` · `OTP0102` · `TRF0201`(상대 은행에 수취 계좌 없음) · `TRF0301`(수취 계좌 거래 불가) · `TRF0308`(상대 은행이 처리하지 못함 — 출금했으면 되돌린 뒤 확정) 중 하나가 담긴다.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseInterbankTransferResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`TRF0003` 이체금액 형식 · `TRF0005` 통장 표시내용 길이 · `TRF0006` 지원하지 않는 은행 · `TRF0007` 타행 계좌번호 형식 · `TRF0008` 보낼 수 없는 문자",
             "content": {
               "*/*": {
                 "schema": {
@@ -2780,7 +2865,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 자기 자신 대상 또는 관리자 허용 목록 밖",
+            "description": "`CMN0102` 자기 자신 또는 다른 관리자 대상, 또는 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -2886,7 +2971,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 자기 자신 대상 또는 관리자 허용 목록 밖",
+            "description": "`CMN0102` 자기 자신 또는 다른 관리자 대상, 또는 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -2962,7 +3047,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 자기 자신 대상 또는 관리자 허용 목록 밖",
+            "description": "`CMN0102` 자기 자신 또는 다른 관리자 대상, 또는 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -2973,6 +3058,68 @@
           },
           "404": {
             "description": "`ATH0201` 대상 고객 없음",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/auth/login": {
+      "post": {
+        "tags": [
+          "관리자 인증"
+        ],
+        "summary": "관리자 로그인",
+        "description": "role=ADMIN 계정만 통과한다. 세션은 30분 무조작 만료이고 JSESSIONID·CSRF 쿠키는 고객 로그인과 같이 발급된다.",
+        "operationId": "adminLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "로그인 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`CMN0001` 요청 형식 오류 또는 필수 입력값 누락",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`ATH0101` 아이디 또는 비밀번호 불일치",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`ATH0102` 로그인 비밀번호 오류 횟수 초과로 계정 잠금 · `ATH0106` 이용정지된 계정",
             "content": {
               "*/*": {
                 "schema": {
@@ -3676,6 +3823,28 @@
         }
       }
     },
+    "/transfers/banks": {
+      "get": {
+        "tags": [
+          "이체"
+        ],
+        "summary": "타행이체 은행 목록",
+        "description": "타행이체로 보낼 수 있는 은행을 은행코드 오름차순으로 돌려준다. 당행(088)은 없다.",
+        "operationId": "getInterbankBanks",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListInterbankBankResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/scheduled-transfers/executions": {
       "get": {
         "tags": [
@@ -4360,7 +4529,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 관리자 허용 목록 밖",
+            "description": "`CMN0102` 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -4460,7 +4629,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 관리자 허용 목록 밖",
+            "description": "`CMN0102` 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -4603,7 +4772,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 관리자 허용 목록 밖",
+            "description": "`CMN0102` 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -4659,7 +4828,7 @@
             }
           },
           "403": {
-            "description": "`CMN0102` 관리자 허용 목록 밖",
+            "description": "`CMN0102` 권한 없음",
             "content": {
               "*/*": {
                 "schema": {
@@ -5417,6 +5586,123 @@
             "type": "integer",
             "format": "int64",
             "description": "이체 후 출금계좌 잔액. status=SUCCESS일 때만 채워짐 (TIMEOUT이면 null)"
+          }
+        }
+      },
+      "InterbankTransferRequest": {
+        "type": "object",
+        "properties": {
+          "withdrawalAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "출금계좌 ID (내 계좌)",
+            "example": 1001
+          },
+          "payeeBankCode": {
+            "type": "string",
+            "description": "받는 은행코드. GET /transfers/banks 목록의 bankCode",
+            "example": "004"
+          },
+          "depositAccountNumber": {
+            "type": "string",
+            "description": "입금계좌번호. 숫자만 1~16자리, 하이픈 없이",
+            "example": "1234567890123"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "이체금액. 1원 이상의 정수",
+            "example": 50000,
+            "minimum": 1
+          },
+          "myPassbookMemo": {
+            "type": "string",
+            "description": "내 통장에 남길 표시내용. 최대 10자",
+            "example": "생활비",
+            "maxLength": 10
+          },
+          "recipientPassbookMemo": {
+            "type": "string",
+            "description": "상대 통장에 남길 표시내용. 최대 10자. 이모지 등 전문 문자셋에 없는 문자는 거부된다",
+            "example": "홍길동",
+            "maxLength": 10
+          }
+        }
+      },
+      "ApiResponseInterbankTransferResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/InterbankTransferResponse"
+          }
+        }
+      },
+      "InterbankTransferResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "SUCCESS · ERROR · TIMEOUT. TIMEOUT은 처리 불명이라 실패가 아니다 — 다시 보내지 말고 이체 내역으로 안내한다",
+            "enum": [
+              "SUCCESS",
+              "ERROR",
+              "PROCESSING",
+              "TIMEOUT"
+            ]
+          },
+          "transactionNumber": {
+            "type": "string",
+            "description": "거래번호. 채번 전 실패면 null. TIMEOUT 건은 이 값으로 상세를 다시 조회한다",
+            "example": "20261023WB0000000123"
+          },
+          "transferredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "이체 처리 시각(+09:00). SUCCESS일 때만 있다"
+          },
+          "payeeBankCode": {
+            "type": "string",
+            "description": "받는 은행코드",
+            "example": "004"
+          },
+          "payeeName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "상대 은행이 확인한 예금주(마스킹). SUCCESS일 때만 있다",
+            "example": "김*수"
+          },
+          "withdrawalBalanceAfter": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "이체 후 출금계좌 잔액. SUCCESS일 때만 있다"
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패 코드. ERROR일 때만 있다"
+          },
+          "errorMessage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패 메시지. ERROR일 때만 있다"
           }
         }
       },
@@ -7553,6 +7839,9 @@
           "payeeName": {
             "type": "string"
           },
+          "payeeBankCode": {
+            "type": "string"
+          },
           "amount": {
             "type": "integer",
             "format": "int64"
@@ -7680,6 +7969,38 @@
             "items": {
               "$ref": "#/components/schemas/FavoriteAccountResponse"
             }
+          }
+        }
+      },
+      "ApiResponseListInterbankBankResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterbankBankResponse"
+            }
+          }
+        }
+      },
+      "InterbankBankResponse": {
+        "type": "object",
+        "properties": {
+          "bankCode": {
+            "type": "string",
+            "description": "은행코드 3자리. 문자열이라 앞의 0을 지키며 전문 기관코드와 같다",
+            "example": "004"
+          },
+          "bankName": {
+            "type": "string",
+            "description": "은행명",
+            "example": "KB국민은행"
           }
         }
       },
@@ -8460,6 +8781,28 @@
             "format": "date-time",
             "description": "가입 일시",
             "example": "2026-08-01T10:00:00+09:00"
+          },
+          "role": {
+            "type": "string",
+            "description": "계정 구분",
+            "enum": [
+              "CUSTOMER",
+              "ADMIN"
+            ]
+          },
+          "permissions": {
+            "type": "array",
+            "description": "관리자 권한. 고객은 빈 배열이다",
+            "items": {
+              "type": "string",
+              "enum": [
+                "GL_READ",
+                "GL_WRITE",
+                "CUSTOMER_READ",
+                "CUSTOMER_WRITE",
+                "AUDIT_READ"
+              ]
+            }
           }
         }
       },
@@ -9453,6 +9796,15 @@
             "format": "date",
             "description": "계좌 개설일",
             "example": "2025-03-10"
+          },
+          "maturityDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "계약 만기일. 만기일이 없는 계좌는 null",
+            "example": "2026-10-26"
           },
           "status": {
             "type": "string",

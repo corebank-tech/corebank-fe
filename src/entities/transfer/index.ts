@@ -91,7 +91,6 @@ export {
 export {
   isSameTransferIntent,
   toOtpTransactionData,
-  toTransferRequest,
 } from "@/entities/transfer/lib/transfer-intent"
 export type { TransferIntent } from "@/entities/transfer/lib/transfer-intent"
 
@@ -127,9 +126,10 @@ export type { SearchAutoTransfersParams } from "@/entities/transfer/api/use-auto
 
 export {
   TransferResponseStatus,
-  fetchPayee,
+  fetchPayeeFor,
   useExecuteTransferMutation,
 } from "@/entities/transfer/api/use-instant-transfer"
+export { useInterbankBanksQuery } from "@/entities/transfer/api/use-interbank-transfer"
 export type {
   InstantTransferResult,
   Payee,

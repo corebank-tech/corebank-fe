@@ -91,7 +91,8 @@ describe("X-Correlation-Id (FE C-5)", () => {
     expect(received).not.toMatch(/\d{11,}/)
   })
 
-  it("호출자가 지정한 correlation id 를 존중한다", async () => {
+  it("호출자가 넣은 값도 검증한 값으로 덮는다", async () => {
+    // 서버가 거부하는 값이 그대로 나가면 서버가 교체해 추적이 끊긴다.
     let received: string | null = null
     server.use(
       http.get("*/api/ping", ({ request }) => {
@@ -100,9 +101,10 @@ describe("X-Correlation-Id (FE C-5)", () => {
       }),
     )
     await customFetch("/api/ping", {
-      headers: { "X-Correlation-Id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d" },
+      headers: { "X-Correlation-Id": "123e4567-e89b-42d3-a456-426614174000" },
     })
-    expect(received).toBe("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d")
+    expect(received).not.toBe("123e4567-e89b-42d3-a456-426614174000")
+    expect(received).not.toMatch(/\d{11,}/)
   })
 })
 

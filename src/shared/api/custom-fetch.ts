@@ -59,10 +59,9 @@ const buildHeaders = (method: string, init: RequestInit): Headers => {
   if (!READ_ONLY_METHODS.has(method) && !headers.has(IDEMPOTENCY_KEY_HEADER)) {
     headers.set(IDEMPOTENCY_KEY_HEADER, crypto.randomUUID())
   }
-  // 조회도 추적 대상이라 메서드를 가리지 않는다. 호출자가 넣은 값은 존중한다.
-  if (!headers.has(CORRELATION_ID_HEADER)) {
-    headers.set(CORRELATION_ID_HEADER, createCorrelationId())
-  }
+  // 조회도 추적 대상이라 메서드를 가리지 않는다. 호출자 지정값을 받지 않는 이유는
+  // 검증을 건너뛴 값이 서버에서 교체되면 화면의 id 와 서버 로그의 id 가 갈리기 때문이다.
+  headers.set(CORRELATION_ID_HEADER, createCorrelationId())
   // 상태변경 요청은 CookieCsrfTokenRepository가 요구하는 CSRF 헤더가 없으면 403(CMN0102)으로 거부된다.
   if (!READ_ONLY_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
     const csrfToken = readCsrfCookie()

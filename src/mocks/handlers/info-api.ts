@@ -4,9 +4,8 @@ import type {
   DepositBalancesResponse,
   ProductSubscriptionsResponse,
 } from "@/shared/api/generated"
-import { readMockAuthority } from "@/mocks/handlers/admin"
-import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
-import { fail, ok } from "@/mocks/lib/envelope"
+import { requireMockPermission } from "@/mocks/handlers/auth"
+import { ok } from "@/mocks/lib/envelope"
 import { daysAgo } from "@/shared/lib/mock-date"
 
 const MOCK_LATENCY_MS = 200
@@ -50,18 +49,8 @@ const PRODUCT_SUBSCRIPTIONS: ProductSubscriptionsResponse = {
   ],
 }
 
-/** 서버와 같이 정보계 조회는 `GL_READ` 로 막는다(D-09). */
-const guard = () => {
-  const memberId = readSignedInMemberId()
-  if (memberId == null) return unauthorized()
-  if (!readMockAuthority(memberId).permissions.includes("GL_READ")) {
-    return fail("CMN0102", "해당 자원에 접근할 권한이 없습니다.", 403)
-  }
-  return null
-}
-
 /**
- * ADM-03 정보계 조회 API(PH-77) MSW 목.
+ * ADM-03 정보계 조회 API(PH-77) MSW 목. 서버와 같이 `GL_READ` 로 막는다(D-09).
  *
  * 적재가 끝난 상태 하나만 둔다. 화면이 기간·달을 보내지 않으므로 그 파라미터는
  * 읽지 않는다. 적재 이력 없음(`asOf` null)·정보계 연결 실패(INF9001)는 화면
@@ -70,10 +59,10 @@ const guard = () => {
 export const infoApiHandlers = [
   http.get("*/admin/info/deposit-balances", async () => {
     await delay(MOCK_LATENCY_MS)
-    return guard() ?? ok(DEPOSIT_BALANCES)
+    return requireMockPermission("GL_READ") ?? ok(DEPOSIT_BALANCES)
   }),
   http.get("*/admin/info/product-subscriptions", async () => {
     await delay(MOCK_LATENCY_MS)
-    return guard() ?? ok(PRODUCT_SUBSCRIPTIONS)
+    return requireMockPermission("GL_READ") ?? ok(PRODUCT_SUBSCRIPTIONS)
   }),
 ]

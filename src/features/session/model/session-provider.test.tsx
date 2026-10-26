@@ -52,7 +52,7 @@ const serverHandlers = [
 ]
 
 /** 관리자로 응답하게 바꾼다. 역할·만료 두 describe 가 같이 쓴다. */
-const respondAsAdmin = (permissions: unknown) =>
+const respondAsAdmin = (permissions: string[]) =>
   server.use(
     http.get("*/customers/me", () =>
       HttpResponse.json({
@@ -143,8 +143,7 @@ describe("세션 역할·권한", () => {
   /** 관리자 역할·권한을 실은 프로필 응답으로 갈아끼운다. */
 
   it("역할 필드가 없는 응답은 고객·권한 없음으로 떨어진다", async () => {
-    // 서버가 아직 필드를 내려주지 않는 상태(2026-09-18 기준)가 이 경우다.
-    // 여기서 권한이 새면 관리자 화면이 전원에게 열린다.
+    // 필드가 빠진 응답이 와도 여기서 권한이 새면 관리자 화면이 전원에게 열린다.
     hasServerSession = true
     const { result } = await renderSettledSession()
 
@@ -162,16 +161,6 @@ describe("세션 역할·권한", () => {
       "CUSTOMER_READ",
       "CUSTOMER_WRITE",
     ])
-  })
-
-  it("CSV 문자열로 와도 컨텍스트까지 배열로 도착한다", async () => {
-    // 응답 모양이 확정되기 전이라 `readSessionAuthority` 가 둘 다 받는다(#147).
-    // 파싱은 그쪽 테스트가 덮고, 여기서는 그 결과가 컨텍스트까지 오는지를 본다.
-    hasServerSession = true
-    respondAsAdmin("GL_READ,AUDIT_READ")
-    const { result } = await renderSettledSession()
-
-    expect(result.current.permissions).toEqual(["GL_READ", "AUDIT_READ"])
   })
 
   it("세션이 없으면 권한도 없다", async () => {

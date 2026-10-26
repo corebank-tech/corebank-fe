@@ -92,6 +92,14 @@ export const adminRoutes: RouteObject = {
           }),
         },
         {
+          path: "info-dashboard",
+          handle: { title: "정보계 대시보드" },
+          lazy: guardedLazy("GL_READ", async () => {
+            const { Adm03InfoDashboard } = await import("@/pages/admin")
+            return Adm03InfoDashboard
+          }),
+        },
+        {
           path: "ledger-reconciliation",
           handle: { title: "대사 불일치 목록" },
           lazy: guardedLazy("AUDIT_READ", async () => {

@@ -40,13 +40,21 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "회계",
+    // 장부를 읽어 보여주는 화면을 묶는다(Fineract `reports` 축,
+    // `docs/requirements-admin.md` 부록 A). 장부를 바꾸는 화면은 2차 범위 밖이다.
+    title: "리포트",
     items: [
       {
         label: "시산표",
         path: "/admin/trial-balance",
         // 시산표는 조회 전용이다. `GL_WRITE` 는 결산·역분개가 붙을 때 쓰이는데
         // 그 화면(#129)은 2차 범위 밖이라 이 그룹에 변경 항목이 없다.
+        requiresPermission: "GL_READ",
+      },
+      {
+        label: "정보계 대시보드",
+        path: "/admin/info-dashboard",
+        // 회계도 고객도 감사도 아니지만 권한 5종을 늘리지 않고 GL_READ 로 정했다(D-09).
         requiresPermission: "GL_READ",
       },
     ],

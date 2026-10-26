@@ -128,7 +128,8 @@ export const authHandlers = [
       phoneNumber: "010****5678",
       email: member.email,
       joinedAt: "2026-08-01T10:00:00+09:00",
-      // 서버 스펙에 아직 없는 필드. entities/auth 의 readSessionAuthority 가 읽는다.
+      // 서버 CustomerInfoResponse 의 role·permissions 와 같은 모양이다.
+      // entities/auth 의 readSessionAuthority 가 읽는다.
       ...readMockAuthority(member.memberId),
     })
   }),

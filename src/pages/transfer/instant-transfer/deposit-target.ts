@@ -53,9 +53,15 @@ export const checkDepositAccountNumber = (
   return null
 }
 
+const PAYEE_LOOKUP_FAILED =
+  "입금계좌를 조회하지 못했습니다. 계좌번호를 확인하세요."
+
 /**
  * 입금계좌 확인(REQ-TRSF-004, FE B-8). 입력 오류면 조회하지 않는다. 조회 실패는 서버 문구를
  * 그대로 쓰고(REQ-CMN-008) [다음]을 막는다 — 타행 무응답(`TRF0309`)도 같다(corebank-server#680).
+ *
+ * 성공 응답이라도 예금주명이 비면 확인으로 치지 않는다. 스펙에서 `payeeName` 은 필수가
+ * 아니라, 그대로 두면 받는 분을 보여주지 않은 채 [다음]이 열린다.
  */
 export const resolveDepositTarget = async (
   payeeBankCode: string | null,
@@ -72,6 +78,13 @@ export const resolveDepositTarget = async (
   }
   try {
     const payee = await fetchPayeeFor(payeeBankCode, accountNo)
+    if (payee.payeeName.trim() === "") {
+      return {
+        toConfirmed: false,
+        payeeName: "",
+        toAccountError: PAYEE_LOOKUP_FAILED,
+      }
+    }
     return {
       toConfirmed: true,
       payeeName: payee.payeeName,
@@ -82,9 +95,7 @@ export const resolveDepositTarget = async (
       toConfirmed: false,
       payeeName: "",
       toAccountError:
-        error instanceof ApiError
-          ? error.message
-          : "입금계좌를 조회하지 못했습니다. 계좌번호를 확인하세요.",
+        error instanceof ApiError ? error.message : PAYEE_LOOKUP_FAILED,
     }
   }
 }

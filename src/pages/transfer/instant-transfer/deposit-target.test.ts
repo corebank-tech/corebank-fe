@@ -90,6 +90,36 @@ describe("resolveDepositTarget", () => {
     })
   })
 
+  // 스펙에서 payeeName 은 필수가 아니다 — 이름 없이 확인되면 받는 분을 못 본 채 [다음]이 열린다.
+  it.each([
+    ["당행 이름 없음", null, "*/transfers/payee", "333330730135", {}],
+    [
+      "타행 공백 이름",
+      "004",
+      "*/transfers/interbank/payee",
+      "1234567890123",
+      { payeeName: "  " },
+    ],
+  ])(
+    "%s 이면 확인으로 치지 않는다",
+    async (_label, bank, path, accountNo, data) => {
+      server.use(
+        http.get(path, () =>
+          HttpResponse.json({ code: "0000", message: "", data }),
+        ),
+      )
+
+      await expect(
+        resolveDepositTarget(bank, accountNo, FROM),
+      ).resolves.toEqual({
+        toConfirmed: false,
+        payeeName: "",
+        toAccountError:
+          "입금계좌를 조회하지 못했습니다. 계좌번호를 확인하세요.",
+      })
+    },
+  )
+
   // REQ-TRSF-004·corebank-server#680: 실패는 구분된 서버 문구로 안내하고 [다음]을 막는다.
   it.each([
     ["TRF0201", 404, "입금계좌를 찾을 수 없습니다."],

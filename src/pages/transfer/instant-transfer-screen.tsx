@@ -230,13 +230,15 @@ export const InstantTransferScreen = () => {
   /**
    * REQ-TRSF-004·007·030, FE B-8: 입금계좌번호를 고른 은행으로 조회해 예금주를 확인한다.
    *
-   * 응답이 왔을 때 은행·계좌번호가 요청 때와 같을 때만 반영한다. 조회 중에 사용자가 은행이나
-   * 번호를 바꿨으면 늦게 온 응답이 바뀐 입력을 "확인됨"으로 덮어 다른 계좌로 보내게 된다.
+   * 응답이 왔을 때 출금계좌·은행·계좌번호가 요청 때와 같을 때만 반영한다. 조회 중에 사용자가
+   * 은행이나 번호를 바꿨으면 늦게 온 응답이 바뀐 입력을 "확인됨"으로 덮어 다른 계좌로 보내게
+   * 된다. 출금계좌가 바뀌면 "출금계좌와 같은 계좌" 검사(REQ-TRSF-007)가 옛 출금계좌로 끝난 셈이다.
    */
   const resolveToAccount = async (
     accountNo: string,
     payeeBankCode: string | null,
   ) => {
+    const requestedFromAccount = form.fromAccount
     setForm((f) => ({
       ...f,
       payeeBankCode,
@@ -251,7 +253,9 @@ export const InstantTransferScreen = () => {
       displayForm.fromAccount,
     )
     setForm((f) =>
-      f.toAccount === accountNo && f.payeeBankCode === payeeBankCode
+      f.fromAccount === requestedFromAccount &&
+      f.toAccount === accountNo &&
+      f.payeeBankCode === payeeBankCode
         ? { ...f, ...checked }
         : f,
     )

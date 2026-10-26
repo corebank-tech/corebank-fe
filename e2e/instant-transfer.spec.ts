@@ -74,6 +74,21 @@ const holderName = (page: Page, name: string) =>
 const newTransferButton = (page: Page) =>
   page.getByRole("button", { name: "새 이체하기" })
 
+/**
+ * 받은 응답을 화면이 반영할 때까지 기다린다(JSON 해석 → setState → 렌더). 반영하지 않는
+ * 것이 기대값이면 바뀐 DOM 을 기다릴 수 없어서, 작업 큐를 두 번 비운다.
+ */
+const flushRender = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        setTimeout(
+          () => requestAnimationFrame(() => setTimeout(resolve, 0)),
+          0,
+        ),
+      ),
+  )
+
 test.beforeEach(async ({ page }) => {
   await login(page)
 })
@@ -204,17 +219,41 @@ test("계좌확인 응답이 오기 전에 은행을 바꾸면 늦은 응답을 
   await page.getByRole("button", { name: "계좌확인" }).click()
   await page.locator("#it-bank").selectOption({ label: "우리은행" })
   await (await lateResponse).finished()
-  // 응답을 받은 뒤 화면이 그 결과를 반영할 때까지 기다린다(JSON 해석 → setState → 렌더).
-  // 반영하지 않는 것이 기대값이라 바뀐 DOM 을 기다릴 수 없어서, 작업 큐를 두 번 비운다.
-  await page.evaluate(
-    () =>
-      new Promise((resolve) =>
-        setTimeout(
-          () => requestAnimationFrame(() => setTimeout(resolve, 0)),
-          0,
-        ),
-      ),
-  )
+  await flushRender(page)
+
+  await expect(holderName(page, "박*준")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()
+})
+
+// REQ-TRSF-007: "출금계좌와 같은 계좌" 검사는 확인 당시 출금계좌로 한 것이다 — 출금계좌를
+// 바꾸고도 확인이 남으면 같은 계좌끼리 [다음]이 열릴 수 있다.
+test("출금계좌를 바꾸면 앞서 확인한 예금주를 지우고 다시 확인하게 한다", async ({
+  page,
+}) => {
+  await confirmPayee(page, OTHER_BANK, INTERBANK.OK)
+  await page.locator("#it-amount").fill("30000")
+  await expect(page.getByRole("button", { name: "다음" })).toBeEnabled()
+
+  await page.locator("#it-from").selectOption({ index: 1 })
+
+  await expect(holderName(page, "박*준")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()
+})
+
+test("계좌확인 응답이 오기 전에 출금계좌를 바꾸면 늦은 응답을 반영하지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/instant-transfer")
+  await page.locator("#it-bank").selectOption({ label: OTHER_BANK })
+  await fillAccountPassword(page)
+  await page.locator("#it-amount").fill("30000")
+  await page.locator("#it-to").fill(INTERBANK.SLOW)
+
+  const lateResponse = page.waitForResponse("**/transfers/interbank/payee**")
+  await page.getByRole("button", { name: "계좌확인" }).click()
+  await page.locator("#it-from").selectOption({ index: 1 })
+  await (await lateResponse).finished()
+  await flushRender(page)
 
   await expect(holderName(page, "박*준")).toHaveCount(0)
   await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()

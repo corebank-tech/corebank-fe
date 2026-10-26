@@ -112,7 +112,13 @@ export const InstantTransferStep1 = ({
                 id="it-from"
                 options={accounts}
                 value={form.fromAccount}
-                onChange={(v) => onChange("fromAccount", v)}
+                onChange={(v) => {
+                  // 출금계좌가 바뀌면 "출금계좌와 같은 계좌" 검사(REQ-TRSF-007)를 다시 해야 한다.
+                  onChange("fromAccount", v)
+                  onChange("toConfirmed", false)
+                  onChange("payeeName", "")
+                  onChange("toAccountError", null)
+                }}
               />
             </FormRow>
             <FormRow label="계좌비밀번호" required htmlFor="it-pw">

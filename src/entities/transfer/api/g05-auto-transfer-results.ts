@@ -14,6 +14,11 @@ export type AutoTransferResultRow = {
   result: AutoTransferResult
   /** 처리일시 ISO datetime. */
   processedAt: string
+  /**
+   * 거래일 ISO date. 휴일에 실행되면 `processedAt` 날짜의 다음 영업일이다.
+   * 이체 전 실패, 이력 없이 합성된 행, 거래일 대입(#516) 이전 회차는 없다(서버 #679).
+   */
+  tradeDate?: string
   fromAccountNo: string
   fromAlias: string
   toAccountNo: string

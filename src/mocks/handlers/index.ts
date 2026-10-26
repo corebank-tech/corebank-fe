@@ -7,6 +7,7 @@ import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconci
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
 import { productSubscriptionsApiHandlers } from "@/mocks/handlers/product-subscriptions-api"
 import { productsApiHandlers } from "@/mocks/handlers/products-api"
+import { transferApiHandlers } from "@/mocks/handlers/transfer-api"
 
 /**
  * 순서가 중요하다. `accountHandlers` 쪽 와일드카드 패턴이 먼저 오면 실제 경로
@@ -18,6 +19,7 @@ export const handlers = [
   ...productsApiHandlers,
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,
+  ...transferApiHandlers,
   ...glApiHandlers,
   ...ledgerReconciliationApiHandlers,
   ...accountHandlers,

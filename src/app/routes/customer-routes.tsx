@@ -168,7 +168,7 @@ const authedRoutes: RouteObject = {
             {
               path: "instant-transfer",
               element: <InstantTransferScreen />,
-              handle: { crumb: "당행이체" },
+              handle: { crumb: "계좌이체" },
             },
             {
               path: "transfer/history",

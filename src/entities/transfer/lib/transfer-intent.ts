@@ -9,10 +9,15 @@
  * 판정을 특정 setter 가 아니라 거래 내용 자체에 붙인다. 폼을 고치는 자리가 늘어도
  * 이 비교를 지나가므로 규칙이 새로 뚫리지 않는다.
  */
-import type { TransferRequest } from "@/shared/api/generated"
+import type {
+  InterbankTransferRequest,
+  TransferRequest,
+} from "@/shared/api/generated"
 
 export type TransferIntent = {
   withdrawalAccountId: number | null
+  /** 입금 은행코드. `null` 이면 당행이다 — 타행 실행·OTP 는 이 값이 있을 때만 은행코드를 싣는다. */
+  payeeBankCode: string | null
   depositAccountNumber: string
   amount: number | null
   myPassbookMemo: string
@@ -33,9 +38,26 @@ export const toTransferRequest = (intent: TransferIntent): TransferRequest => ({
   recipientPassbookMemo: intent.recipientPassbookMemo || undefined,
 })
 
-/** OTP 발급 시점의 거래정보. 서버가 실행 요청과 대조한다(OTP0102). */
+/**
+ * 타행 실행 요청 본문. 당행 본문에 은행코드를 더한 모양이다(서버 interbank_transfer_fe_handoff.md §4-2).
+ * 당행·타행 중 무엇을 보낼지는 호출부가 `payeeBankCode` 로 고른다 — 이 함수는 고르지 않는다.
+ */
+export const toInterbankTransferRequest = (
+  intent: TransferIntent,
+): InterbankTransferRequest => ({
+  ...toTransferRequest(intent),
+  payeeBankCode: intent.payeeBankCode ?? undefined,
+})
+
+/**
+ * OTP 발급 시점의 거래정보. 서버가 실행 요청과 대조한다(OTP0102).
+ *
+ * 타행이면 은행코드를 더한다(서버 interbank_transfer_fe_handoff.md §4-3). 당행에는 키를
+ * 만들지 않는다 — 대조 대상이 늘면 지금 맞는 당행 거래정보가 어긋날 수 있다.
+ */
 export const toOtpTransactionData = (intent: TransferIntent) => ({
   withdrawalAccountId: intent.withdrawalAccountId ?? undefined,
+  ...(intent.payeeBankCode != null && { payeeBankCode: intent.payeeBankCode }),
   depositAccountNumber: intent.depositAccountNumber,
   amount: intent.amount ?? undefined,
 })
@@ -47,6 +69,7 @@ export const isSameTransferIntent = (
 ): boolean =>
   a != null &&
   a.withdrawalAccountId === b.withdrawalAccountId &&
+  a.payeeBankCode === b.payeeBankCode &&
   a.depositAccountNumber === b.depositAccountNumber &&
   a.amount === b.amount &&
   a.myPassbookMemo === b.myPassbookMemo &&

@@ -1,6 +1,5 @@
 import { delay, http } from "msw"
-import { readMockAuthority } from "@/mocks/handlers/admin"
-import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
+import { requireMockPermission } from "@/mocks/handlers/auth"
 import { aggregateTrialBalance } from "@/mocks/gl/aggregate-trial-balance"
 import { MOCK_JOURNAL_ENTRIES } from "@/mocks/gl/journal-entries"
 import { fail, ok } from "@/mocks/lib/envelope"
@@ -45,11 +44,8 @@ export const glApiHandlers = [
   http.get("*/admin/trial-balance", async ({ request }) => {
     await delay(MOCK_LATENCY_MS)
 
-    const memberId = readSignedInMemberId()
-    if (memberId == null) return unauthorized()
-    if (!readMockAuthority(memberId).permissions.includes("GL_READ")) {
-      return fail("CMN0102", "해당 자원에 접근할 권한이 없습니다.", 403)
-    }
+    const denied = requireMockPermission("GL_READ")
+    if (denied) return denied
 
     const url = new URL(request.url)
     const fromDate = url.searchParams.get("fromDate") ?? ""

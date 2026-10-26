@@ -1,5 +1,9 @@
 import { delay, http } from "msw"
-import { MOCK_MEMBERS, type SessionRole } from "@/entities/auth"
+import {
+  MOCK_MEMBERS,
+  type AdminPermission,
+  type SessionRole,
+} from "@/entities/auth"
 import {
   ADMIN_SESSION_TIMEOUT_SECONDS,
   SESSION_TIMEOUT_SECONDS,
@@ -46,6 +50,19 @@ const writeSignedInMemberId = (memberId: string | null): void => {
 
 export const unauthorized = () =>
   fail("CMN0101", "인증정보가 없거나 세션이 만료되었습니다.", 401)
+
+/**
+ * 관리자 조회 API 의 진입 검사 — 로그인(401 `CMN0101`) → 권한(403 `CMN0102`).
+ * 통과하면 `null` 이라 핸들러는 `requireMockPermission(...) ?? ok(...)` 로 쓴다.
+ */
+export const requireMockPermission = (permission: AdminPermission) => {
+  const memberId = readSignedInMemberId()
+  if (memberId == null) return unauthorized()
+  if (!readMockAuthority(memberId).permissions.includes(permission)) {
+    return fail("CMN0102", "해당 자원에 접근할 권한이 없습니다.", 403)
+  }
+  return null
+}
 
 /**
  * 서버는 경로마다 받는 역할이 정해져 있다 — 고객은 `/auth/login`, 관리자는

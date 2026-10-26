@@ -1,6 +1,7 @@
 export { Adm01CustomerDetail } from "@/pages/admin/adm01-customer-detail"
 export { Adm01CustomerList } from "@/pages/admin/adm01-customer-list"
 export { Adm02TrialBalance } from "@/pages/admin/adm02-trial-balance"
+export { Adm03InfoDashboard } from "@/pages/admin/adm03-info-dashboard"
 export { Adm04ReconciliationMismatches } from "@/pages/admin/adm04-reconciliation-mismatches"
 export { AdminForbidden } from "@/pages/admin/admin-forbidden"
 export { AdminHome } from "@/pages/admin/admin-home"

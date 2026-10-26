@@ -27,7 +27,7 @@ const summaryValue = (page: Page, label: string) =>
     .locator("xpath=following-sibling::div")
     .first()
 
-test("회계 메뉴로 시산표에 들어가면 차대변 총계가 일치한다", async ({
+test("리포트 메뉴로 시산표에 들어가면 차대변 총계가 일치한다", async ({
   page,
 }) => {
   await loginAsAdmin(page)

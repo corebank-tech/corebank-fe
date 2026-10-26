@@ -1,6 +1,6 @@
 # CoreBank 관리자 채널 요구사항 정의서 — 2차 확정 범위
 
-- 작성 2026-09-22 · 갱신 2026-10-22 · 김다연(P3) · 이슈 #156 · #159 · #136
+- 작성 2026-09-22 · 갱신 2026-10-26 · 김다연(P3) · 이슈 #156 · #159 · #136 · #146
 - 범위 정본: `corebank-server` 의 `docs/phase2/` — `README.md`(공통 규칙 · 결정 로그 · 범위 밖) · `tasks.md`(태스크별 범위 · 완료 기준)
 - **v3 판본(`plans/260916-corebank-phase2-v3/`)은 폐기됐다**(최종안 D-21). 이 문서가 그 경로를 인용하던 것을 2026-09-23에 전부 갈아끼웠다
 - 고객 채널 요구사항 정의서: `corebank-design/docs/requirements.md`(원본 `CoreBank_요구사항정의서_v1_4.xlsx`)
@@ -29,7 +29,7 @@
 |---|---|---|---|---|---|---|---|
 | ADM-01 | 고객 계정 운영 (목록·상세) | `/admin/customers`, `/admin/customers/:customerId` | REQ-ADM-010~018 | `CUSTOMER_READ` 조회 · `CUSTOMER_WRITE` 변경 | PH-97 (P3) | S0 | 완료 (#144·PR #145) |
 | ADM-02 | 시산표 | `/admin/trial-balance` | REQ-ADM-020~025 | `GL_READ` | PH-28 (P3) | S2 | 화면 완료 (#128·PR #152), 실연동 (#180) |
-| ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` (제안) | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 미착수 (#146) |
+| ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 화면 완료 (#146), 실제 숫자는 PH-77 ②(서버 #704) 뒤 |
 | ADM-04 | 대사 불일치 목록 | `/admin/ledger-reconciliation` | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 완료 (#130-①) |
 | ADM-90 | [공통] 관리자 셸 — 사이드바·헤더·세션 | 전 관리자 화면 | REQ-ADM-001~006 | — | — | S0 | 완료 (#126·PR #138) |
 | ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 완료 (#136) |
@@ -43,6 +43,7 @@
 |---|---|
 | ADM-01 | `src/pages/admin/adm01-customer-list.tsx`, `adm01-customer-detail.tsx` |
 | ADM-02 | `src/pages/admin/adm02-trial-balance.tsx` |
+| ADM-03 | `src/pages/admin/adm03-info-dashboard.tsx` |
 | ADM-04 | `src/pages/admin/adm04-reconciliation-mismatches.tsx` |
 | ADM-90 | `src/widgets/admin-shell/admin-shell.tsx`, `src/app/layouts/admin-shell-layout.tsx`, `src/app/require-admin.tsx` |
 | ADM-91 | `src/pages/admin/admin-login.tsx` |
@@ -67,7 +68,7 @@
 | `GL_WRITE` | 회계 변경 | 결산·역분개 — **2차에 쓰는 화면이 없다**(#129 범위 밖) |
 | `CUSTOMER_READ` | 고객 조회 | 고객 검색·상세 |
 | `CUSTOMER_WRITE` | 고객 변경 | 잠금 해제·비밀번호 초기화·상태 변경 |
-| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:61` · 라우트 게이트 `admin-routes.tsx:97`) |
+| `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:69` · 라우트 게이트 `admin-routes.tsx:105`) |
 
 구현: `src/shared/types/admin-permission.ts:17-25`(이름 집합) · `src/entities/auth/lib/session-role.ts`(판정 단일 출처).
 
@@ -78,9 +79,9 @@
 | ADM-90 셸 | `role = ADMIN` | — | — | `src/app/require-admin.tsx:38` |
 | 관리자 홈 | `role = ADMIN` | 권한 조건 없음 | — | `src/shared/config/admin-nav.ts:28` |
 | ADM-01 | `CUSTOMER_READ` | `CUSTOMER_READ` | `CUSTOMER_WRITE` | `admin-nav.ts:38` · `adm01-customer-detail.tsx:78` |
-| ADM-02 | `GL_READ` | `GL_READ` | 없음(조회 전용) | `admin-nav.ts:50` |
-| ADM-03 | `GL_READ` | `GL_READ` | 없음(조회 전용) | D-09 |
-| ADM-04 | `AUDIT_READ` | `AUDIT_READ` | 없음(조회 전용) | `admin-nav.ts:61` · tasks.md `FE ADM-04` |
+| ADM-02 | `GL_READ` | `GL_READ` | 없음(조회 전용) | `admin-nav.ts:52` |
+| ADM-03 | `GL_READ` | `GL_READ` | 없음(조회 전용) | D-09 · `admin-nav.ts:58` · `admin-routes.tsx:97` |
+| ADM-04 | `AUDIT_READ` | `AUDIT_READ` | 없음(조회 전용) | `admin-nav.ts:69` · tasks.md `FE ADM-04` |
 
 **ADM-03에 딱 맞는 권한이 고정 5종에 없었다.** 정보계 대시보드는 회계(GL)도 고객(CUSTOMER)도 감사(AUDIT)도 아니다. FE가 세 안(`GL_READ` 대용 / 권한 조건 없음 / 6번째 권한 신설)을 올렸고, **최종안 D-09가 `GL_READ`로 확정**했다 — 권한 집합 5종은 늘리지 않는다. 서버 PH-77도 같은 권한을 쓴다.
 
@@ -161,14 +162,14 @@
 | REQ-ADM-024 | 미등록 계정 노출 | 계정과목에 없는 코드가 분개에 있으면 행을 버리지 않고 남기며, 계정과목과 분류를 경고색으로 표시한다. 분류·정상잔액을 추측해 채우지 않는다 | 미등록 코드가 섞인 기간에서 해당 행이 표시되고 총계에 반영된다 (`adm02-trial-balance.test.tsx`) |
 | REQ-ADM-025 | 범위 한정 | 이 화면은 시산표 한 장이다. 계정과목 트리·전표/분개 목록·상세를 제공하지 않는다 | 화면에 시산표 외의 회계 조회 진입점이 없다 |
 
-### 4-4. ADM-03 정보계 대시보드 (미착수)
+### 4-4. ADM-03 정보계 대시보드
 
 | ID | 요구사항명 | 상세 | 인수기준 |
 |---|---|---|---|
-| REQ-ADM-030 | 지표 3개 | 총 예수금 잔액(일별 계정잔액 마트) · 당월 신규 가입 · 당월 해지(상품별 가입·해지 마트)를 표시한다. **차트를 만들지 않는다** | 화면에 숫자 3개가 있고 그래프가 없다 |
-| REQ-ADM-031 | 기준시점 동반 표기 | 모든 숫자에 기준시점을 함께 표기한다. 「120건(기준 2026-10-28 마감)」 형태. 기준시점은 응답 `asOf`(첫 적재일부터 빠짐없이 적재가 끝난 마지막 거래일, `yyyy-MM-dd`)이고 시각은 없다. 중간에 적재가 실패했거나 적재되지 않은 영업일이 있으면 그 직전 거래일에 머문다 | 세 지표 각각에 기준시점이 표시된다 (POL-A10) |
-| REQ-ADM-032 | 기준시점 없는 응답 | 기준시점이 없는 응답은 값을 표시하지 않고 안내를 표시한다 | 응답에서 기준시점을 제거하면 그 지표 자리에 값 대신 안내가 뜬다 |
-| REQ-ADM-033 | 개인정보 미포함 | 집계 응답에 개인 식별 정보가 포함되지 않는다 | 응답 필드에 고객 식별자가 없다 (PH-75 "마트 PII 0건") |
+| REQ-ADM-030 | 지표 3개 | 총 예수금 잔액(일별 계정잔액 마트) · 당월 신규 가입 · 당월 해지(상품별 가입·해지 마트)를 표시한다. **차트를 만들지 않는다** | 화면에 숫자 3개가 있고 그래프가 없다 (`admin-info-dashboard.spec.ts`). 당월은 서버가 고른 asOf 의 달이고 그 달을 라벨에 밝힌다 — 오늘의 달로 물으면 월초에 새 달 0건이 지난달 기준시점과 함께 보인다 (`adm03-info-dashboard.test.tsx`) |
+| REQ-ADM-031 | 기준시점 동반 표기 | 모든 숫자에 기준시점을 함께 표기한다. 「120건(기준 2026-10-28 마감)」 형태. 기준시점은 응답 `asOf`(첫 적재일부터 빠짐없이 적재가 끝난 마지막 거래일, `yyyy-MM-dd`)이고 시각은 없다. 중간에 적재가 실패했거나 적재되지 않은 영업일이 있으면 그 직전 거래일에 머문다 | 세 지표 각각에 기준시점이 표시된다 (POL-A10). 두 API 의 asOf 가 달라도 지표마다 자기 asOf 를 쓴다 (`adm03-info-dashboard.test.tsx`) |
+| REQ-ADM-032 | 기준시점 없는 응답 | 기준시점이 없는 응답은 값을 표시하지 않고 안내를 표시한다 | 응답에서 기준시점을 제거하면 그 지표 자리에 값 대신 안내가 뜬다. 잔액은 asOf 날짜의 행이 없을 때도 다른 날 값으로 대신하지 않는다 (`metrics.test.ts` · `adm03-info-dashboard.test.tsx`) |
+| REQ-ADM-033 | 개인정보 미포함 | 집계 응답에 개인 식별 정보가 포함되지 않는다 | 응답 필드에 고객 식별자가 없다 (PH-75 "마트 PII 0건"). 화면은 상품별 목록(`items`)도 그리지 않는다 |
 
 ### 4-5. ADM-04 대사 불일치 목록
 
@@ -253,3 +254,4 @@
 | 2026-10-20 | ADM-02 실연동(#180). 집계가 서버 PH-28로 넘어가 REQ-ADM-022·024 검증을 화면 테스트로 옮김 |
 | 2026-10-20 | ADM-04 REQ-ADM-040~042 작성(#130). 서버 #613 응답 스키마 기준. 경로 `/admin/ledger-reconciliation` 확정 |
 | 2026-10-22 | 관리자 로그인 엔드포인트를 `/admin/auth/login`으로 교체 (#136). ADM-91·REQ-ADM-007 완료, REQ-ADM-008 차단 주체를 서버로 정정, POL-A01의 "서버는 아직 10분" 해제 |
+| 2026-10-26 | ADM-03 화면(#146). 서버 PH-77 ① 스텁 스키마 기준. 경로 `/admin/info-dashboard` 확정, 네비 "회계" 그룹을 "리포트"로 바꿔 ADM-02와 묶음(부록 A 3번). "당월"은 asOf 가 속한 달로 정함(REQ-ADM-030) |

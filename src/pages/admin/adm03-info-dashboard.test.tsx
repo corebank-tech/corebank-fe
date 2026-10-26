@@ -15,6 +15,8 @@ import { Adm03InfoDashboard } from "@/pages/admin/adm03-info-dashboard"
  * e2e(`e2e/admin-info-dashboard.spec.ts`)가 본다.
  */
 
+let subscriptionQueries: URLSearchParams[] = []
+
 const envelope = (data: unknown) =>
   HttpResponse.json({ code: "0000", message: "성공", data })
 
@@ -31,9 +33,10 @@ const respond = (
     http.get("*/admin/info/deposit-balances", () =>
       balances === "INF9001" ? failure() : envelope(balances),
     ),
-    http.get("*/admin/info/product-subscriptions", () =>
-      subscriptions === "INF9001" ? failure() : envelope(subscriptions),
-    ),
+    http.get("*/admin/info/product-subscriptions", ({ request }) => {
+      subscriptionQueries.push(new URL(request.url).searchParams)
+      return subscriptions === "INF9001" ? failure() : envelope(subscriptions)
+    }),
   )
 }
 
@@ -45,9 +48,13 @@ const BALANCES: DepositBalancesResponse = {
   ],
 }
 
+/**
+ * 달을 오늘이 속한 달과 겹치지 않는 고정값으로 둔다. 겹치면 "당월 = 서버가 고른 달"
+ * 대신 오늘의 달을 쓰는 구현도 이 파일의 단언을 통과한다.
+ */
 const SUBSCRIPTIONS: ProductSubscriptionsResponse = {
-  asOf: "2026-10-27",
-  month: "2026-10",
+  asOf: "2025-12-31",
+  month: "2025-12",
   subscribedCount: 1_200,
   closedCount: 5,
   items: [],
@@ -74,11 +81,14 @@ const renderPage = () => {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  subscriptionQueries = []
+})
 afterAll(() => server.close())
 
 describe("Adm03InfoDashboard", () => {
-  it("숫자마다 자기 API 의 기준시점을 붙인다", async () => {
+  it("숫자마다 자기 API 의 기준시점을 붙이고, 당월은 서버가 고른 달로 적는다", async () => {
     respond(BALANCES, SUBSCRIPTIONS)
     renderPage()
 
@@ -87,12 +97,14 @@ describe("Adm03InfoDashboard", () => {
       await screen.findByText("1,523,400원(기준 2026-10-28 마감)"),
     ).toBeInTheDocument()
     expect(
-      await screen.findByText("1,200건(기준 2026-10-27 마감)"),
+      await screen.findByText("1,200건(기준 2025-12-31 마감)"),
     ).toBeInTheDocument()
-    expect(screen.getByText("5건(기준 2026-10-27 마감)")).toBeInTheDocument()
-    // 당월은 오늘의 달이 아니라 서버가 고른 달이라 라벨에 밝힌다.
-    expect(screen.getByText("2026년 10월 신규 가입")).toBeInTheDocument()
-    expect(screen.getByText("2026년 10월 해지")).toBeInTheDocument()
+    expect(screen.getByText("5건(기준 2025-12-31 마감)")).toBeInTheDocument()
+    // 당월은 오늘의 달이 아니라 서버가 고른 달이라 라벨에 밝힌다. 그러려면 달을
+    // 요청에 싣지 않아야 한다 — 실으면 서버가 asOf 의 달을 고르지 않는다.
+    expect(screen.getByText("2025년 12월 신규 가입")).toBeInTheDocument()
+    expect(screen.getByText("2025년 12월 해지")).toBeInTheDocument()
+    expect(subscriptionQueries.at(-1)?.has("month")).toBe(false)
   })
 
   it("기준시점이 없으면 숫자 대신 안내를 띄운다", async () => {
@@ -116,7 +128,7 @@ describe("Adm03InfoDashboard", () => {
       await screen.findByText("정보계 API에 연결하지 못했습니다."),
     ).toBeInTheDocument()
     expect(
-      await screen.findByText("1,200건(기준 2026-10-27 마감)"),
+      await screen.findByText("1,200건(기준 2025-12-31 마감)"),
     ).toBeInTheDocument()
   })
 })

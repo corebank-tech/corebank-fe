@@ -1,8 +1,8 @@
 import type { SessionAuthority } from "@/entities/auth"
 
 /**
- * 관리자 권한 목. 서버가 세션 응답에 역할·권한 필드를 내려주기 전까지 이걸로
- * 대신한다(PH-49a 구현 10/8, #147).
+ * 관리자 권한 목. MSW 의 `GET /customers/me` 가 실어 줄 역할·권한을 계정별로
+ * 정한다. 실서버는 같은 모양을 `customer.role`·`admin_permission` 에서 준다(PH-49a).
  *
  * 확정 계약은 `role` + `permissions` 고정 집합 5종이다
  * (`corebank-server/docs/phase2/README.md` §3-4).

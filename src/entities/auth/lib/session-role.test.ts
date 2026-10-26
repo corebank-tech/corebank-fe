@@ -7,8 +7,8 @@ import {
 
 describe("readSessionAuthority — 역할", () => {
   it("역할 필드가 없으면 고객으로 본다", () => {
-    // 서버가 아직 역할을 내려주지 않는 상태(2026-09-18 기준)가 이 경우다.
-    // 여기서 ADMIN 으로 떨어지면 관리자 화면이 전원에게 열린다.
+    // 필드가 빠진 응답이 와도 여기서 ADMIN 으로 떨어지면 관리자 화면이
+    // 전원에게 열린다.
     expect(readSessionAuthority({ customerId: 1 })).toEqual({
       role: "CUSTOMER",
       permissions: [],
@@ -49,16 +49,6 @@ describe("readSessionAuthority — 권한", () => {
     ).toEqual(["CUSTOMER_READ", "CUSTOMER_WRITE"])
   })
 
-  it("CSV 문자열로 와도 읽는다", () => {
-    // DB 가 CSV 컬럼이라 응답 모양이 확정되기 전까지 둘 다 받는다(#147).
-    expect(
-      readSessionAuthority({
-        role: "ADMIN",
-        permissions: "GL_READ, AUDIT_READ",
-      }).permissions,
-    ).toEqual(["GL_READ", "AUDIT_READ"])
-  })
-
   it("모르는 권한 값은 버린다", () => {
     // 서버가 집합을 늘렸는데 FE 가 아직 모르는 상황에서 화면이 깨지는 것보다
     // 그 권한이 없는 것으로 보는 쪽이 안전하다.
@@ -70,27 +60,14 @@ describe("readSessionAuthority — 권한", () => {
     ).toEqual(["CUSTOMER_READ"])
   })
 
-  it("중복된 권한은 한 번만 남긴다", () => {
+  it.each([
+    ["CSV 문자열", "GL_READ,AUDIT_READ"],
+    ["객체", { a: 1 }],
+  ])("권한 필드가 배열이 아니면(%s) 빈 목록이다", (_case, permissions) => {
+    // 서버 계약은 배열이다. 다른 모양에서 권한을 만들어내는 것보다 권한이
+    // 없는 것으로 보는 쪽이 안전하다.
     expect(
-      readSessionAuthority({
-        role: "ADMIN",
-        permissions: "GL_READ,GL_READ",
-      }).permissions,
-    ).toEqual(["GL_READ"])
-  })
-
-  it("빈 문자열은 빈 목록으로 읽는다", () => {
-    // CSV 컬럼이 비어 있으면 `""` 가 온다. `"".split(",")` 는 `[""]` 라
-    // 걸러지지 않으면 모르는 권한 하나가 들어온 것처럼 다뤄진다.
-    expect(
-      readSessionAuthority({ role: "ADMIN", permissions: "" }).permissions,
-    ).toEqual([])
-  })
-
-  it("권한 필드가 배열도 문자열도 아니면 빈 목록이다", () => {
-    expect(
-      readSessionAuthority({ role: "ADMIN", permissions: { a: 1 } })
-        .permissions,
+      readSessionAuthority({ role: "ADMIN", permissions }).permissions,
     ).toEqual([])
   })
 

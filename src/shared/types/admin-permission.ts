@@ -2,7 +2,7 @@
  * 관리자 기능 권한. 2차 확정 계약의 고정 집합이다
  * (`corebank-server/docs/phase2/README.md` §3-4).
  *
- * > 모델: `customer.role` + `permissions` CSV. 권한은 고정 5종
+ * > 모델: `customer.role` + `admin_permission` 조인 테이블. 권한은 고정 5종
  * > (`GL_READ · GL_WRITE · CUSTOMER_READ · CUSTOMER_WRITE · AUDIT_READ`)이다.
  *
  * **`entities/auth` 가 아니라 `shared/types` 에 둔다.** 관리자 네비 설정

@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query"
-import { login, type LoginRequest } from "@/shared/api/generated"
+import { adminLogin, login, type LoginRequest } from "@/shared/api/generated"
 import { isApiError } from "@/shared/api/api-error"
 import { getAttemptFailureData } from "@/shared/api/attempt-failure-data"
 
 /**
- * 서버가 로그인 실패에 쓰는 코드(POST /auth/login 의 401·403).
+ * 서버가 로그인 실패에 쓰는 코드(POST /auth/login · /admin/auth/login 의 401·403).
  * 화면은 이 코드를 직접 보지 않고 아래 LoginFailureReason 만 본다 —
  * 서버가 코드를 늘려도 화면 분기가 조용히 새 값을 흘리지 않게 하기 위해서다.
  */
@@ -42,6 +42,15 @@ export const resolveRemainingAttempts = (
 export const useLoginMutation = () =>
   useMutation({
     mutationFn: (request: LoginRequest) => login(request),
+  })
+
+/**
+ * 관리자 로그인(ADM-91, REQ-ADM-007). 요청·응답은 고객 로그인과 같다.
+ * 서버가 관리자 계정만 받으므로 고객 계정은 ATH0101 로 거절된다.
+ */
+export const useAdminLoginMutation = () =>
+  useMutation({
+    mutationFn: (request: LoginRequest) => adminLogin(request),
   })
 
 export type { LoginRequest }

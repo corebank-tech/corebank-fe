@@ -1,5 +1,9 @@
 import { delay, http } from "msw"
-import { MOCK_MEMBERS } from "@/entities/auth"
+import { MOCK_MEMBERS, type SessionRole } from "@/entities/auth"
+import {
+  ADMIN_SESSION_TIMEOUT_SECONDS,
+  SESSION_TIMEOUT_SECONDS,
+} from "@/shared/config/policy"
 import { maskName } from "@/shared/lib/format"
 import { readMockAuthority } from "@/mocks/handlers/admin"
 import { fail, ok } from "@/mocks/lib/envelope"
@@ -43,27 +47,48 @@ const writeSignedInMemberId = (memberId: string | null): void => {
 export const unauthorized = () =>
   fail("CMN0101", "인증정보가 없거나 세션이 만료되었습니다.", 401)
 
-export const authHandlers = [
-  http.post("*/auth/login", async ({ request }) => {
-    await delay(MOCK_LATENCY_MS)
-    const { userId, password } = (await request.json()) as {
-      userId: string
-      password: string
-    }
-    const member = MOCK_MEMBERS.find(
-      (m) => m.memberId === userId && m.loginPassword === password,
-    )
-    if (!member) {
-      return fail("ATH0101", "아이디 또는 비밀번호가 일치하지 않습니다.", 401)
-    }
+/**
+ * 서버는 경로마다 받는 역할이 정해져 있다 — 고객은 `/auth/login`, 관리자는
+ * `/admin/auth/login`(서버 `docs/phase2/admin_auth.md` 결정 ③). 역할이 맞지 않으면
+ * 아이디·비밀번호 불일치와 같은 ATH0101 을 준다. 다르게 주면 관리자 계정의 존재가
+ * 드러난다. 만료 간격도 역할을 따른다(결정 ④).
+ */
+const login = async (
+  request: Request,
+  role: SessionRole,
+  timeoutSeconds: number,
+) => {
+  await delay(MOCK_LATENCY_MS)
+  const { userId, password } = (await request.json()) as {
+    userId: string
+    password: string
+  }
+  const member = MOCK_MEMBERS.find(
+    (m) => m.memberId === userId && m.loginPassword === password,
+  )
+  if (!member || readMockAuthority(member.memberId).role !== role) {
+    return fail("ATH0101", "아이디 또는 비밀번호가 일치하지 않습니다.", 401)
+  }
 
-    writeSignedInMemberId(member.memberId)
-    return ok({
-      customerId: 1,
-      userName: member.ownerName,
-      sessionExpiresAt: new Date(Date.now() + 600_000).toISOString(),
-    })
-  }),
+  writeSignedInMemberId(member.memberId)
+  return ok({
+    customerId: 1,
+    userName: member.ownerName,
+    sessionExpiresAt: new Date(
+      Date.now() + timeoutSeconds * 1000,
+    ).toISOString(),
+  })
+}
+
+export const authHandlers = [
+  // 관리자 경로가 먼저 와야 한다. `*` 는 `/` 도 건너뛰어서, 아래 `*/auth/login` 이
+  // 앞에 있으면 `/admin/auth/login` 요청까지 그쪽이 가로챈다.
+  http.post("*/admin/auth/login", ({ request }) =>
+    login(request, "ADMIN", ADMIN_SESSION_TIMEOUT_SECONDS),
+  ),
+  http.post("*/auth/login", ({ request }) =>
+    login(request, "CUSTOMER", SESSION_TIMEOUT_SECONDS),
+  ),
 
   http.post("*/auth/logout", async () => {
     await delay(MOCK_LATENCY_MS)

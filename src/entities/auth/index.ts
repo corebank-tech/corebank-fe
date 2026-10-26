@@ -16,6 +16,7 @@ export type {
 export {
   resolveLoginFailure,
   resolveRemainingAttempts,
+  useAdminLoginMutation,
   useLoginMutation,
 } from "@/entities/auth/api/login"
 export { logout } from "@/entities/auth/api/logout"
@@ -52,7 +53,4 @@ export { ADMIN_PERMISSION_LABELS } from "@/entities/auth/lib/permission-label"
  * API 를 자기가 다시 import 하면 순환이 된다). 그 밖의 소비자는 이 경로를 쓴다.
  */
 export type { AdminPermission } from "@/shared/types/admin-permission"
-export {
-  LOGIN_MISMATCH_MESSAGE,
-  resolveLoginFailureMessage,
-} from "@/entities/auth/lib/login-failure-message"
+export { resolveLoginFailureMessage } from "@/entities/auth/lib/login-failure-message"

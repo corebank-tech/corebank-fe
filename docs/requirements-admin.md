@@ -1,6 +1,6 @@
 # CoreBank 관리자 채널 요구사항 정의서 — 2차 확정 범위
 
-- 작성 2026-09-22 · 갱신 2026-10-01 · 김다연(P3) · 이슈 #156 · #159 · #136
+- 작성 2026-09-22 · 갱신 2026-10-22 · 김다연(P3) · 이슈 #156 · #159 · #136
 - 범위 정본: `corebank-server` 의 `docs/phase2/` — `README.md`(공통 규칙 · 결정 로그 · 범위 밖) · `tasks.md`(태스크별 범위 · 완료 기준)
 - **v3 판본(`plans/260916-corebank-phase2-v3/`)은 폐기됐다**(최종안 D-21). 이 문서가 그 경로를 인용하던 것을 2026-09-23에 전부 갈아끼웠다
 - 고객 채널 요구사항 정의서: `corebank-design/docs/requirements.md`(원본 `CoreBank_요구사항정의서_v1_4.xlsx`)
@@ -32,7 +32,7 @@
 | ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` (제안) | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 미착수 (#146) |
 | ADM-04 | 대사 불일치 목록 | `/admin/ledger-reconciliation` | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 완료 (#130-①) |
 | ADM-90 | [공통] 관리자 셸 — 사이드바·헤더·세션 | 전 관리자 화면 | REQ-ADM-001~006 | — | — | S0 | 완료 (#126·PR #138) |
-| ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 화면 완료, 엔드포인트 교체 대기 (#136) |
+| ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 완료 (#136) |
 | ADM-92 | [공통] 접근 권한 없음 | 라우트 없음 — 진입 URL 유지 | REQ-ADM-009 | — | — | S0 | 완료 |
 
 화면ID는 1차 체계를 따른다 — 업무 화면은 일련번호, 공통 컴포넌트는 90번대(1차 A-90~A-95와 같은 규칙).
@@ -104,10 +104,10 @@
 
 | 정책ID | 분류 | 항목 | 기준값 | 상태 | 근거 |
 |---|---|---|---|---|---|
-| POL-A01 | 세션 | 관리자 무조작 만료 | **30분** | 확정 | PH-49a ① 결정 4 (tasks.md `PH-49a`). 고객 10분(POL-001)과 다르다. 반영 완료 — `ADMIN_SESSION_TIMEOUT_SECONDS = 1800`(`src/shared/config/policy.ts`), 판정은 경로가 아니라 세션의 역할로 한다(#136). **서버는 아직 10분이다** — `corebank-server` `application.yml:5` `session.timeout: 10m`. PH-49a-②(10/8)가 30분을 넣기 전까지는 화면이 잔여 30분을 보여도 서버가 10분 무조작에 401을 줘 "서버 만료" 안내가 먼저 뜬다. 10/16 릴리스에 양쪽이 같이 나가면 해소된다. 참고로 Apache Fineract 백오피스는 채널 구분 없이 15분이다(`fineract-backoffice-ui` `src/app/core/services/idle.service.ts`) — 우리 관리자 값이 그보다 길다 |
+| POL-A01 | 세션 | 관리자 무조작 만료 | **30분** | 확정 | PH-49a ① 결정 4 (tasks.md `PH-49a`). 고객 10분(POL-001)과 다르다. 반영 완료 — `ADMIN_SESSION_TIMEOUT_SECONDS = 1800`(`src/shared/config/policy.ts`), 판정은 경로가 아니라 세션의 역할로 한다(#136). 서버는 PH-49a-②(corebank-server PR #639)가 관리자 로그인에 30분을 적용한다 — `application.yml` `app.security.admin.session-timeout: 30m`. 배포 서버에는 릴리스 2(10/23)로 올라간다. 참고로 Apache Fineract 백오피스는 채널 구분 없이 15분이다(`fineract-backoffice-ui` `src/app/core/services/idle.service.ts`) — 우리 관리자 값이 그보다 길다 |
 | POL-A02 | 세션 | 세션 연장 | 서버 요청 1회로 재설정, 횟수 제한 없음 | 확정 | 고객 POL-002와 동일. `extend`가 `refreshProfile()`을 보내고 응답이 타이머를 리셋한다(`src/features/session/model/session-provider.tsx:192-197`) |
 | POL-A03 | 세션 | 만료 시 도착지 | `/admin/login` | 확정 | 채널별 분기(`src/app/session-expired-gate.tsx:23-39`). 고객은 `/` |
-| POL-A04 | 인증 | 관리자 로그인 실패 문구 | 고객과 동일 문구 사용 | 확정 | 권한 없음을 따로 알리지 않는다(계정 열거 차단, REQ-AUTH-023 취지). `src/entities/auth/lib/login-failure-message.ts:12,:21` |
+| POL-A04 | 인증 | 관리자 로그인 실패 문구 | 고객과 동일 문구 사용 | 확정 | 권한 없음을 따로 알리지 않는다(계정 열거 차단, REQ-AUTH-023 취지). `src/entities/auth/lib/login-failure-message.ts:12` |
 | POL-A05 | 개인정보 | 관리자 화면 마스킹 범위 | 성명·아이디·이메일·연락처·생년월일 **전부 마스킹**. 해제 수단 없음 | 확정 | 1차 `format.ts` 6종 재사용(#127 범위 정정 코멘트). 적용 위치는 §4 REQ-ADM-005 |
 | POL-A06 | 조회 | 관리자 목록 페이지 크기 | 10건 고정, 크기 선택 UI 없음 | 제안 | 현재 고객 규정 `QUERY_DEFAULT_PAGE_SIZE`(POL-022)를 빌려 쓰는 중(`adm01-customer-list.tsx:28`). 관리자 목록은 대상이 전체 고객이라 선택 UI가 필요해질 수 있으나, 2차 목 데이터가 12건이라 근거가 없다 |
 | POL-A07 | 조회 | 관리자 조회기간 | 기본 1개월 / 최대 1년 | 제안 | 현재 고객 관용구를 빌려 쓰며 코드 주석이 "POL-021을 적용한 것이 아니다"라고 자백하고 있다(`adm02-trial-balance.tsx:92-95`). 이 정책ID로 관리자 화면의 근거를 만든다. **최대 1년은 한 번에 조회하는 기간 폭이다** — 시작일이 오늘보다 얼마나 과거인지는 제한하지 않는다(서버 `TrialBalanceQueryService`와 같음). 고객 조회의 시작일 소급 1년(REQ-INQR-010)과 다르다 |
@@ -131,8 +131,8 @@
 | REQ-ADM-004 | 권한 없는 화면 직접 접근 차단 | 필요 권한이 없는 관리자가 URL로 직접 접근하면 화면을 그리지 않고, 무엇이 필요한지와 함께 접근 권한 없음을 표시한다. 네비는 남겨 다른 화면으로 옮겨갈 수 있게 한다 | ADM-90 | `GL_READ`만 가진 관리자가 `/admin/customers`·`/admin/customers/3`을 직접 열면 목록·상세가 그려지지 않고 필요 권한이 안내되며, 같은 계정이 `/admin/trial-balance`는 정상으로 연다 (`e2e/admin-access.spec.ts` 3건) |
 | REQ-ADM-005 | 개인정보 마스킹 | 관리자 화면에 표시되는 고객 성명·아이디·이메일·연락처·생년월일은 전부 마스킹한다. 마스킹 해제 수단을 제공하지 않는다 | 전 관리자 화면 | 목록·상세·확인 다이얼로그·결과 모달 어디에도 평문 개인정보가 없다 (POL-A05) |
 | REQ-ADM-006 | 관리자 세션 | 무조작 30분 경과 시 세션을 끊고 안내 후 관리자 로그인으로 보낸다. 헤더에 잔여시간을 표시하고 [연장]은 서버 세션까지 갱신한다 | ADM-90 | 만료 후 [다시 로그인]·[메인화면] 모두 `/admin/login`으로 이동한다. 30분 반영 완료, 단위 테스트가 고객 10분 경과 후에도 관리자 세션이 살아 있음을 확인한다(POL-A01) |
-| REQ-ADM-007 | 관리자 로그인 분리 | 관리자 로그인은 고객 로그인과 다른 경로(`/admin/login`)와 다른 엔드포인트(`/admin/auth/login`)를 쓴다 | ADM-91 | 화면 경로는 분리 완료. **엔드포인트 교체 미완**(#136, 담당 P3 — 서버 PH-49a-② 선행) |
-| REQ-ADM-008 | 관리자 문의 고객 세션 차단 | 관리자 로그인으로 고객 계정이 인증되면 세션을 즉시 되돌리고, 권한 없음을 알리지 않는 공통 실패 문구를 표시한다 | ADM-91 | 고객 계정으로 관리자 로그인 시도 후 `/dashboard`에 접근하면 로그인 화면으로 튕긴다 (`admin-access.spec.ts:36, :47`) |
+| REQ-ADM-007 | 관리자 로그인 분리 | 관리자 로그인은 고객 로그인과 다른 경로(`/admin/login`)와 다른 엔드포인트(`/admin/auth/login`)를 쓴다 | ADM-91 | 화면 경로·엔드포인트 모두 분리 완료(#136). `useAdminLoginMutation` → `POST /admin/auth/login` |
+| REQ-ADM-008 | 관리자 문의 고객 세션 차단 | 관리자 로그인은 고객 계정을 인증하지 않고, 권한 없음을 알리지 않는 공통 실패 문구를 표시한다. 서버가 ATH0101로 거절하고 세션을 열지 않는다(서버 `admin_auth.md` 결정 ③) | ADM-91 | 고객 계정으로 관리자 로그인 시도 후 `/dashboard`에 접근하면 로그인 화면으로 튕긴다 (`admin-access.spec.ts:38, :49`) |
 | REQ-ADM-009 | 접근 권한 없음 표시 | 인증됐으나 관리자 역할이 아니면 리다이렉트하지 않고 진입한 URL 자리에 안내를 표시한다 | ADM-92 | 고객 세션으로 `/admin` 접근 시 "접근 권한이 없습니다"가 뜨고 URL이 `/admin`에 남는다 (`admin-access.spec.ts:60`) |
 
 ### 4-2. ADM-01 고객 계정 운영
@@ -252,3 +252,4 @@
 | 2026-10-19 | REQ-ADM-031 `asOf` 정의를 서버 리뷰 반영(corebank-server#634, 연속 적재 기준일)에 맞춤 |
 | 2026-10-20 | ADM-02 실연동(#180). 집계가 서버 PH-28로 넘어가 REQ-ADM-022·024 검증을 화면 테스트로 옮김 |
 | 2026-10-20 | ADM-04 REQ-ADM-040~042 작성(#130). 서버 #613 응답 스키마 기준. 경로 `/admin/ledger-reconciliation` 확정 |
+| 2026-10-22 | 관리자 로그인 엔드포인트를 `/admin/auth/login`으로 교체 (#136). ADM-91·REQ-ADM-007 완료, REQ-ADM-008 차단 주체를 서버로 정정, POL-A01의 "서버는 아직 10분" 해제 |

@@ -17,6 +17,7 @@ import {
   MOCK_ACCOUNT_OWNER_ID,
 } from "@/mocks/handlers/accounts-api"
 import { consumeOtpAuthToken } from "@/mocks/handlers/otp-api"
+import { readMockAuthority } from "@/mocks/handlers/admin"
 
 /**
  * MSW 목의 실패 경로. 목은 서버 규칙을 옮긴 것이라(corebank-server origin/dev,
@@ -507,4 +508,52 @@ describe("시산표 목 — 서버 AdminTrialBalanceController·TrialBalanceQuer
     )
     expect(status).toBe(200)
   })
+})
+
+describe("로그인 목 — 서버 admin_auth.md 결정 ③(경로 분리)", () => {
+  const byRole = (role: "ADMIN" | "CUSTOMER") =>
+    MOCK_MEMBERS.find((m) => readMockAuthority(m.memberId).role === role)!
+  const ADMIN = byRole("ADMIN")
+  const CUSTOMER = byRole("CUSTOMER")
+
+  const login = (path: string, member: (typeof MOCK_MEMBERS)[number]) =>
+    call("POST", path, {
+      userId: member.memberId,
+      password: member.loginPassword,
+    })
+
+  // 거절된 로그인이 세션을 남기는지 보려면 빈 세션에서 시작해야 한다.
+  beforeEach(() => sessionStorage.clear())
+
+  // 응답은 아이디·비밀번호 불일치와 같다 — 다르면 관리자 계정의 존재가 드러난다.
+  it.each([
+    ["관리자 계정을 고객 경로", "/auth/login", ADMIN],
+    ["고객 계정을 관리자 경로", "/admin/auth/login", CUSTOMER],
+  ])(
+    "%s로 로그인하면 401 ATH0101 이고 세션을 남기지 않는다",
+    async (_case, path, member) => {
+      const { status, body } = await login(path, member)
+      expect(status).toBe(401)
+      expect(body.code).toBe("ATH0101")
+      expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()
+    },
+  )
+
+  it.each([
+    { role: "고객", path: "/auth/login", member: CUSTOMER, minutes: 10 },
+    { role: "관리자", path: "/admin/auth/login", member: ADMIN, minutes: 30 },
+  ])(
+    "$role 계정은 $path 로 로그인되고 만료는 $minutes분 뒤다",
+    async ({ path, member, minutes }) => {
+      const before = Date.now()
+      const { status, body } = await login(path, member)
+      const after = Date.now()
+
+      expect(status).toBe(200)
+      expect(sessionStorage.getItem(SESSION_KEY)).toBe(member.memberId)
+      const expiresAt = new Date(body.data.sessionExpiresAt as string).getTime()
+      expect(expiresAt).toBeGreaterThanOrEqual(before + minutes * 60_000)
+      expect(expiresAt).toBeLessThanOrEqual(after + minutes * 60_000)
+    },
+  )
 })

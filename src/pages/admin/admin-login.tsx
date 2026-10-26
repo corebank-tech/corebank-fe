@@ -1,13 +1,9 @@
 import * as React from "react"
 import { useLocation, useNavigate } from "react-router"
-import { useQueryClient } from "@tanstack/react-query"
 import {
-  LOGIN_MISMATCH_MESSAGE,
-  readSessionAuthority,
   resolveLoginFailureMessage,
-  useLoginMutation,
+  useAdminLoginMutation,
 } from "@/entities/auth"
-import { getCustomerProfileQueryKey } from "@/entities/customer"
 import { useSession } from "@/features/session"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
@@ -20,21 +16,16 @@ type RedirectState = { from?: string } | null
  * 인증 실패로 여기 온 사용자를 고객 메인으로 보내면 원래 가려던 관리자 화면으로
  * 돌아갈 수 없다.
  *
- * 인증 엔드포인트는 현재 고객과 같은 `/auth/login` 을 쓴다. 서버가 관리자 경로를
- * 분리할지 미정이라(BE 요청 문서 참조), 확정되면 이 훅만 바꾼다.
- *
- * 엔드포인트가 같더라도 **관리자 문으로 들어온 로그인은 관리자만 성립시킨다** —
- * 권한 없는 계정이 여기서 로그인에 성공하면 관리자 화면 대신 403 을 보게 되는데,
- * 그 사이 고객 세션은 이미 열려 있다. 관리자 문에서 고객 세션이 열리는 건
- * 직무분리(PH-49) 관점에서 어긋나므로 세션을 되돌리고 로그인 실패로 다룬다.
- * 문구도 아이디·비밀번호 불일치와 같게 둔다(`LOGIN_MISMATCH_MESSAGE`).
+ * 인증 엔드포인트도 나뉘어 있다 — `POST /admin/auth/login`(REQ-ADM-007). 고객 계정을
+ * 거르는 건 서버다. 관리자가 아니면 아이디·비밀번호 불일치와 같은 ATH0101 을 주고
+ * 세션을 열지 않는다(서버 `docs/phase2/admin_auth.md` 결정 ③). 그래서 화면은 로그인
+ * 뒤에 역할을 다시 확인하지 않고, 실패 문구도 고객 로그인과 같은 변환을 쓴다.
  */
 export const AdminLogin = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { setSession, logout } = useSession()
-  const login = useLoginMutation()
-  const queryClient = useQueryClient()
+  const { setSession } = useSession()
+  const login = useAdminLoginMutation()
 
   const [userId, setUserId] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -58,17 +49,6 @@ export const AdminLogin = () => {
     const restored = await setSession()
     if (!restored) {
       setError("로그인 상태를 확인하지 못했습니다. 다시 시도해 주세요.")
-      return
-    }
-
-    // setSession 이 끝나면 프로필이 캐시에 들어와 있다. 컨텍스트의 role 은 다음
-    // 렌더에야 갱신되므로 여기서는 캐시를 직접 읽는다.
-    const { role } = readSessionAuthority(
-      queryClient.getQueryData(getCustomerProfileQueryKey()),
-    )
-    if (role !== "ADMIN") {
-      await logout()
-      setError(LOGIN_MISMATCH_MESSAGE)
       return
     }
 

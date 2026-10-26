@@ -21,6 +21,7 @@ import {
 import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
 import { consumeOtpAuthToken, otpError } from "@/mocks/handlers/otp-api"
 import { fail, ok } from "@/mocks/lib/envelope"
+import { readStore } from "@/mocks/lib/mock-store"
 
 const MOCK_LATENCY_MS = 200
 
@@ -110,6 +111,13 @@ const INTERBANK_SCENARIO = {
 } as const
 
 const INTERBANK_PAYEE_NAME = "박*준"
+
+/**
+ * 켜 두면 은행 목록 조회가 500 으로 실패한다(e2e 의 "당행 이체만" 장면). MSW 는 서비스
+ * 워커로 응답해 Playwright `page.route` 가 가로채지 못하므로 목 저장소로 켠다 —
+ * sessionStorage 키는 `corebank-mock:` + 이 값이다.
+ */
+const BANKS_UNAVAILABLE_KEY = "transfer:banks-unavailable"
 
 /** 늦은 응답 장면에서 응답이 오기 전에 입력을 바꿀 여유. 화면 조작 몇 번이면 끝나는 시간보다 길게 둔다. */
 const SLOW_PAYEE_LATENCY_MS = 1000
@@ -206,6 +214,13 @@ export const transferApiHandlers = [
   http.get("*/transfers/banks", async () => {
     await delay(MOCK_LATENCY_MS)
     if (readSignedInMemberId() == null) return unauthorized()
+    if (readStore(BANKS_UNAVAILABLE_KEY, false)) {
+      return fail(
+        "CMN9999",
+        "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        500,
+      )
+    }
     return ok(MOCK_BANKS)
   }),
 

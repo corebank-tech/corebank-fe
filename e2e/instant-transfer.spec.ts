@@ -259,6 +259,47 @@ test("계좌확인 응답이 오기 전에 출금계좌를 바꾸면 늦은 응�
   await expect(page.getByRole("button", { name: "다음" })).toBeDisabled()
 })
 
+// 목록을 못 받아도 당행 이체는 막지 않는다 — 안내가 빠지면 사용자는 타행이 왜 없는지 모른다.
+test("은행 목록을 못 받으면 당행 이체만 된다고 알리고 당행 이체는 완료된다", async ({
+  page,
+}) => {
+  // 목 스위치(src/mocks/handlers/transfer-api.ts 의 BANKS_UNAVAILABLE_KEY). 키가 어긋나면
+  // 목록이 정상으로 와서 아래 안내 확인이 깨진다.
+  await page.evaluate(() =>
+    sessionStorage.setItem("corebank-mock:transfer:banks-unavailable", "true"),
+  )
+  await confirmPayee(page, OWN_BANK, "333330730135")
+
+  await expect(
+    page.getByRole("alert").filter({
+      hasText:
+        "다른 은행 목록을 불러오지 못했습니다. 당행 이체만 할 수 있습니다.",
+    }),
+  ).toBeVisible()
+  await expect(page.locator("#it-bank option")).toHaveText([OWN_BANK])
+
+  await expect(holderName(page, "김*수")).toBeVisible()
+  await transfer(page, 30_000)
+  await expect(page.getByText("이체가 완료되었습니다.")).toBeVisible()
+})
+
+// 자주 쓰는·최근 계좌는 당행 계좌뿐이다(서버 인계 문서 §8). 고른 은행을 그대로 쓰면 당행
+// 계좌번호를 타행으로 조회한다.
+test("타행을 고른 채 최근 이체계좌를 누르면 입금은행이 당행으로 바뀐다", async ({
+  page,
+}) => {
+  await page.goto("/instant-transfer")
+  await page.locator("#it-bank").selectOption({ label: OTHER_BANK })
+
+  await page
+    .getByRole("button", { name: /333-330-730135/ })
+    .first()
+    .click()
+
+  await expect(page.locator("#it-bank option:checked")).toHaveText(OWN_BANK)
+  await expect(holderName(page, "김*수")).toBeVisible()
+})
+
 test("당행 이체는 지금처럼 완료되고 자주 쓰는 계좌로 등록할 수 있다", async ({
   page,
 }) => {

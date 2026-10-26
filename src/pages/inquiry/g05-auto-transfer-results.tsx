@@ -136,6 +136,7 @@ export const G05AutoTransferResults = () => {
   const exportHeaders = [
     "처리결과",
     "처리일시",
+    "거래일",
     "출금계좌",
     "입금계좌",
     "예금주",
@@ -147,6 +148,7 @@ export const G05AutoTransferResults = () => {
   const exportRows = pageRows.map((r) => [
     r.result,
     formatDateTime(r.processedAt),
+    r.tradeDate ? formatDate(r.tradeDate) : "-",
     formatAccountLabel(r.fromAlias, maskAccountNo(r.fromAccountNo)),
     maskAccountNo(r.toAccountNo),
     maskName(r.payeeName),
@@ -176,6 +178,15 @@ export const G05AutoTransferResults = () => {
       // 서버가 내려준 한 페이지를 넘긴다. 켜면 그 페이지 안에서만 재배열되면서
       // 사용자는 전체 정렬로 읽는다(#148). 서버 정렬이 생기면 그때 붙인다.
       render: (r) => <span>{formatDateTime(r.processedAt)}</span>,
+    },
+    {
+      // 처리일시와 따로 둔다. 휴일에 실행된 회차는 거래일이 다음 영업일이라 두 날짜가
+      // 다르고, 이체 전 실패·합성 행은 거래일이 없다(서버 #679).
+      key: "tradeDate",
+      header: "거래일",
+      align: "center",
+      width: 110,
+      render: (r) => <span>{r.tradeDate ? formatDate(r.tradeDate) : "-"}</span>,
     },
     {
       key: "fromAccountNo",

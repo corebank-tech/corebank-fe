@@ -123,6 +123,7 @@ export const E05ReservationResults = () => {
   const exportHeaders = [
     "처리결과",
     "이체일자",
+    "거래일",
     "출금계좌",
     "입금계좌",
     "예금주",
@@ -134,6 +135,7 @@ export const E05ReservationResults = () => {
   const exportRows = pageRows.map((r) => [
     r.result,
     formatDate(r.transferDate),
+    r.tradeDate ? formatDate(r.tradeDate) : "-",
     r.fromAccountNo,
     r.toAccountNo,
     r.payeeName,
@@ -163,6 +165,15 @@ export const E05ReservationResults = () => {
       // 서버가 내려준 한 페이지를 넘긴다. 켜면 그 페이지 안에서만 재배열되면서
       // 사용자는 전체 정렬로 읽는다(#148). 서버 정렬이 생기면 그때 붙인다.
       render: (r) => <span>{formatDate(r.transferDate)}</span>,
+    },
+    {
+      // 이체일자와 따로 둔다. 휴일에 실행된 회차는 거래일이 다음 영업일이라 두 날짜가
+      // 다르고, 취소·이체 전 실패 회차는 거래일이 없어 이체일자만 남는다(서버 #679).
+      key: "tradeDate",
+      header: "거래일",
+      align: "center",
+      width: 110,
+      render: (r) => <span>{r.tradeDate ? formatDate(r.tradeDate) : "-"}</span>,
     },
     {
       key: "fromAccountNo",

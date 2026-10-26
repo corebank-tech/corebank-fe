@@ -83,6 +83,7 @@ export const toReservationResultRow = (
   // 정상·오류는 실행 시각, 취소는 취소 시각이 채워진다. 서버가 목록을 정렬하는
   // 기준도 이 둘의 COALESCE라 같은 값을 쓴다.
   transferDate: item.executedAt ?? item.canceledAt ?? "",
+  tradeDate: item.tradeDate ?? undefined,
   fromAccountNo: item.withdrawalAccountNumber ?? "",
   toAccountNo: item.accountNumber ?? "",
   payeeName: item.payeeName ?? "",
@@ -179,6 +180,7 @@ export const toAutoTransferResultRow = (
   id: String(item.executionId ?? ""),
   result: toAutoTransferResult(item.status),
   processedAt: item.executedAt ?? "",
+  tradeDate: item.tradeDate ?? undefined,
   fromAccountNo: fromAccount.accountNo,
   fromAlias: fromAccount.alias,
   toAccountNo: item.depositAccountNumber ?? "",

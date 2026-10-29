@@ -138,7 +138,7 @@ test("조회 전용 관리자에게 계정 운영 버튼이 보이지 않는다"
   await loginAsAdmin(page, READONLY_ADMIN)
   await expect(page).toHaveURL("/admin")
 
-  await page.goto("/admin/customers/3")
+  await page.goto("/admin/customers/3?reason=OPERATION")
 
   // 상세는 열리지만(CUSTOMER_READ) 변경 액션은 렌더링되지 않는다(CUSTOMER_WRITE 없음).
   await expect(page.getByText("계정 정보")).toBeVisible()
@@ -157,7 +157,7 @@ test("전 권한 관리자에게는 계정 운영 버튼이 보인다", async ({
   await loginAsAdmin(page, ADMIN)
   await expect(page).toHaveURL("/admin")
 
-  await page.goto("/admin/customers/3")
+  await page.goto("/admin/customers/3?reason=OPERATION")
 
   // 위 시나리오의 짝. 버튼이 아예 만들어지지 않은 것과 권한으로 숨긴 것을 구분한다.
   await expect(page.getByRole("button", { name: "잠금 해제" })).toBeVisible()

@@ -11,6 +11,10 @@ import {
   type AdminCustomerSummaryResponse,
 } from "@/shared/api/generated"
 import {
+  ACCESS_REASON_HEADER,
+  type AccessReason,
+} from "@/entities/admin-customer/lib/access-reason"
+import {
   toSearchParams,
   type AdminCustomerSearchCondition,
 } from "@/entities/admin-customer/lib/search-condition"
@@ -22,9 +26,16 @@ import {
  * 그대로 그리고 다시 마스킹하지 않는다 — 이미 가려진 값을 FE 규칙으로 또 가리면
  * 서버 규칙과 다른 모양이 된다.
  *
- * 조회 사유 헤더(`X-Access-Reason`, PH-89)를 붙일 때는 이 파일의 훅에만 넣는다.
- * 화면이 생성 훅을 직접 부르지 않게 해서 헤더를 빠뜨릴 경로를 없앤다.
+ * 조회 사유(`X-Access-Reason`, PH-89, REQ-ADM-019)는 이 파일의 훅만 붙인다. 화면이
+ * 생성 훅을 직접 부르지 않게 해서 헤더를 빠뜨릴 경로를 없앤다. 사유가 `null` 이면
+ * 조회는 요청하지 않는다 — "사유를 고르지 않으면 요청이 나가지 않는다".
+ *
+ * 쿼리 키에 사유를 넣는다. 같은 조건에서 사유만 바꿔도 다시 요청해야 서버 감사의
+ * Why 에 바뀐 사유가 남는다.
  */
+
+const reasonRequest = (reason: AccessReason | null) =>
+  reason ? { headers: { [ACCESS_REASON_HEADER]: reason } } : undefined
 
 export type AdminCustomerStatus = "ACTIVE" | "SUSPENDED"
 
@@ -87,6 +98,7 @@ const toAdminCustomer = (
  */
 export const useAdminCustomerSearch = (params: {
   condition: AdminCustomerSearchCondition | null
+  reason: AccessReason | null
   page: number
   size: number
 }) => {
@@ -101,9 +113,14 @@ export const useAdminCustomerSearch = (params: {
     searchParams,
     {
       query: {
-        enabled: params.condition != null,
+        queryKey: [
+          ...getSearchAdminCustomersQueryKey(searchParams),
+          params.reason,
+        ],
+        enabled: params.condition != null && params.reason != null,
         placeholderData: keepPreviousData,
       },
+      request: reasonRequest(params.reason),
     },
   )
 
@@ -122,10 +139,20 @@ export const useAdminCustomerSearch = (params: {
 }
 
 /** 고객 상세(`GET /admin/customers/{customerId}`). 권한 `CUSTOMER_READ`. */
-export const useAdminCustomerDetail = (customerId: number) => {
+export const useAdminCustomerDetail = (
+  customerId: number,
+  reason: AccessReason | null,
+) => {
   const { data, isPending, isError, error } = useGetAdminCustomerDetail(
     customerId,
-    { query: { enabled: Number.isInteger(customerId) && customerId > 0 } },
+    {
+      query: {
+        queryKey: [...getGetAdminCustomerDetailQueryKey(customerId), reason],
+        enabled:
+          Number.isInteger(customerId) && customerId > 0 && reason != null,
+      },
+      request: reasonRequest(reason),
+    },
   )
 
   return {
@@ -158,16 +185,24 @@ const useInvalidateCustomer = () => {
  *
  * `Idempotency-Key` 는 `customFetch` 가 요청마다 새로 붙인다. 잠금 해제와 상태 변경은
  * 서버가 "이미 같은 상태여도 200"이라 다시 눌러도 결과가 같다.
+ *
+ * 사유는 상세를 연 사유를 그대로 쓴다. 화면은 사유 없이 상세를 그리지 않으므로
+ * 변경 버튼이 보일 때는 항상 사유가 있다.
  */
-export const useAdminCustomerOperations = () => {
+export const useAdminCustomerOperations = (reason: AccessReason | null) => {
   const invalidate = useInvalidateCustomer()
   const onSuccess = (_: unknown, variables: { customerId: number }) =>
     invalidate(variables.customerId)
+  const request = reasonRequest(reason)
 
-  const unlock = useUnlockAdminCustomer({ mutation: { onSuccess } })
-  const changeStatus = useChangeAdminCustomerStatus({ mutation: { onSuccess } })
+  const unlock = useUnlockAdminCustomer({ mutation: { onSuccess }, request })
+  const changeStatus = useChangeAdminCustomerStatus({
+    mutation: { onSuccess },
+    request,
+  })
   const resetPassword = useResetAdminCustomerPassword({
     mutation: { onSuccess },
+    request,
   })
 
   return { unlock, changeStatus, resetPassword }

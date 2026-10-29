@@ -6,12 +6,15 @@ import { Input } from "@/shared/ui/input"
 import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
+import { Alert } from "@/shared/ui/alert"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import {
+  AccessReasonSelect,
   EMPTY_ADMIN_CUSTOMER_CONDITION,
   useAdminCustomerSearch,
+  type AccessReason,
   type AdminCustomer,
   type AdminCustomerSearchCondition,
   type AdminCustomerStatusFilter,
@@ -28,6 +31,9 @@ import {
  *
  * 검색과 페이징은 서버(`GET /admin/customers`, PH-97)가 한다. 서버는 조건 없는 검색을
  * 거부하므로 [조회]를 누르기 전에는 요청하지 않는다.
+ *
+ * 조회 사유(REQ-ADM-019)를 고르지 않으면 [조회]를 눌러도 요청하지 않는다. 고른 사유는
+ * 상세 링크에 실어 넘겨 상세 조회와 변경에도 같은 사유를 쓴다.
  *
  * 개인정보는 서버가 마스킹해 보낸 값을 그대로 표시한다. 관리자가 대상을 특정하는
  * 수단은 검색 조건이지 화면에 찍힌 원본 값이 아니다.
@@ -53,10 +59,18 @@ export const Adm01CustomerList = () => {
   // [조회] 전에는 null 이다. 서버가 조건 없는 검색을 거부하므로 요청하지 않는다.
   const [applied, setApplied] =
     React.useState<AdminCustomerSearchCondition | null>(null)
+  const [draftReason, setDraftReason] = React.useState<AccessReason | null>(
+    null,
+  )
+  const [appliedReason, setAppliedReason] = React.useState<AccessReason | null>(
+    null,
+  )
+  const [reasonMissing, setReasonMissing] = React.useState(false)
   const [page, setPage] = React.useState(1)
 
   const { customerPage, isFetching, isError, error } = useAdminCustomerSearch({
     condition: applied,
+    reason: appliedReason,
     page,
     size: QUERY_DEFAULT_PAGE_SIZE,
   })
@@ -75,13 +89,22 @@ export const Adm01CustomerList = () => {
   }
 
   const handleSearch = () => {
+    if (draftReason == null) {
+      setReasonMissing(true)
+      return
+    }
+    setReasonMissing(false)
     setApplied(draft)
+    setAppliedReason(draftReason)
     setPage(1)
   }
 
   const handleReset = () => {
     setDraft(EMPTY_ADMIN_CUSTOMER_CONDITION)
     setApplied(null)
+    setDraftReason(null)
+    setAppliedReason(null)
+    setReasonMissing(false)
     setPage(1)
   }
 
@@ -173,7 +196,7 @@ export const Adm01CustomerList = () => {
       // 8곳의 회귀 범위가 열리므로, 진입점을 셀 안의 링크로 둔다.
       render: (row) => (
         <Link
-          to={`/admin/customers/${row.customerId}`}
+          to={`/admin/customers/${row.customerId}?reason=${appliedReason ?? ""}`}
           // 링크 글자가 행마다 "상세"로 같아서, 이름이 없으면 스크린리더의 링크
           // 목록에 "상세"만 열두 개 나열된다. 서버가 아이디를 앞 4자리만 남기고
           // 가리므로(uat1104p1·uat1104p2 → 둘 다 "uat1*****") 아이디만으로는 행이
@@ -194,6 +217,17 @@ export const Adm01CustomerList = () => {
             링크를 항상 그리는데, 관리자 화면에는 저장할 조건 규정이 없어 눌러도
             아무 일이 없는 죽은 컨트롤이 된다. */}
         <div>
+          <FormRow label="조회 사유" htmlFor="adm-access-reason" required>
+            <AccessReasonSelect
+              id="adm-access-reason"
+              value={draftReason}
+              invalid={reasonMissing}
+              onChange={(reason) => {
+                setDraftReason(reason)
+                if (reason) setReasonMissing(false)
+              }}
+            />
+          </FormRow>
           <FormRow label="아이디" htmlFor="adm-search-user-id">
             <Input
               id="adm-search-user-id"
@@ -241,6 +275,13 @@ export const Adm01CustomerList = () => {
             </Select>
           </FormRow>
         </div>
+
+        {reasonMissing && (
+          <Alert variant="danger" className="mt-3">
+            조회 사유를 고른 뒤 조회하세요. 고객 개인정보 조회는 사유가
+            기록됩니다.
+          </Alert>
+        )}
 
         <div className="mt-4 flex items-center justify-center gap-2">
           <Button

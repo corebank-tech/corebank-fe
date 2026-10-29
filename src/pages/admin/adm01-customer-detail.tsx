@@ -1,10 +1,13 @@
 import * as React from "react"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { hasPermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import {
+  AccessReasonSelect,
+  isAccessReason,
   useAdminCustomerDetail,
   useAdminCustomerOperations,
+  type AccessReason,
 } from "@/entities/admin-customer"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { Alert } from "@/shared/ui/alert"
@@ -12,6 +15,7 @@ import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { EmptyState } from "@/shared/ui/empty-state"
+import { FormRow } from "@/shared/ui/form-row"
 import { LabelValueRow } from "@/shared/ui/label-value-row"
 import { Modal } from "@/shared/ui/modal"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
@@ -31,7 +35,45 @@ import { LOGIN_MAX_ATTEMPTS } from "@/shared/config/policy"
  *
  * 개인정보는 서버가 마스킹해 보낸 값을 그대로 표시한다(PH-97). 관리자가 대상을
  * 특정하는 수단은 목록의 검색 조건이지 상세에 찍힌 원본 값이 아니다.
+ *
+ * 조회 사유(REQ-ADM-019)는 목록이 링크의 `?reason=` 으로 넘긴다. 주소를 직접 열어
+ * 사유가 없거나 정의되지 않은 값이면 상세를 요청하지 않고 사유부터 고르게 한다.
  */
+
+/** 사유 없이 상세를 연 경우. 고르면 주소에 실어 새로고침해도 유지한다. */
+const AccessReasonGate = ({
+  onSelect,
+}: {
+  onSelect: (reason: AccessReason) => void
+}) => {
+  const [reason, setReason] = React.useState<AccessReason | null>(null)
+  return (
+    <Panel>
+      <PanelHeader title="조회 사유" />
+      <div className="flex flex-col gap-3 px-4 pt-1 pb-4">
+        <p className="text-base text-ink">
+          고객 개인정보를 열기 전에 조회 사유를 고르세요. 사유는 감사 기록에
+          남습니다.
+        </p>
+        <FormRow label="조회 사유" htmlFor="adm-detail-access-reason" required>
+          <AccessReasonSelect
+            id="adm-detail-access-reason"
+            value={reason}
+            onChange={setReason}
+          />
+        </FormRow>
+        <div>
+          <Button
+            disabled={reason == null}
+            onClick={() => reason && onSelect(reason)}
+          >
+            확인
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  )
+}
 
 /** 실행할 변경 액션. `null` 이면 확인 다이얼로그가 닫힌 상태다. */
 type PendingAction = "unlock" | "resetPassword" | "toggleStatus" | null
@@ -55,14 +97,19 @@ export const Adm01CustomerDetail = () => {
   // 회계 관리자에게 고객 정지 버튼이 열린다.
   const canOperateCustomer = hasPermission(permissions, "CUSTOMER_WRITE")
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const reasonParam = searchParams.get("reason")
+  const reason = isAccessReason(reasonParam) ? reasonParam : null
+
   const parsedId = Number(customerId)
   const {
     customer,
     isPending,
     isError,
     error: loadError,
-  } = useAdminCustomerDetail(parsedId)
-  const { unlock, changeStatus, resetPassword } = useAdminCustomerOperations()
+  } = useAdminCustomerDetail(parsedId, reason)
+  const { unlock, changeStatus, resetPassword } =
+    useAdminCustomerOperations(reason)
   const isMutating =
     unlock.isPending || changeStatus.isPending || resetPassword.isPending
   const [pendingAction, setPendingAction] = React.useState<PendingAction>(null)
@@ -74,6 +121,24 @@ export const Adm01CustomerDetail = () => {
   // 주소가 숫자가 아니면 조회를 걸지 않으므로 isPending 이 풀리지 않는다.
   // 그 경우는 로딩이 아니라 "찾을 수 없음"으로 보낸다.
   const isValidId = Number.isInteger(parsedId) && parsedId > 0
+  if (isValidId && reason == null) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Link
+            to="/admin/customers"
+            className="text-base text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            ← 고객 목록
+          </Link>
+        </div>
+        <AccessReasonGate
+          onSelect={(selected) => setSearchParams({ reason: selected })}
+        />
+      </div>
+    )
+  }
+
   if (isValidId && isPending) {
     return (
       <Panel>

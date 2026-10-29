@@ -258,6 +258,14 @@ const updateCustomer = (customerId: number, patch: Partial<MockCustomer>) => {
   return customers.find((c) => c.customerId === customerId)!
 }
 
+const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
+
+/** 서버 PH-89: 사유 헤더가 없거나 정의되지 않은 코드면 400 CMN0007. */
+const requireAccessReason = (request: Request) =>
+  ACCESS_REASONS.includes(request.headers.get("X-Access-Reason") ?? "")
+    ? null
+    : fail("CMN0007", "조회 사유가 없거나 올바르지 않습니다.", 400)
+
 const requireIdempotencyKey = (request: Request) =>
   request.headers.get("Idempotency-Key")
     ? null
@@ -268,12 +276,14 @@ const requireIdempotencyKey = (request: Request) =>
  *
  * 검색 규칙은 서버 `AdminCustomerQueryService` 와 같다. 조건이 하나도 없거나
  * 정상(ACTIVE), 잠김 아님(false)만 있으면 거부하고, 아이디와 성명은 두 글자 이상
- * 앞부분 일치, 이메일은 정확 일치다. 페이지는 0부터다.
+ * 앞부분 일치, 이메일은 정확 일치다. 페이지는 0부터다. 다섯 API 모두 조회 사유
+ * 헤더(PH-89)를 요구한다.
  */
 export const adminCustomersApiHandlers = [
   http.get("*/admin/customers", async ({ request }) => {
     await delay(MOCK_LATENCY_MS)
-    const denied = requireMockPermission("CUSTOMER_READ")
+    const denied =
+      requireMockPermission("CUSTOMER_READ") ?? requireAccessReason(request)
     if (denied) return denied
 
     const url = new URL(request.url)
@@ -316,9 +326,10 @@ export const adminCustomersApiHandlers = [
     })
   }),
 
-  http.get("*/admin/customers/:customerId", async ({ params }) => {
+  http.get("*/admin/customers/:customerId", async ({ params, request }) => {
     await delay(MOCK_LATENCY_MS)
-    const denied = requireMockPermission("CUSTOMER_READ")
+    const denied =
+      requireMockPermission("CUSTOMER_READ") ?? requireAccessReason(request)
     if (denied) return denied
     const customer = findCustomer(params)
     return customer ? ok(toDetail(customer)) : notFound()
@@ -330,6 +341,7 @@ export const adminCustomersApiHandlers = [
       await delay(MOCK_LATENCY_MS)
       const denied =
         requireMockPermission("CUSTOMER_WRITE") ??
+        requireAccessReason(request) ??
         requireIdempotencyKey(request)
       if (denied) return denied
       const customer = findCustomer(params)
@@ -352,6 +364,7 @@ export const adminCustomersApiHandlers = [
       await delay(MOCK_LATENCY_MS)
       const denied =
         requireMockPermission("CUSTOMER_WRITE") ??
+        requireAccessReason(request) ??
         requireIdempotencyKey(request)
       if (denied) return denied
       const customer = findCustomer(params)
@@ -369,9 +382,10 @@ export const adminCustomersApiHandlers = [
 
   http.post(
     "*/admin/customers/:customerId/password-reset",
-    async ({ params }) => {
+    async ({ params, request }) => {
       await delay(MOCK_LATENCY_MS)
-      const denied = requireMockPermission("CUSTOMER_WRITE")
+      const denied =
+        requireMockPermission("CUSTOMER_WRITE") ?? requireAccessReason(request)
       if (denied) return denied
       const customer = findCustomer(params)
       if (!customer) return notFound()

@@ -1,6 +1,7 @@
 import { accountPasswordApiHandlers } from "@/mocks/handlers/account-password-api"
 import { accountsApiHandlers } from "@/mocks/handlers/accounts-api"
 import { accountHandlers } from "@/mocks/handlers/account"
+import { adminCustomersApiHandlers } from "@/mocks/handlers/admin-customers-api"
 import { authHandlers } from "@/mocks/handlers/auth"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
 import { infoApiHandlers } from "@/mocks/handlers/info-api"
@@ -23,6 +24,7 @@ export const handlers = [
   ...transferApiHandlers,
   ...glApiHandlers,
   ...ledgerReconciliationApiHandlers,
+  ...adminCustomersApiHandlers,
   ...infoApiHandlers,
   ...accountHandlers,
   ...authHandlers,

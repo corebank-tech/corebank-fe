@@ -6,23 +6,21 @@ import { Input } from "@/shared/ui/input"
 import { Select } from "@/shared/ui/select"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
+import { Alert } from "@/shared/ui/alert"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { Pagination } from "@/shared/ui/pagination"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import {
+  AccessReasonSelect,
   EMPTY_ADMIN_CUSTOMER_CONDITION,
-  filterCustomers,
-  readAdminCustomers,
+  useAdminCustomerSearch,
+  type AccessReason,
   type AdminCustomer,
   type AdminCustomerSearchCondition,
   type AdminCustomerStatusFilter,
 } from "@/entities/admin-customer"
-import {
-  formatDateTime,
-  maskEmail,
-  maskName,
-  maskUserId,
-} from "@/shared/lib/format"
+import { toErrorMessage } from "@/shared/api/api-error"
+import { formatDateTime } from "@/shared/lib/format"
 import {
   LOGIN_MAX_ATTEMPTS,
   QUERY_DEFAULT_PAGE_SIZE,
@@ -31,12 +29,14 @@ import {
 /**
  * ADM-01 관리자 고객 계정 운영 — 검색·목록.
  *
- * 대응 서버 API(PH-97)가 아직 없어 목 데이터를 직접 필터링한다. 조건과 필터링은
- * `entities/admin-customer` 에 있고 이 파일은 그것을 화면에 붙이기만 한다 —
- * 실 API가 오면 조건이 그대로 요청 파라미터가 되고 페이징도 서버로 옮긴다.
+ * 검색과 페이징은 서버(`GET /admin/customers`, PH-97)가 한다. 서버는 조건 없는 검색을
+ * 거부하므로 [조회]를 누르기 전에는 요청하지 않는다.
  *
- * 개인정보는 목록에서도 마스킹해 표시한다. 관리자가 대상을 특정하는 수단은
- * 검색 조건이지 화면에 찍힌 원본 값이 아니다.
+ * 조회 사유(REQ-ADM-019)를 고르지 않으면 [조회]를 눌러도 요청하지 않는다. 고른 사유는
+ * 상세 링크에 실어 넘겨 상세 조회와 변경에도 같은 사유를 쓴다.
+ *
+ * 개인정보는 서버가 마스킹해 보낸 값을 그대로 표시한다. 관리자가 대상을 특정하는
+ * 수단은 검색 조건이지 화면에 찍힌 원본 값이 아니다.
  */
 
 /**
@@ -56,29 +56,30 @@ export const Adm01CustomerList = () => {
   const [draft, setDraft] = React.useState<AdminCustomerSearchCondition>(
     EMPTY_ADMIN_CUSTOMER_CONDITION,
   )
-  const [applied, setApplied] = React.useState<AdminCustomerSearchCondition>(
-    EMPTY_ADMIN_CUSTOMER_CONDITION,
+  // [조회] 전에는 null 이다. 서버가 조건 없는 검색을 거부하므로 요청하지 않는다.
+  const [applied, setApplied] =
+    React.useState<AdminCustomerSearchCondition | null>(null)
+  const [draftReason, setDraftReason] = React.useState<AccessReason | null>(
+    null,
   )
+  const [appliedReason, setAppliedReason] = React.useState<AccessReason | null>(
+    null,
+  )
+  const [reasonMissing, setReasonMissing] = React.useState(false)
   const [page, setPage] = React.useState(1)
 
-  const rows = React.useMemo(
-    // 상세 화면에서 잠금 해제·상태 변경을 하면 저장소가 바뀐다. 마운트 시점에
-    // 다시 읽어야 목록으로 돌아왔을 때 배지가 갱신된다.
-    () => filterCustomers(readAdminCustomers(), applied),
-    [applied],
-  )
+  const { customerPage, isFetching, isError, error } = useAdminCustomerSearch({
+    condition: applied,
+    reason: appliedReason,
+    page,
+    size: QUERY_DEFAULT_PAGE_SIZE,
+  })
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(rows.length / QUERY_DEFAULT_PAGE_SIZE),
-  )
-  // 조건이 좁아져 결과가 줄면 totalPages 만 작아지고 page 는 그대로라 빈 화면이 된다.
-  if (page > totalPages) setPage(totalPages)
-
-  const pageRows = rows.slice(
-    (page - 1) * QUERY_DEFAULT_PAGE_SIZE,
-    page * QUERY_DEFAULT_PAGE_SIZE,
-  )
+  const emptyMessage = (() => {
+    if (applied == null) return "검색 조건을 입력한 뒤 [조회]를 누르세요."
+    if (isError) return toErrorMessage(error) ?? ""
+    return "조회 조건에 해당하는 고객이 없습니다."
+  })()
 
   const setField = <K extends keyof AdminCustomerSearchCondition>(
     key: K,
@@ -88,13 +89,22 @@ export const Adm01CustomerList = () => {
   }
 
   const handleSearch = () => {
+    if (draftReason == null) {
+      setReasonMissing(true)
+      return
+    }
+    setReasonMissing(false)
     setApplied(draft)
+    setAppliedReason(draftReason)
     setPage(1)
   }
 
   const handleReset = () => {
     setDraft(EMPTY_ADMIN_CUSTOMER_CONDITION)
-    setApplied(EMPTY_ADMIN_CUSTOMER_CONDITION)
+    setApplied(null)
+    setDraftReason(null)
+    setAppliedReason(null)
+    setReasonMissing(false)
     setPage(1)
   }
 
@@ -121,14 +131,14 @@ export const Adm01CustomerList = () => {
       key: "userId",
       header: "아이디",
       width: 140,
-      render: (row) => maskUserId(row.userId),
+      render: (row) => row.userId,
     },
     {
       key: "userName",
       header: "성명",
       align: "center",
       width: 90,
-      render: (row) => maskName(row.userName),
+      render: (row) => row.userName,
     },
     // 생년월일·연락처는 목록에 두지 않는다. 마스킹하면(`1988.**.**`) 대상을
     // 가려내는 데 쓸 수 없어 식별 가치가 없고, 목록은 검색으로 좁히는 화면이라
@@ -136,7 +146,7 @@ export const Adm01CustomerList = () => {
     {
       key: "email",
       header: "이메일",
-      render: (row) => maskEmail(row.email),
+      render: (row) => row.email,
     },
     {
       key: "loginFailureCount",
@@ -186,12 +196,12 @@ export const Adm01CustomerList = () => {
       // 8곳의 회귀 범위가 열리므로, 진입점을 셀 안의 링크로 둔다.
       render: (row) => (
         <Link
-          to={`/admin/customers/${row.customerId}`}
+          to={`/admin/customers/${row.customerId}?reason=${appliedReason ?? ""}`}
           // 링크 글자가 행마다 "상세"로 같아서, 이름이 없으면 스크린리더의 링크
-          // 목록에 "상세"만 열두 개 나열된다. 성명이 아니라 아이디를 쓰는 이유는
-          // 마스킹하면 동명이인이 같은 접근명이 되기 때문이다(박서준·박상준 →
-          // 둘 다 "박*준"). 아이디는 유일하므로 행마다 반드시 갈린다.
-          aria-label={`${maskUserId(row.userId)} 계정 상세`}
+          // 목록에 "상세"만 열두 개 나열된다. 서버가 아이디를 앞 4자리만 남기고
+          // 가리므로(uat1104p1·uat1104p2 → 둘 다 "uat1*****") 아이디만으로는 행이
+          // 갈리지 않는다. 유일한 고객 번호를 함께 붙인다.
+          aria-label={`${row.userId} (고객 번호 ${row.customerId}) 계정 상세`}
           className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           상세
@@ -207,6 +217,17 @@ export const Adm01CustomerList = () => {
             링크를 항상 그리는데, 관리자 화면에는 저장할 조건 규정이 없어 눌러도
             아무 일이 없는 죽은 컨트롤이 된다. */}
         <div>
+          <FormRow label="조회 사유" htmlFor="adm-access-reason" required>
+            <AccessReasonSelect
+              id="adm-access-reason"
+              value={draftReason}
+              invalid={reasonMissing}
+              onChange={(reason) => {
+                setDraftReason(reason)
+                if (reason) setReasonMissing(false)
+              }}
+            />
+          </FormRow>
           <FormRow label="아이디" htmlFor="adm-search-user-id">
             <Input
               id="adm-search-user-id"
@@ -255,6 +276,13 @@ export const Adm01CustomerList = () => {
           </FormRow>
         </div>
 
+        {reasonMissing && (
+          <Alert variant="danger" className="mt-3">
+            조회 사유를 고른 뒤 조회하세요. 고객 개인정보 조회는 사유가
+            기록됩니다.
+          </Alert>
+        )}
+
         <div className="mt-4 flex items-center justify-center gap-2">
           <Button
             variant="primary"
@@ -278,20 +306,21 @@ export const Adm01CustomerList = () => {
       <FormSection title="조회결과" className="mb-0">
         <p className="mb-2 text-base text-ink">
           <span className="font-bold text-primary">
-            [총 {rows.length.toLocaleString("ko-KR")}건]
+            [총 {(customerPage?.totalCount ?? 0).toLocaleString("ko-KR")}건]
           </span>
         </p>
 
         <DataGrid
           columns={columns}
-          rows={pageRows}
+          rows={isError ? [] : (customerPage?.customers ?? [])}
           rowKey={(row) => String(row.customerId)}
-          emptyMessage="조회 조건에 해당하는 고객이 없습니다."
+          loading={isFetching}
+          emptyMessage={emptyMessage}
         />
 
         <Pagination
           page={page}
-          totalPages={totalPages}
+          totalPages={isError ? 0 : (customerPage?.totalPages ?? 0)}
           onPageChange={setPage}
         />
       </FormSection>
@@ -299,9 +328,9 @@ export const Adm01CustomerList = () => {
       <NoticeBoxFooter
         items={[
           "고객 정보는 목록·상세 모두 마스킹되어 표시됩니다. 대상 특정은 검색 조건으로 합니다.",
+          "아이디·성명은 두 글자 이상 앞부분으로, 이메일은 전체 주소로 찾습니다.",
           "계정 잠금은 로그인 5회 연속 실패(POL-003) 외에 관리자가 직접 잠근 경우에도 발생합니다.",
           "계정 잠금 해제는 관리자 수동 처리로만 가능하며 고객용 해제 화면은 제공하지 않습니다(REQ-AUTH-026).",
-          "서버 API 연동 전이라 현재 표시되는 값은 목업 데이터입니다.",
         ]}
       />
     </div>

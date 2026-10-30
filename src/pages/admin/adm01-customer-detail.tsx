@@ -1,30 +1,26 @@
 import * as React from "react"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { hasPermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import {
-  findAdminCustomer,
-  updateAdminCustomer,
-  type AdminCustomer,
+  AccessReasonSelect,
+  isAccessReason,
+  useAdminCustomerDetail,
+  useAdminCustomerOperations,
+  type AccessReason,
 } from "@/entities/admin-customer"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { Alert } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { EmptyState } from "@/shared/ui/empty-state"
+import { FormRow } from "@/shared/ui/form-row"
 import { LabelValueRow } from "@/shared/ui/label-value-row"
 import { Modal } from "@/shared/ui/modal"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { Panel, PanelHeader } from "@/shared/ui/panel"
-import {
-  formatDate,
-  formatDateTime,
-  maskBirthDate,
-  maskEmail,
-  maskName,
-  maskPhone,
-  maskUserId,
-} from "@/shared/lib/format"
+import { formatDate, formatDateTime } from "@/shared/lib/format"
 import { LOGIN_MAX_ATTEMPTS } from "@/shared/config/policy"
 
 /**
@@ -34,18 +30,56 @@ import { LOGIN_MAX_ATTEMPTS } from "@/shared/config/policy"
  * (화면을 넘기는 3단)을 쓰지 않는다 — 계정 운영은 이 화면에 머문 채 끝나므로, 화면을
  * 넘기면 방금 무엇을 누구에게 했는지 대상 정보와 함께 볼 수 없다.
  *
- * 비밀번호 초기화만 결과를 모달로 띄운다. 임시 비밀번호는 1회만 표시되고 메일 발송이
- * 없어, 인라인 알림에 섞으면 스크롤로 사라진다.
+ * 비밀번호 초기화만 결과를 모달로 띄운다. 임시 비밀번호는 서버가 응답으로 1회만
+ * 돌려주고 메일 발송이 없어, 인라인 알림에 섞으면 스크롤로 사라진다.
  *
- * 개인정보는 전부 마스킹해 표시한다. 관리자가 대상을 특정하는 수단은 목록의 검색
- * 조건이지 상세에 찍힌 원본 값이 아니다.
+ * 개인정보는 서버가 마스킹해 보낸 값을 그대로 표시한다(PH-97). 관리자가 대상을
+ * 특정하는 수단은 목록의 검색 조건이지 상세에 찍힌 원본 값이 아니다.
+ *
+ * 조회 사유(REQ-ADM-019)는 목록이 링크의 `?reason=` 으로 넘긴다. 주소를 직접 열어
+ * 사유가 없거나 정의되지 않은 값이면 상세를 요청하지 않고 사유부터 고르게 한다.
  */
+
+/** 사유 없이 상세를 연 경우. 고르면 주소에 실어 새로고침해도 유지한다. */
+const AccessReasonGate = ({
+  onSelect,
+}: {
+  onSelect: (reason: AccessReason) => void
+}) => {
+  const [reason, setReason] = React.useState<AccessReason | null>(null)
+  return (
+    <Panel>
+      <PanelHeader title="조회 사유" />
+      <div className="flex flex-col gap-3 px-4 pt-1 pb-4">
+        <p className="text-base text-ink">
+          고객 개인정보를 열기 전에 조회 사유를 고르세요. 사유는 감사 기록에
+          남습니다.
+        </p>
+        <FormRow label="조회 사유" htmlFor="adm-detail-access-reason" required>
+          <AccessReasonSelect
+            id="adm-detail-access-reason"
+            value={reason}
+            onChange={setReason}
+          />
+        </FormRow>
+        <div>
+          <Button
+            disabled={reason == null}
+            onClick={() => reason && onSelect(reason)}
+          >
+            확인
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  )
+}
 
 /** 실행할 변경 액션. `null` 이면 확인 다이얼로그가 닫힌 상태다. */
 type PendingAction = "unlock" | "resetPassword" | "toggleStatus" | null
 
 type ActionResult = {
-  variant: "success" | "info"
+  variant: "success" | "info" | "danger"
   message: string
 }
 
@@ -53,20 +87,6 @@ const ACTION_TITLE: Record<Exclude<PendingAction, null>, string> = {
   unlock: "계정 잠금 해제",
   resetPassword: "로그인 비밀번호 초기화",
   toggleStatus: "계정 상태 변경",
-}
-
-/**
- * 목업 임시 비밀번호. 실제 발급은 서버(PH-97)가 하고 응답으로 1회 돌려준다 —
- * 화면은 받은 값을 보여줄 뿐이라 생성 규칙을 흉내만 낸다.
- */
-const issueTemporaryPassword = (): string => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-  const picked = Array.from(
-    { length: 10 },
-    () => chars[Math.floor(Math.random() * chars.length)],
-  ).join("")
-  // 서버 비밀번호 규칙(영문·숫자·특수문자)을 만족하는 모양으로 끝을 고정한다.
-  return `${picked}!1`
 }
 
 export const Adm01CustomerDetail = () => {
@@ -77,23 +97,65 @@ export const Adm01CustomerDetail = () => {
   // 회계 관리자에게 고객 정지 버튼이 열린다.
   const canOperateCustomer = hasPermission(permissions, "CUSTOMER_WRITE")
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const reasonParam = searchParams.get("reason")
+  const reason = isAccessReason(reasonParam) ? reasonParam : null
+
   const parsedId = Number(customerId)
-  const [customer, setCustomer] = React.useState<AdminCustomer | undefined>(
-    () =>
-      Number.isInteger(parsedId) ? findAdminCustomer(parsedId) : undefined,
-  )
+  const {
+    customer,
+    isPending,
+    isError,
+    error: loadError,
+  } = useAdminCustomerDetail(parsedId, reason)
+  const { unlock, changeStatus, resetPassword } =
+    useAdminCustomerOperations(reason)
+  const isMutating =
+    unlock.isPending || changeStatus.isPending || resetPassword.isPending
   const [pendingAction, setPendingAction] = React.useState<PendingAction>(null)
   const [result, setResult] = React.useState<ActionResult | null>(null)
   const [temporaryPassword, setTemporaryPassword] = React.useState<
     string | null
   >(null)
 
+  // 주소가 숫자가 아니면 조회를 걸지 않으므로 isPending 이 풀리지 않는다.
+  // 그 경우는 로딩이 아니라 "찾을 수 없음"으로 보낸다.
+  const isValidId = Number.isInteger(parsedId) && parsedId > 0
+  if (isValidId && reason == null) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Link
+            to="/admin/customers"
+            className="text-base text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            ← 고객 목록
+          </Link>
+        </div>
+        <AccessReasonGate
+          onSelect={(selected) => setSearchParams({ reason: selected })}
+        />
+      </div>
+    )
+  }
+
+  if (isValidId && isPending) {
+    return (
+      <Panel>
+        <p className="px-4 py-6 text-base text-ink-muted">불러오는 중…</p>
+      </Panel>
+    )
+  }
+
   if (!customer) {
     return (
       <Panel>
         <EmptyState
           message="고객을 찾을 수 없습니다"
-          description="목록에서 다시 선택해 주세요."
+          description={
+            (isError && toErrorMessage(loadError)) ||
+            "목록에서 다시 선택해 주세요."
+          }
           action={
             <Button onClick={() => navigate("/admin/customers")}>
               고객 목록으로
@@ -110,8 +172,8 @@ export const Adm01CustomerDetail = () => {
   const confirmItems = (() => {
     if (pendingAction == null) return []
     const target = [
-      { label: "대상 아이디", value: maskUserId(customer.userId) },
-      { label: "대상 성명", value: maskName(customer.userName) },
+      { label: "대상 아이디", value: customer.userId },
+      { label: "대상 성명", value: customer.userName },
     ]
     if (pendingAction === "unlock") {
       return [
@@ -137,43 +199,57 @@ export const Adm01CustomerDetail = () => {
     ]
   })()
 
+  const showFailure = (error: unknown) => {
+    const message = toErrorMessage(error)
+    // 세션 만료는 A-11 모달이 덮으므로 같은 문구를 또 띄우지 않는다.
+    if (message) setResult({ variant: "danger", message })
+  }
+
   const handleConfirm = () => {
     const action = pendingAction
     setPendingAction(null)
     if (action == null) return
+    setResult(null)
+    const target = { customerId: customer.customerId }
 
     if (action === "unlock") {
-      // REQ-AUTH-035: 잠금을 해제하면 로그인 실패 횟수를 0으로 초기화한다.
-      const updated = updateAdminCustomer(customer.customerId, {
-        accountLocked: false,
-        loginFailureCount: 0,
-      })
-      setCustomer(updated)
-      setResult({
-        variant: "success",
-        message:
-          "계정 잠금을 해제했습니다. 로그인 실패 횟수도 0으로 초기화됐습니다.",
+      // REQ-AUTH-035: 잠금을 해제하면 서버가 로그인 실패 횟수를 0으로 초기화한다.
+      unlock.mutate(target, {
+        onSuccess: () =>
+          setResult({
+            variant: "success",
+            message:
+              "계정 잠금을 해제했습니다. 로그인 실패 횟수도 0으로 초기화됐습니다.",
+          }),
+        onError: showFailure,
       })
       return
     }
 
     if (action === "resetPassword") {
-      setTemporaryPassword(issueTemporaryPassword())
+      resetPassword.mutate(target, {
+        onSuccess: (response) =>
+          setTemporaryPassword(response.temporaryPassword ?? null),
+        onError: showFailure,
+      })
       return
     }
 
     const nextStatus = isSuspended ? "ACTIVE" : "SUSPENDED"
-    const updated = updateAdminCustomer(customer.customerId, {
-      status: nextStatus,
-    })
-    setCustomer(updated)
-    setResult({
-      variant: "success",
-      message:
-        nextStatus === "SUSPENDED"
-          ? "계정을 정지 상태로 변경했습니다. 이 계정은 로그인할 수 없습니다."
-          : "계정을 정상 상태로 변경했습니다.",
-    })
+    changeStatus.mutate(
+      { ...target, data: { status: nextStatus } },
+      {
+        onSuccess: () =>
+          setResult({
+            variant: "success",
+            message:
+              nextStatus === "SUSPENDED"
+                ? "계정을 정지 상태로 변경했습니다. 이 계정은 로그인할 수 없습니다."
+                : "계정을 정상 상태로 변경했습니다.",
+          }),
+        onError: showFailure,
+      },
+    )
   }
 
   const handleCloseTemporaryPassword = () => {
@@ -212,14 +288,11 @@ export const Adm01CustomerDetail = () => {
             </span>
           }
         />
-        <LabelValueRow label="아이디" value={maskUserId(customer.userId)} />
-        <LabelValueRow label="성명" value={maskName(customer.userName)} />
-        <LabelValueRow
-          label="생년월일"
-          value={maskBirthDate(customer.birthDate)}
-        />
-        <LabelValueRow label="이메일" value={maskEmail(customer.email)} />
-        <LabelValueRow label="연락처" value={maskPhone(customer.phoneNumber)} />
+        <LabelValueRow label="아이디" value={customer.userId} />
+        <LabelValueRow label="성명" value={customer.userName} />
+        <LabelValueRow label="생년월일" value={customer.birthDate ?? "-"} />
+        <LabelValueRow label="이메일" value={customer.email} />
+        <LabelValueRow label="연락처" value={customer.phoneNumber ?? "-"} />
         <LabelValueRow
           label="로그인 실패"
           value={
@@ -251,19 +324,21 @@ export const Adm01CustomerDetail = () => {
           <div className="flex flex-wrap gap-2 px-4 pt-1 pb-4">
             <Button
               variant="secondary"
-              disabled={!customer.accountLocked}
+              disabled={isMutating || !customer.accountLocked}
               onClick={() => setPendingAction("unlock")}
             >
               잠금 해제
             </Button>
             <Button
               variant="secondary"
+              disabled={isMutating}
               onClick={() => setPendingAction("resetPassword")}
             >
               비밀번호 초기화
             </Button>
             <Button
               variant="secondary"
+              disabled={isMutating}
               onClick={() => setPendingAction("toggleStatus")}
             >
               {isSuspended ? "정지 해제" : "계정 정지"}
@@ -287,7 +362,6 @@ export const Adm01CustomerDetail = () => {
           "계정 잠금 해제 시 로그인 실패 횟수가 0으로 초기화됩니다(REQ-AUTH-035).",
           "임시 비밀번호는 발급 직후 1회만 표시되며 메일로 발송되지 않습니다. 고객에게 안전한 경로로 전달하세요.",
           "계정 정지는 로그인 자체를 차단합니다. 잠금(로그인 실패 누적)과는 다른 상태입니다.",
-          "서버 API 연동 전이라 현재 변경은 화면 안에서만 유지되며 새로고침하면 처음 상태로 돌아갑니다.",
         ]}
       />
 
@@ -317,7 +391,7 @@ export const Adm01CustomerDetail = () => {
       >
         <div className="flex flex-col gap-3">
           <p className="text-base text-ink">
-            {maskName(customer.userName)} 님의 임시 비밀번호입니다.
+            {customer.userName} 님의 임시 비밀번호입니다.
           </p>
           <p className="rounded-md border border-border bg-surface-2 px-4 py-3 text-center text-h2 font-bold text-ink">
             {temporaryPassword}

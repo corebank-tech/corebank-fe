@@ -30,6 +30,10 @@ test("조회 사유를 고르지 않으면 요청하지 않는다(REQ-ADM-019)",
   await page.getByRole("button", { name: "조회", exact: true }).click()
 
   await expect(page.getByText("조회 사유를 고른 뒤 조회하세요.")).toBeVisible()
+  await expect(page.getByLabel("조회 사유")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  )
   // 입력은 그대로 남는다.
   await expect(page.getByLabel("아이디")).toHaveValue("mins")
   expect(requests).toHaveLength(0)

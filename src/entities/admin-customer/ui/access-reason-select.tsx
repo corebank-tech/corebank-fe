@@ -26,7 +26,7 @@ export const AccessReasonSelect = ({
     id={id}
     className="max-w-48"
     value={value ?? ""}
-    aria-invalid={invalid || undefined}
+    invalid={invalid}
     onChange={(event) =>
       onChange(isAccessReason(event.target.value) ? event.target.value : null)
     }

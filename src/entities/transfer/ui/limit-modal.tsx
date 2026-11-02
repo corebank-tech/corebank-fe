@@ -14,7 +14,7 @@ type LimitModalProps = {
   perDay: number
   /** 1회 이체한도 (KRW). */
   perTransfer: number
-  /** 당일 이체잔여한도 (KRW). */
+  /** 당일 잔여 이체가능금액 (KRW). */
   dailyRemaining: number
   /** Opens the limit-change flow. */
   onChangeLimit: () => void
@@ -37,7 +37,7 @@ export const LimitModal = ({
   const rows: { label: string; value: number }[] = [
     { label: "1일 이체한도", value: perDay },
     { label: "1회 이체한도", value: perTransfer },
-    { label: "당일 이체잔여한도", value: dailyRemaining },
+    { label: "당일 잔여 이체가능금액", value: dailyRemaining },
   ]
 
   return (

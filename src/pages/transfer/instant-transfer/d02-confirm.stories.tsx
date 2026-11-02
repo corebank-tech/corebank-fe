@@ -38,6 +38,7 @@ const meta = {
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
+        payeeBank="CoreBank(당행)"
         toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}
@@ -74,6 +75,7 @@ export const WithAuthError: Story = {
             {FROM_ACCOUNT.alias} {formatAccountNo(FROM_ACCOUNT.accountNo)}
           </span>
         }
+        payeeBank="CoreBank(당행)"
         toAccount={<span>{formatAccountNo(TO_ACCOUNT_NO)}</span>}
         payeeName={maskName(PAYEE_NAME)}
         amount={formatAmount(AMOUNT, { suffix: false })}

@@ -1,6 +1,5 @@
-import * as React from "react"
 import { toErrorMessage } from "@/shared/api/api-error"
-import { MOCK_PROFILE, useCustomerProfileQuery } from "@/entities/customer"
+import { useCustomerProfileQuery } from "@/entities/customer"
 import { QueryPageLayout } from "@/shared/ui/query-page-layout"
 import { F01ProfileContactForm } from "@/pages/mypage/f01-profile-contact-form"
 import { F01ProfilePasswordForm } from "@/pages/mypage/f01-profile-password-form"
@@ -17,9 +16,6 @@ export const F01Profile = () => {
     isError: isProfileError,
     error: profileError,
   } = useCustomerProfileQuery()
-
-  // 연락처/비밀번호 API 연동 전까지만 유지하는 임시 mock 상태
-  const [mockProfile, setMockProfile] = React.useState(MOCK_PROFILE)
 
   return (
     <QueryPageLayout
@@ -49,10 +45,8 @@ export const F01Profile = () => {
       {customerInfo && <F01ProfileSummary profile={customerInfo} />}
 
       {customerInfo && <F01ProfileContactForm profile={customerInfo} />}
-      <F01ProfilePasswordForm
-        profile={mockProfile}
-        onProfileChange={setMockProfile}
-      />
+
+      {customerInfo && <F01ProfilePasswordForm profile={customerInfo} />}
     </QueryPageLayout>
   )
 }

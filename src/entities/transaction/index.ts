@@ -1,10 +1,4 @@
-export type {
-  AccountStatus,
-  Transaction,
-} from "@/entities/transaction/api/transactions"
-
-export { getAccountStatusBadgeVariant } from "@/entities/transaction/lib/status-badge"
-
+export type { Transaction } from "@/entities/transaction/api/transactions"
 export type { PeriodRangeCheck } from "@/entities/transaction/lib/validate-period"
 export { checkPeriodRange } from "@/entities/transaction/lib/validate-period"
 

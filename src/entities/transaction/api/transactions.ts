@@ -1,6 +1,3 @@
-/** 계좌상태. 정상 계좌만 출금가능금액이 계좌잔액과 동일하다(REQ-INQR-008). */
-export type AccountStatus = "정상" | "거래정지" | "해지"
-
 /**
  * B-03 거래내역조회 상단 계좌상세정보(REQ-INQR-007)에 필요한 필드를 더한 계좌 정보.
  * AccountOption을 확장하므로 AccountSelectField 등 기존 소비처에는 그대로 전달할 수 있다.

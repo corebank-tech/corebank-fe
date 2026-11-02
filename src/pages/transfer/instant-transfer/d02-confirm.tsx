@@ -8,6 +8,8 @@ type InstantTransferStep2Props = {
   steps: string[]
   scheduledAt: React.ReactNode
   fromAccount: React.ReactNode
+  /** FE B-8: 입금은행명. 당행도 이름으로 받는다. */
+  payeeBank: React.ReactNode
   toAccount: React.ReactNode
   payeeName: React.ReactNode
   amount: React.ReactNode
@@ -31,6 +33,7 @@ export const InstantTransferStep2 = ({
   steps,
   scheduledAt,
   fromAccount,
+  payeeBank,
   toAccount,
   payeeName,
   amount,
@@ -49,7 +52,7 @@ export const InstantTransferStep2 = ({
       title="즉시이체"
       notice={[
         "아래 이체 내용을 확인한 뒤 [이체하기]를 누르면 거래내용 확인, 계좌비밀번호 검증, OTP 인증 순으로 진행됩니다.",
-        "받는분과 이체금액이 맞는지 다시 확인하세요. 이체 후에는 취소할 수 없습니다.",
+        "예금주와 이체금액이 맞는지 다시 확인하세요. 이체 후에는 취소할 수 없습니다.",
       ]}
       footer={
         <>
@@ -77,7 +80,7 @@ export const InstantTransferStep2 = ({
           columns={[
             { label: "이체예정일시", value: scheduledAt },
             { label: "출금계좌", value: fromAccount },
-            { label: "입금은행", value: "당행" },
+            { label: "입금은행", value: payeeBank },
             { label: "입금계좌", value: toAccount },
             { label: "예금주", value: payeeName },
             { label: "이체금액(원)", value: amount, emphasis: true },
@@ -87,7 +90,7 @@ export const InstantTransferStep2 = ({
               label: "표시내용",
               value: (
                 <div className="flex flex-col gap-0.5 text-left text-xs">
-                  <span>받는분 {payeeMemo}</span>
+                  <span>받는 분 통장 {payeeMemo}</span>
                   <span>내 통장 {myMemo}</span>
                 </div>
               ),
@@ -95,7 +98,7 @@ export const InstantTransferStep2 = ({
           ]}
         />
         <p className="mt-2 text-2xs text-ink-faint">
-          ※ 당행이체는 수수료가 발생하지 않습니다.
+          ※ 이체 수수료는 당행·타행 모두 발생하지 않습니다.
         </p>
         <p className="mt-1 text-2xs text-ink-faint">
           ※ 이체예정일시는 인증 완료 후 실제 처리 시각으로 확정됩니다.

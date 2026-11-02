@@ -23,13 +23,6 @@ export const MOCK_TRANSFER_ACCOUNTS: AccountOption[] = [
   },
 ]
 
-/** MOCK_TRANSFER_ACCOUNTS 계좌비밀번호(4자리) 레지스트리. REQ-TRSF-009 검증용. */
-export const MOCK_ACCOUNT_PASSWORDS: Record<string, string> = {
-  "110632892336": "1234",
-  "302998112233": "2345",
-  "255104778910": "3456",
-}
-
 /** Transfer limits for the demo customer, in KRW. */
 export const MOCK_TRANSFER_LIMITS = {
   /** 1회 이체한도 */
@@ -56,11 +49,6 @@ export type PayeeAccountRecord = {
   payeeName: string
   status: PayeeAccountStatus
   accountType: PayeeAccountType
-  /**
-   * 예금주 조회는 통과하지만 인증 완료 후 실행 단계에서 시스템 오류로 실패하는
-   * 데모 케이스 (REQ-TRSF-019 실패 화면 확인용).
-   */
-  executionFails?: boolean
 }
 
 export const MOCK_PAYEE_ACCOUNTS: PayeeAccountRecord[] = [
@@ -117,7 +105,6 @@ export const MOCK_PAYEE_ACCOUNTS: PayeeAccountRecord[] = [
     payeeName: "한상우",
     status: "normal",
     accountType: "checking",
-    executionFails: true,
   },
 ]
 
@@ -125,7 +112,6 @@ export type PayeeLookupResult = {
   ok: boolean
   payeeName?: string
   accountType?: PayeeAccountType
-  executionFails?: boolean
   /** ok가 false일 때 표시할 안내 문구. */
   error?: string
 }
@@ -166,7 +152,6 @@ export function lookupPayeeAccount(accountNo: string): PayeeLookupResult {
     ok: true,
     payeeName: record.payeeName,
     accountType: record.accountType,
-    executionFails: record.executionFails,
   }
 }
 
@@ -216,15 +201,6 @@ export type FrequentTransferAccount = {
   nickname?: string
 }
 
-/** 자주 쓰는 계좌 최대 등록 건수. REQ-TRSF-026. */
-export const MOCK_FREQUENT_ACCOUNTS_MAX = 20
-
-/** 자주 쓰는 계좌 초기 등록 목록. REQ-TRSF-026. */
-export const MOCK_FREQUENT_TRANSFER_ACCOUNTS: FrequentTransferAccount[] = [
-  { accountNo: "333330730135", payeeName: "김민수", nickname: "단골 거래처" },
-  { accountNo: "219934482201", payeeName: "오수빈", nickname: "가족" },
-]
-
 /* ================================================================== */
 /* 이체 결과 — REQ-TRSF-018 · REQ-TRSF-019 · REQ-TRSF-028               */
 /* ================================================================== */
@@ -242,16 +218,4 @@ export type TransferResultRow = {
   memo: string
   /** 이체 후 출금계좌 예상잔액. 실패 건은 처리 전 잔액과 동일하다. */
   balanceAfter: number
-}
-
-const CHANNEL_CODE = "01" // 인터넷뱅킹
-
-/** REQ-TRSF-028: 'YYYYMMDD + 채널코드(2자리) + 일련번호(10자리)' 형식으로 거래번호를 채번한다. */
-export function generateTransactionId(processedAt: string): string {
-  const d = new Date(processedAt)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  const serial = String(Math.floor(Math.random() * 1e10)).padStart(10, "0")
-  return `${y}${m}${day}${CHANNEL_CODE}${serial}`
 }

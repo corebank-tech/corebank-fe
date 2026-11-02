@@ -1,4 +1,3 @@
-import * as React from "react"
 import { useNavigate } from "react-router"
 import { FormSection } from "@/shared/ui/form-section"
 import { Button } from "@/shared/ui/button"
@@ -12,12 +11,15 @@ import {
 } from "@/pages/dashboard/banking-shortcuts"
 import { NotificationSummary } from "@/pages/dashboard/notification-summary"
 import {
-  MOCK_DASHBOARD_ACCOUNTS,
   MOCK_NOTIFICATIONS,
   useLoginStatusQuery,
-  type DashboardAccount,
   type NotificationItem,
 } from "@/entities/dashboard"
+import {
+  useInquirableAccounts,
+  type InquirableAccount,
+} from "@/entities/account"
+import { toErrorMessage } from "@/shared/api/api-error"
 import { useSession } from "@/features/session"
 import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
 
@@ -39,18 +41,16 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.balance
 
 type A09MainDashboardProps = {
-  accounts?: DashboardAccount[]
   notifications?: NotificationItem[]
   shortcuts?: ShortcutLink[]
-  onInquiry?: (accountId: string) => void
-  onTransfer?: (accountId: string) => void
+  onInquiry?: (accountId: number) => void
+  onTransfer?: (accountId: number) => void
   onBrowseProducts?: () => void
   onSelectShortcut?: (id: string) => void
   onOpenInbox?: () => void
 }
 
 export const A09MainDashboard = ({
-  accounts = MOCK_DASHBOARD_ACCOUNTS,
   notifications = MOCK_NOTIFICATIONS,
   shortcuts,
   onInquiry,
@@ -64,43 +64,59 @@ export const A09MainDashboard = ({
   const { customerName } = useSession()
   const loginStatus = useLoginStatusQuery()
 
-  const totalBalance = React.useMemo(
-    () => accounts.reduce((sum, a) => sum + a.balance, 0),
-    [accounts],
+  const {
+    accounts: inquirableAccounts,
+    isLoading: isAccountsLoading,
+    isError: isAccountsError,
+    error: accountsError,
+  } = useInquirableAccounts()
+
+  const accounts = inquirableAccounts.filter(
+    (account) => account.groupCode === "DEMAND_DEPOSIT",
   )
+  const primaryAccount = accounts[0] ?? null
+
+  const totalBalance = accounts.reduce(
+    (sum, account) => sum + account.balance,
+    0,
+  )
+
+  const accountErrorMessage = isAccountsError
+    ? toErrorMessage(accountsError)
+    : null
 
   const handleInquiry =
     onInquiry ??
-    ((accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId)
-      navigate(account ? `/inquiry?account=${account.accountNo}` : "/inquiry")
+    ((accountId: number) => {
+      navigate(`/inquiry?accountId=${accountId}`)
     })
   const handleTransfer =
     onTransfer ??
-    ((accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId)
+    ((accountId: number) => {
+      const account = accounts.find((a) => a.accountId === accountId)
+
       navigate(
         account
-          ? `/instant-transfer?from=${account.accountNo}`
+          ? `/instant-transfer?from=${account.accountNumber}`
           : "/instant-transfer",
       )
     })
   const handleBrowseProducts = onBrowseProducts ?? (() => navigate("/products"))
   const handleOpenInbox = onOpenInbox ?? (() => navigate("/notifications"))
 
-  const columns: DataGridColumn<DashboardAccount>[] = [
+  const columns: DataGridColumn<InquirableAccount>[] = [
     {
-      key: "alias",
+      key: "accountName",
       header: "계좌명",
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.alias,
     },
     {
-      key: "accountNo",
+      key: "accountNumber",
       header: "계좌번호",
       align: "left",
       width: ACCOUNT_COLUMN_WIDTHS.accountNo,
-      render: (r) => <span>{formatAccountNo(r.accountNo)}</span>,
+      render: (r) => <span>{formatAccountNo(r.accountNumber)}</span>,
     },
     {
       key: "openedDate",
@@ -110,11 +126,15 @@ export const A09MainDashboard = ({
       render: (r) => <span>{formatDate(r.openedDate)}</span>,
     },
     {
-      key: "lastTxDate",
+      key: "lastTransactionAt",
       header: "최근거래일",
       align: "center",
       width: ACCOUNT_COLUMN_WIDTHS.lastTxDate,
-      render: (r) => <span>{formatDate(r.lastTxDate)}</span>,
+      render: (r) => (
+        <span>
+          {r.lastTransactionAt ? formatDate(r.lastTransactionAt) : "-"}
+        </span>
+      ),
     },
     {
       key: "balance",
@@ -135,17 +155,19 @@ export const A09MainDashboard = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => handleInquiry(r.id)}
+            onClick={() => handleInquiry(r.accountId)}
           >
             조회
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => handleTransfer(r.id)}
-          >
-            이체
-          </Button>
+          {r.status === "ACTIVE" && r.transferEnabled && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => handleTransfer(r.accountId)}
+            >
+              이체
+            </Button>
+          )}
         </div>
       ),
     },
@@ -177,7 +199,17 @@ export const A09MainDashboard = ({
       {/* [2] 대표계좌 요약 */}
       <div className="border border-border bg-surface-elevated p-6">
         <FormSection title="대표계좌" className="mb-0">
-          {accounts.length === 0 ? (
+          {isAccountsLoading ? (
+            <div className="p-6 text-base text-ink-muted">
+              계좌 정보를 불러오는 중입니다.
+            </div>
+          ) : isAccountsError ? (
+            accountErrorMessage != null ? (
+              <div className="p-6 text-base text-danger">
+                {accountErrorMessage}
+              </div>
+            ) : null
+          ) : accounts.length === 0 ? (
             <div className="border-t-2 border-b border-border border-t-navy">
               <EmptyState
                 message="등록된 계좌가 없습니다."
@@ -191,23 +223,26 @@ export const A09MainDashboard = ({
             </div>
           ) : (
             <>
-              <div className="mb-4 flex items-end justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-base font-bold text-ink-muted">
-                    기본 입출금계좌 · {accounts[0].alias}
-                  </span>
-                  <span className="text-base font-bold text-ink-muted">
-                    {formatAccountNo(accounts[0].accountNo)}
+              {primaryAccount && (
+                <div className="mb-4 flex items-end justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-base font-bold text-ink-muted">
+                      기본 입출금계좌 · {primaryAccount.accountName}
+                    </span>
+                    <span className="text-base font-bold text-ink-muted">
+                      {formatAccountNo(primaryAccount.accountNumber)}
+                    </span>
+                  </div>
+
+                  <span className="text-h2 font-value text-ink">
+                    {formatAmount(primaryAccount.balance)}
                   </span>
                 </div>
-                <span className="text-h2 font-value text-ink">
-                  {formatAmount(accounts[0].balance)}
-                </span>
-              </div>
+              )}
               <DataGrid
                 columns={columns}
                 rows={accounts}
-                rowKey={(r) => r.id}
+                rowKey={(r) => String(r.accountId)}
               />
               <SummaryRow
                 className="mt-3"

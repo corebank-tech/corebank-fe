@@ -6,37 +6,113 @@ import { Button } from "@/shared/ui/button"
 import { Alert } from "@/shared/ui/alert"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
+import { useQueryClient } from "@tanstack/react-query"
+import { ApiError } from "@/shared/api/api-error"
 import {
-  MOCK_ORDER_ACCOUNTS,
-  sortByOpenedDateAsc,
+  getAccountOverviewQueryKey,
+  toOrderAccounts,
+  useAccountOverviewQuery,
+  useResetAccountDisplayOrderMutation,
+  useSaveAccountDisplayOrderMutation,
   type OrderAccount,
 } from "@/entities/account"
 
 /** REQ-ACCT-014: 계좌 표시순서 변경. [확인] 저장, [초기화] 시 개설일 오름차순 복원. */
 export const B07AccountOrder = () => {
-  const [order, setOrder] = React.useState(MOCK_ORDER_ACCOUNTS)
+  const queryClient = useQueryClient()
+
+  const accountOverviewQuery = useAccountOverviewQuery()
+  const saveOrderMutation = useSaveAccountDisplayOrderMutation()
+  const resetOrderMutation = useResetAccountDisplayOrderMutation()
+
+  const serverOrder = React.useMemo(
+    () =>
+      toOrderAccounts(
+        (accountOverviewQuery.data?.items ?? []).flatMap(
+          (group) => group.accounts ?? [],
+        ),
+      ),
+    [accountOverviewQuery.data],
+  )
+
+  const [draftOrder, setDraftOrder] = React.useState<OrderAccount[] | null>(
+    null,
+  )
+
+  const order = draftOrder ?? serverOrder
+  const isDirty = draftOrder !== null
+
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
     null,
   )
 
+  const [actionError, setActionError] = React.useState<string | null>(null)
+
+  const isMutating = saveOrderMutation.isPending || resetOrderMutation.isPending
+
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction
+
     if (target < 0 || target >= order.length) return
-    setOrder((prev) => {
-      const next = [...prev]
+
+    setDraftOrder((prev) => {
+      const next = [...(prev ?? serverOrder)]
       ;[next[index], next[target]] = [next[target], next[index]]
       return next
     })
+
     setSuccessMessage(null)
+    setActionError(null)
   }
 
-  const handleSave = () => {
-    setSuccessMessage("계좌 표시순서가 저장되었습니다.")
+  const handleSave = async () => {
+    setSuccessMessage(null)
+    setActionError(null)
+
+    try {
+      await saveOrderMutation.mutateAsync({
+        data: {
+          accountIds: order.map((account) => account.accountId),
+        },
+      })
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      setDraftOrder(null)
+
+      setSuccessMessage("계좌 표시순서가 저장되었습니다.")
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌 표시순서 저장 중 오류가 발생했습니다.",
+      )
+    }
   }
 
-  const handleReset = () => {
-    setOrder(sortByOpenedDateAsc(MOCK_ORDER_ACCOUNTS))
+  const handleReset = async () => {
     setSuccessMessage(null)
+    setActionError(null)
+
+    try {
+      await resetOrderMutation.mutateAsync()
+
+      await queryClient.invalidateQueries({
+        queryKey: getAccountOverviewQueryKey(),
+      })
+
+      setDraftOrder(null)
+
+      setSuccessMessage("계좌 표시순서가 초기화되었습니다.")
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError
+          ? error.message
+          : "계좌 표시순서 초기화 중 오류가 발생했습니다.",
+      )
+    }
   }
 
   const columns: DataGridColumn<OrderAccount>[] = [
@@ -47,7 +123,7 @@ export const B07AccountOrder = () => {
       width: 70,
       render: (_r, i) => <span>{i + 1}</span>,
     },
-    { key: "alias", header: "계좌명", width: 200 },
+    { key: "accountName", header: "계좌명", width: 200 },
     {
       key: "accountNo",
       header: "계좌번호",
@@ -79,7 +155,7 @@ export const B07AccountOrder = () => {
             variant="secondary"
             size="sm"
             aria-label="위로 이동"
-            disabled={i === 0}
+            disabled={isMutating || i === 0}
             onClick={() => move(i, -1)}
           >
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
@@ -88,7 +164,7 @@ export const B07AccountOrder = () => {
             variant="secondary"
             size="sm"
             aria-label="아래로 이동"
-            disabled={i === order.length - 1}
+            disabled={isMutating || i === order.length - 1}
             onClick={() => move(i, 1)}
           >
             <ArrowDown className="h-4 w-4" aria-hidden="true" />
@@ -113,11 +189,13 @@ export const B07AccountOrder = () => {
     >
       {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
+      {actionError && <Alert variant="danger">{actionError}</Alert>}
+
       <FormSection title="계좌순서 변경" className="mb-0">
         <DataGrid
           columns={columns}
           rows={order}
-          rowKey={(r) => r.id}
+          rowKey={(r) => String(r.accountId)}
           emptyMessage="보유한 계좌가 없습니다."
         />
 
@@ -126,7 +204,8 @@ export const B07AccountOrder = () => {
             variant="secondary"
             size="lg"
             className="min-w-30"
-            onClick={handleReset}
+            onClick={() => void handleReset()}
+            disabled={isMutating || order.length === 0}
           >
             초기화
           </Button>
@@ -134,7 +213,8 @@ export const B07AccountOrder = () => {
             variant="primary"
             size="lg"
             className="min-w-30"
-            onClick={handleSave}
+            onClick={() => void handleSave()}
+            disabled={isMutating || !isDirty || order.length === 0}
           >
             확인
           </Button>

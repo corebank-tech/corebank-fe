@@ -17,6 +17,12 @@ export type ReservationResultRow = {
    * 서버가 목록을 정렬하는 기준과 같은 값이다.
    */
   transferDate: string
+  /**
+   * 거래일 ISO date. 이 회차가 만든 이체가 귀속된 영업일이라, 휴일에 실행되면
+   * `transferDate` 날짜의 다음 영업일이다. 취소·이체 전 실패, 거래일 대입(#516)
+   * 이전 회차는 없다(서버 #679).
+   */
+  tradeDate?: string
   /** 서버가 마스킹해서 내려준다(예: `110******877`). 화면에서 다시 가공하지 않는다. */
   fromAccountNo: string
   /** 서버가 마스킹해서 내려준다. */

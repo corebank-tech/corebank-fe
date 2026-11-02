@@ -1,0 +1,338 @@
+import * as React from "react"
+import { Link } from "react-router"
+import { FormRow } from "@/shared/ui/form-row"
+import { FormSection } from "@/shared/ui/form-section"
+import { Input } from "@/shared/ui/input"
+import { Select } from "@/shared/ui/select"
+import { Button } from "@/shared/ui/button"
+import { Badge } from "@/shared/ui/badge"
+import { Alert } from "@/shared/ui/alert"
+import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
+import { Pagination } from "@/shared/ui/pagination"
+import { NoticeBoxFooter } from "@/shared/ui/notice-box"
+import {
+  AccessReasonSelect,
+  EMPTY_ADMIN_CUSTOMER_CONDITION,
+  useAdminCustomerSearch,
+  type AccessReason,
+  type AdminCustomer,
+  type AdminCustomerSearchCondition,
+  type AdminCustomerStatusFilter,
+} from "@/entities/admin-customer"
+import { toErrorMessage } from "@/shared/api/api-error"
+import { formatDateTime } from "@/shared/lib/format"
+import {
+  LOGIN_MAX_ATTEMPTS,
+  QUERY_DEFAULT_PAGE_SIZE,
+} from "@/shared/config/policy"
+
+/**
+ * ADM-01 관리자 고객 계정 운영 — 검색·목록.
+ *
+ * 검색과 페이징은 서버(`GET /admin/customers`, PH-97)가 한다. 서버는 조건 없는 검색을
+ * 거부하므로 [조회]를 누르기 전에는 요청하지 않는다.
+ *
+ * 조회 사유(REQ-ADM-019)를 고르지 않으면 [조회]를 눌러도 요청하지 않는다. 고른 사유는
+ * 상세 링크에 실어 넘겨 상세 조회와 변경에도 같은 사유를 쓴다.
+ *
+ * 개인정보는 서버가 마스킹해 보낸 값을 그대로 표시한다. 관리자가 대상을 특정하는
+ * 수단은 검색 조건이지 화면에 찍힌 원본 값이 아니다.
+ */
+
+/**
+ * 상태 선택지. `satisfies` 로 필터 타입에 묶어 둔다 — 필터 종류가 늘었는데
+ * 선택지를 안 만들거나 반대로 없는 값을 적으면 타입 오류로 드러난다.
+ */
+const STATUS_FILTER_OPTIONS = [
+  { label: "전체", value: "all" },
+  { label: "정상", value: "active" },
+  { label: "정지", value: "suspended" },
+  { label: "잠김", value: "locked" },
+] satisfies { label: string; value: AdminCustomerStatusFilter }[]
+
+export const Adm01CustomerList = () => {
+  // 입력 중인 값과 [조회]로 확정한 값을 나눈다 — 타이핑하는 동안 목록이 따라
+  // 바뀌면 조회 결과가 어느 조건의 것인지 화면에서 말할 수 없다.
+  const [draft, setDraft] = React.useState<AdminCustomerSearchCondition>(
+    EMPTY_ADMIN_CUSTOMER_CONDITION,
+  )
+  // [조회] 전에는 null 이다. 서버가 조건 없는 검색을 거부하므로 요청하지 않는다.
+  const [applied, setApplied] =
+    React.useState<AdminCustomerSearchCondition | null>(null)
+  const [draftReason, setDraftReason] = React.useState<AccessReason | null>(
+    null,
+  )
+  const [appliedReason, setAppliedReason] = React.useState<AccessReason | null>(
+    null,
+  )
+  const [reasonMissing, setReasonMissing] = React.useState(false)
+  const [page, setPage] = React.useState(1)
+
+  const { customerPage, isFetching, isError, error } = useAdminCustomerSearch({
+    condition: applied,
+    reason: appliedReason,
+    page,
+    size: QUERY_DEFAULT_PAGE_SIZE,
+  })
+
+  const emptyMessage = (() => {
+    if (applied == null) return "검색 조건을 입력한 뒤 [조회]를 누르세요."
+    if (isError) return toErrorMessage(error) ?? ""
+    return "조회 조건에 해당하는 고객이 없습니다."
+  })()
+
+  const setField = <K extends keyof AdminCustomerSearchCondition>(
+    key: K,
+    value: AdminCustomerSearchCondition[K],
+  ) => {
+    setDraft((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSearch = () => {
+    if (draftReason == null) {
+      setReasonMissing(true)
+      return
+    }
+    setReasonMissing(false)
+    setApplied(draft)
+    setAppliedReason(draftReason)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setDraft(EMPTY_ADMIN_CUSTOMER_CONDITION)
+    setApplied(null)
+    setDraftReason(null)
+    setAppliedReason(null)
+    setReasonMissing(false)
+    setPage(1)
+  }
+
+  /**
+   * 정렬 가능 컬럼을 두지 않는다. `DataGrid` 는 **넘겨받은 rows 안에서만** 정렬하는데
+   * (`shared/ui/data-grid.tsx` 의 `sortedRows`) 이 화면은 이미 잘라낸 현재 페이지를
+   * 넘기므로, 정렬을 켜면 페이지 안에서만 재배열되어 목록 전체 순서로 오인된다.
+   *
+   * 전체 정렬을 하려면 정렬 상태를 이 화면이 소유해야 하는데 `DataGrid` 가 밖으로
+   * 내보내지 않는다. prop 을 더하는 방향은 택하지 않았다 — 이 그리드를 쓰는 파일이
+   * 24곳이라 회귀 범위가 레포 전체로 열린다. 서버 정렬이 생기면 그때 붙인다.
+   *
+   * 레포의 기준은 하나다 — **정렬을 켜는 화면은 `DataGrid` 에 전체 목록을 넘기는 곳뿐이다.**
+   * `b01-all-accounts.tsx`·`b02-deposit-accounts.tsx`·`a09-main-dashboard.tsx` 가 그렇고,
+   * 거기서는 정렬이 결과 전체를 대상으로 돌아 맞다.
+   *
+   * 한 페이지만 잘라 넘기는 화면은 정렬을 두지 않는다 — `b03-transaction-inquiry.tsx`·
+   * `d04-transfer-history.tsx`·`g04-auto-transfer-list.tsx` 는 원래 없었고,
+   * `e04`·`e05`·`g05`(서버 페이징)와 `f02`(클라이언트 슬라이싱)는 같은 결함이 있어
+   * #148 에서 제거했다.
+   */
+  const columns: DataGridColumn<AdminCustomer>[] = [
+    {
+      key: "userId",
+      header: "아이디",
+      width: 140,
+      render: (row) => row.userId,
+    },
+    {
+      key: "userName",
+      header: "성명",
+      align: "center",
+      width: 90,
+      render: (row) => row.userName,
+    },
+    // 생년월일·연락처는 목록에 두지 않는다. 마스킹하면(`1988.**.**`) 대상을
+    // 가려내는 데 쓸 수 없어 식별 가치가 없고, 목록은 검색으로 좁히는 화면이라
+    // 개인정보를 덜 뿌리는 편이 낫다. 두 값은 상세에서 마스킹된 채로 본다.
+    {
+      key: "email",
+      header: "이메일",
+      render: (row) => row.email,
+    },
+    {
+      key: "loginFailureCount",
+      header: "로그인 실패",
+      align: "center",
+      width: 100,
+      render: (row) => (
+        <span className={row.loginFailureCount > 0 ? "text-danger" : undefined}>
+          {row.loginFailureCount}/{LOGIN_MAX_ATTEMPTS}
+        </span>
+      ),
+    },
+    {
+      key: "state",
+      header: "상태",
+      align: "center",
+      width: 130,
+      render: (row) => (
+        <span className="inline-flex gap-1">
+          <Badge variant={row.status === "ACTIVE" ? "success" : "danger"}>
+            {row.status === "ACTIVE" ? "정상" : "정지"}
+          </Badge>
+          {/* 잠김은 상태와 별개 축이다 — 정지 계정이 잠겨 있을 수도, 정상 계정이
+              5회 실패로 잠겨 있을 수도 있어 배지를 겹쳐 보여준다. */}
+          {row.accountLocked && <Badge variant="warning">잠김</Badge>}
+        </span>
+      ),
+    },
+    {
+      key: "lastLoginAt",
+      header: "최근 로그인",
+      align: "center",
+      width: 160,
+      render: (row) =>
+        row.lastLoginAt ? (
+          formatDateTime(row.lastLoginAt)
+        ) : (
+          <span className="text-ink-faint">이력 없음</span>
+        ),
+    },
+    {
+      key: "detail",
+      header: "관리",
+      align: "center",
+      width: 70,
+      // DataGrid 에 행 클릭 기능이 없다. 공용 컴포넌트에 prop 을 더하면 고객 화면
+      // 8곳의 회귀 범위가 열리므로, 진입점을 셀 안의 링크로 둔다.
+      render: (row) => (
+        <Link
+          to={`/admin/customers/${row.customerId}?reason=${appliedReason ?? ""}`}
+          // 링크 글자가 행마다 "상세"로 같아서, 이름이 없으면 스크린리더의 링크
+          // 목록에 "상세"만 열두 개 나열된다. 서버가 아이디를 앞 4자리만 남기고
+          // 가리므로(uat1104p1·uat1104p2 → 둘 다 "uat1*****") 아이디만으로는 행이
+          // 갈리지 않는다. 유일한 고객 번호를 함께 붙인다.
+          aria-label={`${row.userId} (고객 번호 ${row.customerId}) 계정 상세`}
+          className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          상세
+        </Link>
+      ),
+    },
+  ]
+
+  return (
+    <div className="flex flex-col gap-6">
+      <FormSection title="조회조건" className="mb-0">
+        {/* 고객 조회화면의 `SearchPanel` 을 쓰지 않는다 — 그 컴포넌트는 [조회조건저장]
+            링크를 항상 그리는데, 관리자 화면에는 저장할 조건 규정이 없어 눌러도
+            아무 일이 없는 죽은 컨트롤이 된다. */}
+        <div>
+          <FormRow label="조회 사유" htmlFor="adm-access-reason" required>
+            <AccessReasonSelect
+              id="adm-access-reason"
+              value={draftReason}
+              invalid={reasonMissing}
+              onChange={(reason) => {
+                setDraftReason(reason)
+                if (reason) setReasonMissing(false)
+              }}
+            />
+          </FormRow>
+          <FormRow label="아이디" htmlFor="adm-search-user-id">
+            <Input
+              id="adm-search-user-id"
+              className="max-w-xs"
+              autoComplete="off"
+              value={draft.userId}
+              onChange={(event) => setField("userId", event.target.value)}
+            />
+          </FormRow>
+          <FormRow label="성명" htmlFor="adm-search-user-name">
+            <Input
+              id="adm-search-user-name"
+              className="max-w-xs"
+              autoComplete="off"
+              value={draft.userName}
+              onChange={(event) => setField("userName", event.target.value)}
+            />
+          </FormRow>
+          <FormRow label="이메일" htmlFor="adm-search-email">
+            <Input
+              id="adm-search-email"
+              className="max-w-md"
+              autoComplete="off"
+              value={draft.email}
+              onChange={(event) => setField("email", event.target.value)}
+            />
+          </FormRow>
+          <FormRow label="계정 상태" htmlFor="adm-search-status">
+            <Select
+              id="adm-search-status"
+              className="max-w-40"
+              value={draft.status}
+              onChange={(event) =>
+                setField(
+                  "status",
+                  event.target.value as AdminCustomerStatusFilter,
+                )
+              }
+            >
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </FormRow>
+        </div>
+
+        {reasonMissing && (
+          <Alert variant="danger" className="mt-3">
+            조회 사유를 고른 뒤 조회하세요. 고객 개인정보 조회는 사유가
+            기록됩니다.
+          </Alert>
+        )}
+
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Button
+            variant="primary"
+            size="md"
+            className="min-w-25"
+            onClick={handleSearch}
+          >
+            조회
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            className="min-w-25"
+            onClick={handleReset}
+          >
+            초기화
+          </Button>
+        </div>
+      </FormSection>
+
+      <FormSection title="조회결과" className="mb-0">
+        <p className="mb-2 text-base text-ink">
+          <span className="font-bold text-primary">
+            [총 {(customerPage?.totalCount ?? 0).toLocaleString("ko-KR")}건]
+          </span>
+        </p>
+
+        <DataGrid
+          columns={columns}
+          rows={isError ? [] : (customerPage?.customers ?? [])}
+          rowKey={(row) => String(row.customerId)}
+          loading={isFetching}
+          emptyMessage={emptyMessage}
+        />
+
+        <Pagination
+          page={page}
+          totalPages={isError ? 0 : (customerPage?.totalPages ?? 0)}
+          onPageChange={setPage}
+        />
+      </FormSection>
+
+      <NoticeBoxFooter
+        items={[
+          "고객 정보는 목록·상세 모두 마스킹되어 표시됩니다. 대상 특정은 검색 조건으로 합니다.",
+          "아이디·성명은 두 글자 이상 앞부분으로, 이메일은 전체 주소로 찾습니다.",
+          "계정 잠금은 로그인 5회 연속 실패(POL-003) 외에 관리자가 직접 잠근 경우에도 발생합니다.",
+          "계정 잠금 해제는 관리자 수동 처리로만 가능하며 고객용 해제 화면은 제공하지 않습니다(REQ-AUTH-026).",
+        ]}
+      />
+    </div>
+  )
+}

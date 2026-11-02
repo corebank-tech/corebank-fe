@@ -10,7 +10,7 @@ export type PeriodRangeCheck = {
 /**
  * 조회기간 입력을 검사한다(REQ-INQR-010).
  *
- * 한도는 두 가지를 함께 본다. 요구사항이 열마다 다른 기준을 쓰기 때문이다 —
+ * 고객 조회화면은 한도 두 가지를 함께 본다. 요구사항이 열마다 다른 기준을 쓰기 때문이다 —
  * 본문과 POL-021 적용기준 열은 "시작일 기준"(조회 시작일이 조회 시점으로부터 1년 이내)이고,
  * 인수기준 열은 "1년 초과 **기간**"으로 폭을 말한다. 한쪽만 보면 다른 쪽이 뚫린다.
  *
@@ -20,24 +20,27 @@ export type PeriodRangeCheck = {
  * 빈 문자열은 `daysBetween`이 NaN을 내고 NaN은 어떤 비교에도 false라 두 검사를 그냥
  * 통과한다. 조용히 빈 목록이 나오므로 `incomplete`로 따로 구분한다.
  *
- * @param maxPeriodDays 시작일 소급 한도이자 기간 폭 한도. 두 한도를 한 값으로
- *   겸한다 — 지금은 어느 화면에서도 같은 값이라 하나로 되지만, 한쪽만 다른 화면이
- *   생기면 인자를 둘로 갈라야 한다.
+ * @param maxPeriodDays 기간 폭 한도.
+ * @param maxLookbackDays 시작일 소급 한도. 기본은 `maxPeriodDays` 와 같은 값이다(고객
+ *   조회화면, REQ-INQR-010). **`null` 이면 소급을 재지 않는다** — 관리자 시산표는 폭만
+ *   제한한다(POL-A07, 서버 `TrialBalanceQueryService`).
  */
 export function checkPeriodRange(
   start: string,
   end: string,
   today: string,
   maxPeriodDays: number,
+  maxLookbackDays: number | null = maxPeriodDays,
 ): PeriodRangeCheck {
   if (!start || !end) {
     return { incomplete: true, reversed: false, overLimit: false }
   }
   const span = daysBetween(start, end)
+  const lookbackExceeded =
+    maxLookbackDays != null && daysBetween(start, today) > maxLookbackDays
   return {
     incomplete: false,
     reversed: span < 0,
-    overLimit:
-      daysBetween(start, today) > maxPeriodDays || span > maxPeriodDays,
+    overLimit: lookbackExceeded || span > maxPeriodDays,
   }
 }

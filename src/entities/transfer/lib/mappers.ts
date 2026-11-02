@@ -43,6 +43,7 @@ export const toReservationRow = (
   item: ScheduledTransferListItemResponse,
 ): ReservationRow => ({
   id: String(item.scheduledTransferId ?? ""),
+  withdrawalAccountId: item.withdrawalAccountId ?? null,
   status: RESERVATION_STATUS_MAP[item.status ?? "WAITING"],
   scheduledDate: item.scheduledDate ?? "",
   registeredAt: item.registeredAt,
@@ -82,6 +83,7 @@ export const toReservationResultRow = (
   // 정상·오류는 실행 시각, 취소는 취소 시각이 채워진다. 서버가 목록을 정렬하는
   // 기준도 이 둘의 COALESCE라 같은 값을 쓴다.
   transferDate: item.executedAt ?? item.canceledAt ?? "",
+  tradeDate: item.tradeDate ?? undefined,
   fromAccountNo: item.withdrawalAccountNumber ?? "",
   toAccountNo: item.accountNumber ?? "",
   payeeName: item.payeeName ?? "",
@@ -153,6 +155,7 @@ const AUTO_TRANSFER_RESULT_MAP: Record<string, AutoTransferResult> = {
   // 배치가 실행 중인 짧은 순간의 상태. 정상·오류 중 하나로 뭉개면 확정되지 않은
   // 회차를 확정된 것처럼 보여주게 된다.
   PROCESSING: "처리중",
+  TIMEOUT: "처리중",
 }
 
 const toAutoTransferResult = (
@@ -177,6 +180,7 @@ export const toAutoTransferResultRow = (
   id: String(item.executionId ?? ""),
   result: toAutoTransferResult(item.status),
   processedAt: item.executedAt ?? "",
+  tradeDate: item.tradeDate ?? undefined,
   fromAccountNo: fromAccount.accountNo,
   fromAlias: fromAccount.alias,
   toAccountNo: item.depositAccountNumber ?? "",
@@ -191,6 +195,9 @@ const TRANSFER_STATUS_MAP: Record<string, TransferStatus> = {
   SUCCESS: "정상",
   ERROR: "오류",
   PROCESSING: "처리중",
+  // 대외 무응답으로 처리 결과를 모르는 상태. 실패가 아니므로 '오류'로 보여주지
+  // 않고, 화면 처리상태는 3종만 쓰므로(POL-025) '처리중'과 같이 둔다.
+  TIMEOUT: "처리중",
 }
 
 /**

@@ -22,12 +22,16 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import {
-  getAccountStatusBadgeVariant,
   toTransactionRows,
   useAccountTransactionQuery,
   type Transaction,
 } from "@/entities/transaction"
-import { useInquirableAccounts } from "@/entities/account"
+import {
+  getAccountStatusBadgeVariant,
+  getAccountStatusLabel,
+  useAccountDetailQuery,
+  useInquirableAccounts,
+} from "@/entities/account"
 import {
   formatAccountNo,
   formatAmount,
@@ -45,6 +49,8 @@ import {
 } from "@/shared/config/policy"
 import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
+import { Button } from "@/shared/ui/button"
+import { Skeleton } from "@/shared/ui/skeleton"
 
 /**
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-INQR-009 인수기준:
@@ -227,6 +233,12 @@ export const B03TransactionInquiry = () => {
     isError: isTransactionsError,
     error: transactionsError,
   } = useAccountTransactionQuery(effectiveAppliedAccountId, transactionParams)
+  const {
+    data: accountDetail,
+    isLoading: isAccountDetailLoading,
+    isError: isAccountDetailError,
+    refetch: refetchAccountDetail,
+  } = useAccountDetailQuery(effectiveAppliedAccountId)
   const savedCondition = useSavedConditionAlert()
   const downloadComplete = useSavedConditionAlert()
   const [brailleOpen, setBrailleOpen] = React.useState(false)
@@ -254,6 +266,17 @@ export const B03TransactionInquiry = () => {
     () => toTransactionRows(transactionData?.items ?? []),
     [transactionData?.items],
   )
+  const renderAccountDetailValue = (value: React.ReactNode) => {
+    if (isAccountDetailLoading) {
+      return <Skeleton className="h-5 w-24" />
+    }
+
+    if (isAccountDetailError || accountDetail == null) {
+      return "-"
+    }
+
+    return value
+  }
 
   const depositSum = transactionData?.summary?.depositAmount ?? 0
   const depositCount = transactionData?.summary?.depositCount ?? 0
@@ -262,6 +285,8 @@ export const B03TransactionInquiry = () => {
 
   const totalCount = transactionData?.totalCount ?? 0
   const totalPages = transactionData?.totalPages ?? 0
+
+  const accountStatus = getAccountStatusLabel(accountDetail?.status)
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",
@@ -477,24 +502,31 @@ export const B03TransactionInquiry = () => {
           <InfoRow
             gridCols="grid-cols-4"
             items={[
-              { term: "계좌명", desc: selectedAccount.accountName || "-" },
-              { term: "예금주", desc: "-" },
+              {
+                term: "계좌명",
+                desc: renderAccountDetailValue(
+                  accountDetail?.accountName || "-",
+                ),
+              },
+              {
+                term: "예금주",
+                desc: renderAccountDetailValue(accountDetail?.ownerName || "-"),
+              },
               {
                 term: "계좌번호",
-                desc: formatAccountNo(selectedAccount.accountNumber),
+                desc: renderAccountDetailValue(
+                  accountDetail?.accountNumber
+                    ? formatAccountNo(accountDetail.accountNumber)
+                    : "-",
+                ),
               },
               {
                 term: "계좌상태",
-                desc: (() => {
-                  const status =
-                    selectedAccount.status === "SUSPENDED" ? "거래정지" : "정상"
-
-                  return (
-                    <Badge variant={getAccountStatusBadgeVariant(status)}>
-                      {status}
-                    </Badge>
-                  )
-                })(),
+                desc: renderAccountDetailValue(
+                  <Badge variant={getAccountStatusBadgeVariant(accountStatus)}>
+                    {accountStatus}
+                  </Badge>,
+                ),
               },
             ]}
           />
@@ -503,23 +535,50 @@ export const B03TransactionInquiry = () => {
               gridCols="grid-cols-3"
               items={[
                 {
-                  term: "계좌잔액",
-                  desc: formatAmount(selectedAccount.balance),
+                  term: "잔액",
+                  desc: renderAccountDetailValue(
+                    accountDetail?.balance != null
+                      ? formatAmount(accountDetail.balance)
+                      : "-",
+                  ),
                   dominant: true,
                 },
                 {
                   term: "출금가능금액",
-                  desc: "-",
+                  desc: renderAccountDetailValue(
+                    accountDetail?.availableBalance != null
+                      ? formatAmount(accountDetail.availableBalance)
+                      : "-",
+                  ),
                 },
                 {
                   term: "신규일자",
-                  desc: selectedAccount.openedDate
-                    ? formatDate(selectedAccount.openedDate)
-                    : "-",
+                  desc: renderAccountDetailValue(
+                    accountDetail?.openedDate
+                      ? formatDate(accountDetail.openedDate)
+                      : "-",
+                  ),
                 },
               ]}
             />
           </div>
+          {isAccountDetailError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-2 border-t border-border bg-danger-tint px-4 py-2"
+            >
+              <p className="text-base text-ink">
+                계좌 상세정보를 불러오지 못했습니다.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void refetchAccountDetail()}
+              >
+                다시 조회
+              </Button>
+            </div>
+          )}
         </div>
       </CollapsibleSection>
 
@@ -612,7 +671,7 @@ export const B03TransactionInquiry = () => {
         className="mt-8"
         items={[
           "조회기간은 시작일 기준 최대 1년 이내로 지정할 수 있으며, 시작일이 종료일보다 늦으면 조회되지 않습니다.",
-          "거래 후 잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
+          "거래후잔액은 해당 거래 처리 시점 기준이며, 이후 발생한 거래에 따라 현재 잔액과 다를 수 있습니다.",
           "자동이체 실행 건은 적요가 '자동이체'로 표시됩니다.",
           "파일저장은 현재 표시 중인 페이지의 거래내역을 CSV로 저장하며, 파일에는 마스킹된 계좌번호가 사용됩니다.",
         ]}

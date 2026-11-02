@@ -9,6 +9,7 @@ import { SummaryRow } from "@/shared/ui/summary-row"
 import { GridToolbar, SavedConditionAlert } from "@/widgets/query"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { TextViewModal } from "@/shared/ui/text-view-modal"
+import { Badge } from "@/shared/ui/badge"
 import {
   GridSearchModal,
   type GridSearchField,
@@ -24,6 +25,8 @@ import {
 
 import { getToday } from "@/shared/config/clock"
 import {
+  getAccountStatusBadgeVariant,
+  getAccountStatusLabel,
   useInquirableAccounts,
   type InquirableAccount,
 } from "@/entities/account"
@@ -77,6 +80,19 @@ const buildColumns = (
           group === "DEPOSIT_SAVINGS" ? r.maturityDate : r.lastTransactionAt
 
         return <span>{date ? formatDate(date) : "-"}</span>
+      },
+    },
+    {
+      key: "status",
+      header: "상태",
+      align: "center",
+      width: 90,
+      render: (r) => {
+        const status = getAccountStatusLabel(r.status)
+
+        return (
+          <Badge variant={getAccountStatusBadgeVariant(status)}>{status}</Badge>
+        )
       },
     },
     {

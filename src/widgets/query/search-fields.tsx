@@ -83,15 +83,17 @@ type PeriodFieldProps = {
   /** 기본은 REQ-INQR-009의 과거 방향 프리셋. 미래 건을 다루는 화면은 직접 넘긴다. */
   presets?: PeriodPreset[]
   /**
-   * 조회기간 한도(일). **시작일 소급 한도와 기간 폭 한도를 겸한다** —
-   * `checkPeriodRange`가 이 값 하나로 둘 다 잰다(REQ-INQR-010의 적용기준 열은
-   * 시작일 기준, 인수기준 열은 폭 기준이다). 한쪽만 다른 화면이 생기면 prop을
-   * 둘로 갈라야 한다.
-   *
-   * 기본은 POL-021(거래내역 조회 최대 1년). 다른 규칙을 따르는 화면은 자기 상수를
-   * 넘긴다 — 여기서 고정하면 화면의 조회 차단 기준과 입력칸 표시가 갈라진다.
+   * 기간 폭 한도(일). 기본은 POL-021(거래내역 조회 최대 1년). 다른 규칙을 따르는
+   * 화면은 자기 상수를 넘긴다 — 여기서 고정하면 화면의 조회 차단 기준과 입력칸
+   * 표시가 갈라진다.
    */
   maxPeriodDays?: number
+  /**
+   * 시작일 소급 한도(일). 기본은 `maxPeriodDays` 와 같다(REQ-INQR-010의 적용기준 열은
+   * 시작일 기준, 인수기준 열은 폭 기준이라 고객 화면은 둘 다 잰다). `null` 이면 소급을
+   * 재지 않는다. 화면이 조회를 막을 때 `checkPeriodRange` 에 넘기는 값과 같아야 한다.
+   */
+  maxLookbackDays?: number | null
 }
 
 export const PeriodField = ({
@@ -101,6 +103,7 @@ export const PeriodField = ({
   today,
   presets = PAST_PERIOD_PRESETS,
   maxPeriodDays = QUERY_MAX_RANGE_DAYS,
+  maxLookbackDays = maxPeriodDays,
 }: PeriodFieldProps) => {
   const applyPreset = (preset: PeriodPreset) => {
     onChange({
@@ -131,14 +134,16 @@ export const PeriodField = ({
     end,
     today,
     maxPeriodDays,
+    maxLookbackDays,
   )
   // 한도는 화면마다 다를 수 있으므로 안내 문구도 넘겨받은 값에서 만든다.
-  const limitLabel =
-    maxPeriodDays % 365 === 0
-      ? `${maxPeriodDays / 365}년`
-      : `${maxPeriodDays}일`
+  const toLimitLabel = (days: number) =>
+    days % 365 === 0 ? `${days / 365}년` : `${days}일`
   // JSX 텍스트로 두면 prettier가 표현식 앞뒤에서 줄을 바꾸며 공백을 지운다.
-  const overLimitMessage = `조회기간은 최대 ${limitLabel} 이내여야 하고, 시작일도 오늘로부터 ${limitLabel} 이내여야 합니다. 기간을 다시 선택하세요.`
+  const overLimitMessage =
+    maxLookbackDays == null
+      ? `조회기간은 최대 ${toLimitLabel(maxPeriodDays)} 이내여야 합니다. 기간을 다시 선택하세요.`
+      : `조회기간은 최대 ${toLimitLabel(maxPeriodDays)} 이내여야 하고, 시작일도 오늘로부터 ${toLimitLabel(maxLookbackDays)} 이내여야 합니다. 기간을 다시 선택하세요.`
 
   const stepperGroup =
     "inline-flex items-stretch overflow-hidden rounded-md border border-border-strong"

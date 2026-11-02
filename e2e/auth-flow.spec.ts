@@ -21,8 +21,12 @@ test("로그인 실패는 세션만료 안내가 아니라 로그인 실패 문�
   await expect(page.getByRole("alert")).toContainText(
     "아이디 또는 비밀번호가 올바르지 않습니다.",
   )
-  // 로그인 실패도 401 이라 상태코드로만 판정하면 A-11 안내가 뜬다.
-  await expect(page.getByText("세션이 만료")).toBeHidden()
+  // 로그인 실패도 401 이라 상태코드로만 판정하면 A-11 안내가 뜬다. 찾는 문구는 모달
+  // 본문이어야 한다 — `세션이 만료` 는 A-11 에 없고 MSW 401 응답 메시지에만 있어서,
+  // 그걸로 보면 모달이 실제로 떠도 통과한다(#164 에서 발견).
+  await expect(
+    page.getByText("장시간 조작이 없어 자동 로그아웃되었습니다."),
+  ).toBeHidden()
 })
 
 test("입력을 고치면 이전 실패 안내가 사라진다", async ({ page }) => {

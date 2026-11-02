@@ -68,12 +68,12 @@ export const AutoTransferStep2 = ({
           columns={[
             { label: "출금계좌", value: fromAccount },
             { label: "입금계좌", value: toAccount },
-            { label: "받는분", value: payeeName },
+            { label: "예금주", value: payeeName },
             { label: "이체금액(원)", value: amount, emphasis: true },
             { label: "이체주기", value: cycle },
             { label: "이체지정일", value: dayOfMonth },
             { label: "이체기간", value: period },
-            { label: "받는통장 메모", value: payeeMemo },
+            { label: "받는 분 통장 표시내용", value: payeeMemo },
           ]}
         />
         <p className="mt-2 text-2xs text-ink-faint">

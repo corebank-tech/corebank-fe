@@ -13,6 +13,21 @@ import { expect, test, type Page } from "@playwright/test"
  * 의도된 시각 변경(보더 색상 버그 수정 등)이 있는 커밋 직후에만 `--update-snapshots`로 재베이스라인한다.
  */
 
+/**
+ * 시계와 타임존을 고정한다.
+ *
+ * mock 데이터는 의도적으로 상대 날짜(`shared/lib/mock-date.ts`의 `daysAgo`)를 쓴다 —
+ * 고정 날짜로 두면 기본 조회기간(POL-021) 밖으로 밀려나 화면이 빈 목록이 되기 때문이다.
+ * 그 대가로 화면에 찍히는 날짜가 매일 달라져, 시계를 풀어두면 베이스라인이 하루 만에
+ * 깨진다(실제로 10건 전부 그렇게 깨져 있었다).
+ *
+ * 타임존까지 묶는 이유는 `getToday()`가 브라우저 로컬 타임존을 읽기 때문이다.
+ * UTC 로 맞춘 기기에서는 KST 오전 9시 이전에 하루 이른 날짜가 찍힌다.
+ */
+test.use({ timezoneId: "Asia/Seoul" })
+
+const FIXED_NOW = new Date("2026-09-10T09:00:00+09:00")
+
 const CREDENTIALS = { userId: "honggildong", password: "Passw0rd!" }
 
 async function login(page: Page) {
@@ -87,25 +102,32 @@ const SCENARIOS: Scenario[] = [
 
 for (const scenario of SCENARIOS) {
   for (const theme of ["light", "dark"] as const) {
-    test(`${scenario.name} — ${theme}`, async ({ page }) => {
-      await login(page)
-      await setTheme(page, theme)
-      await navigate(page, scenario.path)
-      await scenario.ready(page)
-      await page.waitForTimeout(200)
-      await expect(page).toHaveScreenshot(`${scenario.name}-${theme}.png`, {
-        fullPage: true,
-        animations: "disabled",
-        // 헤더의 세션 잔여시간(mm:ss)이 매초 바뀌어 캡처 안정화를 막으므로 마스킹한다.
-        // 개발 메뉴 버튼(App.tsx DevNav, 디자인시스템 비포함 dev 전용 UI)과 헤더 테마
-        // 토글 버튼 주변에서 브라우저/OS 오버레이가 간헐적으로 겹쳐 찍혀 플레이키해지므로
-        // 함께 마스킹한다(앱 코드에는 해당 위치에 그런 요소가 없음 — 환경 아티팩트).
-        mask: [
-          page.getByText(/^\d{2}:\d{2}$/),
-          page.getByRole("button", { name: "개발 메뉴" }),
-          page.getByRole("button", { name: /(다크|라이트) 모드로 전환/ }),
-        ],
-      })
-    })
+    // `@visual` — 베이스라인을 커밋하지 않아 CI e2e 에서 뺀다(.github/workflows/e2e.yml).
+    test(
+      `${scenario.name} — ${theme}`,
+      { tag: "@visual" },
+      async ({ page }) => {
+        // 첫 스크립트가 돌기 전에 걸어야 mock 데이터의 상대 날짜가 고정된다.
+        await page.clock.setFixedTime(FIXED_NOW)
+        await login(page)
+        await setTheme(page, theme)
+        await navigate(page, scenario.path)
+        await scenario.ready(page)
+        await page.waitForTimeout(200)
+        await expect(page).toHaveScreenshot(`${scenario.name}-${theme}.png`, {
+          fullPage: true,
+          animations: "disabled",
+          // 헤더의 세션 잔여시간(mm:ss)이 매초 바뀌어 캡처 안정화를 막으므로 마스킹한다.
+          // 개발 메뉴 버튼(App.tsx DevNav, 디자인시스템 비포함 dev 전용 UI)과 헤더 테마
+          // 토글 버튼 주변에서 브라우저/OS 오버레이가 간헐적으로 겹쳐 찍혀 플레이키해지므로
+          // 함께 마스킹한다(앱 코드에는 해당 위치에 그런 요소가 없음 — 환경 아티팩트).
+          mask: [
+            page.getByText(/^\d{2}:\d{2}$/),
+            page.getByRole("button", { name: "개발 메뉴" }),
+            page.getByRole("button", { name: /(다크|라이트) 모드로 전환/ }),
+          ],
+        })
+      },
+    )
   }
 }

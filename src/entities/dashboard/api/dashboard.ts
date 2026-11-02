@@ -1,19 +1,6 @@
 import { daysAgo } from "@/shared/lib/mock-date"
 
-/** Dashboard presentation mock data. KRW single currency, Asia/Seoul. */
-
-export type DashboardAccount = {
-  id: string
-  /** 계좌명 (별칭 + 상품명 구분용) */
-  alias: string
-  /** 12-digit raw account number. */
-  accountNo: string
-  /** 신규일 ISO date. */
-  openedDate: string
-  /** 최근거래일 ISO date. */
-  lastTxDate: string
-  balance: number
-}
+/** Dashboard presentation data. KRW single currency, Asia/Seoul. */
 
 export type NotificationCategory = "이체" | "출금" | "안내"
 
@@ -24,34 +11,6 @@ export type NotificationItem = {
   /** ISO datetime. */
   datetime: string
 }
-
-/** 대표계좌 요약에 표시할 계좌 목록. */
-export const MOCK_DASHBOARD_ACCOUNTS: DashboardAccount[] = [
-  {
-    id: "acc-1",
-    alias: "자유입출금",
-    accountNo: "110632892336",
-    openedDate: "2021-03-14",
-    lastTxDate: daysAgo(0),
-    balance: 12_340_500,
-  },
-  {
-    id: "acc-2",
-    alias: "급여통장",
-    accountNo: "302998112233",
-    openedDate: "2019-11-02",
-    lastTxDate: daysAgo(1),
-    balance: 3_860_000,
-  },
-  {
-    id: "acc-3",
-    alias: "비상금통장",
-    accountNo: "255104778910",
-    openedDate: "2023-06-20",
-    lastTxDate: daysAgo(5),
-    balance: 1_500_000,
-  },
-]
 
 /** 미읽음 알림 3건. */
 export const MOCK_NOTIFICATIONS: NotificationItem[] = [

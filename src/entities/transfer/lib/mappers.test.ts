@@ -4,12 +4,14 @@ import {
   toReservationRow,
   toAutoTransferResultRow,
   toReservationResultRow,
+  toTransferHistoryRow,
 } from "@/entities/transfer/lib/mappers"
 import type {
   AutoTransferExecutionHistoryItemResponse,
   AutoTransferListItemResponse,
   ScheduledTransferExecutionResultItemResponse,
   ScheduledTransferListItemResponse,
+  TransferHistoryItemResponse,
 } from "@/shared/api/generated"
 
 const FROM_ACCOUNT_NO = "110632892336"
@@ -168,6 +170,7 @@ describe("toAutoTransferRow", () => {
 
 const RESERVATION_ITEM: ScheduledTransferListItemResponse = {
   scheduledTransferId: 7,
+  withdrawalAccountId: 1,
   status: "WAITING",
   scheduledDate: "2026-08-24",
   registeredAt: "2026-08-20T10:12:00",
@@ -185,6 +188,7 @@ describe("toReservationRow", () => {
     const row = toReservationRow(RESERVATION_ITEM)
 
     expect(row.fromAccountNo).toBe("110******877")
+    expect(row.withdrawalAccountId).toBe(1)
     expect(row.toAccountNo).toBe("333******135")
     expect(row.payeeName).toBe("김*수")
   })
@@ -227,6 +231,7 @@ const BASE_EXECUTION: AutoTransferExecutionHistoryItemResponse = {
   executionId: 7,
   status: "SUCCESS",
   executedAt: "2026-07-21T00:10:00",
+  tradeDate: "2026-07-21",
   withdrawalAccountId: 1,
   depositAccountNumber: "110550098213",
   payeeName: "박지훈",
@@ -244,6 +249,7 @@ describe("toAutoTransferResultRow", () => {
       id: "7",
       result: "정상",
       processedAt: "2026-07-21T00:10:00",
+      tradeDate: "2026-07-21",
       fromAccountNo: FROM_ACCOUNT_NO,
       fromAlias: "자유입출금",
       toAccountNo: "110550098213",
@@ -268,6 +274,7 @@ describe("toAutoTransferResultRow", () => {
     ["SUCCESS", "정상"],
     ["ERROR", "오류"],
     ["PROCESSING", "처리중"],
+    ["TIMEOUT", "처리중"],
   ])("실행결과 %s를 %s로 옮긴다", (apiStatus, expected) => {
     const row = toAutoTransferResultRow(
       {
@@ -317,6 +324,29 @@ describe("toAutoTransferResultRow", () => {
     )
     expect(row.failReason).toBeUndefined()
   })
+
+  // 자동이체는 휴일에도 달력 날짜에 실행되고 거래일은 다음 영업일이다(서버 #679).
+  // 처리일시에서 날짜를 잘라 쓰면 이 회차의 거래일이 토요일로 보인다.
+  it("휴일 실행 회차는 처리일시와 다른 거래일을 그대로 싣는다", () => {
+    const row = toAutoTransferResultRow(
+      {
+        ...BASE_EXECUTION,
+        executedAt: "2026-07-18T00:10:00",
+        tradeDate: "2026-07-20",
+      },
+      FROM_ACCOUNT,
+    )
+    expect(row.processedAt).toBe("2026-07-18T00:10:00")
+    expect(row.tradeDate).toBe("2026-07-20")
+  })
+
+  it("거래일이 null이면 undefined로 둔다", () => {
+    const row = toAutoTransferResultRow(
+      { ...BASE_EXECUTION, status: "ERROR", tradeDate: null },
+      FROM_ACCOUNT,
+    )
+    expect(row.tradeDate).toBeUndefined()
+  })
 })
 
 const BASE_RESULT: ScheduledTransferExecutionResultItemResponse = {
@@ -330,6 +360,7 @@ const BASE_RESULT: ScheduledTransferExecutionResultItemResponse = {
   payeeName: "김*수",
   amount: 500_000,
   transactionNumber: "20260715019000001120",
+  tradeDate: "2026-07-15",
   failureReason: null,
 }
 
@@ -339,6 +370,7 @@ describe("toReservationResultRow", () => {
       id: "77",
       result: "정상",
       transferDate: "2026-07-15T00:10:00",
+      tradeDate: "2026-07-15",
       fromAccountNo: "110******336",
       toAccountNo: "333******135",
       payeeName: "김*수",
@@ -370,9 +402,21 @@ describe("toReservationResultRow", () => {
       executedAt: null,
       canceledAt: "2026-07-10T09:30:00",
       transactionNumber: null,
+      tradeDate: null,
     })
     expect(row.transferDate).toBe("2026-07-10T09:30:00")
     expect(row.txId).toBeUndefined()
+    expect(row.tradeDate).toBeUndefined()
+  })
+
+  it("휴일 실행 회차는 이체일자와 다른 거래일을 그대로 싣는다", () => {
+    const row = toReservationResultRow({
+      ...BASE_RESULT,
+      executedAt: "2026-08-01T00:10:00",
+      tradeDate: "2026-08-03",
+    })
+    expect(row.transferDate).toBe("2026-08-01T00:10:00")
+    expect(row.tradeDate).toBe("2026-08-03")
   })
 
   it("실패 사유를 그대로 싣는다", () => {
@@ -393,6 +437,40 @@ describe("toReservationResultRow", () => {
     const row = toReservationResultRow({ ...BASE_RESULT, status: "WAITING" })
 
     expect(row.result).toBe("처리중")
+    expect(spy).toHaveBeenCalledOnce()
+    spy.mockRestore()
+  })
+})
+
+describe("toTransferHistoryRow", () => {
+  const BASE_HISTORY: TransferHistoryItemResponse = {
+    transactionNumber: "T20261020000001",
+    status: "SUCCESS",
+    executedAt: "2026-10-20T10:00:00",
+    accountNumber: "110220093412",
+    payeeName: "김*지",
+    amount: 10_000,
+  }
+
+  it.each([
+    ["SUCCESS", "정상"],
+    ["ERROR", "오류"],
+    ["PROCESSING", "처리중"],
+    ["TIMEOUT", "처리중"],
+  ])("처리상태 %s를 %s로 옮긴다", (apiStatus, expected) => {
+    const row = toTransferHistoryRow({
+      ...BASE_HISTORY,
+      status: apiStatus as TransferHistoryItemResponse["status"],
+    })
+    expect(row.status).toBe(expected)
+  })
+
+  it("모르는 처리상태는 콘솔에 남기고 '처리중'으로 폴백한다", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const row = toTransferHistoryRow({ ...BASE_HISTORY, status: undefined })
+
+    expect(row.status).toBe("처리중")
     expect(spy).toHaveBeenCalledOnce()
     spy.mockRestore()
   })

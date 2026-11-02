@@ -25,7 +25,7 @@ type AutoTransferStep3Props = {
 const COLUMNS: DataGridColumn<AutoCompleteRow>[] = [
   { key: "fromAccount", header: "출금계좌", align: "center" },
   { key: "toAccount", header: "입금계좌", align: "center" },
-  { key: "payeeName", header: "받는분", align: "center", width: 90 },
+  { key: "payeeName", header: "예금주", align: "center", width: 90 },
   { key: "amount", header: "이체금액(원)", align: "right", width: 130 },
   { key: "period", header: "이체기간", align: "center", width: 190 },
   { key: "cycle", header: "이체주기", align: "center", width: 90 },

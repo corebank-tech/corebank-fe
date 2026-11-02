@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   formatAccountLabel,
   formatAccountNo,
+  formatSessionClock,
   maskAccountNo,
   maskEmail,
   maskName,
@@ -70,5 +71,24 @@ describe("formatAccountLabel", () => {
     expect(formatAccountLabel("", "110-220-093412", " / ")).toBe(
       "110-220-093412",
     )
+  })
+})
+
+describe("formatSessionClock", () => {
+  it("mm:ss 로 0 을 채워 그린다", () => {
+    expect(formatSessionClock(600)).toBe("10:00")
+    expect(formatSessionClock(65)).toBe("01:05")
+    expect(formatSessionClock(9)).toBe("00:09")
+  })
+
+  it("0 이면 00:00 이다", () => {
+    expect(formatSessionClock(0)).toBe("00:00")
+  })
+
+  it("음수는 00:00 으로 접는다", () => {
+    // 만료 판정과 타이머 갱신 사이 한 틱 동안 음수가 나올 수 있다.
+    // 접지 않으면 헤더에 "-1:-1" 같은 값이 그려진다.
+    expect(formatSessionClock(-1)).toBe("00:00")
+    expect(formatSessionClock(-120)).toBe("00:00")
   })
 })

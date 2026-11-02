@@ -3,10 +3,11 @@ import { cn } from "@/shared/lib/utils"
 import { statusToneClasses } from "@/shared/ui/status-tone"
 
 export type BadgeVariant =
-  "primary" | "neutral" | "success" | "danger" | "warning"
+  "primary" | "coolViolet" | "neutral" | "success" | "danger" | "warning"
 
 const BADGE_VARIANT_CLASSES: Record<BadgeVariant, string> = {
   primary: statusToneClasses("primary"),
+  coolViolet: statusToneClasses("coolViolet"),
   neutral: "border-border bg-surface text-ink-muted",
   success: statusToneClasses("success"),
   danger: statusToneClasses("danger"),

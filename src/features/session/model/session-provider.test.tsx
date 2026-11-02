@@ -13,7 +13,10 @@ import { act, renderHook, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
-import { SESSION_TIMEOUT_SECONDS } from "@/shared/config/policy"
+import {
+  ADMIN_SESSION_TIMEOUT_SECONDS,
+  SESSION_TIMEOUT_SECONDS,
+} from "@/shared/config/policy"
 import { SessionProvider } from "@/features/session/model/session-provider"
 import { useSession } from "@/features/session/model/use-session"
 
@@ -47,6 +50,23 @@ const serverHandlers = [
     return respondUnauthorized()
   }),
 ]
+
+/** 관리자로 응답하게 바꾼다. 역할·만료 두 describe 가 같이 쓴다. */
+const respondAsAdmin = (permissions: string[]) =>
+  server.use(
+    http.get("*/customers/me", () =>
+      HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: {
+          customerId: 2,
+          userName: "박*준",
+          role: "ADMIN",
+          permissions,
+        },
+      }),
+    ),
+  )
 
 beforeAll(() => {
   vi.stubEnv("VITE_API_BASE_URL", "")
@@ -119,6 +139,38 @@ describe("세션 부트스트랩", () => {
   })
 })
 
+describe("세션 역할·권한", () => {
+  /** 관리자 역할·권한을 실은 프로필 응답으로 갈아끼운다. */
+
+  it("역할 필드가 없는 응답은 고객·권한 없음으로 떨어진다", async () => {
+    // 필드가 빠진 응답이 와도 여기서 권한이 새면 관리자 화면이 전원에게 열린다.
+    hasServerSession = true
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("CUSTOMER")
+    expect(result.current.permissions).toEqual([])
+  })
+
+  it("관리자 응답의 권한을 컨텍스트로 옮긴다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["CUSTOMER_READ", "CUSTOMER_WRITE"])
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("ADMIN")
+    expect(result.current.permissions).toEqual([
+      "CUSTOMER_READ",
+      "CUSTOMER_WRITE",
+    ])
+  })
+
+  it("세션이 없으면 권한도 없다", async () => {
+    const { result } = await renderSettledSession()
+
+    expect(result.current.role).toBe("CUSTOMER")
+    expect(result.current.permissions).toEqual([])
+  })
+})
+
 describe("세션 만료", () => {
   it("무조작 타이머가 끝나면 서버 세션까지 끊는다", async () => {
     hasServerSession = true
@@ -162,6 +214,50 @@ describe("세션 만료", () => {
     expect(result.current.expiredReason).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
     expect(logoutCallCount).toBe(0)
+  })
+})
+
+describe("관리자 세션 만료 (POL-A01)", () => {
+  it("관리자 세션은 30분으로 센다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    // 역할은 프로필이 도착해야 정해진다. 만료 길이를 상태로 들고 나중에 맞추는
+    // 구조였다면 프로필 도착 직전 리셋이 고객 길이로 잡혀 여기서 600 이 나온다.
+    await waitFor(() =>
+      expect(result.current.remainingSeconds).toBe(
+        ADMIN_SESSION_TIMEOUT_SECONDS,
+      ),
+    )
+  })
+
+  it("고객 만료 시간이 지나도 관리자 세션은 살아 있다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    await act(async () => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_SECONDS * 1000)
+    })
+
+    expect(result.current.expiredReason).toBeNull()
+    expect(result.current.isAuthenticated).toBe(true)
+    expect(logoutCallCount).toBe(0)
+  })
+
+  it("30분이 지나면 관리자도 서버 세션까지 끊는다", async () => {
+    hasServerSession = true
+    respondAsAdmin(["GL_READ"])
+    const { result } = await renderSettledSession()
+
+    await act(async () => {
+      vi.advanceTimersByTime(ADMIN_SESSION_TIMEOUT_SECONDS * 1000)
+    })
+
+    await waitFor(() => expect(result.current.expiredReason).toBe("timer"))
+    await waitFor(() => expect(logoutCallCount).toBe(1))
+    expect(result.current.isAuthenticated).toBe(false)
   })
 })
 

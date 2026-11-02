@@ -63,6 +63,51 @@ describe("customFetch 봉투 해제 (REQ-CMN-007)", () => {
   })
 })
 
+describe("X-Correlation-Id (FE C-5)", () => {
+  it("조회 요청에도 correlation id 를 붙인다", async () => {
+    let received: string | null = null
+    server.use(
+      http.get("*/api/ping", ({ request }) => {
+        received = request.headers.get("X-Correlation-Id")
+        return HttpResponse.json({ code: "0000", message: "ok", data: null })
+      }),
+    )
+    await customFetch("/api/ping")
+    expect(received).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    )
+  })
+
+  it("서버가 버리는 값을 보내지 않는다", async () => {
+    // 11자리 이상 연속 숫자가 섞이면 서버가 자기 값으로 갈아끼워 추적이 끊긴다.
+    let received: string | null = null
+    server.use(
+      http.post("*/api/transfers", ({ request }) => {
+        received = request.headers.get("X-Correlation-Id")
+        return HttpResponse.json({ code: "0000", message: "ok", data: null })
+      }),
+    )
+    await customFetch("/api/transfers", { method: "POST" })
+    expect(received).not.toMatch(/\d{11,}/)
+  })
+
+  it("호출자가 넣은 값도 검증한 값으로 덮는다", async () => {
+    // 서버가 거부하는 값이 그대로 나가면 서버가 교체해 추적이 끊긴다.
+    let received: string | null = null
+    server.use(
+      http.get("*/api/ping", ({ request }) => {
+        received = request.headers.get("X-Correlation-Id")
+        return HttpResponse.json({ code: "0000", message: "ok", data: null })
+      }),
+    )
+    await customFetch("/api/ping", {
+      headers: { "X-Correlation-Id": "123e4567-e89b-42d3-a456-426614174000" },
+    })
+    expect(received).not.toBe("123e4567-e89b-42d3-a456-426614174000")
+    expect(received).not.toMatch(/\d{11,}/)
+  })
+})
+
 describe("Idempotency-Key (REQ-CMN-014)", () => {
   it("GET 요청에는 멱등키를 붙이지 않는다", async () => {
     let receivedKey: string | null = null

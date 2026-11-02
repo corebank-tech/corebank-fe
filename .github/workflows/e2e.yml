@@ -22,7 +22,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm codegen
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm exec playwright test e2e/smoke.spec.ts e2e/auth-flow.spec.ts
+      # 시각 회귀(@visual)는 베이스라인을 커밋하지 않아 CI 에 비교 대상이 없다.
+      # 파일을 열거하면 새 spec 이 조용히 빠지므로 "전체 - 시각 회귀"로 돌린다.
+      - run: pnpm exec playwright test --grep-invert @visual
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}

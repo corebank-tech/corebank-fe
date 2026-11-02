@@ -4,70 +4,41 @@
  * [초기화] 동작(개설일 오름차순 복원)을 확인할 수 있게 한다.
  */
 
-import type { AccountGroupId } from "@/entities/account/api/b01-accounts"
-import { daysAgo } from "@/shared/lib/mock-date"
+import type { AccountItemResponse } from "@/shared/api/generated"
 
 export type OrderAccount = {
-  id: string
-  group: AccountGroupId
+  accountId: number
+  accountName: string
   accountNo: string
-  alias: string
   openedDate: string
   balance: number
+  displayOrder: number
 }
 
-export const MOCK_ORDER_ACCOUNTS: OrderAccount[] = [
-  {
-    id: "ord1",
-    group: "checking",
-    accountNo: "255104778910",
-    alias: "비상금통장",
-    openedDate: "2023-06-20",
-    balance: 1_500_000,
-  },
-  {
-    id: "ord2",
-    group: "checking",
-    accountNo: "110632892336",
-    alias: "자유입출금",
-    openedDate: "2021-03-14",
-    balance: 12_340_500,
-  },
-  {
-    id: "ord3",
-    group: "deposit",
-    accountNo: "110550051877",
-    alias: "정기예금 1년",
-    openedDate: daysAgo(223),
-    balance: 10_000_000,
-  },
-  {
-    id: "ord4",
-    group: "checking",
-    accountNo: "302998112233",
-    alias: "급여통장",
-    openedDate: "2019-11-02",
-    balance: 3_860_000,
-  },
-  {
-    id: "ord5",
-    group: "deposit",
-    accountNo: "110220093412",
-    alias: "내집마련적금",
-    openedDate: daysAgo(354),
-    balance: 3_600_000,
-  },
-  {
-    id: "ord6",
-    group: "deposit",
-    accountNo: "110770164529",
-    alias: "여행적금",
-    openedDate: daysAgo(138),
-    balance: 900_000,
-  },
-]
+export const toOrderAccounts = (
+  accounts: AccountItemResponse[],
+): OrderAccount[] =>
+  accounts
+    .flatMap((account) => {
+      if (account.accountId == null || account.accountNumber == null) {
+        return []
+      }
 
-/** REQ-ACCT-014: [초기화] 시 기본 순서(개설일 오름차순)로 복원한다. */
-export function sortByOpenedDateAsc(accounts: OrderAccount[]): OrderAccount[] {
-  return [...accounts].sort((a, b) => a.openedDate.localeCompare(b.openedDate))
-}
+      return [
+        {
+          accountId: account.accountId,
+          accountName: account.accountName ?? account.baseAccountName ?? "계좌",
+          accountNo: account.accountNumber,
+          openedDate: account.openedDate ?? "",
+          balance: account.balance ?? 0,
+          displayOrder: account.displayOrder ?? Number.MAX_SAFE_INTEGER,
+        },
+      ]
+    })
+    .sort((a, b) => {
+      if (a.displayOrder !== b.displayOrder) {
+        return a.displayOrder - b.displayOrder
+      }
+
+      return a.accountId - b.accountId
+    })

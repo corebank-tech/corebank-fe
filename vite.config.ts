@@ -49,6 +49,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: false,
     setupFiles: ["./src/shared/lib/test-setup.ts"],
+    // 셋업 파일의 `afterEach(cleanup)` 이 각 테스트 파일의 뒷정리보다 **나중에** 돌아야
+    // 한다. `stack` 은 "after" 훅을 등록 역순으로 돌리므로, 먼저 등록되는 셋업 훅이
+    // 마지막에 선다. 설치된 vitest 의 기본값도 `stack` 이지만(타입 정의의 `@default`)
+    // 문서가 버전·페이지마다 달라서 여기에 명시해 고정한다.
+    sequence: { hooks: "stack" },
     include: ["src/**/*.test.{ts,tsx}"],
   },
 })

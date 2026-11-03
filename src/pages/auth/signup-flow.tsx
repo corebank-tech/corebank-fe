@@ -79,6 +79,11 @@ export const SignupFlow = () => {
             })
             setStep(4)
           }}
+          onRestart={() => {
+            setData(EMPTY_DATA)
+            setAuth({})
+            setStep(1)
+          }}
         />
       )
     case 4:

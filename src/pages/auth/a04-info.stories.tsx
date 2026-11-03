@@ -26,6 +26,7 @@ const A04InfoDemo = () => {
       onChange={(partial) => setData((prev) => ({ ...prev, ...partial }))}
       onAuthChange={(partial) => setAuth((prev) => ({ ...prev, ...partial }))}
       onNext={() => {}}
+      onRestart={() => {}}
     />
   )
 }

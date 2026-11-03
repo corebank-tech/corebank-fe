@@ -214,7 +214,7 @@ export const A08ResetPassword = () => {
                 if (codeError) setCodeError(null)
               }}
               placeholder="인증번호 6자리"
-              className="w-32 text-center tracking-3"
+              className="w-44 text-center tracking-3"
             />
             <Button variant="secondary" size="sm" onClick={confirmCode}>
               확인

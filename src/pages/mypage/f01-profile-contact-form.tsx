@@ -306,7 +306,7 @@ export const F01ProfileContactForm = ({ profile }: Props) => {
                       )
                       setCodeError(null)
                     }}
-                    className="w-32 text-center tracking-3"
+                    className="w-44 text-center tracking-3"
                   />
 
                   {!emailVerified && !codeExpired && (

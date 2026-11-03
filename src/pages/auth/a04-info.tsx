@@ -500,7 +500,7 @@ export const A04Info = ({
                         }
                       }}
                       placeholder="인증번호 6자리"
-                      className="w-32 text-center tracking-3"
+                      className="w-44 text-center tracking-3"
                       aria-label="이메일 인증번호 입력"
                     />
 

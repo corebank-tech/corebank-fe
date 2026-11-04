@@ -66,6 +66,12 @@ const getErrorMessage = (error: unknown): string => {
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
+/**
+ * 약관 동의 토큰(ATH0104)과 계좌 인증 토큰(ATH0105)은 앞 단계에서만 다시 받을 수 있다.
+ * 이 화면에 머물면 같은 오류만 반복되므로 1단계부터 다시 진행시킨다.
+ */
+const RESTART_REQUIRED_CODES = new Set(["ATH0104", "ATH0105"])
+
 type PendingIdCheck = {
   userId: string
   token: string
@@ -77,6 +83,8 @@ type A04InfoProps = {
   onChange: (partial: Partial<SignupData>) => void
   onAuthChange: (partial: Partial<SignupAuthState>) => void
   onNext: (tempSignupToken: string) => void
+  /** 앞 단계 토큰이 만료돼 약관동의부터 다시 해야 할 때. */
+  onRestart: () => void
 }
 
 /** A-04 회원가입 3단계 · 정보입력. REQ-AUTH-008~017. */
@@ -86,6 +94,7 @@ export const A04Info = ({
   onChange,
   onAuthChange,
   onNext,
+  onRestart,
 }: A04InfoProps) => {
   const checkUserIdMutation = useCheckSignupUserIdMutation()
   const issueEmailMutation = useIssueSignupEmailVerificationMutation()
@@ -115,6 +124,7 @@ export const A04Info = ({
   const emailExpired = emailIssued && emailRemaining <= 0
 
   const [alert, setAlert] = React.useState<string | null>(null)
+  const [restartAlert, setRestartAlert] = React.useState<string | null>(null)
 
   const idRef = React.useRef<HTMLInputElement>(null)
   const passwordRef = React.useRef<HTMLInputElement>(null)
@@ -320,6 +330,10 @@ export const A04Info = ({
 
       onNext(result.tempSignupToken)
     } catch (error) {
+      if (isApiError(error) && RESTART_REQUIRED_CODES.has(error.code)) {
+        setRestartAlert(error.message)
+        return
+      }
       setAlert(getErrorMessage(error))
     }
   }
@@ -486,7 +500,7 @@ export const A04Info = ({
                         }
                       }}
                       placeholder="인증번호 6자리"
-                      className="w-32 text-center tracking-3"
+                      className="w-44 text-center tracking-3"
                       aria-label="이메일 인증번호 입력"
                     />
 
@@ -550,6 +564,20 @@ export const A04Info = ({
         onClose={() => setAlert(null)}
         title="정보입력 안내"
         messages={alert ? [alert] : []}
+      />
+
+      <AlertDialog
+        open={restartAlert !== null}
+        onClose={() => {
+          setRestartAlert(null)
+          onRestart()
+        }}
+        title="정보입력 안내"
+        messages={
+          restartAlert
+            ? [restartAlert, "회원가입을 약관동의부터 다시 진행합니다."]
+            : []
+        }
       />
 
       <AlertDialog

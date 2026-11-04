@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router"
+import { createBrowserRouter, Navigate, type RouteObject } from "react-router"
 import { RootLayout } from "@/app/layouts/root-layout"
 import { RouteError } from "@/app/route-error"
 import { adminRoutes } from "@/app/routes/admin-routes"
@@ -12,10 +12,68 @@ import { customerRoutes } from "@/app/routes/customer-routes"
  * `errorElement` 는 루트에 둔다. 없는 주소의 404 는 루트 라우트에 걸리므로
  * 하위 라우트의 경계로는 받을 수 없다.
  */
-export const router = createBrowserRouter([
+/** 시연 프로토타입(로컬 전용 브랜치). 세션 없이 뜬다. */
+const demoRoutes: RouteObject[] = [
   {
-    element: <RootLayout />,
-    errorElement: <RouteError />,
-    children: [...customerRoutes, adminRoutes],
+    path: "demo/objection/apply",
+    lazy: async () => {
+      const { ApplyPage } = await import("@/pages/demo-objection")
+      return { Component: ApplyPage }
+    },
   },
-])
+  {
+    path: "demo/objection",
+    lazy: async () => {
+      const { ObjectionListPage } = await import("@/pages/demo-objection")
+      return { Component: ObjectionListPage }
+    },
+  },
+  {
+    path: "demo/objection/kpi",
+    lazy: async () => {
+      const { KpiDashboardPage } = await import("@/pages/demo-objection")
+      return { Component: KpiDashboardPage }
+    },
+  },
+  {
+    path: "demo/objection/:scenarioId/run",
+    lazy: async () => {
+      const { AnalysisRunPage } = await import("@/pages/demo-objection")
+      return { Component: AnalysisRunPage }
+    },
+  },
+  {
+    path: "demo/objection/:scenarioId",
+    lazy: async () => {
+      const { ObjectionDetailPage } = await import("@/pages/demo-objection")
+      return { Component: ObjectionDetailPage }
+    },
+  },
+]
+
+/**
+ * 시연 전용 정적 배포(VITE_DEMO_ONLY=true)는 RootLayout 을 거치지 않는다.
+ * RootLayout 의 SessionProvider 가 고객 프로필 API 를 부르므로, 배포본이 어떤 서버도 부르지 않게 뺀다.
+ */
+const demoOnlyRouter = () =>
+  createBrowserRouter([
+    {
+      errorElement: <RouteError />,
+      children: [
+        ...demoRoutes,
+        // 시연은 고객 앱 신청부터 시작한다
+        { path: "*", element: <Navigate to="/demo/objection/apply" replace /> },
+      ],
+    },
+  ])
+
+export const router =
+  import.meta.env.VITE_DEMO_ONLY === "true"
+    ? demoOnlyRouter()
+    : createBrowserRouter([
+        {
+          element: <RootLayout />,
+          errorElement: <RouteError />,
+          children: [...customerRoutes, adminRoutes, ...demoRoutes],
+        },
+      ])

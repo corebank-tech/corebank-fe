@@ -1,0 +1,5 @@
+export { ObjectionListPage } from "@/pages/demo-objection/objection-list-page"
+export { ObjectionDetailPage } from "@/pages/demo-objection/objection-detail-page"
+export { KpiDashboardPage } from "@/pages/demo-objection/kpi-dashboard-page"
+export { AnalysisRunPage } from "@/pages/demo-objection/analysis-run-page"
+export { ApplyPage } from "@/pages/demo-objection/apply-page"

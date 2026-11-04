@@ -29,6 +29,7 @@ import {
 import {
   getAccountStatusBadgeVariant,
   getAccountStatusLabel,
+  getMaturityNotice,
   useAccountDetailQuery,
   useInquirableAccounts,
 } from "@/entities/account"
@@ -287,6 +288,11 @@ export const B03TransactionInquiry = () => {
   const totalPages = transactionData?.totalPages ?? 0
 
   const accountStatus = getAccountStatusLabel(accountDetail?.status)
+  const maturityNotice = getMaturityNotice(
+    accountDetail?.maturityDate,
+    accountDetail?.status,
+    TODAY,
+  )
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",
@@ -562,6 +568,23 @@ export const B03TransactionInquiry = () => {
               ]}
             />
           </div>
+          {accountDetail?.maturityDate && (
+            <div className="border-t border-border">
+              <InfoRow
+                gridCols="grid-cols-2"
+                items={[
+                  {
+                    term: "만기일",
+                    desc: formatDate(accountDetail.maturityDate),
+                  },
+                  {
+                    term: "만기 안내",
+                    desc: maturityNotice ?? "-",
+                  },
+                ]}
+              />
+            </div>
+          )}
           {isAccountDetailError && (
             <div
               role="alert"

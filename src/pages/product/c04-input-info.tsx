@@ -96,7 +96,8 @@ export const C04InputInfo = () => {
     amount <= product.maxAmount &&
     // 정기예금만 출금가능금액을 검증한다(REQ-PRDT-008). 정기적금은 가입 시점에 출금이 발생하지 않는다.
     (product.category === "정기적금" ||
-      (selectedAccount != null && amount <= selectedAccount.withdrawable))
+      (selectedAccount?.withdrawable != null &&
+        amount <= selectedAccount.withdrawable))
 
   const canSubmit = termValid && amountValid && fromAccount !== ""
 
@@ -247,7 +248,7 @@ export const C04InputInfo = () => {
                 max={product.maxAmount}
                 withdrawable={
                   product.category === "정기예금"
-                    ? selectedAccount?.withdrawable
+                    ? (selectedAccount?.withdrawable ?? undefined)
                     : undefined
                 }
               />

@@ -234,7 +234,7 @@ export const InstantTransferStep1 = ({
                   perTransferLimit={perTransferLimit}
                   dailyRemaining={dailyRemaining}
                   isLimitUnavailable={isLimitUnavailable}
-                  fullAmount={selected?.withdrawable}
+                  fullAmount={selected?.withdrawable ?? undefined}
                 />
                 <p className="text-2xs text-ink-muted">
                   ※ 1회 최대 이체한도 범위 내에서 1원 이상의 정수만 입력할 수

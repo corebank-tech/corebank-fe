@@ -9,6 +9,14 @@ import type { AccountOption } from "@/shared/types/account"
  * "출금계좌 자격"의 정의를 여기 한 곳에 둔다 — 자동이체 등록(G-01)·예약이체 등록(E-01)·
  * 자동이체 조회(G-04)가 같은 조건을 각자 복제하고 있었다. 조건이 바뀌면 이 파일만 고친다.
  */
+export const toWithdrawAccountOption = (
+  account: AccountItemResponse,
+): AccountOption => ({
+  alias: account.accountName ?? "",
+  accountNo: account.accountNumber ?? "",
+  balance: account.balance ?? 0,
+  withdrawable: account.availableBalance ?? null,
+})
 export const useWithdrawAccounts = (): {
   accounts: AccountItemResponse[]
   /** 이체·상품가입 화면이 셀렉트에 그대로 넘기는 형태. */
@@ -36,14 +44,7 @@ export const useWithdrawAccounts = (): {
   }, [overview])
 
   const options = React.useMemo(
-    () =>
-      accounts.map((a) => ({
-        alias: a.accountName ?? "",
-        accountNo: a.accountNumber ?? "",
-        balance: a.balance ?? 0,
-        // AccountItemResponse 에 출금가능금액 필드가 없어 잔액을 그대로 쓴다.
-        withdrawable: a.balance ?? 0,
-      })),
+    () => accounts.map(toWithdrawAccountOption),
     [accounts],
   )
 

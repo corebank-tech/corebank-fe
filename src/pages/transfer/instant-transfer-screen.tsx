@@ -282,14 +282,20 @@ export const InstantTransferScreen = () => {
 
   if (step === 2) {
     const amount = currentIntent.amount ?? 0
-    const balanceInsufficient =
-      selectedAccount != null && amount > selectedAccount.withdrawable
-    const balanceAfter = Math.max(
-      (selectedAccount?.withdrawable ?? 0) - amount,
-      0,
-    )
+    const withdrawable = selectedAccount?.withdrawable
+
+    const balanceInsufficient = withdrawable != null && amount > withdrawable
+
+    const balanceAfter =
+      withdrawable == null ? null : Math.max(withdrawable - amount, 0)
 
     const handleTransferClick = () => {
+      if (withdrawable == null) {
+        setAuthError(
+          "출금가능금액을 확인할 수 없습니다. 계좌정보를 다시 조회해 주세요.",
+        )
+        return
+      }
       if (balanceInsufficient) {
         setAuthError(
           `출금가능금액 ${formatAmount(selectedAccount?.withdrawable ?? 0)}이 이체금액보다 적어 이체를 실행할 수 없습니다. 이체금액을 낮춰 다시 시도하세요.`,
@@ -477,7 +483,11 @@ export const InstantTransferScreen = () => {
           payeeName={maskName(form.payeeName)}
           amount={formatAmount(amount, { suffix: false })}
           fee={formatAmount(0, { suffix: false })}
-          balanceAfter={formatAmount(balanceAfter, { suffix: false })}
+          balanceAfter={
+            balanceAfter == null
+              ? "-"
+              : formatAmount(balanceAfter, { suffix: false })
+          }
           payeeMemo={form.payeeMemo || "-"}
           myMemo={form.myMemo || "-"}
           authError={authError}

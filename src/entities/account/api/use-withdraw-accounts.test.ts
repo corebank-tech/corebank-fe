@@ -46,4 +46,13 @@ describe("toWithdrawAccountOption", () => {
     expect(result.balance).toBe(1_000_000)
     expect(result.withdrawable).toBe(1_000_000)
   })
+
+  it("원장잔액이 누락되면 0원이 아닌 null을 유지한다", () => {
+    const result = toWithdrawAccountOption(
+      createAccount({ balance: undefined }),
+    )
+
+    expect(result.balance).toBeNull()
+    expect(result.withdrawable).toBe(700_000)
+  })
 })

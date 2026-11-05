@@ -210,6 +210,11 @@ export const InstantTransferScreen = () => {
   const selectedAccount = accounts.find(
     (a) => a.accountNo === displayForm.fromAccount,
   )
+  const latestSelectedAccountRef = React.useRef(selectedAccount)
+
+  React.useEffect(() => {
+    latestSelectedAccountRef.current = selectedAccount
+  }, [selectedAccount])
   const selectedAccountId = withdrawAccounts.find(
     (a) => a.accountNumber === displayForm.fromAccount,
   )?.accountId
@@ -282,26 +287,34 @@ export const InstantTransferScreen = () => {
 
   if (step === 2) {
     const amount = currentIntent.amount ?? 0
-    const withdrawable = selectedAccount?.withdrawable
-
-    const balanceInsufficient = withdrawable != null && amount > withdrawable
+    const ledgerBalance = selectedAccount?.balance
 
     const balanceAfter =
-      withdrawable == null ? null : Math.max(withdrawable - amount, 0)
+      ledgerBalance == null ? null : Math.max(ledgerBalance - amount, 0)
 
-    const handleTransferClick = () => {
-      if (withdrawable == null) {
+    const checkCurrentWithdrawable = (): boolean => {
+      const currentWithdrawable = latestSelectedAccountRef.current?.withdrawable
+
+      if (currentWithdrawable == null) {
         setAuthError(
           "출금가능금액을 확인할 수 없습니다. 계좌정보를 다시 조회해 주세요.",
         )
-        return
+        return false
       }
-      if (balanceInsufficient) {
+
+      if (amount > currentWithdrawable) {
         setAuthError(
-          `출금가능금액 ${formatAmount(selectedAccount?.withdrawable ?? 0)}이 이체금액보다 적어 이체를 실행할 수 없습니다. 이체금액을 낮춰 다시 시도하세요.`,
+          `출금가능금액 ${formatAmount(currentWithdrawable)}이 이체금액보다 적어 이체를 실행할 수 없습니다. 이체금액을 낮춰 다시 시도하세요.`,
         )
-        return
+        return false
       }
+
+      return true
+    }
+
+    const handleTransferClick = () => {
+      if (!checkCurrentWithdrawable()) return
+
       setAuthError(null)
       setTransactionAt(getNow())
       setConfirmOpen(true)
@@ -309,6 +322,12 @@ export const InstantTransferScreen = () => {
 
     const handleConfirmDialogConfirm = async () => {
       setConfirmOpen(false)
+
+      if (!checkCurrentWithdrawable()) {
+        setPasswordAuthToken(null)
+        return
+      }
+
       if (selectedAccountId == null) {
         setAuthError(
           "출금계좌를 확인할 수 없습니다. 이전 단계에서 다시 선택하세요.",
@@ -328,6 +347,10 @@ export const InstantTransferScreen = () => {
           setAuthError(
             "계좌비밀번호 인증 토큰을 발급받지 못했습니다. 다시 시도하세요.",
           )
+          return
+        }
+        if (!checkCurrentWithdrawable()) {
+          setPasswordAuthToken(null)
           return
         }
         setPasswordAuthToken(verified.accountPasswordAuthToken)
@@ -356,6 +379,12 @@ export const InstantTransferScreen = () => {
 
     const handleOtpConfirm = async (otpAuthToken: string) => {
       setOtpOpen(false)
+
+      if (!checkCurrentWithdrawable()) {
+        setPasswordAuthToken(null)
+        return
+      }
+
       if (selectedAccountId == null || passwordAuthToken == null) {
         setAuthError(
           "인증 정보를 확인할 수 없습니다. 처음부터 다시 시도하세요.",

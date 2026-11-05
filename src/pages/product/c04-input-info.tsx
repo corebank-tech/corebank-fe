@@ -240,18 +240,29 @@ export const C04InputInfo = () => {
               htmlFor="c04-amount"
               labelWidth={220}
             >
-              <JoinAmountField
-                id="c04-amount"
-                value={amount}
-                onChange={setAmount}
-                min={product.minAmount}
-                max={product.maxAmount}
-                withdrawable={
-                  product.category === "정기예금"
-                    ? (selectedAccount?.withdrawable ?? undefined)
-                    : undefined
-                }
-              />
+              <div className="flex w-full flex-col gap-2">
+                <JoinAmountField
+                  id="c04-amount"
+                  value={amount}
+                  onChange={setAmount}
+                  min={product.minAmount}
+                  max={product.maxAmount}
+                  withdrawable={
+                    product.category === "정기예금"
+                      ? (selectedAccount?.withdrawable ?? undefined)
+                      : undefined
+                  }
+                />
+
+                {product.category === "정기예금" &&
+                  fromAccount !== "" &&
+                  selectedAccount?.withdrawable == null && (
+                    <p role="alert" className="text-xs font-bold text-danger">
+                      출금가능금액을 확인할 수 없어 가입금액을 검증할 수
+                      없습니다. 잠시 후 새로고침하여 다시 시도하세요.
+                    </p>
+                  )}
+              </div>
             </FormRow>
             <FormRow label="만기 시 처리방법" labelWidth={220}>
               <div className="flex flex-col gap-1">

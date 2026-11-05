@@ -14,7 +14,8 @@ import type { SessionAuthority } from "@/entities/auth"
  * - seojunpark  — 전 권한 관리자
  * - dayeonkim   — **조회 전용 관리자.** 직무분리의 절반(권한 없는 쪽)을 이 계정으로
  *   확인한다. `CUSTOMER_READ` 가 있어 고객 메뉴·목록·상세는 보이지만 `CUSTOMER_WRITE`
- *   가 없어 계정 운영 버튼 3종이 렌더링되지 않는다
+ *   가 없어 계정 운영 버튼 3종이 렌더링되지 않는다. 지급정지도 조회만 있어 대리
+ *   접수 버튼과 판정 확정 입력이 그려지지 않는다
  * - minjunlee   — **회계 전용 관리자(#156).** `GL_READ` 하나뿐이라 고객 화면 자체가
  *   막힌다. 위 둘은 두 관리자 화면 어디에도 걸리지 않아, 화면 단위 권한 게이트
  *   (REQ-ADM-004)가 URL 직접 접근을 막는지 확인할 수단이 이 계정뿐이다
@@ -28,11 +29,18 @@ const MOCK_AUTHORITIES: Record<string, SessionAuthority> = {
       "CUSTOMER_READ",
       "CUSTOMER_WRITE",
       "AUDIT_READ",
+      "PAYMENT_STOP_READ",
+      "PAYMENT_STOP_WRITE",
     ],
   },
   dayeonkim: {
     role: "ADMIN",
-    permissions: ["GL_READ", "CUSTOMER_READ", "AUDIT_READ"],
+    permissions: [
+      "GL_READ",
+      "CUSTOMER_READ",
+      "AUDIT_READ",
+      "PAYMENT_STOP_READ",
+    ],
   },
   minjunlee: {
     role: "ADMIN",

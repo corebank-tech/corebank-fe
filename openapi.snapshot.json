@@ -5936,6 +5936,633 @@
           }
         }
       }
+    },
+    "/admin/objections/{objectionId}/completeness": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "소명 완비 확인",
+        "description": "소명 완비를 확인하고 심사 기한(완비 확인일 + 5영업일)을 정한다. RECEIVED, SUPPLEMENT_SUBMITTED 에서만 받고 아니면 PST0308. 멱등키 필수.",
+        "operationId": "confirmObjectionCompleteness",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCompletenessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/supplement-requests": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "보완 요청",
+        "description": "누락 서류를 적어 보완을 요청한다. 1회째 + 5영업일, 2회째 + 3영업일, 3회째는 PST0006. 명의인 통지를 기록한다. 멱등키 필수.",
+        "operationId": "requestObjectionSupplement",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSupplementResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/review-sessions": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "심사 시작 기록",
+        "description": "상세 화면을 연 시각을 기록한다(처리시간 평가용). 조회 권한으로 부른다.",
+        "operationId": "startObjectionReviewSession",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/decisions/{decisionId}/approve": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "판정 승인",
+        "description": "승인 대기 판정을 승인한다. 작성자와 같은 사람이면 PST0309, 승인할 판정이 없으면 PST0204. 확정 직전 해제 요건을 다시 계산한 뒤 계좌에 반영한다. 동시 승인은 1건만 반영된다. 멱등키 필수.",
+        "operationId": "approveObjectionDecision",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/decisions/{decisionId}/return": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "판정 반려",
+        "description": "승인 대기 판정을 반려한다. 판정은 RETURNED, 이의제기는 UNDER_REVIEW 로 돌아간다. 멱등키 필수.",
+        "operationId": "returnObjectionDecision",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/external-checks": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "외부 확인 목록",
+        "description": "수사기관과 관련 금융회사에 요청한 확인과 회신.",
+        "operationId": "listObjectionExternalChecks",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListExternalCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "외부 확인 요청",
+        "description": "모의 요청이라 지정한 회신으로 바로 REPLIED 가 된다. 같은 기관에 다시 요청하면 기존 행을 돌려준다. 멱등키 필수.",
+        "operationId": "requestObjectionExternalCheck",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExternalCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/notices": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "통지 기록",
+        "description": "접수, 보완 요청, 판정 확정 때 남긴 통지 기록. 실제 발송은 하지 않는다.",
+        "operationId": "listObjectionNotices",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListObjectionNoticeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/documents": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "첨부 서류 목록",
+        "description": "신분증 사본도 kind=ID_COPY 로 보인다.",
+        "operationId": "listObjectionDocuments",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListObjectionDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "첨부 서류 업로드",
+        "description": "대리 접수 뒤 서류를 붙인다. PDF, PNG, JPEG만, 1개 10MB, 합계 30MB, 10개 이하. 위반은 PST0007. 멱등키 필수.",
+        "operationId": "uploadObjectionDocuments",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "maxItems": 10,
+                    "minItems": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "EVIDENCE",
+                      "ID_COPY"
+                    ]
+                  }
+                },
+                "required": [
+                  "files",
+                  "kind"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListObjectionDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/documents/{documentId}/content": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "첨부 서류 내용",
+        "description": "파일 바이트를 그대로 준다(공통 응답 봉투 없음). 조회 사유 헤더를 받고 조회 감사를 남긴다. PST0205 문서 없음.",
+        "operationId": "getObjectionDocumentContent",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "description": "조회 사유",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            },
+            "example": "OPERATION"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/documents/{documentId}/ocr": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "첨부 서류 판독 결과",
+        "description": "페이지별 글자 영역. 텍스트는 가명 처리된 값이다. PST0205 문서 없음.",
+        "operationId": "getObjectionDocumentOcr",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDocumentOcrResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/ledger": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "지급정지 계좌 원장",
+        "description": "해제 요건 점검 창 기간의 지급정지 계좌 원장. 원장 타임라인 차트용.",
+        "operationId": "listObjectionLedger",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListObjectionLedgerEntryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11447,6 +12074,24 @@
           "decidedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "decisionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "returnReason": {
+            "type": "string"
           }
         }
       },
@@ -11503,6 +12148,22 @@
           "receivedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "reviewDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "deadlineAlert": {
+            "type": "boolean"
+          },
+          "supplementOverdue": {
+            "type": "boolean"
+          },
+          "latestRunStatus": {
+            "type": "string"
+          },
+          "latestRunLastStepTitle": {
+            "type": "string"
           }
         }
       },
@@ -11622,6 +12283,37 @@
           },
           "decision": {
             "$ref": "#/components/schemas/DecisionResponse"
+          },
+          "reviewDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "deadlineAlert": {
+            "type": "boolean"
+          },
+          "supplementDue": {
+            "type": "string",
+            "format": "date"
+          },
+          "supplementRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "supplementOverdue": {
+            "type": "boolean"
+          },
+          "pendingDecision": {
+            "$ref": "#/components/schemas/DecisionResponse"
+          },
+          "externalChecks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalCheckResponse"
+            }
+          },
+          "documentCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -11820,6 +12512,419 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AgentRunStepResponse"
+            }
+          }
+        }
+      },
+      "ApiResponseCompletenessResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CompletenessResponse"
+          }
+        }
+      },
+      "CompletenessResponse": {
+        "type": "object",
+        "properties": {
+          "reviewDeadline": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "SupplementRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "missingDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "missingDocuments",
+          "reason"
+        ]
+      },
+      "ApiResponseSupplementResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SupplementResponse"
+          }
+        }
+      },
+      "SupplementResponse": {
+        "type": "object",
+        "properties": {
+          "round": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "supplementDue": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "ApiResponseReviewSessionResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewSessionResponse"
+          }
+        }
+      },
+      "ReviewSessionResponse": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReturnRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "ExternalCheckRequest": {
+        "type": "object",
+        "properties": {
+          "agency": {
+            "type": "string",
+            "enum": [
+              "POLICE",
+              "PEER_BANK"
+            ]
+          },
+          "mockReply": {
+            "type": "string",
+            "enum": [
+              "INVOLVEMENT_SUSPECTED",
+              "DOCUMENT_FORGED",
+              "OWNER_UNRELATED",
+              "NO_RECORD"
+            ]
+          }
+        },
+        "required": [
+          "agency",
+          "mockReply"
+        ]
+      },
+      "ApiResponseExternalCheckResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExternalCheckResponse"
+          }
+        }
+      },
+      "ExternalCheckResponse": {
+        "type": "object",
+        "properties": {
+          "checkId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "agency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListExternalCheckResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalCheckResponse"
+            }
+          }
+        }
+      },
+      "ObjectionNoticeResponse": {
+        "type": "object",
+        "properties": {
+          "noticeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "target": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListObjectionNoticeResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectionNoticeResponse"
+            }
+          }
+        }
+      },
+      "ObjectionDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "round": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ocrStatus": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseListObjectionDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectionDocumentResponse"
+            }
+          }
+        }
+      },
+      "OcrRegion": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string"
+          },
+          "bbox": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "OcrPage": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OcrRegion"
+            }
+          }
+        }
+      },
+      "DocumentOcrResponse": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OcrPage"
+            }
+          }
+        }
+      },
+      "ApiResponseDocumentOcrResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DocumentOcrResponse"
+          }
+        }
+      },
+      "ObjectionLedgerEntryResponse": {
+        "type": "object",
+        "properties": {
+          "transactionNumber": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "interbank": {
+            "type": "boolean"
+          },
+          "counterpartyAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disputed": {
+            "type": "boolean"
+          },
+          "afterDispute": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListObjectionLedgerEntryResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectionLedgerEntryResponse"
             }
           }
         }

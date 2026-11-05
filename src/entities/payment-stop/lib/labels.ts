@@ -84,3 +84,11 @@ export const OBJECTION_STATUS_LABEL: Record<string, string> = {
 /** 표에 없는 코드는 코드 그대로 보인다. 빈칸으로 두면 값이 없다고 오인한다. */
 export const labelOf = (labels: Record<string, string>, code: string) =>
   labels[code] ?? code
+
+/** AI 분석 실행 상태(서버 `AgentRunStatus`). */
+export const AGENT_RUN_STATUS_LABEL: Record<string, string> = {
+  QUEUED: "대기",
+  RUNNING: "분석 중",
+  COMPLETED: "완료",
+  FAILED: "실패",
+}

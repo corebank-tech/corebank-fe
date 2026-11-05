@@ -20,7 +20,7 @@ import {
   type ObjectionClause,
   type ObjectionDecision,
 } from "@/entities/payment-stop"
-import { GateChecklist } from "@/widgets/objection"
+import { AgentAnalysis, GateChecklist } from "@/widgets/objection"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import { Alert } from "@/shared/ui/alert"
@@ -39,7 +39,7 @@ import { Adm05ObjectionDecisionForm } from "@/pages/admin/adm05-objection-decisi
  * ADM-05 지급정지 이의제기 심사 — 상세와 판정 확정.
  *
  * 위에서 아래로 담당자가 판단하는 순서대로 놓는다: 사건, 다툼 거래, 명의인 소명,
- * 해제 요건 점검, AI 분석, 판정. 판정 확정은 이 화면에 머문 채 끝나므로 ADM-01 처럼
+ * AI 분석(참고), 해제 요건 점검(서버 규칙), 판정. 판정 확정은 이 화면에 머문 채 끝나므로 ADM-01 처럼
  * 화면을 넘기지 않고 확인 다이얼로그 뒤 결과를 같은 화면에 보인다.
  *
  * 조회 사유(PH-89)는 ADM-01 과 같이 주소의 `?reason=` 으로 받는다. 목록 응답에는 소명
@@ -393,21 +393,16 @@ export const Adm05ObjectionDetail = () => {
         </Panel>
       </FormSection>
 
-      <FormSection title="해제 요건 점검" className="mb-0">
-        <GateChecklist objection={objection} />
+      <FormSection title="AI 분석" className="mb-0">
+        <AgentAnalysis
+          objectionId={objection.objectionId}
+          isDecided={objection.decision != null}
+          canRequest={canDecide}
+        />
       </FormSection>
 
-      {/* 계획 PA-05(분석 실행, 단계 이벤트, 판정안, 1초 폴링)가 서버에 생기면 이 자리에
-          실행 타임라인을 붙인다. 그 전에는 예시 데이터를 넣지 않고 자리만 둔다. */}
-      <FormSection title="AI 분석 실행 타임라인" className="mb-0">
-        <div
-          className="border border-dashed border-border-strong bg-surface px-4 py-6 text-center"
-          data-testid="agent-timeline-placeholder"
-        >
-          <p className="text-base text-ink-muted">
-            AI 분석이 연결되면 이 자리에 분석 단계가 차례로 표시됩니다.
-          </p>
-        </div>
+      <FormSection title="해제 요건 점검" className="mb-0">
+        <GateChecklist objection={objection} />
       </FormSection>
 
       <FormSection title="판정 확정" className="mb-0">

@@ -67,3 +67,21 @@ test("조회 권한만 있으면 대리 접수와 판정 입력이 보이지 않
   await page.goto("/admin/objections/intake")
   await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeVisible()
 })
+
+test("AI 분석 단계가 차례로 붙고, 끝나면 판정안과 갈래 차이 경고가 보인다", async ({
+  page,
+}) => {
+  await loginAs(page, ADMIN)
+
+  // 목의 이의제기 2는 처음 조회할 때 분석이 시작돼 약 12초 동안 단계가 쌓인다.
+  await page.goto("/admin/objections/2?reason=OPERATION")
+  const timeline = page.getByRole("list", { name: "AI 분석 단계" })
+  await expect(timeline.getByText("분석 작업 시작")).toBeVisible({
+    timeout: 5_000,
+  })
+  await expect(page.getByText("서버 규칙 결과와 AI 판정안이 다름")).toBeVisible(
+    { timeout: 20_000 },
+  )
+  await expect(timeline.locator("li[data-seq]")).toHaveCount(8)
+  await expect(page.getByText("다른 은행 거래내역서").first()).toBeVisible()
+})

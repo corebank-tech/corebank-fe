@@ -29,7 +29,7 @@ const STORE_KEY = "payment-stop:objections"
 const RULES_VERSION = "2026-11-03.1"
 const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
 
-type MockObjection = Required<
+export type MockObjection = Required<
   Pick<
     ObjectionDetailResponse,
     | "objectionId"
@@ -255,8 +255,12 @@ const seed = (): MockState => {
 const readState = (): MockState => readStore<MockState>(STORE_KEY, seed())
 const writeState = (state: MockState) => writeStore(STORE_KEY, state)
 
+/** AI 분석 목(`payment-stop-agent-api.ts`)이 이의제기를 읽는 자리. */
+export const readMockObjection = (objectionId: number) =>
+  readState().objections.find((item) => item.objectionId === objectionId)
+
 /** 서버 `GateResult.allowsRelease` 와 같은 판정 허용 조건. */
-const allowedResults = (objection: MockObjection) => {
+export const allowedResults = (objection: MockObjection) => {
   const normal = objection.branch === "NORMAL_ACCEPT"
   const open = !objection.litigationPending
   return {

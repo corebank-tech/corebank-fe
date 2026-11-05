@@ -4,15 +4,19 @@ import { hasPermission } from "@/entities/auth"
 import { useSession } from "@/features/session"
 import {
   CASE_STATUS_LABEL,
+  AGENT_RUN_STATUS_LABEL,
   OBJECTION_STATUS_LABEL,
   formatClause,
   labelOf,
+  useAgentRunSnapshots,
   useObjectionList,
+  type AgentRunSnapshot,
   type ObjectionSummary,
 } from "@/entities/payment-stop"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
+import { Loader2 } from "lucide-react"
 import { Badge, type BadgeVariant } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
@@ -30,7 +34,7 @@ import { Panel } from "@/shared/ui/panel"
  * 목록 응답에는 소명 원문이 없어 조회 사유를 묻지 않는다. 사유는 소명이 보이는
  * 상세를 열 때 묻는다.
  *
- * AI 분석 진행률과 현재 단계 칸은 분석 실행 API(계획 PA-05)가 생기면 붙인다.
+ * AI 분석 상태 칸은 이의제기마다 실행 목록을 따로 묻는다. 목록 응답에 요약이 없어서다.
  */
 
 const CASE_STATUS_TONE: Record<string, BadgeVariant> = {
@@ -57,6 +61,8 @@ export const Adm05ObjectionList = () => {
     (page - 1) * QUERY_DEFAULT_PAGE_SIZE,
     page * QUERY_DEFAULT_PAGE_SIZE,
   )
+  // 분석 상태는 이의제기마다 따로 묻는다(N+1). 보이는 쪽의 행만 묻는다.
+  const snapshots = useAgentRunSnapshots(pageRows.map((row) => row.objectionId))
   const waitingCount = rows.filter(
     (row) => row.objectionStatus === "RECEIVED",
   ).length
@@ -64,28 +70,30 @@ export const Adm05ObjectionList = () => {
   const columns: DataGridColumn<ObjectionSummary>[] = [
     {
       key: "objectionId",
-      header: "이의제기 번호",
+      header: "번호",
       align: "center",
-      width: 110,
+      width: 64,
       render: (row) => row.objectionId,
     },
     {
       key: "caseId",
       header: "사건 번호",
       align: "center",
-      width: 90,
+      width: 84,
       render: (row) => row.caseId,
     },
     {
       key: "accountId",
       header: "계좌 ID",
       align: "center",
-      width: 90,
+      width: 80,
       render: (row) => row.accountId,
     },
     {
       key: "clause",
       header: "이의제기 사유",
+      // 사유가 길어 줄을 바꾼다. 한 줄로 두면 오른쪽 칸이 화면 밖으로 밀린다.
+      className: "whitespace-normal",
       render: (row) => formatClause(row.clause),
     },
     {
@@ -107,7 +115,7 @@ export const Adm05ObjectionList = () => {
       key: "receivedAt",
       header: "접수 일시",
       align: "center",
-      width: 160,
+      width: 150,
       render: (row) => (row.receivedAt ? formatDateTime(row.receivedAt) : "-"),
     },
     {
@@ -132,6 +140,14 @@ export const Adm05ObjectionList = () => {
         >
           {labelOf(OBJECTION_STATUS_LABEL, row.objectionStatus)}
         </Badge>
+      ),
+    },
+    {
+      key: "analysis",
+      header: "AI 분석",
+      width: 150,
+      render: (row) => (
+        <AnalysisStatus snapshot={snapshots.get(row.objectionId)} />
       ),
     },
     {
@@ -234,3 +250,37 @@ const Stat = ({
     </p>
   </Panel>
 )
+
+const RUN_STATUS_TONE: Record<string, BadgeVariant> = {
+  QUEUED: "neutral",
+  RUNNING: "primary",
+  COMPLETED: "success",
+  FAILED: "danger",
+}
+
+/** AI 분석 상태 칸. 분석 중이면 지금 하는 단계를 함께 보인다. */
+const AnalysisStatus = ({
+  snapshot,
+}: {
+  snapshot: AgentRunSnapshot | undefined
+}) => {
+  if (!snapshot?.isLoaded) return <span className="text-ink-faint">-</span>
+  if (snapshot.status == null) {
+    return <span className="text-xs text-ink-faint">분석 없음</span>
+  }
+  if (snapshot.status === "RUNNING") {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-primary">
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+        <span className="truncate">
+          {snapshot.currentStepTitle ?? "분석 중"}
+        </span>
+      </span>
+    )
+  }
+  return (
+    <Badge variant={RUN_STATUS_TONE[snapshot.status] ?? "neutral"}>
+      {labelOf(AGENT_RUN_STATUS_LABEL, snapshot.status)}
+    </Badge>
+  )
+}

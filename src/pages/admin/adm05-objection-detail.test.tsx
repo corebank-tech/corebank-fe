@@ -1,4 +1,12 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest"
 import {
   fireEvent,
   render,
@@ -179,7 +187,25 @@ const submitDecision = async (options: {
   fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
 }
 
+/**
+ * AI 분석 영역이 부르는 API. 기본은 "실행 없음"이고, 분석 실패 경우만 바꿔 끼운다.
+ * 타임라인 자체의 분기는 `widgets/objection/agent-analysis.test.tsx` 가 본다.
+ */
+const respondAgent = (runs: unknown[] = []) =>
+  server.use(
+    http.get("*/admin/objections/:objectionId/agent-runs", () =>
+      HttpResponse.json({ code: "0000", message: "성공", data: runs }),
+    ),
+    http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
+      HttpResponse.json({ code: "0000", message: "성공", data: [] }),
+    ),
+    http.get("*/admin/objections/:objectionId/review-draft", () =>
+      HttpResponse.json({ code: "0000", message: "성공", data: null }),
+    ),
+  )
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
+beforeEach(() => respondAgent())
 afterEach(() => {
   server.resetHandlers()
   decisionCalls = []
@@ -224,7 +250,6 @@ describe("Adm05ObjectionDetail", () => {
     ).toBeInTheDocument()
     // "게이트" 같은 시스템 용어를 화면에 드러내지 않는다.
     expect(screen.queryByText(/게이트/)).not.toBeInTheDocument()
-    expect(screen.getByTestId("agent-timeline-placeholder")).toBeInTheDocument()
   })
 
   it("서버가 닫은 판정은 라디오를 잠그고 이유를 보인다", async () => {
@@ -319,6 +344,28 @@ describe("Adm05ObjectionDetail", () => {
     expect(retry.idempotencyKey).toBe(first.idempotencyKey)
     // 불수용은 지급정지를 줄이지 않으므로 조기 해제 근거를 보내지 않는다.
     expect(first.body).toEqual({ result: "REJECTED", reason: "사기 정황" })
+  })
+
+  it("AI 분석이 실패해도 판정을 확정할 수 있다", async () => {
+    respondDetail(NORMAL_ACCEPT_DETAIL)
+    respondAgent([
+      {
+        runId: 31,
+        status: "FAILED",
+        attempt: 3,
+        failureReason: "점유 시간 초과",
+      },
+    ])
+    respondDecision(() => ({ code: "0000", message: "성공", status: 200 }))
+    renderDetail()
+
+    expect(await screen.findByText("AI 분석 중단")).toBeInTheDocument()
+    await submitDecision({ result: "불수용", reason: "사기 정황" })
+
+    await waitFor(() => expect(decisionCalls).toHaveLength(1))
+    expect(
+      await screen.findByText(/불수용 판정을 확정했습니다/),
+    ).toBeInTheDocument()
   })
 
   it("조회 권한만 있으면 판정 입력을 그리지 않는다", async () => {

@@ -1,4 +1,12 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { MemoryRouter } from "react-router"
@@ -70,8 +78,43 @@ const renderList = (permissions: AdminPermission[]) => {
   )
 }
 
+let runRequests: string[] = []
+
+/** 행마다 실행 목록을 묻는다. 3번은 분석 중, 1번은 완료다. */
+const respondRuns = () =>
+  server.use(
+    http.get("*/admin/objections/:objectionId/agent-runs", ({ params }) => {
+      runRequests.push(String(params.objectionId))
+      const status = params.objectionId === "3" ? "RUNNING" : "COMPLETED"
+      return HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: [{ runId: Number(params.objectionId) * 100, status, attempt: 1 }],
+      })
+    }),
+    http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
+      HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: [
+          { seq: 1, type: "CLAIMED", title: "분석 작업 시작", status: "DONE" },
+          {
+            seq: 2,
+            type: "TOOL_CALL",
+            title: "송금인과의 과거 거래 조회",
+            status: "DONE",
+          },
+        ],
+      }),
+    ),
+  )
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-afterEach(() => server.resetHandlers())
+beforeEach(() => respondRuns())
+afterEach(() => {
+  server.resetHandlers()
+  runRequests = []
+})
 afterAll(() => server.close())
 
 describe("Adm05ObjectionList", () => {
@@ -101,6 +144,13 @@ describe("Adm05ObjectionList", () => {
     expect(
       screen.getByRole("button", { name: "대리 접수" }),
     ).toBeInTheDocument()
+
+    // AI 분석 상태: 분석 중이면 마지막 단계 이름, 끝났으면 완료.
+    expect(
+      await within(waitingRow).findByText("송금인과의 과거 거래 조회"),
+    ).toBeInTheDocument()
+    expect(await within(decidedRow).findByText("완료")).toBeInTheDocument()
+    expect([...new Set(runRequests)].sort()).toEqual(["1", "3"])
   })
 
   it("조회 권한만 있으면 대리 접수 버튼을 그리지 않는다", async () => {

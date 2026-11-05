@@ -9,6 +9,7 @@ import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconci
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
 import { paymentStopAgentApiHandlers } from "@/mocks/handlers/payment-stop-agent-api"
 import { paymentStopApiHandlers } from "@/mocks/handlers/payment-stop-api"
+import { paymentStopCustomerApiHandlers } from "@/mocks/handlers/payment-stop-customer-api"
 import { productSubscriptionsApiHandlers } from "@/mocks/handlers/product-subscriptions-api"
 import { productsApiHandlers } from "@/mocks/handlers/products-api"
 import { transferApiHandlers } from "@/mocks/handlers/transfer-api"
@@ -30,6 +31,7 @@ export const handlers = [
   ...infoApiHandlers,
   ...paymentStopAgentApiHandlers,
   ...paymentStopApiHandlers,
+  ...paymentStopCustomerApiHandlers,
   ...accountHandlers,
   ...authHandlers,
 ]

@@ -49,8 +49,10 @@ export const formatClause = (clause: number): string => {
 /** 해제 요건 점검 규칙 이름(서버 `GateRule`). 처음 보는 규칙은 코드를 그대로 보인다. */
 export const GATE_RULE_LABEL: Record<string, string> = {
   SIMPLIFIED_EXCLUSION: "간소화 대상 제외",
+  EXTERNAL_CHECK: "외부 확인 회신",
   FRAUD_PATTERN: "사기 패턴",
   RELATIONSHIP: "관계 인정",
+  PARTIAL_REQUIREMENT: "일부 지급정지 요건",
 }
 
 /** 규칙 근거 구분(D33). 수치는 공식 기준이 아니라 내부 기준이라는 것을 함께 밝힌다. */

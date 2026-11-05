@@ -28,6 +28,7 @@ type Props = {
 const MATCHED_TONE: Record<string, BadgeVariant> = {
   FRAUD_PATTERN: "danger",
   RELATIONSHIP: "success",
+  PARTIAL_REQUIREMENT: "success",
   SIMPLIFIED_EXCLUSION: "warning",
 }
 

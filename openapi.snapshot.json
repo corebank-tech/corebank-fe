@@ -131,6 +131,10 @@
     {
       "name": "관리자 이의제기 심사",
       "description": "지급정지 이의제기 접수, 목록, 상세(해제 요건 점검 포함), 판정 확정"
+    },
+    {
+      "name": "관리자 이의제기 AI 분석",
+      "description": "AI 분석 실행 목록, 실행 타임라인 폴링, AI 판정안, 재분석 요청"
     }
   ],
   "paths": {
@@ -5757,6 +5761,175 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/review-requests": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 재분석 요청",
+        "description": "분석을 대기열에 다시 넣는다. 접수 때는 자동으로 들어가므로 실패했거나 다시 보고 싶을 때만 쓴다. PST0302 이미 판정 확정, PST0306 진행 중인 분석 있음. 멱등키 필수.",
+        "operationId": "requestObjectionReview",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewRequestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/review-draft": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 판정안",
+        "description": "가장 최근 판정안. 없으면 data 가 null 이다. 판정안은 심사 참고안이고 해제 근거가 아니다.",
+        "operationId": "getObjectionReviewDraft",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/agent-runs": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 분석 실행 목록",
+        "description": "최근 실행부터. PST0202 이의제기 없음.",
+        "operationId": "listObjectionAgentRuns",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListAgentRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/agent-runs/{runId}/steps": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 분석 실행 타임라인",
+        "description": "after 보다 큰 순번의 단계만 순서대로 준다. 화면은 1초마다 마지막 순번으로 다시 부르고 실행이 끝나면 멈춘다. PST0203 실행 없음.",
+        "operationId": "listObjectionAgentRunSteps",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "마지막으로 받은 순번. 처음이면 0",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            },
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListAgentRunStepResponse"
                 }
               }
             }
@@ -11475,6 +11648,179 @@
           },
           "detail": {
             "type": "string"
+          }
+        }
+      },
+      "ApiResponseReviewRequestResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewRequestResponse"
+          }
+        }
+      },
+      "ReviewRequestResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseReviewDraftResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewDraftResponse"
+          }
+        }
+      },
+      "ReviewDraftResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AgentRunResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "costMicroUsd": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseListAgentRunResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunResponse"
+            }
+          }
+        }
+      },
+      "AgentRunStepResponse": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListAgentRunStepResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunStepResponse"
+            }
           }
         }
       }

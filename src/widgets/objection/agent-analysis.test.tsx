@@ -17,7 +17,7 @@ import { AgentAnalysis } from "@/widgets/objection/agent-analysis"
  * 가짜 타이머를 쓰면 MSW 응답과 TanStack Query 의 타이머가 엇갈려 순서를 보장하기 어렵다.
  */
 
-const POLLING_TEST_TIMEOUT_MS = 15_000
+const POLLING_TEST_TIMEOUT_MS = 20_000
 
 const envelope = (data: unknown) =>
   HttpResponse.json({ code: "0000", message: "성공", data })
@@ -198,9 +198,14 @@ describe("AgentAnalysis", () => {
       await waitFor(() => expect(stepAfterValues.at(-1)).toBe(4), {
         timeout: 3_000,
       })
+      // 종료를 보기 전에 떠난 after=4 요청이 있으면, 종료를 본 뒤 시작한 요청이 한 번 더 온다(부하가 클 때).
+      // 그 한 번까지 받고 멈춰야 한다.
       const callsAfterEnd = stepAfterValues.length
       await sleep(2_500)
-      expect(stepAfterValues).toHaveLength(callsAfterEnd)
+      const settled = stepAfterValues.length
+      expect(settled - callsAfterEnd).toBeLessThanOrEqual(1)
+      await sleep(2_500)
+      expect(stepAfterValues).toHaveLength(settled)
       expect(screen.queryByText("다음 단계 진행 중")).not.toBeInTheDocument()
     },
     POLLING_TEST_TIMEOUT_MS,

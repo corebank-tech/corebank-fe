@@ -113,9 +113,19 @@ const respondDecision = (
           idempotencyKey: request.headers.get("Idempotency-Key"),
         })
         const { code, message, status } = reply(decisionCalls.length)
+        const body = decisionCalls.at(-1)?.body as { result?: string }
+        const releasing = body?.result !== "REJECTED"
         return HttpResponse.json(
           code === "0000"
-            ? { code, message, data: { result: "ACCEPTED" } }
+            ? {
+                code,
+                message,
+                data: {
+                  decisionId: 31,
+                  result: body?.result,
+                  status: releasing ? "PENDING_APPROVAL" : "CONFIRMED",
+                },
+              }
             : { code, message },
           { status },
         )
@@ -182,7 +192,9 @@ const submitDecision = async (options: {
       target: { value: options.basis },
     })
   }
-  fireEvent.click(screen.getByRole("button", { name: "판정 확정" }))
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(판정 확정|승인 요청)$/ }),
+  )
   const dialog = await screen.findByRole("dialog")
   fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
 }
@@ -204,12 +216,59 @@ const respondAgent = (runs: unknown[] = []) =>
     ),
   )
 
+let sessionCalls: (string | null)[] = []
+let approveCalls: (string | null)[] = []
+
+const okJson = (data: unknown) =>
+  HttpResponse.json({ code: "0000", message: "성공", data })
+
+/**
+ * 심사 운영 영역이 부르는 API(계약 v2). 기본은 빈 목록이고, 로그인한 관리자는 고객 번호
+ * `adminId` 다. 심사 시작 기록과 승인 요청은 멱등키를 세어 둔다.
+ */
+const respondReviewOps = (adminId = 2) =>
+  server.use(
+    http.get("*/customers/me", () =>
+      okJson({ customerId: adminId, userName: "관*자" }),
+    ),
+    http.post(
+      "*/admin/objections/:objectionId/review-sessions",
+      ({ request }) => {
+        sessionCalls.push(request.headers.get("Idempotency-Key"))
+        return okJson({ sessionId: 1, startedAt: "2026-11-06T09:00:00" })
+      },
+    ),
+    http.get("*/admin/objections/:objectionId/documents", () => okJson([])),
+    http.get("*/admin/objections/:objectionId/notices", () => okJson([])),
+    http.get("*/admin/objections/:objectionId/external-checks", () =>
+      okJson([]),
+    ),
+    http.get("*/admin/objections/:objectionId/ledger", () => okJson([])),
+    http.post(
+      "*/admin/objections/:objectionId/decisions/:decisionId/approve",
+      ({ request }) => {
+        approveCalls.push(request.headers.get("Idempotency-Key"))
+        return okJson({
+          decisionId: 51,
+          status: "CONFIRMED",
+          result: "ACCEPTED",
+          approvedBy: 14,
+        })
+      },
+    ),
+  )
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
-beforeEach(() => respondAgent())
+beforeEach(() => {
+  respondAgent()
+  respondReviewOps()
+})
 afterEach(() => {
   server.resetHandlers()
   decisionCalls = []
   detailReasons = []
+  sessionCalls = []
+  approveCalls = []
 })
 afterAll(() => server.close())
 
@@ -276,7 +335,7 @@ describe("Adm05ObjectionDetail", () => {
     fireEvent.change(screen.getByLabelText(/판정 사유/), {
       target: { value: "정상 거래 관계가 확인됨" },
     })
-    fireEvent.click(screen.getByRole("button", { name: "판정 확정" }))
+    fireEvent.click(screen.getByRole("button", { name: "승인 요청" }))
 
     expect(
       await screen.findByText(
@@ -392,5 +451,165 @@ describe("Adm05ObjectionDetail", () => {
     expect(await screen.findByText("확정된 판정")).toBeInTheDocument()
     expect(screen.getByText("관리자 번호 7")).toBeInTheDocument()
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument()
+  })
+
+  it("상세를 열면 심사 시작을 한 번 기록하고 멱등키를 보낸다", async () => {
+    respondDetail(NORMAL_ACCEPT_DETAIL)
+    renderDetail()
+
+    await screen.findByText("해제 요건 점검")
+    await waitFor(() => expect(sessionCalls).toHaveLength(1))
+    expect(sessionCalls[0]).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it("수용을 작성하면 바로 확정하지 않고 승인 대기로 올린다", async () => {
+    respondDetail(NORMAL_ACCEPT_DETAIL)
+    respondDecision(() => ({ code: "0000", message: "성공", status: 200 }))
+    renderDetail()
+    await screen.findByText("해제 요건 점검")
+
+    await submitDecision({
+      result: "수용",
+      reason: "정상 거래 관계가 확인됨",
+      basis: "관계 거래 3회",
+    })
+
+    expect(
+      await screen.findByText(/수용 판정을 승인 대기로 올렸습니다/),
+    ).toBeInTheDocument()
+  })
+
+  it("심사 기한 경보가 켜지면 빨간 기한과 경고를 보인다", async () => {
+    respondDetail({
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionStatus: "UNDER_REVIEW",
+      reviewDeadline: "2026-11-10",
+      deadlineAlert: true,
+    })
+    renderDetail()
+
+    const deadline = await screen.findByRole("status", {
+      name: /심사 기한 2026\.11\.10.*기한 임박/,
+    })
+    expect(deadline).toHaveClass("text-danger")
+    expect(screen.getByText("심사 기한 임박")).toBeInTheDocument()
+  })
+
+  it("보완 2회를 다 쓰면 보완 요청 입력 대신 소진 안내를 보인다", async () => {
+    respondDetail({
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionStatus: "UNDER_REVIEW",
+      supplementRound: 2,
+    })
+    renderDetail()
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "보완 요청 작성" }),
+    )
+    expect(screen.getByText("보완 요청 횟수 소진")).toBeInTheDocument()
+    expect(screen.queryByLabelText(/요청 사유/)).not.toBeInTheDocument()
+  })
+
+  it("보완 1회 뒤 재보완은 2회째이고 기한은 3영업일이라고 안내한다", async () => {
+    respondDetail({
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionStatus: "UNDER_REVIEW",
+      supplementRound: 1,
+    })
+    renderDetail()
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "보완 요청 작성" }),
+    )
+    expect(
+      screen.getByText(
+        /이번 요청은 2회째 보완입니다. 보완 기한은 요청일부터 3영업일/,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  describe("2인 승인", () => {
+    const PENDING_DETAIL: ObjectionDetailResponse = {
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionId: 5,
+      objectionStatus: "PENDING_APPROVAL",
+      pendingDecision: {
+        decisionId: 51,
+        status: "PENDING_APPROVAL",
+        result: "ACCEPTED",
+        reason: "수강료 정기 입금",
+        earlyReleaseBasis: "관계 거래 3건",
+        decidedBy: 2,
+        decidedAt: "2026-11-05T17:10:00",
+      },
+    }
+    const APPROVER: AdminPermission[] = [
+      "PAYMENT_STOP_READ",
+      "PAYMENT_STOP_APPROVE",
+    ]
+
+    it("승인 권한이 없으면 승인 대기와 작성자만 보이고 버튼이 없다", async () => {
+      respondDetail(PENDING_DETAIL)
+      renderDetail({ path: "/admin/objections/5?reason=OPERATION" })
+
+      const panel = await screen.findByRole("region", {
+        name: "승인 대기 판정",
+      })
+      expect(
+        within(panel).getByText("관리자 번호 2 (본인)"),
+      ).toBeInTheDocument()
+      expect(within(panel).getByText("승인 권한 없음")).toBeInTheDocument()
+      expect(
+        within(panel).queryByRole("button", { name: "승인" }),
+      ).not.toBeInTheDocument()
+      // 승인 대기 중에는 판정을 다시 작성하지 않는다.
+      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument()
+    })
+
+    it("작성자 본인은 승인 권한이 있어도 승인과 반려를 누를 수 없다", async () => {
+      respondDetail(PENDING_DETAIL)
+      respondReviewOps(2)
+      renderDetail({
+        path: "/admin/objections/5?reason=OPERATION",
+        permissions: APPROVER,
+      })
+
+      const panel = await screen.findByRole("region", {
+        name: "승인 대기 판정",
+      })
+      await waitFor(() =>
+        expect(
+          within(panel).getByText(
+            /본인이 작성한 판정은 승인하거나 반려할 수 없습니다/,
+          ),
+        ).toBeInTheDocument(),
+      )
+      expect(within(panel).getByRole("button", { name: "승인" })).toBeDisabled()
+      expect(within(panel).getByRole("button", { name: "반려" })).toBeDisabled()
+    })
+
+    it("다른 승인 관리자는 확인 뒤 승인하고 멱등키를 보낸다", async () => {
+      respondDetail(PENDING_DETAIL)
+      respondReviewOps(14)
+      renderDetail({
+        path: "/admin/objections/5?reason=OPERATION",
+        permissions: APPROVER,
+      })
+
+      const panel = await screen.findByRole("region", {
+        name: "승인 대기 판정",
+      })
+      const approve = within(panel).getByRole("button", { name: "승인" })
+      await waitFor(() => expect(approve).toBeEnabled())
+      fireEvent.click(approve)
+      const dialog = await screen.findByRole("dialog")
+      fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+      expect(
+        await screen.findByText(/수용 판정을 승인해 확정했습니다/),
+      ).toBeInTheDocument()
+      expect(approveCalls).toHaveLength(1)
+      expect(approveCalls[0]).toMatch(/^[0-9a-f-]{36}$/)
+    })
   })
 })

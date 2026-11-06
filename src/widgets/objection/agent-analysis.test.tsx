@@ -284,4 +284,40 @@ describe("AgentAnalysis", () => {
     await screen.findByText("완료")
     expect(screen.getByRole("button", { name: "재분석 요청" })).toBeDisabled()
   })
+
+  it("끝난 실행은 전체 단계를 받아 두고, 재생하면 처음 단계부터 다시 붙인다", async () => {
+    respondCompleted()
+    const allStepRequests: string[] = []
+    server.use(
+      http.get(
+        "*/admin/objections/:objectionId/agent-runs/:runId/steps",
+        ({ request }) => {
+          const after = new URL(request.url).searchParams.get("after")
+          if (after == null) allStepRequests.push(request.url)
+          return envelope(SCRIPT)
+        },
+      ),
+    )
+    renderAnalysis()
+
+    const replay = await screen.findByRole("button", { name: "2배 재생" })
+    expect(screen.getByRole("button", { name: "1배 재생" })).toBeInTheDocument()
+    await waitFor(() => expect(allStepRequests).toHaveLength(1))
+    await waitFor(() => expect(renderedTitles()).toEqual(EXPECTED_TITLES))
+
+    fireEvent.click(replay)
+    expect(
+      await screen.findByRole("button", { name: "재생 중지" }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(renderedTitles()).toEqual([EXPECTED_TITLES[0]]))
+    // 단계 시작 간격이 1초라 2배면 0.5초마다 하나씩 붙는다.
+    await waitFor(() => expect(renderedTitles()).toEqual(EXPECTED_TITLES), {
+      timeout: 4_000,
+    })
+    fireEvent.click(screen.getByRole("button", { name: "재생 중지" }))
+    expect(
+      screen.queryByRole("button", { name: "재생 중지" }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "2배 재생" })).toBeInTheDocument()
+  })
 })

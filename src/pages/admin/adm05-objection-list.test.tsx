@@ -26,11 +26,31 @@ const SUMMARIES: ObjectionSummaryResponse[] = [
     caseId: 13,
     accountId: 2003,
     clause: 2,
-    objectionStatus: "RECEIVED",
+    objectionStatus: "UNDER_REVIEW",
     caseStatus: "STOPPED",
     disputedTotal: 1_200_000,
     objectionDeadline: "2026-12-15",
     receivedAt: "2026-11-03T10:21:40",
+    reviewDeadline: "2026-11-10",
+    deadlineAlert: true,
+    supplementOverdue: false,
+    latestRunStatus: "RUNNING",
+    latestRunLastStepTitle: "송금인과의 과거 거래 조회",
+  },
+  {
+    objectionId: 4,
+    caseId: 14,
+    accountId: 2004,
+    clause: 2,
+    objectionStatus: "SUPPLEMENT_REQUESTED",
+    caseStatus: "STOPPED",
+    disputedTotal: 2_000_000,
+    objectionDeadline: "2026-12-15",
+    receivedAt: "2026-10-23T13:40:00",
+    reviewDeadline: "2026-10-30",
+    deadlineAlert: false,
+    supplementOverdue: true,
+    latestRunStatus: "COMPLETED",
   },
   {
     objectionId: 1,
@@ -42,6 +62,7 @@ const SUMMARIES: ObjectionSummaryResponse[] = [
     disputedTotal: 300_000,
     objectionDeadline: "2026-12-15",
     receivedAt: "2026-10-27T11:45:00",
+    latestRunStatus: "COMPLETED",
   },
 ]
 
@@ -80,33 +101,13 @@ const renderList = (permissions: AdminPermission[]) => {
 
 let runRequests: string[] = []
 
-/** 행마다 실행 목록을 묻는다. 3번은 분석 중, 1번은 완료다. */
+/** 목록은 행마다 실행 목록을 묻지 않는다(N+1 제거). 오면 세어 둔다. */
 const respondRuns = () =>
   server.use(
     http.get("*/admin/objections/:objectionId/agent-runs", ({ params }) => {
       runRequests.push(String(params.objectionId))
-      const status = params.objectionId === "3" ? "RUNNING" : "COMPLETED"
-      return HttpResponse.json({
-        code: "0000",
-        message: "성공",
-        data: [{ runId: Number(params.objectionId) * 100, status, attempt: 1 }],
-      })
+      return HttpResponse.json({ code: "0000", message: "성공", data: [] })
     }),
-    http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
-      HttpResponse.json({
-        code: "0000",
-        message: "성공",
-        data: [
-          { seq: 1, type: "CLAIMED", title: "분석 작업 시작", status: "DONE" },
-          {
-            seq: 2,
-            type: "TOOL_CALL",
-            title: "송금인과의 과거 거래 조회",
-            status: "DONE",
-          },
-        ],
-      }),
-    ),
   )
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
@@ -131,8 +132,21 @@ describe("Adm05ObjectionList", () => {
       within(waitingRow).getByText("제2호 정당한 대가로 받은 돈"),
     ).toBeInTheDocument()
     expect(within(waitingRow).getByText("전부 지급정지")).toBeInTheDocument()
-    expect(within(waitingRow).getByText("판정 대기")).toBeInTheDocument()
+    expect(within(waitingRow).getByText("심사 중")).toBeInTheDocument()
     expect(within(waitingRow).getByText("1,200,000원")).toBeInTheDocument()
+    // 심사 기한 경보는 서버 `deadlineAlert` 로 빨간 표시를 한다.
+    const deadline = within(waitingRow).getByRole("status", {
+      name: /심사 기한 2026\.11\.10/,
+    })
+    expect(deadline).toHaveAttribute("data-alert", "true")
+    expect(deadline).toHaveClass("text-danger")
+
+    // 보완 기한이 지난 건은 불수용 대상으로 표시한다.
+    const overdueRow = screen
+      .getByRole("link", { name: "이의제기 4 심사" })
+      .closest("tr")!
+    expect(within(overdueRow).getByText("불수용 대상")).toBeInTheDocument()
+    expect(within(overdueRow).getByText("보완 요청")).toBeInTheDocument()
 
     const decidedRow = screen
       .getByRole("link", { name: "이의제기 1 심사" })
@@ -140,17 +154,17 @@ describe("Adm05ObjectionList", () => {
     expect(within(decidedRow).getByText("일부 지급정지")).toBeInTheDocument()
     expect(within(decidedRow).getByText("판정 확정")).toBeInTheDocument()
 
-    expect(screen.getByText("[총 2건]")).toBeInTheDocument()
+    expect(screen.getByText("[총 3건]")).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: "대리 접수" }),
     ).toBeInTheDocument()
 
-    // AI 분석 상태: 분석 중이면 마지막 단계 이름, 끝났으면 완료.
+    // AI 분석 상태는 목록 요약 필드로 그린다. 분석 중이면 마지막 단계 이름, 끝났으면 완료.
     expect(
-      await within(waitingRow).findByText("송금인과의 과거 거래 조회"),
+      within(waitingRow).getByText("송금인과의 과거 거래 조회"),
     ).toBeInTheDocument()
-    expect(await within(decidedRow).findByText("완료")).toBeInTheDocument()
-    expect([...new Set(runRequests)].sort()).toEqual(["1", "3"])
+    expect(within(decidedRow).getByText("완료")).toBeInTheDocument()
+    expect(runRequests).toEqual([])
   })
 
   it("조회 권한만 있으면 대리 접수 버튼을 그리지 않는다", async () => {
@@ -159,7 +173,7 @@ describe("Adm05ObjectionList", () => {
     )
     renderList(["PAYMENT_STOP_READ"])
 
-    await screen.findByText("[총 2건]")
+    await screen.findByText("[총 3건]")
     expect(
       screen.queryByRole("button", { name: "대리 접수" }),
     ).not.toBeInTheDocument()

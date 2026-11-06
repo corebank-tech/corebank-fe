@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { hasPermission } from "@/entities/auth"
+import { useCustomerProfileQuery } from "@/entities/customer"
 import { useSession } from "@/features/session"
 import {
   AccessReasonSelect,
@@ -13,14 +14,28 @@ import {
   DECISION_LABEL,
   OBJECTION_STATUS_LABEL,
   formatClause,
+  isObjectionOpen,
   labelOf,
+  useAgentRuns,
   useObjectionDetail,
+  useReviewDraft,
+  useStartReviewSession,
   type DecisionResult,
   type DisputedTransfer,
   type ObjectionClause,
   type ObjectionDecision,
 } from "@/entities/payment-stop"
-import { AgentAnalysis, GateChecklist } from "@/widgets/objection"
+import {
+  AgentAnalysis,
+  ApprovalPanel,
+  DocumentEvidence,
+  ExternalCheckPanel,
+  GateChecklist,
+  LedgerEvidence,
+  NoticeList,
+  ReviewProgress,
+} from "@/widgets/objection"
+import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import { Alert } from "@/shared/ui/alert"
@@ -38,9 +53,12 @@ import { Adm05ObjectionDecisionForm } from "@/pages/admin/adm05-objection-decisi
 /**
  * ADM-05 지급정지 이의제기 심사 — 상세와 판정 확정.
  *
- * 위에서 아래로 담당자가 판단하는 순서대로 놓는다: 사건, 다툼 거래, 명의인 소명,
- * AI 분석(참고), 해제 요건 점검(서버 규칙), 판정. 판정 확정은 이 화면에 머문 채 끝나므로 ADM-01 처럼
- * 화면을 넘기지 않고 확인 다이얼로그 뒤 결과를 같은 화면에 보인다.
+ * 위에서 아래로 담당자가 판단하는 순서대로 놓는다: 사건, 심사 진행(기한, 완비 확인, 보완, 외부
+ * 확인), 다툼 거래, 명의인 소명, 첨부 서류, AI 분석(참고), 주장 대 원장 대조와 원장 타임라인,
+ * 해제 요건 점검(서버 규칙), 판정(작성과 2인 승인), 통지 기록. 판정은 이 화면에 머문 채 끝나므로
+ * ADM-01 처럼 화면을 넘기지 않고 확인 다이얼로그 뒤 결과를 같은 화면에 보인다.
+ *
+ * 상세를 처음 열 때 심사 시작 시각을 서버에 남긴다(처리시간 평가용). 실패해도 화면과 무관하다.
  *
  * 조회 사유(PH-89)는 ADM-01 과 같이 주소의 `?reason=` 으로 받는다. 목록 응답에는 소명
  * 원문이 없어 목록은 사유를 묻지 않으므로, 상세는 처음 열 때 항상 사유부터 고르게 한다.
@@ -133,6 +151,39 @@ const AccessReasonGate = ({
 
 const yesNo = (value: boolean) => (value ? "예" : "아니오")
 
+/** 판정 작성, 승인, 반려 뒤 화면 위에 띄우는 안내. */
+type Outcome =
+  | { kind: "CONFIRMED"; result: DecisionResult }
+  | { kind: "PENDING"; result: DecisionResult }
+  | { kind: "APPROVED"; result: string }
+  | { kind: "RETURNED"; result: string; reason: string | null }
+
+const OutcomeAlert = ({ outcome }: { outcome: Outcome }) => {
+  const label = labelOf(DECISION_LABEL, outcome.result)
+  if (outcome.kind === "PENDING") {
+    return (
+      <Alert variant="info" title="승인 대기">
+        {label} 판정을 승인 대기로 올렸습니다. 다른 관리자가 승인하면 계좌에
+        반영됩니다.
+      </Alert>
+    )
+  }
+  if (outcome.kind === "RETURNED") {
+    return (
+      <Alert variant="warning" title="판정 반려">
+        {label} 판정을 반려했습니다. 이의제기는 심사 중으로 돌아갑니다.
+        {outcome.reason && ` 반려 사유: ${outcome.reason}`}
+      </Alert>
+    )
+  }
+  return (
+    <Alert variant="success">
+      {label} 판정을 {outcome.kind === "APPROVED" ? "승인해 " : ""}확정했습니다.
+      지급정지 상태에 반영됐습니다.
+    </Alert>
+  )
+}
+
 const ConfirmedDecision = ({ decision }: { decision: ObjectionDecision }) => (
   <Panel>
     <PanelHeader
@@ -181,25 +232,64 @@ const ConfirmedDecision = ({ decision }: { decision: ObjectionDecision }) => (
       </>
     )}
     <LabelValueRow
-      label="확정자"
+      label={decision.approvedBy != null ? "작성자" : "확정자"}
       value={
         decision.decidedBy != null ? `관리자 번호 ${decision.decidedBy}` : "-"
       }
       labelWidth={140}
     />
     <LabelValueRow
-      label="확정 일시"
+      label={decision.approvedBy != null ? "작성 일시" : "확정 일시"}
       value={decision.decidedAt ? formatDateTime(decision.decidedAt) : "-"}
       labelWidth={140}
     />
+    {decision.approvedBy != null && (
+      <>
+        <LabelValueRow
+          label="승인자"
+          value={`관리자 번호 ${decision.approvedBy}`}
+          labelWidth={140}
+        />
+        <LabelValueRow
+          label="승인 일시"
+          value={
+            decision.approvedAt ? formatDateTime(decision.approvedAt) : "-"
+          }
+          labelWidth={140}
+        />
+      </>
+    )}
   </Panel>
 )
+
+/**
+ * 상세를 연 시각을 서버에 한 번 남긴다(계약 v2 `review-sessions`). 처리시간 평가용이라 실패는
+ * 무시한다. 같은 화면이 다시 그려져도 한 번만 보낸다.
+ */
+const useReviewSessionOnOpen = (objectionId: number, isReady: boolean) => {
+  const startSession = useStartReviewSession()
+  const idempotency = useIdempotencyKey()
+  const startedRef = React.useRef<number | null>(null)
+  const { mutate } = startSession
+  React.useEffect(() => {
+    if (!isReady || startedRef.current === objectionId) return
+    startedRef.current = objectionId
+    mutate(
+      { objectionId, idempotencyKey: idempotency.keyFor({ objectionId }) },
+      { onError: () => {} },
+    )
+  }, [idempotency, isReady, mutate, objectionId])
+}
 
 export const Adm05ObjectionDetail = () => {
   const { objectionId } = useParams()
   const navigate = useNavigate()
   const { permissions } = useSession()
   const canDecide = hasPermission(permissions, "PAYMENT_STOP_WRITE")
+  const canApprove = hasPermission(permissions, "PAYMENT_STOP_APPROVE")
+  // 판정 작성자와 같은 사람인지 가르는 번호. 세션 복원이 받은 프로필을 그대로 쓴다.
+  const profile = useCustomerProfileQuery()
+  const currentAdminId = profile.data?.customerId ?? null
 
   const [searchParams, setSearchParams] = useSearchParams()
   const reasonParam = searchParams.get("reason")
@@ -210,8 +300,11 @@ export const Adm05ObjectionDetail = () => {
     parsedId,
     reason,
   )
-  const [confirmedResult, setConfirmedResult] =
-    React.useState<DecisionResult | null>(null)
+  const [outcome, setOutcome] = React.useState<Outcome | null>(null)
+  const isValidObjection = Number.isInteger(parsedId) && parsedId > 0
+  useReviewSessionOnOpen(parsedId, isValidObjection && objection != null)
+  const { latestRun } = useAgentRuns(parsedId, isValidObjection)
+  const { draft } = useReviewDraft(parsedId, latestRun)
 
   const backLink = (
     <div>
@@ -266,17 +359,17 @@ export const Adm05ObjectionDetail = () => {
     0,
   )
   const scope = CLAUSE_SCOPE[objection.clause as ObjectionClause]
+  const pending = objection.pendingDecision
+  const canWriteDecision =
+    objection.decision == null &&
+    pending == null &&
+    isObjectionOpen(objection.objectionStatus)
 
   return (
     <div className="flex flex-col gap-6">
       {backLink}
 
-      {confirmedResult != null && (
-        <Alert variant="success">
-          {DECISION_LABEL[confirmedResult]} 판정을 확정했습니다. 지급정지 상태에
-          반영됐습니다.
-        </Alert>
-      )}
+      {outcome != null && <OutcomeAlert outcome={outcome} />}
 
       <Panel>
         <PanelHeader
@@ -290,9 +383,11 @@ export const Adm05ObjectionDetail = () => {
               </Badge>
               <Badge
                 variant={
-                  objection.objectionStatus === "RECEIVED"
-                    ? "primary"
-                    : "neutral"
+                  objection.objectionStatus === "DECIDED"
+                    ? "neutral"
+                    : objection.objectionStatus === "PENDING_APPROVAL"
+                      ? "warning"
+                      : "primary"
                 }
               >
                 {labelOf(OBJECTION_STATUS_LABEL, objection.objectionStatus)}
@@ -339,6 +434,22 @@ export const Adm05ObjectionDetail = () => {
           />
         </div>
       </Panel>
+
+      <FormSection title="심사 진행" className="mb-0">
+        <div className="flex flex-col gap-4">
+          <ReviewProgress
+            objection={objection}
+            canWrite={canDecide}
+            suggestedDocuments={draft?.missingDocuments}
+          />
+          <ExternalCheckPanel
+            objectionId={objection.objectionId}
+            initialChecks={objection.externalChecks}
+            canWrite={canDecide}
+            isClosed={!isObjectionOpen(objection.objectionStatus)}
+          />
+        </div>
+      </FormSection>
 
       <FormSection title="다툼 거래" className="mb-0">
         <p className="mb-2 text-base text-ink">
@@ -393,11 +504,25 @@ export const Adm05ObjectionDetail = () => {
         </Panel>
       </FormSection>
 
+      <FormSection title="첨부 서류" className="mb-0">
+        <DocumentEvidence
+          objectionId={objection.objectionId}
+          accessReason={reason ?? ""}
+        />
+      </FormSection>
+
       <FormSection title="AI 분석" className="mb-0">
         <AgentAnalysis
           objectionId={objection.objectionId}
           isDecided={objection.decision != null}
           canRequest={canDecide}
+        />
+      </FormSection>
+
+      <FormSection title="주장 대 원장 대조" className="mb-0">
+        <LedgerEvidence
+          objectionId={objection.objectionId}
+          rules={objection.gate.rules}
         />
       </FormSection>
 
@@ -408,10 +533,33 @@ export const Adm05ObjectionDetail = () => {
       <FormSection title="판정 확정" className="mb-0">
         {objection.decision ? (
           <ConfirmedDecision decision={objection.decision} />
-        ) : canDecide ? (
+        ) : pending ? (
+          <ApprovalPanel
+            objectionId={objection.objectionId}
+            decision={pending}
+            canApprove={canApprove}
+            currentAdminId={currentAdminId}
+            onSettled={(kind, settled) =>
+              setOutcome(
+                kind === "APPROVED"
+                  ? { kind: "APPROVED", result: settled.result }
+                  : {
+                      kind: "RETURNED",
+                      result: settled.result,
+                      reason: settled.returnReason,
+                    },
+              )
+            }
+          />
+        ) : canDecide && canWriteDecision ? (
           <Adm05ObjectionDecisionForm
             objection={objection}
-            onConfirmed={setConfirmedResult}
+            onConfirmed={(result, status) =>
+              setOutcome({
+                kind: status === "PENDING_APPROVAL" ? "PENDING" : "CONFIRMED",
+                result,
+              })
+            }
           />
         ) : (
           <Alert variant="info" title="조회 전용 권한">
@@ -420,10 +568,16 @@ export const Adm05ObjectionDetail = () => {
         )}
       </FormSection>
 
+      <FormSection title="통지 기록" className="mb-0">
+        <NoticeList objectionId={objection.objectionId} />
+      </FormSection>
+
       <NoticeBoxFooter
         items={[
           "해제 요건 점검은 서버가 원장으로 계산하며 AI 분석 결과는 해제 근거로 쓰이지 않습니다.",
           "불수용은 언제나 고를 수 있고, 지급정지를 줄이는 판정은 요건을 충족할 때만 열립니다.",
+          "수용과 일부 지급정지는 작성한 관리자가 아닌 다른 관리자가 승인해야 계좌에 반영됩니다.",
+          "심사 기한은 소명 완비 확인일부터 5영업일이고, 남은 일수는 주말만 빼고 셉니다. 공휴일은 서버 기한에 반영됩니다.",
           "해제 범위는 이의제기 사유가 정합니다. 제1호와 제2호는 수용, 제3호는 일부 지급정지입니다.",
           "확정 직전에 서버가 요건을 다시 계산하므로, 그 사이 원장이 바뀌면 확정이 거부될 수 있습니다.",
         ]}

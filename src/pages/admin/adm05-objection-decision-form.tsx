@@ -36,11 +36,13 @@ type InputError = {
 
 type Props = {
   objection: ObjectionDetail
-  onConfirmed: (result: DecisionResult) => void
+  /** 작성이 끝났을 때. `status` 가 `PENDING_APPROVAL` 이면 승인 대기로 저장만 됐다 */
+  onConfirmed: (result: DecisionResult, status: string) => void
 }
 
 /**
- * 판정 확정 입력(1인 확정 단계, 2인 승인은 계획 PA-10).
+ * 판정 입력. 불수용은 바로 확정되고, 수용과 일부 지급정지는 다른 관리자의 승인을 기다린다
+ * (2인 승인, 계획 PA-10). 그래서 지급정지를 줄이는 판정은 버튼 이름이 "승인 요청"이다.
  *
  * 고를 수 있는 판정은 서버 해제 요건 점검(`gate.allowedResults`)이 정한다. 닫힌 판정은
  * 라디오를 잠그고 옆에 이유를 적는다 — 눌러서 서버 거부(`PST0301`)를 받는 건 이미 늦다.
@@ -114,9 +116,15 @@ export const Adm05ObjectionDecisionForm = ({
     confirmDecision.mutate(
       { objectionId: objection.objectionId, request, idempotencyKey },
       {
-        onSuccess: () => {
+        onSuccess: (response) => {
           idempotency.reset()
-          onConfirmed(selected)
+          onConfirmed(
+            selected,
+            response.status ||
+              (isReleasingDecision(selected)
+                ? "PENDING_APPROVAL"
+                : "CONFIRMED"),
+          )
         },
         onError: (error) => setServerError(toErrorMessage(error)),
       },
@@ -211,7 +219,11 @@ export const Adm05ObjectionDecisionForm = ({
           className="min-w-30"
           disabled={confirmDecision.isPending}
         >
-          {confirmDecision.isPending ? "확정 중" : "판정 확정"}
+          {confirmDecision.isPending
+            ? "처리 중"
+            : needsBasis
+              ? "승인 요청"
+              : "판정 확정"}
         </Button>
       </div>
 
@@ -219,17 +231,29 @@ export const Adm05ObjectionDecisionForm = ({
         open={isConfirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirm}
-        title="판정 확정"
-        messages={[
-          "아래 판정을 확정합니다.",
-          "확정하면 계좌의 지급정지에 바로 반영되고 되돌릴 수 없습니다.",
-        ]}
+        title={needsBasis ? "승인 요청" : "판정 확정"}
+        messages={
+          needsBasis
+            ? [
+                "아래 판정을 승인 대기로 올립니다.",
+                "다른 관리자가 승인해야 계좌의 지급정지에 반영됩니다.",
+              ]
+            : [
+                "아래 판정을 확정합니다.",
+                "확정하면 계좌의 지급정지에 바로 반영되고 되돌릴 수 없습니다.",
+              ]
+        }
         items={
           selected
             ? [
                 { label: "이의제기 번호", value: objection.objectionId },
                 { label: "판정", value: DECISION_LABEL[selected] },
-                { label: "계좌 반영", value: DECISION_EFFECT[selected] },
+                {
+                  label: "계좌 반영",
+                  value: isReleasingDecision(selected)
+                    ? `승인 뒤 ${DECISION_EFFECT[selected]}`
+                    : DECISION_EFFECT[selected],
+                },
                 ...(isReleasingDecision(selected) && scope
                   ? [{ label: "해제 범위", value: scope }]
                   : []),

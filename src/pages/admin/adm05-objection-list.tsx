@@ -7,12 +7,12 @@ import {
   AGENT_RUN_STATUS_LABEL,
   OBJECTION_STATUS_LABEL,
   formatClause,
+  isObjectionOpen,
   labelOf,
-  useAgentRunSnapshots,
   useObjectionList,
-  type AgentRunSnapshot,
   type ObjectionSummary,
 } from "@/entities/payment-stop"
+import { DeadlineCountdown } from "@/widgets/objection"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
@@ -34,7 +34,9 @@ import { Panel } from "@/shared/ui/panel"
  * 목록 응답에는 소명 원문이 없어 조회 사유를 묻지 않는다. 사유는 소명이 보이는
  * 상세를 열 때 묻는다.
  *
- * AI 분석 상태 칸은 이의제기마다 실행 목록을 따로 묻는다. 목록 응답에 요약이 없어서다.
+ * AI 분석 상태 칸과 심사 기한 칸은 목록 응답의 요약 필드(`latestRunStatus`,
+ * `latestRunLastStepTitle`, `reviewDeadline`, `deadlineAlert`, `supplementOverdue`)로 그린다.
+ * 이의제기마다 실행 목록을 따로 묻던 방식(N+1)은 걷어냈다.
  */
 
 const CASE_STATUS_TONE: Record<string, BadgeVariant> = {
@@ -45,6 +47,10 @@ const CASE_STATUS_TONE: Record<string, BadgeVariant> = {
 
 const OBJECTION_STATUS_TONE: Record<string, BadgeVariant> = {
   RECEIVED: "primary",
+  UNDER_REVIEW: "primary",
+  SUPPLEMENT_REQUESTED: "coolViolet",
+  SUPPLEMENT_SUBMITTED: "primary",
+  PENDING_APPROVAL: "warning",
   DECIDED: "neutral",
 }
 
@@ -52,7 +58,7 @@ export const Adm05ObjectionList = () => {
   const navigate = useNavigate()
   const { permissions } = useSession()
   const canWrite = hasPermission(permissions, "PAYMENT_STOP_WRITE")
-  const { objections, isFetching, isError, error } = useObjectionList()
+  const { objections, isPending, isError, error } = useObjectionList()
   const [page, setPage] = React.useState(1)
 
   const rows = isError ? [] : (objections ?? [])
@@ -61,11 +67,13 @@ export const Adm05ObjectionList = () => {
     (page - 1) * QUERY_DEFAULT_PAGE_SIZE,
     page * QUERY_DEFAULT_PAGE_SIZE,
   )
-  // 분석 상태는 이의제기마다 따로 묻는다(N+1). 보이는 쪽의 행만 묻는다.
-  const snapshots = useAgentRunSnapshots(pageRows.map((row) => row.objectionId))
-  const waitingCount = rows.filter(
-    (row) => row.objectionStatus === "RECEIVED",
+  const openCount = rows.filter((row) =>
+    isObjectionOpen(row.objectionStatus),
   ).length
+  const approvalCount = rows.filter(
+    (row) => row.objectionStatus === "PENDING_APPROVAL",
+  ).length
+  const alertCount = rows.filter((row) => row.deadlineAlert).length
 
   const columns: DataGridColumn<ObjectionSummary>[] = [
     {
@@ -107,16 +115,43 @@ export const Adm05ObjectionList = () => {
       key: "objectionDeadline",
       header: "신청 기한",
       align: "center",
-      width: 110,
+      width: 100,
       render: (row) =>
         row.objectionDeadline ? formatDate(row.objectionDeadline) : "-",
+    },
+    {
+      key: "reviewDeadline",
+      header: "심사 기한",
+      align: "center",
+      width: 190,
+      render: (row) =>
+        row.objectionStatus === "DECIDED" ? (
+          <span className="text-xs text-ink-faint">
+            {row.reviewDeadline ? formatDate(row.reviewDeadline) : "-"}
+          </span>
+        ) : (
+          <DeadlineCountdown
+            label="심사 기한"
+            deadline={row.reviewDeadline}
+            alert={row.deadlineAlert}
+            pendingText="완비 확인 전"
+            compact
+          />
+        ),
     },
     {
       key: "receivedAt",
       header: "접수 일시",
       align: "center",
-      width: 150,
-      render: (row) => (row.receivedAt ? formatDateTime(row.receivedAt) : "-"),
+      width: 100,
+      render: (row) =>
+        row.receivedAt ? (
+          <span title={formatDateTime(row.receivedAt)}>
+            {formatDate(row.receivedAt)}
+          </span>
+        ) : (
+          "-"
+        ),
     },
     {
       key: "caseStatus",
@@ -133,22 +168,23 @@ export const Adm05ObjectionList = () => {
       key: "objectionStatus",
       header: "처리 상태",
       align: "center",
-      width: 90,
+      width: 110,
       render: (row) => (
-        <Badge
-          variant={OBJECTION_STATUS_TONE[row.objectionStatus] ?? "neutral"}
-        >
-          {labelOf(OBJECTION_STATUS_LABEL, row.objectionStatus)}
-        </Badge>
+        <span className="inline-flex flex-col items-center gap-1">
+          <Badge
+            variant={OBJECTION_STATUS_TONE[row.objectionStatus] ?? "neutral"}
+          >
+            {labelOf(OBJECTION_STATUS_LABEL, row.objectionStatus)}
+          </Badge>
+          {row.supplementOverdue && <Badge variant="danger">불수용 대상</Badge>}
+        </span>
       ),
     },
     {
       key: "analysis",
       header: "AI 분석",
       width: 150,
-      render: (row) => (
-        <AnalysisStatus snapshot={snapshots.get(row.objectionId)} />
-      ),
+      render: (row) => <AnalysisStatus row={row} />,
     },
     {
       key: "detail",
@@ -161,7 +197,7 @@ export const Adm05ObjectionList = () => {
           aria-label={`이의제기 ${row.objectionId} 심사`}
           className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
-          {row.objectionStatus === "RECEIVED" ? "심사" : "상세"}
+          {isObjectionOpen(row.objectionStatus) ? "심사" : "상세"}
         </Link>
       ),
     },
@@ -169,10 +205,11 @@ export const Adm05ObjectionList = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <Stat label="접수" value={`${rows.length}건`} />
-        <Stat label="판정 대기" value={`${waitingCount}건`} highlight />
-        <Stat label="판정 확정" value={`${rows.length - waitingCount}건`} />
+        <Stat label="심사 진행" value={`${openCount}건`} highlight />
+        <Stat label="승인 대기" value={`${approvalCount}건`} />
+        <Stat label="기한 임박" value={`${alertCount}건`} danger />
       </div>
 
       <FormSection
@@ -201,7 +238,7 @@ export const Adm05ObjectionList = () => {
           columns={columns}
           rows={pageRows}
           rowKey={(row) => String(row.objectionId)}
-          loading={isFetching}
+          loading={isPending}
           emptyMessage={
             isError
               ? (toErrorMessage(error) ?? "")
@@ -220,7 +257,9 @@ export const Adm05ObjectionList = () => {
         items={[
           "목록은 최근 접수 순 200건까지 표시됩니다.",
           "신청 기한은 채권소멸 공고일 기준 이의제기를 받을 수 있는 마지막 날입니다.",
-          "지급정지 해제는 해제 요건 점검을 통과한 판정을 담당자가 확정할 때만 이루어집니다.",
+          "지급정지 해제는 해제 요건 점검을 통과한 판정을 다른 관리자가 승인할 때만 이루어집니다.",
+          "심사 기한은 소명 완비 확인일부터 5영업일입니다. 기한 하루 전부터 빨간색으로 표시됩니다.",
+          "불수용 대상은 보완 기한까지 자료가 오지 않은 건입니다. 자동으로 확정하지 않습니다.",
           "상세 화면은 소명 원문이 보이므로 조회 사유를 고른 뒤 열립니다.",
         ]}
       />
@@ -232,18 +271,22 @@ const Stat = ({
   label,
   value,
   highlight,
+  danger,
 }: {
   label: string
   value: string
   highlight?: boolean
+  danger?: boolean
 }) => (
   <Panel className="px-4 py-3">
     <p className="text-xs font-bold text-ink-muted">{label}</p>
     <p
       className={
-        highlight
-          ? "text-h2 font-bold text-primary"
-          : "text-h2 font-bold text-ink"
+        danger
+          ? "text-h2 font-bold text-danger"
+          : highlight
+            ? "text-h2 font-bold text-primary"
+            : "text-h2 font-bold text-ink"
       }
     >
       {value}
@@ -259,28 +302,23 @@ const RUN_STATUS_TONE: Record<string, BadgeVariant> = {
 }
 
 /** AI 분석 상태 칸. 분석 중이면 지금 하는 단계를 함께 보인다. */
-const AnalysisStatus = ({
-  snapshot,
-}: {
-  snapshot: AgentRunSnapshot | undefined
-}) => {
-  if (!snapshot?.isLoaded) return <span className="text-ink-faint">-</span>
-  if (snapshot.status == null) {
+const AnalysisStatus = ({ row }: { row: ObjectionSummary }) => {
+  if (row.latestRunStatus == null) {
     return <span className="text-xs text-ink-faint">분석 없음</span>
   }
-  if (snapshot.status === "RUNNING") {
+  if (row.latestRunStatus === "RUNNING") {
     return (
       <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-primary">
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
         <span className="truncate">
-          {snapshot.currentStepTitle ?? "분석 중"}
+          {row.latestRunLastStepTitle ?? "분석 중"}
         </span>
       </span>
     )
   }
   return (
-    <Badge variant={RUN_STATUS_TONE[snapshot.status] ?? "neutral"}>
-      {labelOf(AGENT_RUN_STATUS_LABEL, snapshot.status)}
+    <Badge variant={RUN_STATUS_TONE[row.latestRunStatus] ?? "neutral"}>
+      {labelOf(AGENT_RUN_STATUS_LABEL, row.latestRunStatus)}
     </Badge>
   )
 }

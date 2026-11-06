@@ -1,5 +1,5 @@
 import * as React from "react"
-import { RotateCcw } from "lucide-react"
+import { Play, RotateCcw, Square } from "lucide-react"
 import {
   AGENT_RUN_STATUS_LABEL,
   GATE_BRANCH_LABEL,
@@ -7,6 +7,7 @@ import {
   isRunActive,
   labelOf,
   toTimelineStep,
+  useAgentRunAllSteps,
   useAgentRunSteps,
   useAgentRuns,
   useRequestObjectionReview,
@@ -20,7 +21,9 @@ import { formatDateTime } from "@/shared/lib/format"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import {
   AgentRunTimeline,
+  REPLAY_SPEEDS,
   formatStepDuration,
+  useTimelineReplay,
 } from "@/shared/ui/agent-run-timeline"
 import { Alert } from "@/shared/ui/alert"
 import { Badge, type BadgeVariant } from "@/shared/ui/badge"
@@ -220,7 +223,21 @@ export const AgentAnalysis = ({
   const idempotency = useIdempotencyKey()
   const [requestError, setRequestError] = React.useState<string | null>(null)
 
-  const timelineSteps = steps.map(toTimelineStep)
+  // 재생용 전체 단계. 실행이 끝나면 미리 한 번 받아 두어 네트워크가 끊겨도 재생된다.
+  const isRunEnded = latestRun != null && !isActive
+  const { steps: allSteps } = useAgentRunAllSteps(
+    objectionId,
+    latestRun?.runId ?? null,
+    isRunEnded,
+  )
+  const replaySource = React.useMemo(
+    () => (allSteps ?? steps).map(toTimelineStep),
+    [allSteps, steps],
+  )
+  const replay = useTimelineReplay(replaySource)
+  const timelineSteps = replay.isReplaying
+    ? replay.visibleSteps
+    : steps.map(toTimelineStep)
   const comparison = gateComparisonOf(steps)
   const duration = latestRun ? runDuration(latestRun) : null
 
@@ -293,17 +310,41 @@ export const AgentAnalysis = ({
           <PanelHeader
             title="실행 단계"
             action={
-              <span className="text-xs text-ink-muted tabular-nums">
+              <span className="flex items-center gap-2 text-xs text-ink-muted tabular-nums">
                 {timelineSteps.length}단계
                 {latestRun?.costMicroUsd != null &&
                   `, 비용 ${formatCost(latestRun.costMicroUsd)}`}
+                {replay.isReplaying ? (
+                  <>
+                    <Badge variant="coolViolet">재생 {replay.speed}배</Badge>
+                    <Button size="sm" variant="ghost" onClick={replay.stop}>
+                      <Square className="h-3.5 w-3.5" aria-hidden />
+                      재생 중지
+                    </Button>
+                  </>
+                ) : (
+                  isRunEnded &&
+                  replaySource.length > 0 &&
+                  REPLAY_SPEEDS.map((speed) => (
+                    <Button
+                      key={speed}
+                      size="sm"
+                      variant="outline"
+                      aria-label={`${speed}배 재생`}
+                      onClick={() => replay.start(speed)}
+                    >
+                      <Play className="h-3.5 w-3.5" aria-hidden />
+                      재생 {speed}배
+                    </Button>
+                  ))
+                )}
               </span>
             }
           />
           <div className="border-t border-border px-4 py-3">
             <AgentRunTimeline
               steps={timelineSteps}
-              isActive={isActive}
+              isActive={isActive || replay.isReplaying}
               emptyMessage="표시할 분석 단계가 없습니다."
             />
           </div>

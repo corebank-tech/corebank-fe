@@ -5,6 +5,9 @@
  * > 모델: `customer.role` + `admin_permission` 조인 테이블. 권한은 고정 5종
  * > (`GL_READ · GL_WRITE · CUSTOMER_READ · CUSTOMER_WRITE · AUDIT_READ`)이다.
  *
+ * 지급정지 이의제기 심사가 붙으며 서버가 `PAYMENT_STOP_*` 를 더했다
+ * (`corebank-server` `AdminPermission`, 계획 D14).
+ *
  * **`entities/auth` 가 아니라 `shared/types` 에 둔다.** 관리자 네비 설정
  * (`shared/config/admin-nav.ts`)이 항목마다 필요한 권한을 선언하는데, FSD-lite 의
  * 의존 방향이 `entities → shared` 라 `shared` 가 `entities` 를 import 할 수 없다.
@@ -20,6 +23,10 @@ export const ADMIN_PERMISSIONS = [
   "CUSTOMER_READ",
   "CUSTOMER_WRITE",
   "AUDIT_READ",
+  // 지급정지 이의제기 심사(서버 D-36). 2차 고정 5종 뒤에 서버가 더했다.
+  // 승인 권한 PAYMENT_STOP_APPROVE 는 2인 승인 화면이 붙을 때 더한다.
+  "PAYMENT_STOP_READ",
+  "PAYMENT_STOP_WRITE",
 ] as const
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]

@@ -108,6 +108,33 @@ export const adminRoutes: RouteObject = {
             return Adm04ReconciliationMismatches
           }),
         },
+        {
+          path: "objections",
+          handle: { title: "지급정지 이의제기 심사" },
+          lazy: guardedLazy("PAYMENT_STOP_READ", async () => {
+            const { Adm05ObjectionList } = await import("@/pages/admin")
+            return Adm05ObjectionList
+          }),
+        },
+        {
+          // 사건 등록과 이의제기 접수는 계좌를 바꾸므로 변경 권한으로 막는다.
+          // React Router 는 정적 경로를 `:objectionId` 보다 먼저 맞춘다.
+          path: "objections/intake",
+          handle: { title: "이의제기 대리 접수" },
+          lazy: guardedLazy("PAYMENT_STOP_WRITE", async () => {
+            const { Adm05ObjectionIntake } = await import("@/pages/admin")
+            return Adm05ObjectionIntake
+          }),
+        },
+        {
+          // 상세는 소명 원문이 보이므로 목록과 같은 조회 권한으로 막는다.
+          path: "objections/:objectionId",
+          handle: { title: "이의제기 심사 상세" },
+          lazy: guardedLazy("PAYMENT_STOP_READ", async () => {
+            const { Adm05ObjectionDetail } = await import("@/pages/admin")
+            return Adm05ObjectionDetail
+          }),
+        },
       ],
     },
   ],

@@ -123,6 +123,18 @@
     {
       "name": "약관",
       "description": "회원가입 약관 조회·동의 검증 API"
+    },
+    {
+      "name": "관리자 지급정지 사건",
+      "description": "피해구제 신청을 받은 계좌의 지급정지 사건 등록"
+    },
+    {
+      "name": "관리자 이의제기 심사",
+      "description": "지급정지 이의제기 접수, 목록, 상세(해제 요건 점검 포함), 판정 확정"
+    },
+    {
+      "name": "관리자 이의제기 AI 분석",
+      "description": "AI 분석 실행 목록, 실행 타임라인 폴링, AI 판정안, 재분석 요청"
     }
   ],
   "paths": {
@@ -5543,6 +5555,387 @@
           }
         }
       }
+    },
+    "/admin/payment-stops": {
+      "post": {
+        "tags": [
+          "관리자 지급정지 사건"
+        ],
+        "summary": "지급정지 사건 등록",
+        "description": "다툼 거래가 그 계좌의 최근 180일 성공 입금인지 확인하고, 사건 등록과 전부 지급정지를 한 트랜잭션에서 한다. 오류: PST0001 다툼 거래가 입금이 아님, PST0303 다른 사건에 이미 등록된 거래, ACC0201 계좌 없음, ACC0004 입출금계좌 아님, ACC0301 정상이나 거래정지가 아닌 계좌. 멱등키 필수(CMN0002 누락, CMN0301 처리 중, CMN0302 다른 요청에 쓴 키).",
+        "operationId": "registerPaymentStopCase",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRegisterResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "이의제기 목록",
+        "description": "최근 접수 순 200건. 소명 원문은 담지 않는다.",
+        "operationId": "listObjections",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListObjectionSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "이의제기 접수",
+        "description": "사유 조항(법 제7조제1항 1~3호)과 소명을 받는다. 오류: PST0201 사건 없음, PST0002 신청 기한 경과, PST0003 신분증 사본 확인이나 사유 없음, PST0304 이미 접수된 사건. 멱등키 필수.",
+        "operationId": "receiveObjection",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReceiveResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "이의제기 상세",
+        "description": "소명 원문, 다툼 거래, 해제 요건 점검(조회 시점 원장으로 다시 계산), 확정된 판정을 담는다. 소명 원문이 보이므로 조회 사유 헤더를 받고 조회 감사를 남긴다(PH-89).",
+        "operationId": "getObjectionDetail",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "description": "조회 사유",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            },
+            "example": "OPERATION"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObjectionDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/decisions": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 심사"
+        ],
+        "summary": "이의제기 판정 확정",
+        "description": "1인 확정 단계다(2인 승인은 다음 단계). 해제 게이트가 열지 않는 판정은 확정하지 않는다. 수용은 지급정지 해제, 일부 지급정지는 다툼 입금액만 남기고 해제, 불수용은 유지다. 오류: PST0004 조기 해제 근거 없음, PST0202 이의제기 없음, PST0301 해제 요건 미충족, PST0302 이미 확정. 멱등키 필수. 응답 시간 초과 뒤 같은 키로 다시 보내면 처음 확정 결과를 그대로 돌려준다.",
+        "operationId": "confirmObjectionDecision",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/review-requests": {
+      "post": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 재분석 요청",
+        "description": "분석을 대기열에 다시 넣는다. 접수 때는 자동으로 들어가므로 실패했거나 다시 보고 싶을 때만 쓴다. PST0302 이미 판정 확정, PST0306 진행 중인 분석 있음. 멱등키 필수.",
+        "operationId": "requestObjectionReview",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewRequestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/review-draft": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 판정안",
+        "description": "가장 최근 판정안. 없으면 data 가 null 이다. 판정안은 심사 참고안이고 해제 근거가 아니다.",
+        "operationId": "getObjectionReviewDraft",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/agent-runs": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 분석 실행 목록",
+        "description": "최근 실행부터. PST0202 이의제기 없음.",
+        "operationId": "listObjectionAgentRuns",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListAgentRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/objections/{objectionId}/agent-runs/{runId}/steps": {
+      "get": {
+        "tags": [
+          "관리자 이의제기 AI 분석"
+        ],
+        "summary": "AI 분석 실행 타임라인",
+        "description": "after 보다 큰 순번의 단계만 순서대로 준다. 화면은 1초마다 마지막 순번으로 다시 부르고 실행이 끝나면 멈춘다. PST0203 실행 없음.",
+        "operationId": "listObjectionAgentRunSteps",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "마지막으로 받은 순번. 처음이면 0",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            },
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListAgentRunStepResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10877,6 +11270,558 @@
             "type": "string"
           },
           "data": {}
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "disputedTransactionNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9A-Z]{20}$"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "objectionDeadline": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "accountId",
+          "disputedTransactionNumbers",
+          "objectionDeadline"
+        ]
+      },
+      "ApiResponseRegisterResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegisterResponse"
+          }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReceiveRequest": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clause": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 3,
+            "minimum": 1
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0
+          },
+          "simplifiedRequested": {
+            "type": "boolean"
+          },
+          "idCopyConfirmed": {
+            "type": "boolean"
+          },
+          "litigationPending": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "caseId",
+          "clause",
+          "statement"
+        ]
+      },
+      "ApiResponseReceiveResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReceiveResponse"
+          }
+        }
+      },
+      "ReceiveResponse": {
+        "type": "object",
+        "properties": {
+          "objectionId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DecisionRequest": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "PARTIAL",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "earlyReleaseBasis": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "reason",
+          "result"
+        ]
+      },
+      "ApiResponseDecisionResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DecisionResponse"
+          }
+        }
+      },
+      "DecisionResponse": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "earlyReleaseBasis": {
+            "type": "string"
+          },
+          "requestedHoldAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "appliedHoldAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decidedBy": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListObjectionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectionSummaryResponse"
+            }
+          }
+        }
+      },
+      "ObjectionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "objectionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clause": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "objectionStatus": {
+            "type": "string"
+          },
+          "caseStatus": {
+            "type": "string"
+          },
+          "disputedTotal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objectionDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseObjectionDetailResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ObjectionDetailResponse"
+          }
+        }
+      },
+      "DisputedTransferItem": {
+        "type": "object",
+        "properties": {
+          "transactionNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Gate": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "simplifiedExcluded": {
+            "type": "boolean"
+          },
+          "rulesVersion": {
+            "type": "string"
+          },
+          "allowedResults": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            }
+          }
+        }
+      },
+      "ObjectionDetailResponse": {
+        "type": "object",
+        "properties": {
+          "objectionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "senderAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseStatus": {
+            "type": "string"
+          },
+          "objectionDeadline": {
+            "type": "string",
+            "format": "date"
+          },
+          "disputedTransfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputedTransferItem"
+            }
+          },
+          "clause": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "simplifiedRequested": {
+            "type": "boolean"
+          },
+          "idCopyConfirmed": {
+            "type": "boolean"
+          },
+          "litigationPending": {
+            "type": "boolean"
+          },
+          "objectionStatus": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/Gate"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionResponse"
+          }
+        }
+      },
+      "Rule": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "matched": {
+            "type": "boolean"
+          },
+          "transactionNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseReviewRequestResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewRequestResponse"
+          }
+        }
+      },
+      "ReviewRequestResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseReviewDraftResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewDraftResponse"
+          }
+        }
+      },
+      "ReviewDraftResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AgentRunResponse": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "costMicroUsd": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseListAgentRunResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunResponse"
+            }
+          }
+        }
+      },
+      "AgentRunStepResponse": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListAgentRunStepResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunStepResponse"
+            }
+          }
         }
       }
     }

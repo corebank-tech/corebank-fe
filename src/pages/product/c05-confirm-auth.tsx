@@ -419,7 +419,11 @@ export const C05ConfirmAuth = () => {
           </div>
 
           {newAccountPasswordError && (
-            <p role="alert" className="mt-2 text-xs font-bold text-danger">
+            <p
+              id="c05-new-password-error"
+              role="alert"
+              className="mt-2 text-xs font-bold text-danger"
+            >
               {newAccountPasswordError}
             </p>
           )}

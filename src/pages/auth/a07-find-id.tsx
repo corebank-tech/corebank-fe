@@ -10,12 +10,12 @@ import { AlertDialog } from "@/shared/ui/alert-dialog"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { maskUserId } from "@/shared/lib/format"
 import { onlyDigits } from "@/shared/lib/input-filter"
-import { ACCOUNT_PASSWORD_ERROR_LIMIT as ERROR_LIMIT } from "@/shared/config/policy"
-import { MOCK_MEMBERS, type Member } from "@/entities/auth"
+import { useFindIdMutation } from "@/entities/auth"
+import { toErrorMessage, isApiError } from "@/shared/api/api-error"
 
 /** A-07 아이디 찾기. REQ-AUTH-032. */
 export const A07FindId = () => {
-  const [members, setMembers] = React.useState<Member[]>(MOCK_MEMBERS)
+  const findIdMutation = useFindIdMutation()
   const [name, setName] = React.useState("")
   const [birth, setBirth] = React.useState("")
   const [accountNo, setAccountNo] = React.useState("")
@@ -24,11 +24,15 @@ export const A07FindId = () => {
   const [blocked, setBlocked] = React.useState<string[] | null>(null)
   const [foundId, setFoundId] = React.useState<string | null>(null)
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
+    if (findIdMutation.isPending) return
+
     setFoundId(null)
+    setBlocked(null)
+
     if (
       name.trim().length === 0 ||
-      birth.length !== 6 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(birth) ||
       accountNo.length !== 12 ||
       password.length !== 4
     ) {
@@ -36,52 +40,33 @@ export const A07FindId = () => {
       return
     }
 
-    const member = members.find((m) => m.accountNo === accountNo)
-    if (!member) {
-      setAlert("입력하신 정보와 일치하는 회원을 찾을 수 없습니다.")
-      return
-    }
-    if (member.status === "거래정지") {
-      setBlocked([
-        "누적 오류로 거래정지된 계좌입니다.",
-        "영업점 또는 고객센터에서 거래정지 해제 후 다시 시도하세요.",
-      ])
-      return
-    }
-    if (member.ownerName !== name.trim() || member.birth !== birth) {
-      setAlert("입력하신 정보와 일치하는 회원을 찾을 수 없습니다.")
-      return
-    }
-    if (member.accountPassword !== password) {
-      const nextCount = member.errorCount + 1
-      const isBlocked = nextCount >= ERROR_LIMIT
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.accountNo === accountNo
-            ? {
-                ...m,
-                errorCount: Math.min(nextCount, ERROR_LIMIT),
-                status: isBlocked ? "거래정지" : m.status,
-              }
-            : m,
-        ),
-      )
+    try {
+      const result = await findIdMutation.mutateAsync({
+        customerName: name.trim(),
+        birthDate: birth,
+        accountNumber: accountNo,
+        accountPassword: password,
+      })
+
       setPassword("")
-      if (isBlocked) {
-        setBlocked([
-          "계좌비밀번호를 5회 연속 잘못 입력해 이 계좌가 거래정지 상태로 전환되었습니다.",
-        ])
-      } else {
-        setAlert(
-          `계좌비밀번호가 일치하지 않습니다. (누적 오류 ${nextCount}/${ERROR_LIMIT}회)`,
-        )
+
+      if (!result.userId) {
+        setAlert("아이디 조회 결과를 확인할 수 없습니다.")
+        return
       }
-      return
+
+      setFoundId(result.userId)
+    } catch (error) {
+      setPassword("")
+
+      if (isApiError(error) && error.code === "ATH0102") {
+        setBlocked([error.message])
+        return
+      }
+
+      setAlert(toErrorMessage(error))
     }
-
-    setFoundId(member.memberId)
   }
-
   return (
     <div className="flex flex-col gap-8">
       {foundId && (
@@ -106,13 +91,11 @@ export const A07FindId = () => {
           <FormRow label="생년월일" required htmlFor="findid-birth">
             <Input
               id="findid-birth"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={6}
+              type="date"
+              autoComplete="bday"
               value={birth}
-              onChange={(e) => setBirth(onlyDigits(e.target.value, 6))}
-              placeholder="YYMMDD"
-              className="w-40 tracking-2"
+              onChange={(e) => setBirth(e.target.value)}
+              className="w-48"
             />
           </FormRow>
           <FormRow label="당행 계좌번호" required htmlFor="findid-account">
@@ -147,6 +130,7 @@ export const A07FindId = () => {
             size="lg"
             className="min-w-40"
             onClick={handleSearch}
+            disabled={findIdMutation.isPending}
           >
             아이디 찾기
           </Button>

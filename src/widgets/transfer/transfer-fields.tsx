@@ -65,7 +65,9 @@ export const WithdrawAccountField = ({
         <p className="text-base text-ink-muted">
           출금가능금액{" "}
           <span className="font-bold text-ink">
-            {formatAmount(selected.withdrawable)}
+            {selected.withdrawable == null
+              ? "조회 불가"
+              : formatAmount(selected.withdrawable)}
           </span>
         </p>
       )}

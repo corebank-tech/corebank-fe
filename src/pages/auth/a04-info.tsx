@@ -396,7 +396,7 @@ export const A04Info = ({
                   onChange={(e) =>
                     onChange({ password: e.target.value.slice(0, 15) })
                   }
-                  placeholder="8~15자, 영문 대/소문자·숫자·특수문자 중 3종 이상"
+                  placeholder="8~15자, 영문자·숫자·특수문자 모두 포함"
                   className="max-w-xs"
                 />
                 <RuleList rules={passwordRules} />

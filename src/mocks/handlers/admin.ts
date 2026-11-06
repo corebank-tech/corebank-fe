@@ -7,8 +7,9 @@ import type { SessionAuthority } from "@/entities/auth"
  * 확정 계약은 `role` + `permissions` 고정 집합 5종이다
  * (`corebank-server/docs/phase2/README.md` §3-4).
  *
- * `MOCK_MEMBERS` 를 건드리지 않고 별도 표로 둔 이유는 그쪽이 A-07·A-08 화면의
- * 고정 데이터라, 권한을 섞으면 무관한 화면의 기대값이 흔들리기 때문이다.
+ * `MOCK_MEMBERS`는 회원가입·로그인 목업 및 MSW 테스트에서도 사용하므로,
+ * 관리자 권한은 별도 표로 유지한다.
+ * 권한을 기존 회원 데이터에 섞으면 다른 테스트의 기대값이 달라질 수 있다.
  *
  * - honggildong — 고객. 기존 고객 시나리오가 그대로 돌아야 해서 손대지 않는다
  * - seojunpark  — 전 권한 관리자

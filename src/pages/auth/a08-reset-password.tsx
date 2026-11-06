@@ -9,6 +9,7 @@ import { Alert } from "@/shared/ui/alert"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { AlertDialog } from "@/shared/ui/alert-dialog"
 import {
+  evaluatePasswordRules,
   useIssuePasswordResetMutation,
   useResetPasswordMutation,
   type RuleCheck,
@@ -16,65 +17,6 @@ import {
 import { isApiError, toErrorMessage } from "@/shared/api/api-error"
 import { EMAIL_CODE_TTL_SECONDS as OTP_TTL } from "@/shared/config/policy"
 import { formatClock, useCountdown } from "@/shared/lib/hooks/use-countdown"
-
-/**
- * A-08은 서버 PasswordResetService의 비밀번호 정책을 따른다.
- * 공통 auth-rules는 회원가입 A-04에서도 사용하므로 여기서 변경하지 않는다.
- */
-const hasFourSequentialDigits = (value: string): boolean => {
-  for (let i = 0; i <= value.length - 4; i++) {
-    const part = value.slice(i, i + 4)
-    if (!/^\d{4}$/.test(part)) continue
-
-    const gap = part.charCodeAt(1) - part.charCodeAt(0)
-    if (
-      (gap === 1 || gap === -1) &&
-      part.charCodeAt(2) - part.charCodeAt(1) === gap &&
-      part.charCodeAt(3) - part.charCodeAt(2) === gap
-    ) {
-      return true
-    }
-  }
-
-  return false
-}
-
-const evaluateResetPasswordRules = (
-  password: string,
-  userId: string,
-): RuleCheck[] => [
-  {
-    key: "length",
-    label: "8~15자로 입력합니다",
-    passed: password.length >= 8 && password.length <= 15,
-  },
-  {
-    key: "combination",
-    label: "영문자·숫자·특수문자를 모두 포함하며 공백은 사용할 수 없습니다",
-    passed:
-      /[A-Za-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[^A-Za-z0-9\s]/.test(password) &&
-      !/\s/.test(password),
-  },
-  {
-    key: "no-id",
-    label: "아이디를 포함하지 않습니다",
-    passed:
-      userId.length === 0 ||
-      !password.toLowerCase().includes(userId.toLowerCase()),
-  },
-  {
-    key: "no-repeat",
-    label: "동일한 문자를 4자리 이상 연속 사용하지 않습니다",
-    passed: !/(.)\1{3}/.test(password),
-  },
-  {
-    key: "no-sequential",
-    label: "연속 증가·감소 숫자 4자리를 사용하지 않습니다",
-    passed: !hasFourSequentialDigits(password),
-  },
-]
 
 const RuleList = ({ rules }: { rules: RuleCheck[] }) => {
   return (
@@ -143,7 +85,7 @@ export const A08ResetPassword = () => {
   )
 
   const expired = resetRequestId !== null && remaining <= 0
-  const rules = evaluateResetPasswordRules(newPassword, userId.trim())
+  const rules = evaluatePasswordRules(newPassword, userId.trim())
 
   const requestCode = async (resend: boolean) => {
     if (issueMutation.isPending) return
@@ -391,8 +333,7 @@ export const A08ResetPassword = () => {
           )}
 
           <p className="mt-2 text-2xs text-ink-muted">
-            ※ 인증번호 유효시간은 180초입니다. 실제 인증번호 검증은 비밀번호
-            재설정 요청 시 서버에서 수행합니다.
+            ※ 인증번호 유효시간은 180초입니다.
           </p>
         </FormSection>
       )}
@@ -477,7 +418,6 @@ export const A08ResetPassword = () => {
         items={[
           "비밀번호 재설정은 아이디·성명·가입 이메일 확인 후 인증번호를 발급받아 진행합니다.",
           "신규 비밀번호는 8~15자이며 영문자·숫자·특수문자를 모두 포함해야 합니다.",
-          "인증번호와 신규 비밀번호의 최종 유효성은 서버에서 검증합니다.",
         ]}
       />
 

@@ -16,6 +16,9 @@ import type { SessionAuthority } from "@/entities/auth"
  *   확인한다. `CUSTOMER_READ` 가 있어 고객 메뉴·목록·상세는 보이지만 `CUSTOMER_WRITE`
  *   가 없어 계정 운영 버튼 3종이 렌더링되지 않는다. 지급정지도 조회만 있어 대리
  *   접수 버튼과 판정 확정 입력이 그려지지 않는다
+ * - adminapprover — **지급정지 승인 관리자.** 조회와 승인(`PAYMENT_STOP_APPROVE`)만 있다.
+ *   수용, 일부 지급정지 판정은 작성자와 다른 관리자가 승인해야 확정되므로(계약 v2 §3)
+ *   박서준이 작성한 판정을 이 계정으로 승인해 본다
  * - minjunlee   — **회계 전용 관리자(#156).** `GL_READ` 하나뿐이라 고객 화면 자체가
  *   막힌다. 위 둘은 두 관리자 화면 어디에도 걸리지 않아, 화면 단위 권한 게이트
  *   (REQ-ADM-004)가 URL 직접 접근을 막는지 확인할 수단이 이 계정뿐이다
@@ -31,7 +34,12 @@ const MOCK_AUTHORITIES: Record<string, SessionAuthority> = {
       "AUDIT_READ",
       "PAYMENT_STOP_READ",
       "PAYMENT_STOP_WRITE",
+      "PAYMENT_STOP_APPROVE",
     ],
+  },
+  adminapprover: {
+    role: "ADMIN",
+    permissions: ["PAYMENT_STOP_READ", "PAYMENT_STOP_APPROVE"],
   },
   dayeonkim: {
     role: "ADMIN",
@@ -50,3 +58,19 @@ const MOCK_AUTHORITIES: Record<string, SessionAuthority> = {
 
 export const readMockAuthority = (memberId: string): SessionAuthority =>
   MOCK_AUTHORITIES[memberId] ?? { role: "CUSTOMER", permissions: [] }
+
+/**
+ * 계정별 고객 번호. 서버는 로그인과 `GET /customers/me` 에 실제 고객 번호를 준다.
+ * 지급정지 판정의 작성자, 승인자가 이 번호로 남아 화면이 "내가 쓴 판정"을 가린다.
+ * 고객 계정 운영 목(`admin-customers-api.ts`)의 번호와 맞춘다. 표에 없으면 1이다.
+ */
+const MOCK_CUSTOMER_IDS: Record<string, number> = {
+  honggildong: 1,
+  seojunpark: 2,
+  dayeonkim: 7,
+  minjunlee: 13,
+  adminapprover: 14,
+}
+
+export const readMockCustomerId = (memberId: string): number =>
+  MOCK_CUSTOMER_IDS[memberId] ?? 1

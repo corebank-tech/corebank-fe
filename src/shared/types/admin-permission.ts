@@ -24,9 +24,10 @@ export const ADMIN_PERMISSIONS = [
   "CUSTOMER_WRITE",
   "AUDIT_READ",
   // 지급정지 이의제기 심사(서버 D-36). 2차 고정 5종 뒤에 서버가 더했다.
-  // 승인 권한 PAYMENT_STOP_APPROVE 는 2인 승인 화면이 붙을 때 더한다.
   "PAYMENT_STOP_READ",
   "PAYMENT_STOP_WRITE",
+  // 수용, 일부 지급정지 판정의 2인 승인(계약 v2 §3). 승인과 반려 경로만 이 권한을 본다.
+  "PAYMENT_STOP_APPROVE",
 ] as const
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]

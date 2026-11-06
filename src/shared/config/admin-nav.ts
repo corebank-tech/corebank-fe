@@ -81,6 +81,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         // PAYMENT_STOP_WRITE 를 따로 묻는다.
         requiresPermission: "PAYMENT_STOP_READ",
       },
+      {
+        label: "AI 심사 지원 평가",
+        path: "/admin/objections/evaluation",
+        // 합성 시나리오 평가 결과(정적 수치). 심사 화면과 같은 조회 권한으로 연다.
+        requiresPermission: "PAYMENT_STOP_READ",
+      },
     ],
   },
 ]

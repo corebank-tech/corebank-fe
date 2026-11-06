@@ -127,6 +127,15 @@ export const adminRoutes: RouteObject = {
           }),
         },
         {
+          // 합성 시나리오 평가 대시보드(계획 PA-18). 정적 경로라 `:objectionId` 보다 먼저 맞는다.
+          path: "objections/evaluation",
+          handle: { title: "이의제기 AI 심사 지원 평가" },
+          lazy: guardedLazy("PAYMENT_STOP_READ", async () => {
+            const { Adm05ObjectionEvaluation } = await import("@/pages/admin")
+            return Adm05ObjectionEvaluation
+          }),
+        },
+        {
           // 상세는 소명 원문이 보이므로 목록과 같은 조회 권한으로 막는다.
           path: "objections/:objectionId",
           handle: { title: "이의제기 심사 상세" },

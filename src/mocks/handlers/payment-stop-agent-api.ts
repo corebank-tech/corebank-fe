@@ -120,34 +120,113 @@ const commonHead = (objection: MockObjection): ScriptStep[] => [
   },
 ]
 
-/** 정상 거래 관계가 원장으로 확인되는 각본(이의제기 3). */
+/** 금액이 적힌 판독 영역. 서류에서 나온 주장(계약 v2 §6 `source=DOCUMENT`)을 만든다. */
+const AMOUNT_TEXT = /\d[\d,]*원/
+
+/**
+ * 판독을 마친 첫 증빙 그림과 그 안의 금액 영역. 없으면 `null` 이라 서류 판독 단계와
+ * 서류 주장을 넣지 않는다.
+ */
+const documentEvidence = (objection: MockObjection) => {
+  const document = objection.documents.find(
+    (item) =>
+      item.kind === "EVIDENCE" &&
+      item.ocrStatus === "DONE" &&
+      item.contentType.startsWith("image/"),
+  )
+  const regions = document?.pages?.[0]?.regions ?? []
+  const region = regions.find((item) => AMOUNT_TEXT.test(item.text ?? ""))
+  if (!document || !region) return null
+  return {
+    document,
+    regionCount: regions.length,
+    lowConfidenceCount: regions.filter((item) => (item.confidence ?? 1) < 0.9)
+      .length,
+    claim: {
+      text: `서류에 적힌 금액은 ${region.text?.match(AMOUNT_TEXT)?.[0]}이다`,
+      quote: region.text,
+      source: "DOCUMENT",
+      documentId: document.documentId,
+      regionIndex: region.index,
+    },
+  }
+}
+
+/** 소명 문장을 그대로 주장으로 쓴다. 각본이 이의제기마다 소명을 따로 갖지 않아서다. */
+const sentenceClaims = (objection: MockObjection) =>
+  objection.statement
+    .split(/(?<=\.)\s+/)
+    .filter(Boolean)
+    .map((sentence) => ({
+      text: sentence.replace(/(입니다|습니다)\.$/, "").trim(),
+      quote: sentence,
+      source: "STATEMENT",
+      documentId: null,
+      regionIndex: null,
+    }))
+
+const RELATIONSHIP_CLAIMS = [
+  {
+    text: "거래처에 납품한 물품 대금이다",
+    quote: "거래처에 납품한 물품 대금을 받은 것입니다.",
+    source: "STATEMENT",
+    documentId: null,
+    regionIndex: null,
+  },
+  {
+    text: "같은 거래처와 반년 넘게 매달 거래했다",
+    quote: "같은 거래처와 반년 넘게 매달 거래해 왔습니다.",
+    source: "STATEMENT",
+    documentId: null,
+    regionIndex: null,
+  },
+]
+
+/** 정상 거래 관계가 원장으로 확인되는 각본(이의제기 3, 1, 5). */
 const relationshipScript = (objection: MockObjection): Script => {
   const relation = ruleNumbers(objection, "RELATIONSHIP")
   const disputed = disputedNumbers(objection)
+  const evidence = documentEvidence(objection)
+  const claims = [
+    ...(objection.objectionId === 5
+      ? sentenceClaims(objection)
+      : RELATIONSHIP_CLAIMS),
+    ...(evidence ? [evidence.claim] : []),
+  ]
+  const ocrStep: ScriptStep[] = evidence
+    ? [
+        {
+          endMs: 2_050,
+          durationMs: 220,
+          type: "OCR",
+          title: "첨부 서류 판독",
+          summary: `${evidence.document.fileName}에서 글자 영역 ${evidence.regionCount}개`,
+          detail: {
+            documentId: evidence.document.documentId,
+            pages: 1,
+            regions: evidence.regionCount,
+            lowConfidenceRegions: evidence.lowConfidenceCount,
+            engine: "paddleocr-korean",
+          },
+        },
+      ]
+    : []
   return {
     costMicroUsd: 41_230,
     inputTokens: 18_420,
     outputTokens: 1_310,
     steps: [
       ...commonHead(objection),
+      ...ocrStep,
       {
         endMs: 3_600,
         durationMs: 1_500,
         type: "CLAIM_EXTRACTED",
-        title: "소명에서 주장 2건 정리",
-        summary: "물품 대금이라는 주장과 반년 넘은 정기 거래라는 주장",
-        detail: {
-          claims: [
-            {
-              text: "거래처에 납품한 물품 대금이다",
-              quote: "거래처에 납품한 물품 대금을 받은 것입니다.",
-            },
-            {
-              text: "같은 거래처와 반년 넘게 매달 거래했다",
-              quote: "같은 거래처와 반년 넘게 매달 거래해 왔습니다.",
-            },
-          ],
-        },
+        title: `소명과 서류에서 주장 ${claims.length}건 정리`,
+        summary: evidence
+          ? "소명의 거래 주장과 서류에 적힌 금액"
+          : "소명의 거래 주장",
+        detail: { claims },
       },
       {
         endMs: 5_400,
@@ -186,7 +265,7 @@ const relationshipScript = (objection: MockObjection): Script => {
         detail: {
           branch: "NORMAL_ACCEPT",
           evidenceTransactionNumbers: relation,
-          missingDocuments: ["거래처와의 공급 계약서"],
+          missingDocuments: ["거래처 사업자등록증"],
           model: MODEL,
           costMicroUsd: 41_230,
         },
@@ -197,21 +276,12 @@ const relationshipScript = (objection: MockObjection): Script => {
       branch: "NORMAL_ACCEPT",
       content: {
         evidenceTransactionNumbers: relation,
-        missingDocuments: ["거래처와의 공급 계약서"],
-        claims: [
-          {
-            text: "거래처에 납품한 물품 대금이다",
-            quote: "거래처에 납품한 물품 대금을 받은 것입니다.",
-          },
-          {
-            text: "같은 거래처와 반년 넘게 매달 거래했다",
-            quote: "같은 거래처와 반년 넘게 매달 거래해 왔습니다.",
-          },
-        ],
+        missingDocuments: ["거래처 사업자등록증"],
+        claims,
         contradictions: [],
         followUps: ["공급 계약서의 거래처명이 송금인과 같은지 확인"],
         noticeDraft:
-          "고객님의 이의제기를 검토한 결과, 송금인과의 기존 거래가 확인되어 지급정지 해제를 검토하고 있습니다. 거래처와의 공급 계약서를 제출해 주시기 바랍니다.",
+          "고객님의 이의제기를 검토한 결과, 송금인과의 기존 거래가 확인되어 지급정지 해제를 검토하고 있습니다. 거래처 사업자등록증을 제출해 주시기 바랍니다.",
       },
     },
   }
@@ -404,14 +474,14 @@ const genericScript = (objection: MockObjection): Script => ({
 
 const scriptFor = (objection: MockObjection): Script => {
   if (objection.branch === "FRAUD_PATTERN") return fraudScript(objection)
-  if (objection.objectionId === 1 || objection.objectionId === 3) {
+  if ([1, 3, 5].includes(objection.objectionId)) {
     return relationshipScript(objection)
   }
   return genericScript(objection)
 }
 
 /** 처음부터 끝난 실행으로 두는 이의제기. 나머지는 처음 조회할 때 실행이 시작된다. */
-const COMPLETED_SEEDS = new Set([1, 3])
+const COMPLETED_SEEDS = new Set([1, 3, 4, 5])
 
 const readRuns = (objection: MockObjection): MockRun[] => {
   const store = readStore<RunStore>(STORE_KEY, {})
@@ -468,6 +538,20 @@ const project = (objection: MockObjection, run: MockRun) => {
     endedAt: isComplete ? toServerTime(runStartMs + lastEndMs) : undefined,
   }
   return { response, steps, script, isComplete }
+}
+
+/**
+ * 목록 요약 칸(계약 v2 `latestRunStatus`, `latestRunLastStepTitle`). 서버는 목록 응답에 싣고,
+ * 목은 상세 타임라인과 같은 각본으로 지금 시각의 상태를 계산한다.
+ */
+export const latestRunSummary = (objection: MockObjection) => {
+  const run = readRuns(objection)[0]
+  if (!run) return { status: undefined, lastStepTitle: undefined }
+  const view = project(objection, run)
+  return {
+    status: view.response.status,
+    lastStepTitle: view.steps.at(-1)?.title,
+  }
 }
 
 const notFound = () => fail("PST0202", "이의제기를 찾을 수 없습니다.", 404)

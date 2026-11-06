@@ -157,3 +157,48 @@ export const withIdempotencyKey = (
 
   return { ...options, headers: plainHeaders }
 }
+
+/**
+ * 공통 봉투 없이 파일 바이트를 주는 조회(첨부 서류 내용 등). 성공이면 `Blob` 을 돌려주고,
+ * 실패는 서버가 봉투로 준 오류를 `customFetch` 와 같은 `ApiError` 로 바꾼다.
+ */
+export const fetchBinary = async (
+  url: string,
+  options: RequestInit = {},
+): Promise<Blob> => {
+  let response: Response
+  try {
+    response = await fetch(buildRequestUrl(url), {
+      ...options,
+      method: "GET",
+      credentials: "include",
+      headers: buildHeaders("GET", options),
+      signal: buildAbortSignal(options.signal),
+    })
+  } catch (cause) {
+    throw new ApiError({
+      code: NETWORK_ERROR_CODE,
+      message: NETWORK_ERROR_MESSAGE,
+      status: NETWORK_ERROR_STATUS,
+      cause,
+    })
+  }
+
+  emitApiActivity()
+
+  if (response.ok) return response.blob()
+
+  const envelope = await readEnvelope<unknown>(response)
+  if (
+    response.status === SESSION_EXPIRED_STATUS &&
+    envelope?.code === SESSION_EXPIRED_CODE
+  ) {
+    emitSessionExpired()
+  }
+  throw new ApiError({
+    code: envelope?.code ?? NETWORK_ERROR_CODE,
+    message: envelope?.message ?? NETWORK_ERROR_MESSAGE,
+    status: response.status,
+    data: envelope?.data,
+  })
+}

@@ -2,14 +2,37 @@ import { delay, http } from "msw"
 import type {
   DecisionRequest,
   DecisionResponse,
+  ExternalCheckResponse,
   ObjectionDetailResponse,
+  ObjectionLedgerEntryResponse,
+  ObjectionNoticeResponse,
   ObjectionSummaryResponse,
   ReceiveRequest,
   RegisterRequest,
 } from "@/shared/api/generated"
-import { requireMockPermission } from "@/mocks/handlers/auth"
+import { addBusinessDays } from "@/entities/payment-stop"
+import { readMockCustomerId } from "@/mocks/handlers/admin"
+import {
+  readSignedInMemberId,
+  requireMockPermission,
+} from "@/mocks/handlers/auth"
+import {
+  documentPage,
+  evidenceImage,
+  evidencePdf,
+  idCopy,
+  ledger,
+  livingTransactions,
+  pendingEvidence,
+  type MockDocument,
+} from "@/mocks/handlers/payment-stop-review-fixtures"
 import { fail, ok } from "@/mocks/lib/envelope"
-import { readStore, toLocalDateTime, writeStore } from "@/mocks/lib/mock-store"
+import {
+  nextSequence,
+  readStore,
+  toLocalDateTime,
+  writeStore,
+} from "@/mocks/lib/mock-store"
 import { addDays } from "@/shared/lib/date"
 import { getToday } from "@/shared/config/clock"
 
@@ -22,10 +45,19 @@ import { getToday } from "@/shared/config/clock"
  * 서버 `GateResult.allowsRelease` 와 같게 계산한다.
  *
  * 상태는 sessionStorage 에 둔다(새로고침해도 유지, 탭을 닫으면 처음으로).
+ *
+ * 심사 운영(계약 v2): 기한, 보완, 2인 승인, 외부 확인, 통지, 서류, 원장을 함께 둔다. 그 API
+ * 목은 `payment-stop-review-api.ts` 에 있고 상태는 여기 것을 읽고 쓴다.
+ * - 이의제기 3: 접수(완비 확인 전). 계약서 그림, 거래명세서 PDF, 신분증 사본
+ * - 이의제기 2: 심사 중, 심사 기한이 다음 영업일이라 기한 경보
+ * - 이의제기 4: 보완 기한 경과(불수용 대상)
+ * - 이의제기 5: 박서준(고객 번호 2)이 쓴 수용 판정이 승인 대기
+ * - 이의제기 1: 승인까지 끝난 일부 지급정지
  */
 
 const MOCK_LATENCY_MS = 200
-const STORE_KEY = "payment-stop:objections"
+// 2차 계약으로 상태 모양이 바뀌어 키를 바꾼다. 옛 탭의 저장 상태를 읽지 않게 한다.
+const STORE_KEY = "payment-stop:objections:v2"
 const RULES_VERSION = "2026-11-03.1"
 const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
 
@@ -51,6 +83,14 @@ export type MockObjection = Required<
   branch: string
   rules: NonNullable<ObjectionDetailResponse["gate"]>["rules"]
   decision: DecisionResponse | null
+  reviewDeadline: string | null
+  supplementDue: string | null
+  supplementRound: number
+  pendingDecision: DecisionResponse | null
+  externalChecks: ExternalCheckResponse[]
+  notices: ObjectionNoticeResponse[]
+  documents: MockDocument[]
+  ledger: ObjectionLedgerEntryResponse[]
 }
 
 type MockState = {
@@ -99,15 +139,235 @@ const relationshipRule = (
   detail,
 })
 
+/** 이의제기마다 쓰지 않는 운영 필드의 기본값. */
+const opsDefaults = () => ({
+  reviewDeadline: null,
+  supplementDue: null,
+  supplementRound: 0,
+  pendingDecision: null,
+  externalChecks: [],
+  notices: [],
+  documents: [],
+  ledger: [],
+})
+
+const receiptNotice = (noticeId: number, recordedAt: string) => ({
+  noticeId,
+  target: "HOLDER",
+  kind: "RECEIPT",
+  channel: "SMS",
+  basis: "이의제기 접수(법 제7조)",
+  recordedAt,
+})
+
+/** 관계 거래가 있는 정상 거래 사건의 원장. 관계 거래 3건은 해제 요건 점검 규칙과 같은 번호다. */
+const relationshipLedger = (
+  disputedDate: string,
+  disputedTime: string,
+  disputedSeq: number,
+  amount: number,
+  sender: number,
+  relation: { days: number; seq: number; amount: number }[],
+) =>
+  ledger([
+    ...livingTransactions(disputedDate, 5, 101, transactionNumber),
+    ...relation.map((item) => ({
+      number: transactionNumber(addDays(disputedDate, -item.days), item.seq),
+      direction: "DEPOSIT" as const,
+      amount: item.amount,
+      occurredAt: at(addDays(disputedDate, -item.days), "15:20:00"),
+      counterpartyAccountId: sender,
+    })),
+    {
+      number: transactionNumber(disputedDate, disputedSeq),
+      direction: "DEPOSIT",
+      amount,
+      occurredAt: at(disputedDate, disputedTime),
+      counterpartyAccountId: sender,
+      disputed: true,
+    },
+    {
+      number: transactionNumber(addDays(disputedDate, 2), disputedSeq + 40),
+      direction: "WITHDRAWAL",
+      amount: 300_000,
+      occurredAt: at(addDays(disputedDate, 2), "11:15:00"),
+      counterpartyAccountId: null,
+    },
+  ])
+
+const contractPage = (amount: string) =>
+  documentPage("물품 공급 계약서", [
+    "공급자: 김*수 (명의인)",
+    "구매자: 거래처 CP-3f9a12c0",
+    "계약일: 2026년 4월 1일",
+    `월 공급 대금: ${amount}`,
+    "결제 방법: 매월 말일 계좌 이체",
+    "계약 기간: 2026년 4월부터 12개월",
+    "위 내용으로 계약을 맺는다.",
+  ])
+
 const seed = (): MockState => {
   const d1 = addDays(getToday(), -12)
   const d2 = addDays(getToday(), -6)
   const d3 = addDays(getToday(), -20)
+  const d4 = addDays(getToday(), -25)
+  const d5 = addDays(getToday(), -15)
   const deadline = addDays(getToday(), 40)
+  const today = getToday()
+  const received3 = at(addDays(today, -2), "10:21:40")
+  const received2 = at(addDays(today, -1), "16:02:11")
+  const received4 = at(addDays(today, -14), "13:40:00")
+  const received5 = at(addDays(today, -4), "09:55:30")
+  const received1 = at(addDays(today, -9), "11:45:00")
+  const fraudNumbers = [21, 22, 23, 24].map((seq) => transactionNumber(d2, seq))
   return {
     pendingCases: [],
     objections: [
       {
+        ...opsDefaults(),
+        objectionId: 5,
+        caseId: 15,
+        accountId: 2005,
+        senderAccountId: 3301,
+        caseStatus: "STOPPED",
+        objectionDeadline: deadline,
+        disputedTransfers: [
+          {
+            transactionNumber: transactionNumber(d5, 51),
+            amount: 800_000,
+            occurredAt: at(d5, "10:30:00"),
+          },
+        ],
+        clause: 2,
+        statement:
+          "학원 수강료로 받은 돈입니다. 같은 학부모가 매달 같은 금액을 보내 왔습니다.",
+        simplifiedRequested: false,
+        idCopyConfirmed: true,
+        litigationPending: false,
+        objectionStatus: "PENDING_APPROVAL",
+        receivedAt: received5,
+        branch: "NORMAL_ACCEPT",
+        rules: [
+          simplifiedRule(false),
+          fraudRule(
+            false,
+            [transactionNumber(d5, 51)],
+            "송금인 1명(기준 3명 이상), 즉시 출금 0원 / 입금 800000원(기준 80% 이상)",
+          ),
+          relationshipRule(
+            true,
+            [
+              transactionNumber(addDays(d5, -92), 5),
+              transactionNumber(addDays(d5, -61), 6),
+              transactionNumber(addDays(d5, -31), 8),
+            ],
+            "관계 거래 3회(기준 3회 이상), 기간 61일(기준 30일 이상), 다툼보다 92일 앞섬(기준 30일 이상), 다툼 800000원 / 최대 800000원 × 5",
+          ),
+        ],
+        decision: null,
+        reviewDeadline: addBusinessDays(addDays(today, -3), 5),
+        pendingDecision: {
+          decisionId: 51,
+          status: "PENDING_APPROVAL",
+          result: "ACCEPTED",
+          reason: "다툼 이전 석 달 동안 같은 금액의 수강료 입금이 이어졌다.",
+          earlyReleaseBasis: `관계 거래 ${transactionNumber(addDays(d5, -92), 5)} 외 2건`,
+          decidedBy: 2,
+          decidedAt: at(addDays(today, -1), "17:10:00"),
+        },
+        notices: [receiptNotice(501, received5)],
+        documents: [
+          evidenceImage(
+            501,
+            "수강료_영수증.png",
+            received5,
+            documentPage("수강료 영수증", [
+              "학원명: 바른수학학원",
+              "수강생: 이*준",
+              "납부자: 학부모 CP-71ab03e2",
+              "수강료: 800,000원 (월)",
+              "납부 방법: 계좌 이체",
+            ]),
+          ),
+          idCopy(502, received5),
+        ],
+        ledger: relationshipLedger(d5, "10:30:00", 51, 800_000, 3301, [
+          { days: 92, seq: 5, amount: 800_000 },
+          { days: 61, seq: 6, amount: 800_000 },
+          { days: 31, seq: 8, amount: 800_000 },
+        ]),
+      },
+      {
+        ...opsDefaults(),
+        objectionId: 4,
+        caseId: 14,
+        accountId: 2004,
+        senderAccountId: null,
+        caseStatus: "STOPPED",
+        objectionDeadline: deadline,
+        disputedTransfers: [
+          {
+            transactionNumber: transactionNumber(d4, 41),
+            amount: 2_000_000,
+            occurredAt: at(d4, "19:22:05"),
+          },
+        ],
+        clause: 2,
+        statement:
+          "중고 거래 사이트에서 노트북을 팔고 받은 돈입니다. 판매 글과 대화 기록이 있습니다.",
+        simplifiedRequested: false,
+        idCopyConfirmed: true,
+        litigationPending: false,
+        objectionStatus: "SUPPLEMENT_REQUESTED",
+        receivedAt: received4,
+        branch: "UNDETERMINED",
+        rules: [
+          simplifiedRule(false),
+          fraudRule(
+            false,
+            [transactionNumber(d4, 41)],
+            "송금인 1명(기준 3명 이상), 즉시 출금 0원 / 입금 2000000원(기준 80% 이상)",
+          ),
+          relationshipRule(
+            false,
+            [],
+            "타행 송금이라 당행 관계 거래를 볼 수 없음",
+          ),
+        ],
+        decision: null,
+        reviewDeadline: addBusinessDays(addDays(today, -13), 5),
+        supplementRound: 1,
+        // 보완 기한이 이틀 전에 지났다. 목록에 불수용 대상으로 보인다.
+        supplementDue: addDays(today, -2),
+        notices: [
+          receiptNotice(401, received4),
+          {
+            noticeId: 402,
+            target: "HOLDER",
+            kind: "SUPPLEMENT_REQUEST",
+            channel: "SMS",
+            basis: "판매 글 캡처와 대화 기록 제출 요청",
+            recordedAt: at(addDays(today, -9), "10:00:00"),
+          },
+        ],
+        documents: [
+          pendingEvidence(401, "판매글_캡처.jpg", received4),
+          idCopy(402, received4),
+        ],
+        ledger: ledger([
+          ...livingTransactions(d4, 4, 201, transactionNumber),
+          {
+            number: transactionNumber(d4, 41),
+            direction: "DEPOSIT",
+            amount: 2_000_000,
+            occurredAt: at(d4, "19:22:05"),
+            counterpartyAccountId: null,
+            disputed: true,
+          },
+        ]),
+      },
+      {
+        ...opsDefaults(),
         objectionId: 3,
         caseId: 13,
         accountId: 2003,
@@ -128,7 +388,7 @@ const seed = (): MockState => {
         idCopyConfirmed: true,
         litigationPending: false,
         objectionStatus: "RECEIVED",
-        receivedAt: at(addDays(getToday(), -2), "10:21:40"),
+        receivedAt: received3,
         branch: "NORMAL_ACCEPT",
         rules: [
           simplifiedRule(false),
@@ -148,8 +408,34 @@ const seed = (): MockState => {
           ),
         ],
         decision: null,
+        notices: [receiptNotice(301, received3)],
+        documents: [
+          evidenceImage(
+            301,
+            "물품공급계약서.png",
+            received3,
+            contractPage("1,200,000원"),
+          ),
+          evidencePdf(
+            302,
+            "거래명세서.pdf",
+            received3,
+            documentPage("거래 명세서", [
+              "품목: 사무용 의자 12개",
+              "공급 가액: 1,200,000원",
+              "공급일: 납품 당일",
+            ]),
+          ),
+          idCopy(303, received3),
+        ],
+        ledger: relationshipLedger(d1, "14:05:12", 31, 1_200_000, 3101, [
+          { days: 150, seq: 3, amount: 900_000 },
+          { days: 90, seq: 7, amount: 700_000 },
+          { days: 35, seq: 9, amount: 800_000 },
+        ]),
       },
       {
+        ...opsDefaults(),
         objectionId: 2,
         caseId: 12,
         accountId: 2002,
@@ -174,19 +460,14 @@ const seed = (): MockState => {
         simplifiedRequested: false,
         idCopyConfirmed: true,
         litigationPending: false,
-        objectionStatus: "RECEIVED",
-        receivedAt: at(addDays(getToday(), -1), "16:02:11"),
+        objectionStatus: "UNDER_REVIEW",
+        receivedAt: received2,
         branch: "FRAUD_PATTERN",
         rules: [
           simplifiedRule(false),
           fraudRule(
             true,
-            [
-              transactionNumber(d2, 21),
-              transactionNumber(d2, 22),
-              transactionNumber(d2, 23),
-              transactionNumber(d2, 24),
-            ],
+            fraudNumbers,
             "송금인 4명(기준 3명 이상), 즉시 출금 3150000원 / 입금 3450000원(기준 80% 이상)",
           ),
           relationshipRule(
@@ -196,8 +477,73 @@ const seed = (): MockState => {
           ),
         ],
         decision: null,
+        // 심사 기한이 다음 영업일이라 기한 경보가 켜진다(설계 불변식 6).
+        reviewDeadline: addBusinessDays(today, 1),
+        notices: [receiptNotice(201, received2)],
+        documents: [
+          evidenceImage(
+            201,
+            "통장사용경위서.png",
+            received2,
+            documentPage("통장 사용 경위서", [
+              "작성자: 박*영 (명의인)",
+              "통장은 본인만 사용했습니다.",
+              "체크카드를 잃어버린 적이 없습니다.",
+              "입금된 돈은 모르는 돈입니다.",
+            ]),
+          ),
+          idCopy(202, received2),
+        ],
+        ledger: ledger([
+          ...livingTransactions(d2, 3, 301, transactionNumber),
+          {
+            number: fraudNumbers[0],
+            direction: "DEPOSIT",
+            amount: 950_000,
+            occurredAt: at(d2, "21:40:03"),
+            disputed: true,
+          },
+          {
+            number: fraudNumbers[1],
+            direction: "DEPOSIT",
+            amount: 1_500_000,
+            occurredAt: at(d2, "21:52:47"),
+            disputed: true,
+          },
+          {
+            number: fraudNumbers[2],
+            direction: "DEPOSIT",
+            amount: 600_000,
+            occurredAt: at(d2, "22:05:30"),
+          },
+          {
+            number: fraudNumbers[3],
+            direction: "DEPOSIT",
+            amount: 400_000,
+            occurredAt: at(d2, "22:20:12"),
+          },
+          {
+            number: transactionNumber(d2, 25),
+            direction: "WITHDRAWAL",
+            amount: 1_400_000,
+            occurredAt: at(d2, "22:10:41"),
+          },
+          {
+            number: transactionNumber(d2, 26),
+            direction: "WITHDRAWAL",
+            amount: 1_000_000,
+            occurredAt: at(d2, "22:31:09"),
+          },
+          {
+            number: transactionNumber(d2, 27),
+            direction: "WITHDRAWAL",
+            amount: 750_000,
+            occurredAt: at(d2, "22:58:33"),
+          },
+        ]),
       },
       {
+        ...opsDefaults(),
         objectionId: 1,
         caseId: 11,
         accountId: 2001,
@@ -218,7 +564,7 @@ const seed = (): MockState => {
         idCopyConfirmed: true,
         litigationPending: false,
         objectionStatus: "DECIDED",
-        receivedAt: at(addDays(getToday(), -9), "11:45:00"),
+        receivedAt: received1,
         branch: "NORMAL_ACCEPT",
         rules: [
           simplifiedRule(false),
@@ -238,6 +584,8 @@ const seed = (): MockState => {
           ),
         ],
         decision: {
+          decisionId: 11,
+          status: "CONFIRMED",
           result: "PARTIAL",
           reason:
             "다툼 입금 이전 급여 입금이 정기적으로 확인되어 피해금만 보류한다.",
@@ -245,15 +593,60 @@ const seed = (): MockState => {
           requestedHoldAmount: 300_000,
           appliedHoldAmount: 300_000,
           decidedBy: 2,
-          decidedAt: at(addDays(getToday(), -5), "15:30:00"),
+          decidedAt: at(addDays(today, -6), "15:30:00"),
+          approvedBy: 14,
+          approvedAt: at(addDays(today, -5), "10:05:00"),
         },
+        reviewDeadline: addBusinessDays(addDays(today, -8), 5),
+        notices: [
+          receiptNotice(101, received1),
+          ...["VICTIM", "FSS"].map((target, index) => ({
+            noticeId: 102 + index,
+            target,
+            kind: "DECISION_PARTIAL",
+            channel: "DOCUMENT",
+            basis: "일부 지급정지 확정(법 제7조제3항)",
+            recordedAt: at(addDays(today, -5), "10:05:00"),
+          })),
+        ],
+        documents: [
+          evidenceImage(
+            101,
+            "급여명세서.png",
+            received1,
+            documentPage("급여 명세서", [
+              "성명: 정*호",
+              "지급일: 매월 25일",
+              "실지급액: 2,850,000원",
+            ]),
+          ),
+          idCopy(102, received1),
+        ],
+        ledger: relationshipLedger(d3, "09:12:30", 11, 300_000, 3001, [
+          { days: 120, seq: 1, amount: 400_000 },
+          { days: 60, seq: 2, amount: 350_000 },
+          { days: 31, seq: 4, amount: 300_000 },
+        ]),
       },
     ],
   }
 }
 
-const readState = (): MockState => readStore<MockState>(STORE_KEY, seed())
-const writeState = (state: MockState) => writeStore(STORE_KEY, state)
+export const readState = (): MockState =>
+  readStore<MockState>(STORE_KEY, seed())
+export const writeState = (state: MockState) => writeStore(STORE_KEY, state)
+
+/** 지금 로그인한 관리자의 고객 번호. 판정 작성자, 승인자로 남는다. */
+export const currentAdminId = () =>
+  readMockCustomerId(readSignedInMemberId() ?? "")
+
+/** 외부 확인 회신 중 해제를 막는 것(G6 부정 회신). */
+const NEGATIVE_REPLIES = new Set(["INVOLVEMENT_SUSPECTED", "DOCUMENT_FORGED"])
+
+const hasNegativeReply = (objection: MockObjection) =>
+  objection.externalChecks.some((check) =>
+    NEGATIVE_REPLIES.has(check.reply ?? ""),
+  )
 
 /** AI 분석 목(`payment-stop-agent-api.ts`)이 이의제기를 읽는 자리. */
 export const readMockObjection = (objectionId: number) =>
@@ -262,7 +655,7 @@ export const readMockObjection = (objectionId: number) =>
 /** 서버 `GateResult.allowsRelease` 와 같은 판정 허용 조건. */
 export const allowedResults = (objection: MockObjection) => {
   const normal = objection.branch === "NORMAL_ACCEPT"
-  const open = !objection.litigationPending
+  const open = !objection.litigationPending && !hasNegativeReply(objection)
   return {
     ACCEPTED:
       open && normal && (objection.clause === 1 || objection.clause === 2),
@@ -274,10 +667,44 @@ export const allowedResults = (objection: MockObjection) => {
   }
 }
 
-const disputedTotal = (objection: Pick<MockObjection, "disputedTransfers">) =>
-  objection.disputedTransfers.reduce((sum, t) => sum + (t.amount ?? 0), 0)
+export const disputedTotal = (
+  objection: Pick<MockObjection, "disputedTransfers">,
+) => objection.disputedTransfers.reduce((sum, t) => sum + (t.amount ?? 0), 0)
 
-const toSummary = (objection: MockObjection): ObjectionSummaryResponse => ({
+/** 확정 전이고 오늘이 심사 기한 1영업일 전 이후인가(설계 불변식 6). 목은 주말만 뺀다. */
+const isDeadlineAlert = (objection: MockObjection) => {
+  if (!objection.reviewDeadline || objection.objectionStatus === "DECIDED") {
+    return false
+  }
+  return addBusinessDays(getToday(), 1) >= objection.reviewDeadline
+}
+
+const isSupplementOverdue = (objection: MockObjection) =>
+  objection.objectionStatus === "SUPPLEMENT_REQUESTED" &&
+  objection.supplementDue != null &&
+  getToday() > objection.supplementDue
+
+/** 외부 확인을 요청했으면 해제 요건 점검에 회신 규칙 행을 더한다. */
+const externalRule = (objection: MockObjection) =>
+  objection.externalChecks.length === 0
+    ? []
+    : [
+        {
+          rule: "EXTERNAL_CHECK",
+          description:
+            "수사기관, 관련 금융회사 회신에 가담이나 위조 확인이 있으면 해제 불가",
+          basis: "INTERNAL",
+          matched: hasNegativeReply(objection),
+          transactionNumbers: [],
+          detail: objection.externalChecks
+            .map((check) => `${check.agency} ${check.reply}`)
+            .join(", "),
+        },
+      ]
+
+export const toSummary = (
+  objection: MockObjection,
+): ObjectionSummaryResponse => ({
   objectionId: objection.objectionId,
   caseId: objection.caseId,
   accountId: objection.accountId,
@@ -287,6 +714,9 @@ const toSummary = (objection: MockObjection): ObjectionSummaryResponse => ({
   disputedTotal: disputedTotal(objection),
   objectionDeadline: objection.objectionDeadline,
   receivedAt: objection.receivedAt,
+  reviewDeadline: objection.reviewDeadline ?? undefined,
+  deadlineAlert: isDeadlineAlert(objection),
+  supplementOverdue: isSupplementOverdue(objection),
 })
 
 const toDetail = (objection: MockObjection): ObjectionDetailResponse => ({
@@ -302,38 +732,61 @@ const toDetail = (objection: MockObjection): ObjectionDetailResponse => ({
     simplifiedExcluded: false,
     rulesVersion: RULES_VERSION,
     allowedResults: allowedResults(objection),
-    rules: objection.rules,
+    rules: [...(objection.rules ?? []), ...externalRule(objection)],
   },
   decision: objection.decision ?? undefined,
+  supplementDue: objection.supplementDue ?? undefined,
+  supplementRound: objection.supplementRound,
+  pendingDecision: objection.pendingDecision ?? undefined,
+  externalChecks: objection.externalChecks,
+  documentCount: objection.documents.length,
 })
 
-const requireIdempotencyKey = (request: Request) =>
+export const requireIdempotencyKey = (request: Request) =>
   request.headers.get("Idempotency-Key")
     ? null
     : fail("CMN0002", "필수 입력값이 누락되었습니다.", 400)
 
-const objectionNotFound = () =>
+export const objectionNotFound = () =>
   fail("PST0202", "이의제기를 찾을 수 없습니다.", 404)
 
-const CASE_STATUS_AFTER: Record<string, string> = {
+export const CASE_STATUS_AFTER: Record<string, string> = {
   ACCEPTED: "RELEASED",
   PARTIAL: "PARTIAL",
   REJECTED: "STOPPED",
 }
 
+const NOTICE_BASIS: Record<string, string> = {
+  RECEIPT: "이의제기 접수(법 제7조)",
+  SUPPLEMENT_REQUEST: "소명 보완 요청",
+  DECISION_ACCEPTED: "수용 확정(법 제7조제3항)",
+  DECISION_PARTIAL: "일부 지급정지 확정(법 제7조제3항)",
+  DECISION_REJECTED: "불수용 확정(법 제7조제3항)",
+  STOP_TERMINATED: "지급정지 종료(법 제7조제4항)",
+}
+
+/** 통지 기록 한 줄. 번호는 이의제기 안에서 이어 붙인다. */
+export const noticeOf = (
+  objection: MockObjection,
+  target: string,
+  kind: string,
+  channel: string,
+  recordedAt: string,
+  basis = NOTICE_BASIS[kind] ?? kind,
+): ObjectionNoticeResponse => ({
+  noticeId:
+    Math.max(
+      objection.objectionId * 100,
+      ...objection.notices.map((notice) => notice.noticeId ?? 0),
+    ) + 1,
+  target,
+  kind,
+  channel,
+  basis,
+  recordedAt,
+})
+
 export const paymentStopApiHandlers = [
-  http.get("*/admin/objections", async () => {
-    await delay(MOCK_LATENCY_MS)
-    const denied = requireMockPermission("PAYMENT_STOP_READ")
-    if (denied) return denied
-
-    const { objections } = readState()
-    const recent = [...objections].sort((a, b) =>
-      b.receivedAt.localeCompare(a.receivedAt),
-    )
-    return ok(recent.map(toSummary))
-  }),
-
   http.get("*/admin/objections/:objectionId", async ({ params, request }) => {
     await delay(MOCK_LATENCY_MS)
     const denied = requireMockPermission("PAYMENT_STOP_READ")
@@ -368,6 +821,9 @@ export const paymentStopApiHandlers = [
       if (objection.decision) {
         return fail("PST0302", "이미 판정이 확정된 이의제기입니다.", 409)
       }
+      if (objection.pendingDecision) {
+        return fail("PST0308", "지금 상태에서 할 수 없는 요청입니다.", 409)
+      }
       const releasing = body.result !== "REJECTED"
       if (releasing && !body.earlyReleaseBasis?.trim()) {
         return fail(
@@ -385,18 +841,29 @@ export const paymentStopApiHandlers = [
       }
 
       const total = disputedTotal(objection)
+      const now = toLocalDateTime(new Date())
       const decision: DecisionResponse = {
+        decisionId: 1000 + nextSequence("payment-stop-decision"),
+        // 불수용은 바로 확정, 수용과 일부 지급정지는 승인 대기(2인 승인, 계약 v2 §3).
+        status: releasing ? "PENDING_APPROVAL" : "CONFIRMED",
         result: body.result,
         reason: body.reason,
         earlyReleaseBasis: releasing ? body.earlyReleaseBasis : undefined,
         requestedHoldAmount: body.result === "PARTIAL" ? total : undefined,
-        appliedHoldAmount: body.result === "PARTIAL" ? total : undefined,
-        decidedBy: 1,
-        decidedAt: toLocalDateTime(new Date()),
+        decidedBy: currentAdminId(),
+        decidedAt: now,
       }
-      objection.decision = decision
-      objection.objectionStatus = "DECIDED"
-      objection.caseStatus = CASE_STATUS_AFTER[body.result]
+      if (releasing) {
+        objection.pendingDecision = decision
+        objection.objectionStatus = "PENDING_APPROVAL"
+      } else {
+        objection.decision = decision
+        objection.objectionStatus = "DECIDED"
+        objection.caseStatus = CASE_STATUS_AFTER[body.result]
+        objection.notices.push(
+          noticeOf(objection, "HOLDER", "DECISION_REJECTED", "DOCUMENT", now),
+        )
+      }
       writeState(state)
       return ok(decision)
     },
@@ -445,6 +912,19 @@ export const paymentStopApiHandlers = [
       litigationPending: body.litigationPending ?? false,
       objectionStatus: "RECEIVED",
       receivedAt: toLocalDateTime(new Date()),
+      ...opsDefaults(),
+      notices: [
+        receiptNotice(objectionId * 100 + 1, toLocalDateTime(new Date())),
+      ],
+      ledger: ledger(
+        pending.disputedTransfers.map((transfer) => ({
+          number: transfer.transactionNumber ?? "",
+          direction: "DEPOSIT" as const,
+          amount: transfer.amount ?? 0,
+          occurredAt: transfer.occurredAt ?? "",
+          disputed: true,
+        })),
+      ),
       branch: "UNDETERMINED",
       rules: [
         simplifiedRule(body.simplifiedRequested ?? false),

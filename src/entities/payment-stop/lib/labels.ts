@@ -77,10 +77,84 @@ export const CASE_STATUS_LABEL: Record<string, string> = {
   RELEASED: "지급정지 해제",
 }
 
-/** 이의제기 처리 상태(서버 `ObjectionStatus`). */
+/** 이의제기 처리 상태(서버 `ObjectionStatus`, 계약 v2 §1). */
 export const OBJECTION_STATUS_LABEL: Record<string, string> = {
-  RECEIVED: "판정 대기",
+  RECEIVED: "완비 확인 대기",
+  UNDER_REVIEW: "심사 중",
+  SUPPLEMENT_REQUESTED: "보완 요청",
+  SUPPLEMENT_SUBMITTED: "보완 제출",
+  PENDING_APPROVAL: "승인 대기",
   DECIDED: "판정 확정",
+}
+
+/** 판정을 아직 확정하지 않은 상태인가. 확정과 승인 대기 밖은 모두 심사 진행 중이다. */
+export const isObjectionOpen = (status: string): boolean =>
+  status !== "DECIDED" && status !== "PENDING_APPROVAL"
+
+/** 판정 행 상태(서버 `DecisionStatus`). */
+export const DECISION_STATUS_LABEL: Record<string, string> = {
+  PENDING_APPROVAL: "승인 대기",
+  CONFIRMED: "확정",
+  RETURNED: "반려",
+}
+
+/** 보완 요청 횟수 상한(D12). 1회째 5영업일, 2회째 3영업일, 3회째는 서버가 거부한다. */
+export const SUPPLEMENT_MAX_ROUNDS = 2
+
+/** 회차별 보완 기한(영업일). 화면 안내에 쓴다. 기한 계산은 서버가 한다. */
+export const SUPPLEMENT_BUSINESS_DAYS: Record<number, number> = { 1: 5, 2: 3 }
+
+/** 외부 확인 기관(서버 `agency`). */
+export const EXTERNAL_AGENCY_LABEL: Record<string, string> = {
+  POLICE: "수사기관",
+  PEER_BANK: "관련 금융회사",
+}
+
+/** 외부 확인 모의 회신(서버 `mockReply`). 해제 요건 점검의 외부 확인 회신 규칙이 읽는다. */
+export const EXTERNAL_REPLY_LABEL: Record<string, string> = {
+  INVOLVEMENT_SUSPECTED: "가담 의심",
+  DOCUMENT_FORGED: "서류 위조 확인",
+  OWNER_UNRELATED: "명의인 무관 확인",
+  NO_RECORD: "해당 기록 없음",
+}
+
+export const EXTERNAL_CHECK_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: "회신 대기",
+  REPLIED: "회신 받음",
+}
+
+/** 통지 대상(D30). */
+export const NOTICE_TARGET_LABEL: Record<string, string> = {
+  HOLDER: "명의인",
+  VICTIM: "피해자",
+  FSS: "금융감독원",
+  RELATED_BANK: "관련 금융회사",
+}
+
+export const NOTICE_KIND_LABEL: Record<string, string> = {
+  RECEIPT: "접수 안내",
+  SUPPLEMENT_REQUEST: "보완 요청",
+  DECISION_ACCEPTED: "수용 결과",
+  DECISION_PARTIAL: "일부 지급정지 결과",
+  DECISION_REJECTED: "불수용 결과",
+  STOP_TERMINATED: "지급정지 종료",
+}
+
+export const NOTICE_CHANNEL_LABEL: Record<string, string> = {
+  SMS: "문자",
+  DOCUMENT: "서면",
+}
+
+/** 첨부 서류 종류. 신분증 사본은 판독하지 않는다(D37). */
+export const DOCUMENT_KIND_LABEL: Record<string, string> = {
+  EVIDENCE: "증빙 서류",
+  ID_COPY: "신분증 사본",
+}
+
+export const OCR_STATUS_LABEL: Record<string, string> = {
+  PENDING: "판독 대기",
+  DONE: "판독 완료",
+  FAILED: "판독 실패",
 }
 
 /** 표에 없는 코드는 코드 그대로 보인다. 빈칸으로 두면 값이 없다고 오인한다. */

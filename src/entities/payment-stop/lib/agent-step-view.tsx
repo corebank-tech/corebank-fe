@@ -195,8 +195,38 @@ const draftCard = (detail: Record<string, unknown>): AgentRunStepCard => {
   }
 }
 
+/**
+ * 서류 판독 단계. detail 은 개수만 담는다(`documentId`, `pages`, `regions`,
+ * `lowConfidenceRegions`, `engine`, 실패면 `error`). 영역 좌표와 글자는 관리자 판독 조회
+ * API 가 준다. 인식에 실패해도 단계 상태는 `DONE` 이고 사유가 `error` 에 있다.
+ */
+const ocrCard = (
+  detail: Record<string, unknown>,
+): AgentRunStepCard | undefined => {
+  const count = (value: unknown) => (typeof value === "number" ? value : null)
+  const pages = count(detail.pages)
+  const regions = count(detail.regions)
+  const lowConfidence = count(detail.lowConfidenceRegions)
+  const rows = rowsWithValues([
+    {
+      label: "서류 번호",
+      value: detail.documentId != null ? String(detail.documentId) : null,
+    },
+    { label: "쪽수", value: pages != null ? `${pages}쪽` : null },
+    { label: "글자 영역", value: regions != null ? `${regions}개` : null },
+    {
+      label: "낮은 신뢰도",
+      value: lowConfidence != null ? `${lowConfidence}개` : null,
+    },
+    { label: "판독 엔진", value: asString(detail.engine) },
+    { label: "실패 사유", value: asString(detail.error) },
+  ])
+  return rows.length > 0 ? { title: "판독한 서류", rows } : undefined
+}
+
 const cardFor = (step: AgentRunStep): AgentRunStepCard | undefined => {
   if (step.type === "CONTEXT_LOADED") return contextCard(step.detail)
+  if (step.type === "OCR") return ocrCard(step.detail)
   if (step.type === "TOOL_CALL") return toolCallCard(step.detail)
   if (step.type === "CLAIM_EXTRACTED") return claimsCard(step.detail)
   if (step.type === "CONTRADICTION") return contradictionCard(step.detail)

@@ -2,7 +2,6 @@ import * as React from "react"
 import {
   keepPreviousData,
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
@@ -11,7 +10,6 @@ import {
   getListObjectionAgentRunStepsQueryKey,
   getListObjectionAgentRunsQueryKey,
   getObjectionReviewDraft,
-  listObjectionAgentRuns,
   listObjectionAgentRunSteps,
   requestObjectionReview,
   useListObjectionAgentRuns,
@@ -66,7 +64,15 @@ export type AgentRunStep = {
   endedAt: string | null
 }
 
-export type DraftClaim = { text: string; quote: string | null }
+export type DraftClaim = {
+  text: string
+  quote: string | null
+  /** 주장이 나온 곳. `STATEMENT`(소명) 또는 `DOCUMENT`(첨부 서류 판독). 없으면 소명으로 본다 */
+  source: "STATEMENT" | "DOCUMENT"
+  /** 서류에서 나온 주장이면 그 서류와 판독 영역 번호 */
+  documentId: number | null
+  regionIndex: number | null
+}
 
 export type DraftContradiction = {
   claim: string | null
@@ -98,6 +104,9 @@ export const asRecord = (value: unknown): Record<string, unknown> =>
 
 export const asString = (value: unknown): string | null =>
   typeof value === "string" && value !== "" ? value : null
+
+export const asNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null
 
 export const asStringArray = (value: unknown): string[] =>
   Array.isArray(value)
@@ -148,6 +157,12 @@ const toDraft = (response: ReviewDraftResponse): ReviewDraft => {
       .map((claim) => ({
         text: asString(claim.text) ?? "",
         quote: asString(claim.quote),
+        source:
+          claim.source === "DOCUMENT"
+            ? ("DOCUMENT" as const)
+            : ("STATEMENT" as const),
+        documentId: asNumber(claim.documentId),
+        regionIndex: asNumber(claim.regionIndex),
       }))
       .filter((claim) => claim.text !== ""),
     contradictions: contradictions.map(asRecord).map((item) => ({
@@ -287,74 +302,29 @@ export const useRequestObjectionReview = () => {
   })
 }
 
-/** 목록의 AI 분석 상태 칸을 다시 받는 간격. 상세보다 느슨하게 둔다. */
-const LIST_POLL_INTERVAL_MS = 2000
-
-export type AgentRunSnapshot = {
-  /** 응답을 받았는가. 받기 전과 실행이 없는 것을 가른다 */
-  isLoaded: boolean
-  /** 최근 실행 상태. 실행이 없으면 `null` */
-  status: string | null
-  /** 분석 중일 때 마지막으로 남은 단계 이름 */
-  currentStepTitle: string | null
-}
-
 /**
- * 목록 행마다 최근 실행 상태를 받는다. **이의제기 하나에 요청 하나다(N+1).** 목록 응답에
- * 분석 상태가 없어서다. 그래서 화면에 보이는 쪽의 행(최대 10건)만 넘겨 받는다. 서버 목록에
- * 요약 칸이 생기면 이 훅을 걷어낸다.
+ * 실행 하나의 전체 단계(`after` 생략). 재생 모드가 쓴다(계획 PA-15).
  *
- * 분석 중인 행은 단계 목록을 한 번 더 받아 마지막 단계 이름을 보인다.
+ * 끝난 실행의 단계는 바뀌지 않으므로 한 번 받으면 다시 받지 않고 캐시에서 꺼낸다. 그래서
+ * 한 번 불러온 뒤에는 네트워크가 끊겨도 같은 화면으로 재생된다.
  */
-export const useAgentRunSnapshots = (
-  objectionIds: number[],
-): Map<number, AgentRunSnapshot> => {
-  const runQueries = useQueries({
-    queries: objectionIds.map((objectionId) => ({
-      queryKey: getListObjectionAgentRunsQueryKey(objectionId),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        listObjectionAgentRuns(objectionId, { signal }),
-      refetchInterval: (query: { state: { data?: AgentRunResponse[] } }) =>
-        isRunActive(query.state.data?.[0]?.status)
-          ? LIST_POLL_INTERVAL_MS
-          : false,
-    })),
+export const useAgentRunAllSteps = (
+  objectionId: number,
+  runId: number | null,
+  enabled: boolean,
+) => {
+  const { data, isPending, isError } = useQuery({
+    queryKey: [...agentRunStepsKey(objectionId, runId), "all"],
+    enabled: enabled && runId != null,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    networkMode: "offlineFirst",
+    queryFn: async ({ signal }) =>
+      (
+        await listObjectionAgentRunSteps(objectionId, runId ?? 0, undefined, {
+          signal,
+        })
+      ).map(toStep),
   })
-  const latestRuns = objectionIds.map((objectionId, index) => ({
-    objectionId,
-    run: runQueries[index]?.data?.[0],
-  }))
-  const running = latestRuns.filter(({ run }) => run?.status === "RUNNING")
-  const stepQueries = useQueries({
-    queries: running.map(({ objectionId, run }) => ({
-      queryKey: [
-        ...getListObjectionAgentRunStepsQueryKey(objectionId, run?.runId ?? 0),
-        "list-latest",
-      ],
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        listObjectionAgentRunSteps(
-          objectionId,
-          run?.runId ?? 0,
-          { after: 0 },
-          { signal },
-        ),
-      refetchInterval: LIST_POLL_INTERVAL_MS,
-    })),
-  })
-
-  const snapshots = new Map<number, AgentRunSnapshot>()
-  latestRuns.forEach(({ objectionId, run }) => {
-    const stepIndex = running.findIndex(
-      (item) => item.objectionId === objectionId,
-    )
-    const lastStep =
-      stepIndex >= 0 ? stepQueries[stepIndex]?.data?.at(-1) : undefined
-    snapshots.set(objectionId, {
-      isLoaded:
-        runQueries[objectionIds.indexOf(objectionId)]?.isSuccess ?? false,
-      status: run?.status ?? null,
-      currentStepTitle: lastStep?.title || null,
-    })
-  })
-  return snapshots
+  return { steps: data, isPending, isError }
 }

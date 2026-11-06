@@ -9,6 +9,7 @@ import {
   useListObjections,
   type DecisionRequest,
   type DecisionResponse,
+  type ExternalCheckResponse,
   type ObjectionDetailResponse,
   type ObjectionSummaryResponse,
   type ReceiveRequest,
@@ -45,7 +46,7 @@ export type ObjectionSummary = {
   caseId: number
   accountId: number
   clause: number
-  /** `RECEIVED`(판정 대기), `DECIDED`(판정 확정) */
+  /** 서버 `ObjectionStatus`(계약 v2 §1). `RECEIVED` 부터 `DECIDED` 까지 6단계 */
   objectionStatus: string
   /** `STOPPED`, `PARTIAL`, `RELEASED` */
   caseStatus: string
@@ -53,6 +54,16 @@ export type ObjectionSummary = {
   /** 이의제기 신청 기한(채권소멸 공고일 기준, D31). 통보 기한이 아니다 */
   objectionDeadline: string
   receivedAt: string
+  /** 심사 기한(완비 확인일 + 5영업일). 완비 확인 전이면 `null` */
+  reviewDeadline: string | null
+  /** 확정 전이고 심사 기한 1영업일 전부터 켜진다(설계 불변식 6). 서버가 계산한다 */
+  deadlineAlert: boolean
+  /** 보완 기한이 지났는데 보완이 오지 않았다. 불수용 대상이지만 자동 확정하지 않는다(D32) */
+  supplementOverdue: boolean
+  /** 최근 AI 분석 실행 상태. 실행이 없으면 `null` */
+  latestRunStatus: string | null
+  /** 최근 실행의 마지막 단계 이름 */
+  latestRunLastStepTitle: string | null
 }
 
 export type DisputedTransfer = {
@@ -85,14 +96,35 @@ export type ReleaseGate = {
 }
 
 export type ObjectionDecision = {
+  /** 판정 행 번호. 승인과 반려 경로에 쓴다 */
+  decisionId: number | null
+  /** 서버 `DecisionStatus`: `PENDING_APPROVAL`, `CONFIRMED`, `RETURNED` */
+  status: string
   result: string
   reason: string
   earlyReleaseBasis: string | null
   requestedHoldAmount: number | null
   appliedHoldAmount: number | null
-  /** 확정한 관리자의 고객 번호. 이름은 응답에 없다 */
+  /** 판정을 작성한 관리자의 고객 번호. 이름은 응답에 없다 */
   decidedBy: number | null
   decidedAt: string
+  /** 승인한 관리자의 고객 번호. 불수용처럼 승인 없이 확정되면 `null` */
+  approvedBy: number | null
+  approvedAt: string | null
+  /** 승인자가 반려할 때 적은 사유 */
+  returnReason: string | null
+}
+
+export type ExternalCheck = {
+  checkId: number
+  /** `POLICE`(수사기관), `PEER_BANK`(관련 금융회사) */
+  agency: string
+  /** `REQUESTED`, `REPLIED` */
+  status: string
+  /** 모의 회신 코드. 회신 전이면 `null` */
+  reply: string | null
+  requestedAt: string | null
+  repliedAt: string | null
 }
 
 export type ObjectionDetail = {
@@ -113,6 +145,17 @@ export type ObjectionDetail = {
   receivedAt: string
   gate: ReleaseGate
   decision: ObjectionDecision | null
+  reviewDeadline: string | null
+  deadlineAlert: boolean
+  /** 보완 기한. 보완 요청 중이 아니면 `null` */
+  supplementDue: string | null
+  /** 지금까지 요청한 보완 횟수(0~2) */
+  supplementRound: number
+  supplementOverdue: boolean
+  /** 승인 대기 판정. 수용, 일부 지급정지를 작성하면 여기에 놓인다 */
+  pendingDecision: ObjectionDecision | null
+  externalChecks: ExternalCheck[]
+  documentCount: number
 }
 
 const toSummary = (response: ObjectionSummaryResponse): ObjectionSummary => ({
@@ -125,6 +168,11 @@ const toSummary = (response: ObjectionSummaryResponse): ObjectionSummary => ({
   disputedTotal: response.disputedTotal ?? 0,
   objectionDeadline: response.objectionDeadline ?? "",
   receivedAt: response.receivedAt ?? "",
+  reviewDeadline: response.reviewDeadline ?? null,
+  deadlineAlert: response.deadlineAlert ?? false,
+  supplementOverdue: response.supplementOverdue ?? false,
+  latestRunStatus: response.latestRunStatus ?? null,
+  latestRunLastStepTitle: response.latestRunLastStepTitle || null,
 })
 
 const toRuleCheck = (rule: Rule): GateRuleCheck => ({
@@ -136,7 +184,20 @@ const toRuleCheck = (rule: Rule): GateRuleCheck => ({
   detail: rule.detail ?? "",
 })
 
-const toDecision = (response: DecisionResponse): ObjectionDecision => ({
+export const toExternalCheck = (
+  response: ExternalCheckResponse,
+): ExternalCheck => ({
+  checkId: response.checkId ?? 0,
+  agency: response.agency ?? "",
+  status: response.status ?? "",
+  reply: response.reply || null,
+  requestedAt: response.requestedAt ?? null,
+  repliedAt: response.repliedAt ?? null,
+})
+
+export const toDecision = (response: DecisionResponse): ObjectionDecision => ({
+  decisionId: response.decisionId ?? null,
+  status: response.status ?? "",
   result: response.result ?? "",
   reason: response.reason ?? "",
   earlyReleaseBasis: response.earlyReleaseBasis || null,
@@ -144,6 +205,9 @@ const toDecision = (response: DecisionResponse): ObjectionDecision => ({
   appliedHoldAmount: response.appliedHoldAmount ?? null,
   decidedBy: response.decidedBy ?? null,
   decidedAt: response.decidedAt ?? "",
+  approvedBy: response.approvedBy ?? null,
+  approvedAt: response.approvedAt ?? null,
+  returnReason: response.returnReason || null,
 })
 
 const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
@@ -179,12 +243,39 @@ const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
       rules: (gate.rules ?? []).map(toRuleCheck),
     },
     decision: response.decision ? toDecision(response.decision) : null,
+    reviewDeadline: response.reviewDeadline ?? null,
+    deadlineAlert: response.deadlineAlert ?? false,
+    supplementDue: response.supplementDue ?? null,
+    supplementRound: response.supplementRound ?? 0,
+    supplementOverdue: response.supplementOverdue ?? false,
+    pendingDecision: response.pendingDecision
+      ? toDecision(response.pendingDecision)
+      : null,
+    externalChecks: (response.externalChecks ?? []).map(toExternalCheck),
+    documentCount: response.documentCount ?? 0,
   }
 }
 
-/** 이의제기 목록(`GET /admin/objections`). 서버가 최근 접수 순 200건을 준다. */
+/** 목록의 AI 분석 상태 칸을 다시 받는 간격. 상세보다 느슨하게 둔다. */
+const LIST_POLL_INTERVAL_MS = 2000
+
+const RUN_ACTIVE_STATUSES = new Set(["QUEUED", "RUNNING"])
+
+/**
+ * 이의제기 목록(`GET /admin/objections`). 서버가 최근 접수 순 200건을 준다.
+ * 분석 중인 행이 있으면 목록을 2초마다 다시 받아 분석 상태 칸을 갱신한다.
+ */
 export const useObjectionList = () => {
-  const { data, isPending, isFetching, isError, error } = useListObjections()
+  const { data, isPending, isFetching, isError, error } = useListObjections({
+    query: {
+      refetchInterval: (query) =>
+        query.state.data?.some((row) =>
+          RUN_ACTIVE_STATUSES.has(row.latestRunStatus ?? ""),
+        )
+          ? LIST_POLL_INTERVAL_MS
+          : false,
+    },
+  })
   return {
     objections: data?.map(toSummary),
     isPending,
@@ -254,10 +345,11 @@ export const useReceiveObjection = () => {
 }
 
 /**
- * 판정 확정(`POST /admin/objections/{objectionId}/decisions`). 1인 확정 단계다.
+ * 판정 작성(`POST /admin/objections/{objectionId}/decisions`). 불수용은 바로 확정되고,
+ * 수용과 일부 지급정지는 승인 대기로 저장만 된다(2인 승인, 계약 v2 §3). 응답 `status` 로 가른다.
  *
- * 응답 시간 초과 뒤 같은 키로 다시 보내면 서버가 처음 확정 결과를 그대로 돌려준다.
- * 확정 뒤 상세와 목록을 다시 받아 확정된 판정과 지급정지 상태를 보인다.
+ * 응답 시간 초과 뒤 같은 키로 다시 보내면 서버가 처음 결과를 그대로 돌려준다.
+ * 작성 뒤 상세와 목록을 다시 받아 확정된 판정이나 승인 대기를 보인다.
  *
  * 해제 요건 미충족(`PST0301`)과 이미 확정(`PST0302`)도 상세를 다시 받는다. 서버는 확정
  * 직전에 요건을 다시 계산하므로(D11) 화면을 연 뒤 원장이 바뀌었을 수 있고, 다른 담당자가

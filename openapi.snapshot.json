@@ -125,6 +125,10 @@
       "description": "회원가입 약관 조회·동의 검증 API"
     },
     {
+      "name": "고객 지급정지 이의제기",
+      "description": "고객 비대면 지급정지 이의제기 신청과 보완 서류 제출"
+    },
+    {
       "name": "관리자 지급정지 사건",
       "description": "피해구제 신청을 받은 계좌의 지급정지 사건 등록"
     },
@@ -5552,6 +5556,136 @@
           },
           "403": {
             "description": "CMN0102 CSRF 검증 실패"
+          }
+        }
+      }
+    },
+    "/payment-stops/my": {
+      "get": {
+        "tags": [
+          "고객 지급정지 이의제기"
+        ],
+        "summary": "내 지급정지 사건 목록",
+        "description": "로그인 고객 계좌의 지급정지 사건. 이의제기를 냈으면 처리 상태와 보완 요청 내용을 함께 준다.",
+        "operationId": "listMyPaymentStops",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListMyPaymentStopResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payment-stops/{caseId}/objections": {
+      "post": {
+        "tags": [
+          "고객 지급정지 이의제기"
+        ],
+        "summary": "이의제기 신청(고객 비대면)",
+        "description": "사유 조항(법 제7조제1항 1~3호), 소명, 신분증 사본 1개(필수), 증빙 0~9개를 multipart 로 받는다. 파일은 매직 바이트로 PDF, PNG, JPEG만, 1개 10MB, 합계 30MB, 10개 이하. 오류: PST0007 파일 위반, PST0002 신청 기한 경과, PST0304 이미 접수된 사건, 본인 계좌 사건이 아니면 사건 없음과 같은 오류. 멱등키 필수.",
+        "operationId": "submitMyObjection",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/MyObjectionSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyObjectionSubmitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/objections/{objectionId}/supplements": {
+      "post": {
+        "tags": [
+          "고객 지급정지 이의제기"
+        ],
+        "summary": "보완 서류 제출(고객 비대면)",
+        "description": "보완 요청(SUPPLEMENT_REQUESTED) 상태에서만 받는다. 증빙 1~9개와 메모. 제출하면 이의제기가 SUPPLEMENT_SUBMITTED 가 된다. 오류: PST0007 파일 위반, PST0308 지금 상태에서 할 수 없는 요청. 멱등키 필수.",
+        "operationId": "submitMyObjectionSupplement",
+        "parameters": [
+          {
+            "name": "objectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "멱등키",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/MyObjectionSupplementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListMyObjectionDocumentResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -11897,6 +12031,208 @@
             "type": "string"
           },
           "data": {}
+        }
+      },
+      "ApiResponseListMyPaymentStopResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyPaymentStopResponse"
+            }
+          }
+        }
+      },
+      "MyPaymentStopResponse": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountNumberMasked": {
+            "type": "string",
+            "description": "가운데를 가린 계좌번호"
+          },
+          "disputedTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "다툼 거래 합계(원)"
+          },
+          "objectionDeadline": {
+            "type": "string",
+            "format": "date",
+            "description": "이의제기 신청 기한"
+          },
+          "objectionId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "이의제기를 내지 않았으면 없다"
+          },
+          "objectionStatus": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "UNDER_REVIEW",
+              "SUPPLEMENT_REQUESTED",
+              "SUPPLEMENT_SUBMITTED",
+              "PENDING_APPROVAL",
+              "DECIDED"
+            ]
+          },
+          "supplementDue": {
+            "type": "string",
+            "format": "date",
+            "description": "보완 기한. 보완 요청 중일 때만 있다"
+          },
+          "missingDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "보완 요청한 서류"
+          }
+        }
+      },
+      "MyObjectionSubmitRequest": {
+        "type": "object",
+        "required": [
+          "clause",
+          "statement",
+          "idCopy"
+        ],
+        "properties": {
+          "clause": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1
+          },
+          "simplifiedRequested": {
+            "type": "boolean"
+          },
+          "litigationPending": {
+            "type": "boolean"
+          },
+          "idCopy": {
+            "type": "string",
+            "format": "binary"
+          },
+          "evidence": {
+            "type": "array",
+            "maxItems": 9,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
+      },
+      "ApiResponseMyObjectionSubmitResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MyObjectionSubmitResponse"
+          }
+        }
+      },
+      "MyObjectionSubmitResponse": {
+        "type": "object",
+        "properties": {
+          "objectionId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MyObjectionSupplementRequest": {
+        "type": "object",
+        "required": [
+          "evidence"
+        ],
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 9,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "ApiResponseListMyObjectionDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyObjectionDocumentResponse"
+            }
+          }
+        }
+      },
+      "MyObjectionDocumentResponse": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EVIDENCE",
+              "ID_COPY"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "round": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "RegisterRequest": {

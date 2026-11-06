@@ -107,3 +107,33 @@ export {
   CLAIM_VERIFICATION_LABEL,
   verifyClaims,
 } from "@/entities/payment-stop/lib/claim-verification"
+
+export type {
+  MyObjectionDraft,
+  MyObjectionSupplementDraft,
+  MyPaymentStop,
+} from "@/entities/payment-stop/api/my-objection"
+export {
+  myObjectionFingerprint,
+  mySupplementFingerprint,
+  useMyPaymentStops,
+  useSubmitMyObjection,
+  useSubmitMyObjectionSupplement,
+} from "@/entities/payment-stop/api/my-objection"
+export {
+  CLAUSE_HELP,
+  MY_OBJECTION_STATUS_LABEL,
+  SUPPLEMENT_REQUESTED,
+} from "@/entities/payment-stop/lib/my-objection-labels"
+export type { FileSelection } from "@/entities/payment-stop/lib/objection-files"
+export {
+  MAX_EVIDENCE_COUNT,
+  MAX_FILE_BYTES,
+  MAX_FILE_COUNT,
+  MAX_TOTAL_BYTES,
+  OBJECTION_FILE_ACCEPT,
+  inspectObjectionFile,
+  readFileKind,
+  selectObjectionFiles,
+  summarizeFiles,
+} from "@/entities/payment-stop/lib/objection-files"

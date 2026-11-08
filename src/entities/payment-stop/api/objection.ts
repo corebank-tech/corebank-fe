@@ -72,6 +72,8 @@ export type ObjectionSummary = {
   supplementOverdue: boolean
   /** 접수 경로(서버 `ObjectionChannel`): `BRANCH` 영업점 대리, `ONLINE` 비대면 */
   receivedChannel: string
+  /** 승인 대기나 확정 판정이 해제 요건 점검과 다른 재량 판정인지 */
+  discretionary: boolean
   /** 최근 AI 분석 실행 상태. 실행이 없으면 `null` */
   latestRunStatus: string | null
   /** 최근 실행의 마지막 단계 이름 */
@@ -104,6 +106,12 @@ export type ReleaseGate = {
   rulesVersion: string
   /** 판정별로 담당자가 고를 수 있는지. 서버가 원장으로 다시 계산한 값이다 */
   allowedResults: Record<DecisionResult, boolean>
+  /**
+   * 해제 요건 점검은 닫혔지만 담당자 재량 판정으로 쓸 수 있는 판정. 사유와 다른 관리자의
+   * 확인 승인이 필요하다. 소송 계속, 사유 조항 불일치, 외부 기관 부정 회신은 재량으로도
+   * 넘지 못해 `false` 다. 불수용은 언제나 `false` 다(점검이 늘 연다)
+   */
+  discretionaryResults: Record<DecisionResult, boolean>
   rules: GateRuleCheck[]
 }
 
@@ -125,6 +133,12 @@ export type ObjectionDecision = {
   approvedAt: string | null
   /** 승인자가 반려할 때 적은 사유 */
   returnReason: string | null
+  /** 해제 요건 점검이 닫힌 판정을 담당자 재량으로 썼는지 */
+  discretionary: boolean
+  /** 재량 판정 사유(20~1000자). 재량 판정이 아니면 `null` */
+  discretionaryReason: string | null
+  /** 작성할 때의 해제 요건 점검 갈래(서버 `GateBranch`) */
+  gateBranchAtWrite: string | null
 }
 
 export type ExternalCheck = {
@@ -189,6 +203,7 @@ const toSummary = (response: ObjectionSummaryResponse): ObjectionSummary => ({
   supplementDue: response.supplementDue ?? null,
   supplementOverdue: response.supplementOverdue ?? false,
   receivedChannel: response.receivedChannel ?? "",
+  discretionary: response.discretionary ?? false,
   latestRunStatus: response.latestRunStatus ?? null,
   latestRunLastStepTitle: response.latestRunLastStepTitle || null,
 })
@@ -226,11 +241,15 @@ export const toDecision = (response: DecisionResponse): ObjectionDecision => ({
   approvedBy: response.approvedBy ?? null,
   approvedAt: response.approvedAt ?? null,
   returnReason: response.returnReason || null,
+  discretionary: response.discretionary ?? false,
+  discretionaryReason: response.discretionaryReason || null,
+  gateBranchAtWrite: response.gateBranchAtWrite || null,
 })
 
 const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
   const gate = response.gate ?? {}
   const allowed = gate.allowedResults ?? {}
+  const discretionary = gate.discretionaryResults ?? {}
   return {
     objectionId: response.objectionId ?? 0,
     caseId: response.caseId ?? 0,
@@ -259,6 +278,13 @@ const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
       // 값이 빠진 판정은 닫는다. 열어 두면 서버가 막을 판정을 화면이 권하게 된다.
       allowedResults: Object.fromEntries(
         DECISION_RESULTS.map((result) => [result, allowed[result] === true]),
+      ) as Record<DecisionResult, boolean>,
+      // 재량 판정도 값이 빠지면 닫는다. 서버가 열지 않은 재량을 화면이 권하지 않는다.
+      discretionaryResults: Object.fromEntries(
+        DECISION_RESULTS.map((result) => [
+          result,
+          discretionary[result] === true,
+        ]),
       ) as Record<DecisionResult, boolean>,
       rules: (gate.rules ?? []).map(toRuleCheck),
     },
@@ -429,7 +455,10 @@ export const useReceiveObjection = () => {
  * 응답 시간 초과 뒤 같은 키로 다시 보내면 서버가 처음 결과를 그대로 돌려준다.
  * 작성 뒤 상세, 목록, 통지 기록을 다시 받아 확정된 판정이나 승인 대기를 보인다.
  *
- * 실패해도 다시 받는다. 해제 요건 미충족(`PST0301`), 이미 확정(`PST0302`), 상태가 맞지
+ * 해제 요건 점검이 닫혔지만 `gate.discretionaryResults` 가 연 판정은 `discretionary: true` 와
+ * 재량 판정 사유로 쓴다. 재량으로도 넘을 수 없는 요건이면 서버가 `PST0310` 으로 거부한다.
+ *
+ * 실패해도 다시 받는다. 해제 요건 미충족(`PST0301`, `PST0310`), 이미 확정(`PST0302`), 상태가 맞지
  * 않음(`PST0308`)은 모두 화면의 상세가 서버보다 늦었다는 뜻이다. 서버는 확정 직전에 요건을
  * 다시 계산하므로(D11) 화면을 연 뒤 원장이 바뀌었을 수 있고, 다른 담당자가 먼저 승인 대기를
  * 올렸거나 보완을 요청했을 수도 있다. 화면이 옛 상태를 계속 보이면 같은 실패를 되풀이한다.

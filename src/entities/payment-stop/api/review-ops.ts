@@ -95,7 +95,9 @@ export const useStartReviewSession = () =>
   })
 
 /**
- * 승인 대기 판정 승인. 작성자와 같은 사람이면 `PST0309` 다. 다른 관리자가 먼저 승인했으면
+ * 승인 대기 판정 승인. 작성자와 같은 사람이면 `PST0309` 다. 재량 판정은 승인자가 재량 사유를
+ * 확인했다는 `discretionaryAcknowledged: true` 를 함께 보내야 하고, 빠지면 `PST0311` 이다.
+ * 승인 직전 다시 계산한 요건이 재량으로도 넘을 수 없게 바뀌었으면 `PST0310` 이다. 다른 관리자가 먼저 승인했으면
  * `PST0302`(이미 확정), 먼저 반려했으면 `PST0204`(승인할 판정 없음)다. 서버가 승인 직전에
  * 해제 요건을 다시 계산하므로 `PST0301` 도 올 수 있다. 어느 쪽이든 화면의 상세가 서버보다
  * 늦었다는 뜻이라 성공과 실패 모두 다시 받는다.
@@ -106,12 +108,14 @@ export const useApproveDecision = () => {
     mutationFn: async ({
       objectionId,
       decisionId,
+      discretionaryAcknowledged,
       idempotencyKey,
-    }: Keyed<{ decisionId: number }>) =>
+    }: Keyed<{ decisionId: number; discretionaryAcknowledged: boolean }>) =>
       toDecision(
         await approveObjectionDecision(
           objectionId,
           decisionId,
+          { discretionaryAcknowledged },
           withIdempotencyKey({}, idempotencyKey),
         ),
       ),

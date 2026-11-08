@@ -15,6 +15,11 @@ import { createCorrelationId } from "@/shared/api/correlation-id"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const REQUEST_TIMEOUT_MS = 30_000
+/**
+ * 첨부 업로드 제한 시간. 서버는 요청 하나에 40MB까지 받는데, 30초로는 약 8Mbps 보다 느린
+ * 회선에서 30MB 첨부가 매번 끊긴다. 5분이면 약 1Mbps 회선까지 버틴다.
+ */
+export const UPLOAD_TIMEOUT_MS = 5 * 60_000
 const SESSION_EXPIRED_STATUS = 401
 const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
 const CONTENT_TYPE_HEADER = "Content-Type"
@@ -29,12 +34,29 @@ const buildRequestUrl = (url: string): string =>
   url.startsWith("http") ? url : `${API_BASE_URL}${url}`
 
 /**
+ * `customFetch` 가 받는 요청 설정. orval 이 `Parameters<typeof customFetch>[1]` 로 생성 훅의
+ * `request` 옵션 타입을 만들므로, 여기 더한 항목은 생성 훅에서도 그대로 넘길 수 있다.
+ */
+export type CustomFetchOptions = RequestInit & {
+  /**
+   * 사람이 조작하지 않아도 나가는 요청(폴링). 유휴 타이머의 활동으로 세지 않는다.
+   * 세면 화면을 열어 둔 것만으로 자동 로그아웃(POL-001, POL-A01)이 영영 오지 않는다.
+   */
+  background?: boolean
+  /** 기본 제한 시간(30초) 대신 쓸 값. 큰 첨부 업로드에 `UPLOAD_TIMEOUT_MS` 를 넘긴다 */
+  timeoutMs?: number
+}
+
+/**
  * orval 생성 훅이 넘기는 취소 신호와 자체 타임아웃을 함께 건다.
  * 둘 중 하나라도 중단되면 요청이 끊기므로, 호출자가 신호를 넘겨도
- * REQUEST_TIMEOUT_MS 상한이 유지된다.
+ * 제한 시간 상한이 유지된다.
  */
-const buildAbortSignal = (signal: RequestInit["signal"]): AbortSignal => {
-  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+const buildAbortSignal = (
+  signal: RequestInit["signal"],
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): AbortSignal => {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
   if (!signal) return timeoutSignal
   return AbortSignal.any([signal, timeoutSignal])
 }
@@ -84,7 +106,7 @@ const readEnvelope = async <TData>(
  */
 export const customFetch = async <TData>(
   url: string,
-  options: RequestInit = {},
+  { background = false, timeoutMs, ...options }: CustomFetchOptions = {},
 ): Promise<TData> => {
   const method = (options.method ?? "GET").toUpperCase()
 
@@ -95,7 +117,7 @@ export const customFetch = async <TData>(
       method,
       credentials: "include", // POL-001: 서버 세션 쿠키
       headers: buildHeaders(method, options),
-      signal: buildAbortSignal(options.signal),
+      signal: buildAbortSignal(options.signal, timeoutMs),
     })
   } catch (cause) {
     throw new ApiError({
@@ -106,7 +128,7 @@ export const customFetch = async <TData>(
     })
   }
 
-  emitApiActivity()
+  if (!background) emitApiActivity()
 
   const envelope = await readEnvelope<TData>(response)
 
@@ -144,9 +166,9 @@ export const customFetch = async <TData>(
 
 /** 재시도해도 같은 거래로 취급되도록 멱등키를 고정한다 (REQ-CMN-014). */
 export const withIdempotencyKey = (
-  options: RequestInit = {},
+  options: CustomFetchOptions = {},
   key: string = crypto.randomUUID(),
-): RequestInit => {
+): CustomFetchOptions => {
   const headers = new Headers(options.headers)
   headers.set(IDEMPOTENCY_KEY_HEADER, key)
 

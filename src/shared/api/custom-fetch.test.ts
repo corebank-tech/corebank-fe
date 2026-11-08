@@ -11,7 +11,7 @@ import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
 import { customFetch, withIdempotencyKey } from "@/shared/api/custom-fetch"
 import { isApiError } from "@/shared/api/api-error"
-import { onSessionExpired } from "@/shared/api/session-events"
+import { onApiActivity, onSessionExpired } from "@/shared/api/session-events"
 
 beforeAll(() => {
   vi.stubEnv("VITE_API_BASE_URL", "")
@@ -273,5 +273,54 @@ describe("요청 취소 신호", () => {
     await expect(
       customFetch("/api/ping", { signal: controller.signal }),
     ).rejects.toSatisfy((error: unknown) => isApiError(error))
+  })
+})
+
+describe("유휴 타이머 활동 (POL-001, POL-A01)", () => {
+  it("요청이 끝나면 활동으로 센다", async () => {
+    server.use(
+      http.get("*/api/ping", () =>
+        HttpResponse.json({ code: "0000", message: "ok", data: null }),
+      ),
+    )
+    const listener = vi.fn()
+    const unsubscribe = onApiActivity(listener)
+    await customFetch("/api/ping")
+    unsubscribe()
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it("폴링처럼 background 로 보낸 요청은 활동으로 세지 않는다", async () => {
+    server.use(
+      http.get("*/api/ping", () =>
+        HttpResponse.json({ code: "0000", message: "ok", data: null }),
+      ),
+    )
+    const listener = vi.fn()
+    const unsubscribe = onApiActivity(listener)
+    await customFetch("/api/ping", { background: true })
+    unsubscribe()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it("background 와 timeoutMs 는 fetch 로 넘기지 않는다", async () => {
+    server.use(
+      http.get("*/api/ping", () =>
+        HttpResponse.json({ code: "0000", message: "ok", data: null }),
+      ),
+    )
+    let sentInit: RequestInit | undefined
+    const originalFetch = globalThis.fetch
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      sentInit = init
+      return originalFetch(input, init)
+    })
+
+    await customFetch("/api/ping", { background: true, timeoutMs: 60_000 })
+
+    expect(sentInit).toBeDefined()
+    expect(sentInit).not.toHaveProperty("background")
+    expect(sentInit).not.toHaveProperty("timeoutMs")
+    vi.restoreAllMocks()
   })
 })

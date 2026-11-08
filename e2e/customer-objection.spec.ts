@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test"
 
 /**
  * H-01~H-03 고객 지급정지 이의제기(계획 PA-21). 서버 역할은 MSW 목이 한다
- * (`src/mocks/handlers/payment-stop-customer-api.ts`). 홍길동에게 사건 3건(신청 전,
- * 보완 요청, 심사 중)이 있다.
+ * (`src/mocks/handlers/payment-stop-customer-api.ts`). 홍길동에게 사건 5건(신청 전,
+ * 보완 요청, 심사 중, 수용 확정, 불수용 확정)이 있다.
  *
  * 메뉴 진입 → 신청서 작성 → 서류 첨부 → 확인 → 접수 완료 → 목록 상태 갱신, 그리고 보완
  * 요청 사건의 보완 제출을 본다. 형식 검사, 파일 거부, 재시도 같은 분기는 화면 테스트가
@@ -31,7 +31,11 @@ test("지급정지 사건에 이의제기를 신청하고 접수 번호를 받�
 }) => {
   await login(page)
   await page.goto("/support/payment-stops")
-  await expect(page.getByText("[총 3건]")).toBeVisible()
+  await expect(page.getByText("[총 5건]")).toBeVisible()
+  // 확정된 사건은 결과를 나눠 보인다. 불수용을 완료로 묶지 않는다
+  await expect(
+    page.getByRole("region", { name: "지급정지 계좌 352-0412-****-88" }),
+  ).toContainText("이의제기 불수용")
 
   await page.getByRole("link", { name: "110-632-***336 이의제기 신청" }).click()
 

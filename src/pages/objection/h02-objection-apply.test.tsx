@@ -1,17 +1,23 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { http, HttpResponse } from "msw"
 import { server } from "@/mocks/server"
 import { H02ObjectionApply } from "@/pages/objection/h02-objection-apply"
-import type { MyPaymentStopResponse } from "@/shared/api/generated"
+import type { MyCaseResponse } from "@/shared/api/generated"
 
 const PNG_HEAD = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const PDF_HEAD = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]
 const MB = 1024 * 1024
 
-const OPEN_CASE: MyPaymentStopResponse = {
+const OPEN_CASE: MyCaseResponse = {
   caseId: 101,
   accountNumberMasked: "110-632-***336",
   disputedTotal: 1_200_000,
@@ -19,8 +25,9 @@ const OPEN_CASE: MyPaymentStopResponse = {
   missingDocuments: [],
 }
 
-type Captured = { body: string; idempotencyKey: string | null }
+type Captured = { url: string; body: string; idempotencyKey: string | null }
 let submits: Captured[] = []
+let caseListCalls = 0
 
 const makeFile = (name: string, head: number[], size?: number) => {
   const file = new File([new Uint8Array([...head, 1, 2, 3])], name)
@@ -28,11 +35,12 @@ const makeFile = (name: string, head: number[], size?: number) => {
   return file
 }
 
-const useCases = (cases: MyPaymentStopResponse[]) =>
+const useCases = (cases: MyCaseResponse[]) =>
   server.use(
-    http.get("*/payment-stops/my", () =>
-      HttpResponse.json({ code: "0000", message: "성공", data: cases }),
-    ),
+    http.get("*/payment-stops/my", () => {
+      caseListCalls += 1
+      return HttpResponse.json({ code: "0000", message: "성공", data: cases })
+    }),
   )
 
 /** 응답을 차례로 돌려준다. 마지막 응답은 그 뒤에도 계속 쓴다 */
@@ -43,6 +51,7 @@ const useSubmitReplies = (...replies: (() => Response)[]) => {
       // jsdom 의 FormData 는 Node fetch 가 그대로 직렬화하지 못해 파일 내용은 비어서 온다.
       // 칸 이름과 개수, 값만 본문 문자열로 확인한다.
       submits.push({
+        url: request.url,
         body: await request.text(),
         idempotencyKey: request.headers.get("Idempotency-Key"),
       })
@@ -118,6 +127,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
 afterEach(() => {
   server.resetHandlers()
   submits = []
+  caseListCalls = 0
 })
 afterAll(() => server.close())
 
@@ -156,7 +166,7 @@ describe("H02ObjectionApply", () => {
     expect(screen.queryByText("신청 내용 확인")).toBeNull()
   })
 
-  it("매직 바이트가 형식과 다른 파일은 목록에 넣지 않는다", async () => {
+  it("형식은 확장자가 아니라 파일 앞 바이트로 판정한다", async () => {
     useCases([OPEN_CASE])
     renderApply()
     await fillFormStep()
@@ -164,16 +174,53 @@ describe("H02ObjectionApply", () => {
     pick("증빙 서류", [
       makeFile("renamed.pdf", [0x50, 0x4b, 0x03, 0x04]),
       makeFile("ok.pdf", PDF_HEAD),
+      // 서버는 확장자를 보지 않는다. 확장자 없는 PDF, 이름이 .jpg 인 PNG 도 받는다
+      makeFile("scan", PDF_HEAD),
+      makeFile("capture.jpg", PNG_HEAD),
     ])
 
     expect(
       await screen.findByText(
-        "renamed.pdf: 파일 내용이 PDF, PNG, JPG 형식이 아닙니다. 확장자만 바꾼 파일은 올릴 수 없습니다.",
+        "renamed.pdf: PDF, PNG, JPG 파일만 올릴 수 있습니다. 파일 이름이 아니라 내용으로 형식을 봅니다.",
       ),
     ).toBeInTheDocument()
     const list = screen.getByRole("list", { name: "증빙 서류 첨부 목록" })
-    expect(within(list).getAllByRole("listitem")).toHaveLength(1)
-    expect(within(list).getByText("ok.pdf")).toBeInTheDocument()
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining("ok.pdf"),
+      expect.stringContaining("scan"),
+      expect.stringContaining("capture.jpg"),
+    ])
+  })
+
+  it("두 칸을 함께 골라도 합계는 두 칸의 최신 파일로 센다", async () => {
+    useCases([OPEN_CASE])
+    renderApply()
+    await fillFormStep()
+
+    // 검사가 끝나기를 기다리지 않고 두 칸을 잇달아 고른다. 9MB + 8MB x 3 = 33MB
+    pick("신분증 사본", [makeFile("id.png", PNG_HEAD, 9 * MB)])
+    pick("증빙 서류", [
+      makeFile("e1.pdf", PDF_HEAD, 8 * MB),
+      makeFile("e2.pdf", PDF_HEAD, 8 * MB),
+      makeFile("e3.pdf", PDF_HEAD, 8 * MB),
+    ])
+
+    expect(
+      await screen.findByText(/e3\.pdf: 첨부 파일 합계는 30MB까지입니다/),
+    ).toBeInTheDocument()
+    expect(
+      within(
+        screen.getByRole("list", { name: "증빙 서류 첨부 목록" }),
+      ).getAllByRole("listitem"),
+    ).toHaveLength(2)
+    expect(
+      screen.getByRole("list", { name: "신분증 사본 첨부 목록" }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "다음" })).toBeEnabled()
   })
 
   it("10MB 를 넘는 파일과 9개를 넘는 증빙은 받지 않는다", async () => {
@@ -230,10 +277,14 @@ describe("H02ObjectionApply", () => {
     expect(heading).toHaveFocus()
     expect(screen.getByText("7")).toBeInTheDocument()
     expect(screen.getByText(/5영업일 안에 심사 결과/)).toBeInTheDocument()
+    // 서버는 문자를 보내지 않는다(통지는 기록만). 보내 준다고 약속하지 않는다
+    expect(screen.queryByText(/문자/)).toBeNull()
 
     expect(submits).toHaveLength(1)
-    const [{ body, idempotencyKey }] = submits
+    const [{ url, body, idempotencyKey }] = submits
     expect(idempotencyKey).toBeTruthy()
+    // 소명 원문이 주소(쿼리 문자열)에 실리지 않는다
+    expect(new URL(url).search).toBe("")
     expect(fieldValue(body, "clause")).toBe("2")
     expect(fieldValue(body, "statement")).toBe("노트북 판매 대금입니다.")
     expect(fieldValue(body, "simplifiedRequested")).toBe("true")
@@ -309,6 +360,34 @@ describe("H02ObjectionApply", () => {
     expect(
       screen.getByRole("button", { name: "invoice.pdf 삭제" }),
     ).toBeInTheDocument()
+  })
+
+  it("다시 내도 같은 결과인 거부(PST0304)면 다시 제출 대신 목록으로 안내하고 목록을 다시 받는다", async () => {
+    useCases([OPEN_CASE])
+    useSubmitReplies(() =>
+      HttpResponse.json(
+        { code: "PST0304", message: "이미 이의제기가 접수된 사건입니다." },
+        { status: 409 },
+      ),
+    )
+    renderApply()
+    await fillFormStep()
+    await attachAndConfirm()
+    const callsBefore = caseListCalls
+    fireEvent.click(screen.getByRole("button", { name: "제출" }))
+
+    expect(
+      await screen.findByText("이미 이의제기가 접수된 사건입니다."),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/이 사건은 다시 제출해도 접수되지 않습니다/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "지급정지 이의제기 목록" }),
+    ).toHaveAttribute("href", "/support/payment-stops")
+    expect(screen.queryByRole("button", { name: "다시 제출" })).toBeNull()
+    expect(screen.getByRole("button", { name: "제출" })).toBeDisabled()
+    await waitFor(() => expect(caseListCalls).toBeGreaterThan(callsBefore))
   })
 
   it("이미 신청한 사건이면 신청서를 열지 않는다", async () => {

@@ -1,6 +1,8 @@
 import { Link } from "react-router"
 import {
+  MY_CASE_STATUS_LABEL,
   SUPPLEMENT_REQUESTED,
+  labelOf,
   type MyPaymentStop,
 } from "@/entities/payment-stop"
 import {
@@ -18,11 +20,31 @@ import { Spinner } from "@/shared/ui/spinner"
 
 /** 이의제기 고객 화면 세 개가 함께 쓰는 사건 표시 조각. */
 
+/**
+ * 확정된 결과는 결과마다 색을 나눈다. 불수용을 성공색으로 보이면 고객이 해제된 줄 안다.
+ * 결과를 모르는 확정은 중립으로 둔다.
+ */
+const DECISION_VARIANT: Record<string, BadgeVariant> = {
+  ACCEPTED: "success",
+  PARTIAL: "warning",
+  REJECTED: "danger",
+}
+
 const statusVariantOf = (item: MyPaymentStop): BadgeVariant => {
   if (item.objectionStatus == null) return "neutral"
   if (item.objectionStatus === SUPPLEMENT_REQUESTED) return "warning"
-  if (item.objectionStatus === "DECIDED") return "success"
+  if (item.objectionStatus === "DECIDED") {
+    return DECISION_VARIANT[item.decisionResult ?? ""] ?? "neutral"
+  }
   return "primary"
+}
+
+/** 확정된 결과가 계좌에 무엇을 뜻하는지. */
+const DECISION_GUIDE: Record<string, string> = {
+  ACCEPTED: "이의제기가 받아들여졌습니다.",
+  PARTIAL:
+    "이의제기가 일부만 받아들여졌습니다. 다툼 금액 중 일부는 지급정지가 이어집니다.",
+  REJECTED: "이의제기가 받아들여지지 않았습니다. 지급정지가 이어집니다.",
 }
 
 export const StatusBadge = ({ item }: { item: MyPaymentStop }) => (
@@ -53,6 +75,32 @@ export const CaseInfoRows = ({ item }: { item: MyPaymentStop }) => (
     </FormRow>
   </div>
 )
+
+/** 확정된 심사결과와 지금 지급정지 상태. 확정 전이면 그리지 않는다. */
+export const DecisionResultRows = ({ item }: { item: MyPaymentStop }) => {
+  if (item.decisionResult == null) return null
+  return (
+    <div>
+      <FormRow label="심사 결과" className="border-t-0">
+        <span className="text-base font-bold text-ink">
+          {statusTextOf(item)}
+        </span>
+        {DECISION_GUIDE[item.decisionResult] && (
+          <span className="text-2xs text-ink-muted">
+            {DECISION_GUIDE[item.decisionResult]}
+          </span>
+        )}
+      </FormRow>
+      {item.caseStatus !== "" && (
+        <FormRow label="지급정지 상태" className="border-t-0">
+          <span className="text-base text-ink">
+            {labelOf(MY_CASE_STATUS_LABEL, item.caseStatus)}
+          </span>
+        </FormRow>
+      )}
+    </div>
+  )
+}
 
 /** 보완 요청 내용. 보완 요청 상태일 때만 그린다. */
 export const SupplementRequestNotice = ({ item }: { item: MyPaymentStop }) => {

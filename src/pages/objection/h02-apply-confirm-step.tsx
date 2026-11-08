@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Link } from "react-router"
 import {
   formatClause,
   summarizeFiles,
@@ -12,6 +13,10 @@ import { FormRow } from "@/shared/ui/form-row"
 import { FormSection } from "@/shared/ui/form-section"
 import { Spinner } from "@/shared/ui/spinner"
 import type { ApplyFiles, ApplyForm } from "@/pages/objection/h02-apply-draft"
+import {
+  MY_PAYMENT_STOPS_PATH,
+  type SubmitFailure,
+} from "@/pages/objection/objection-shared"
 
 type Props = {
   item: MyPaymentStop
@@ -22,7 +27,7 @@ type Props = {
   onAgreeChange: (checked: boolean) => void
   agreeRef: React.Ref<HTMLInputElement>
   isSubmitting: boolean
-  submitError: string | null
+  submitError: SubmitFailure | null
 }
 
 const Value = ({ children }: { children: React.ReactNode }) => (
@@ -127,11 +132,24 @@ export const ApplyConfirmStep = ({
       </div>
       {submitError && (
         <Alert variant="danger" title="제출하지 못했습니다" className="mt-2">
-          <p>{submitError}</p>
-          <p className="mt-1">
-            입력한 내용과 첨부 파일은 그대로 있습니다. 아래 다시 제출을
-            누르세요. 파일 문제라면 이전 단계에서 파일을 바꾼 뒤 제출하세요.
-          </p>
+          {submitError.message && <p>{submitError.message}</p>}
+          {submitError.final ? (
+            <p className="mt-1">
+              이 사건은 다시 제출해도 접수되지 않습니다.{" "}
+              <Link
+                to={MY_PAYMENT_STOPS_PATH}
+                className="font-bold text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                지급정지 이의제기 목록
+              </Link>
+              에서 사건의 진행 상황을 확인하세요.
+            </p>
+          ) : (
+            <p className="mt-1">
+              입력한 내용과 첨부 파일은 그대로 있습니다. 아래 다시 제출을
+              누르세요. 파일 문제라면 이전 단계에서 파일을 바꾼 뒤 제출하세요.
+            </p>
+          )}
         </Alert>
       )}
     </>

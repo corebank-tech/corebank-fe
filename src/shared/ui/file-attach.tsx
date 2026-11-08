@@ -9,7 +9,10 @@ type FileAttachProps = {
   /** 칸 이름. 파일 선택 입력의 접근 가능한 이름이 `"{label} 파일 선택"` 이 된다 */
   label: string
   files: readonly File[]
-  /** 고른 파일. 검사와 목록 합치기는 호출자가 한다 */
+  /**
+   * 고른 파일. 검사와 목록 합치기는 호출자가 한다. 검사 중에 또 골라도 넘기므로
+   * 호출자는 검사가 겹쳐도 최신 목록에 합쳐야 한다
+   */
   onSelect: (files: File[]) => void
   onRemove: (index: number) => void
   multiple?: boolean
@@ -56,7 +59,8 @@ export const FileAttach = ({
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? [])
     event.target.value = ""
-    if (picked.length > 0 && !busy) onSelect(picked)
+    // 검사 중이라고 버리지 않는다. 버리면 고른 파일이 안내 없이 사라진다
+    if (picked.length > 0) onSelect(picked)
   }
 
   const handleRemove = (index: number) => {

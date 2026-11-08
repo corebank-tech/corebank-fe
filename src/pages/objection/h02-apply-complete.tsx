@@ -28,18 +28,16 @@ export const ApplyComplete = ({ objectionId }: { objectionId: number }) => {
       <div className="mt-6 w-full max-w-160 border border-border bg-surface px-6 py-4 text-left">
         <h3 className="text-base font-bold text-ink">다음 절차</h3>
         <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-base leading-relaxed text-ink">
-          <li>등록된 휴대전화로 접수 문자를 보내 드립니다.</li>
           <li>
             담당자가 신청서와 서류가 모두 갖춰졌는지 확인합니다. 빠진 서류가
-            있으면 보완을 요청하고 문자로 알려 드립니다.
+            있으면 보완을 요청합니다.
           </li>
           <li>
-            소명 자료가 모두 갖춰진 날부터 5영업일 안에 심사 결과를 알려
-            드립니다.
+            소명 자료가 모두 갖춰진 날부터 5영업일 안에 심사 결과가 나옵니다.
           </li>
           <li>
-            진행 상황과 보완 요청은 지급정지 이의제기 화면에서 확인할 수
-            있습니다.
+            진행 상황, 보완 요청, 심사 결과는 지급정지 이의제기 화면에서
+            확인하세요.
           </li>
         </ol>
       </div>

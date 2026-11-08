@@ -2,15 +2,18 @@ import * as React from "react"
 import { Link, useParams } from "react-router"
 import {
   MAX_EVIDENCE_COUNT,
+  MAX_FILE_COUNT,
+  MAX_TOTAL_BYTES,
   OBJECTION_FILE_ACCEPT,
   SUPPLEMENT_REQUESTED,
+  inspectObjectionFiles,
+  mergeObjectionFiles,
   mySupplementFingerprint,
-  selectObjectionFiles,
   summarizeFiles,
   useSubmitMyObjectionSupplement,
+  type FileSelection,
   type MyPaymentStop,
 } from "@/entities/payment-stop"
-import { toErrorMessage } from "@/shared/api/api-error"
 import { formatFileSize } from "@/shared/lib/file-size"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { Alert } from "@/shared/ui/alert"
@@ -31,7 +34,9 @@ import {
 import {
   MY_PAYMENT_STOPS_PATH,
   statusTextOf,
+  toSubmitFailure,
   useMyCase,
+  type SubmitFailure,
 } from "@/pages/objection/objection-shared"
 
 /**
@@ -40,11 +45,16 @@ import {
  * 담당자가 보완을 요청한 이의제기에만 낼 수 있다. 다른 상태에서도 화면은 열되 입력을
  * 막고 이유를 보인다 — 목록의 링크가 아니라 주소로 들어와도 무엇을 기다리는지 알 수 있게.
  * 서버도 같은 조건으로 거부한다(`PST0308`).
+ *
+ * 첨부 한도(10개, 30MB)는 신청 때 낸 신분증 사본과 증빙까지 합쳐 센다. 서버가 이미 낸
+ * 서류의 개수와 크기를 목록에 주지 않아 화면은 이번 제출분만 미리 보고, 누적 한도
+ * 초과(`PST0007`)는 거부를 받은 뒤 안내한다.
  */
 
 const MAX_NOTE_LENGTH = 1000
 const EVIDENCE_INPUT_ID = "supplement-evidence"
 const EVIDENCE_REQUIRED = "보완 서류를 하나 이상 첨부하세요."
+const LIMIT_TEXT = `이의제기 하나에 올리는 서류는 신청 때 낸 신분증 사본과 증빙까지 모두 합쳐 ${MAX_FILE_COUNT}개, ${formatFileSize(MAX_TOTAL_BYTES)}까지입니다.`
 
 const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
   const submit = useSubmitMyObjectionSupplement()
@@ -52,11 +62,20 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
   const enabled =
     item.objectionStatus === SUPPLEMENT_REQUESTED && item.objectionId != null
 
-  const [evidence, setEvidence] = React.useState<File[]>([])
-  const [errors, setErrors] = React.useState<string[]>([])
-  const [checking, setChecking] = React.useState(false)
+  // 목록과 거부 안내를 한 상태로 둔다. 검사가 겹칠 때 한 갱신 함수 안에서 함께 바꾼다
+  const [selection, setSelection] = React.useState<FileSelection>({
+    files: [],
+    errors: [],
+  })
+  const { files: evidence, errors } = selection
+  const setErrors = (next: string[]) =>
+    setSelection((prev) => ({ ...prev, errors: next }))
+  // 진행 중인 검사 수. 검사 중에 또 고르면 그 검사도 끝나야 풀린다
+  const [checking, setChecking] = React.useState(0)
   const [note, setNote] = React.useState("")
-  const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [submitError, setSubmitError] = React.useState<SubmitFailure | null>(
+    null,
+  )
   const [submittedCount, setSubmittedCount] = React.useState<number | null>(
     null,
   )
@@ -66,16 +85,18 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
     if (submittedCount != null) resultRef.current?.focus()
   }, [submittedCount])
 
+  // 검사가 겹쳐도 서로의 결과를 덮지 않게 최신 목록에 붙인다
   const handleSelect = async (picked: File[]) => {
-    setChecking(true)
-    const result = await selectObjectionFiles({
-      current: evidence,
-      incoming: picked,
-      maxCount: MAX_EVIDENCE_COUNT,
-    })
-    setChecking(false)
-    setEvidence(result.files)
-    setErrors(result.errors)
+    setChecking((count) => count + 1)
+    const inspected = await inspectObjectionFiles(picked)
+    setSelection((prev) =>
+      mergeObjectionFiles({
+        current: prev.files,
+        inspected,
+        maxCount: MAX_EVIDENCE_COUNT,
+      }),
+    )
+    setChecking((count) => count - 1)
   }
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -101,7 +122,7 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
           idempotency.reset()
           setSubmittedCount(documents.length)
         },
-        onError: (error) => setSubmitError(toErrorMessage(error)),
+        onError: (error) => setSubmitError(toSubmitFailure(error)),
       },
     )
   }
@@ -116,8 +137,8 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
         <Alert variant="success" title="보완 서류를 제출했습니다">
           <p>
             서류 {submittedCount}개를 받았습니다. 담당자가 다시 확인한 뒤 소명
-            자료가 모두 갖춰지면 그날부터 5영업일 안에 심사 결과를 알려
-            드립니다.
+            자료가 모두 갖춰지면 그날부터 5영업일 안에 심사 결과가 나옵니다.
+            결과는 지급정지 이의제기 화면에서 확인하세요.
           </p>
         </Alert>
         <div className="flex justify-center">
@@ -156,13 +177,15 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
               required
               disabled={!enabled || isSubmitting}
               files={evidence}
-              busy={checking}
+              busy={checking > 0}
               errors={errors}
-              hint={`요청받은 서류를 ${MAX_EVIDENCE_COUNT}개까지 올립니다. PDF, PNG, JPG 파일만, 파일 하나 10MB, 모두 합쳐 30MB까지입니다.`}
+              hint={`요청받은 서류를 한 번에 ${MAX_EVIDENCE_COUNT}개까지 올립니다. PDF, PNG, JPG 파일만, 파일 하나 10MB까지입니다. ${LIMIT_TEXT}`}
               onSelect={(picked) => void handleSelect(picked)}
               onRemove={(index) => {
-                setEvidence((prev) => prev.filter((_, i) => i !== index))
-                setErrors([])
+                setSelection((prev) => ({
+                  files: prev.files.filter((_, i) => i !== index),
+                  errors: [],
+                }))
               }}
             />
           </FormRow>
@@ -201,10 +224,22 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
       </div>
       {submitError && (
         <Alert variant="danger" title="제출하지 못했습니다">
-          <p>{submitError}</p>
-          <p className="mt-1">
-            첨부한 파일과 전할 말은 그대로 있습니다. 다시 제출을 누르세요.
-          </p>
+          {submitError.message && <p>{submitError.message}</p>}
+          {submitError.final ? (
+            <p className="mt-1">
+              이 이의제기는 지금 보완 서류를 받지 않습니다. 목록에서 진행 상황을
+              확인하세요.
+            </p>
+          ) : submitError.code === "PST0007" ? (
+            <p className="mt-1">
+              {LIMIT_TEXT} 파일 수를 줄이거나 더 작은 파일로 바꾼 뒤 다시
+              제출하세요.
+            </p>
+          ) : (
+            <p className="mt-1">
+              첨부한 파일과 전할 말은 그대로 있습니다. 다시 제출을 누르세요.
+            </p>
+          )}
         </Alert>
       )}
 
@@ -219,11 +254,13 @@ const SupplementForm = ({ item }: { item: MyPaymentStop }) => {
           type="submit"
           size="lg"
           className="min-w-40"
-          disabled={!enabled || isSubmitting || checking}
+          disabled={
+            !enabled || isSubmitting || checking > 0 || submitError?.final
+          }
         >
           {isSubmitting
             ? "제출 중"
-            : submitError
+            : submitError && !submitError.final
               ? "다시 제출"
               : "보완 서류 제출"}
         </Button>

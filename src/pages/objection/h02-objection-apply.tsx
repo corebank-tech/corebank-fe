@@ -2,13 +2,16 @@ import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import {
   MAX_EVIDENCE_COUNT,
+  MAX_FILE_COUNT,
+  MAX_TOTAL_BYTES,
+  inspectObjectionFiles,
+  mergeObjectionFiles,
   myObjectionFingerprint,
-  selectObjectionFiles,
   useSubmitMyObjection,
   type MyObjectionDraft,
   type MyPaymentStop,
 } from "@/entities/payment-stop"
-import { toErrorMessage } from "@/shared/api/api-error"
+import { formatFileSize } from "@/shared/lib/file-size"
 import { getToday } from "@/shared/config/clock"
 import { formatDate } from "@/shared/lib/format"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
@@ -23,7 +26,9 @@ import {
 import {
   MY_PAYMENT_STOPS_PATH,
   isDeadlinePassed,
+  toSubmitFailure,
   useMyCase,
+  type SubmitFailure,
 } from "@/pages/objection/objection-shared"
 import {
   APPLY_STEPS,
@@ -63,11 +68,13 @@ const NOTICE: Record<number, string[]> = {
     "소명 내용에는 돈을 받은 경위, 상대방과의 관계, 거래 내용을 구체적으로 적으세요.",
   ],
   2: [
-    "신분증 사본은 꼭 첨부해야 합니다. 증빙 서류는 9개까지 올릴 수 있습니다.",
-    "PDF, PNG, JPG 파일만, 파일 하나 10MB, 모두 합쳐 30MB까지 올릴 수 있습니다.",
+    "신분증 사본은 꼭 첨부해야 합니다. PDF, PNG, JPG 파일만, 파일 하나 10MB까지 올릴 수 있습니다.",
+    `이의제기 하나에 올리는 서류는 신분증 사본과 나중에 낼 보완 서류까지 모두 합쳐 ${MAX_FILE_COUNT}개, ${formatFileSize(MAX_TOTAL_BYTES)}까지입니다. 보완을 요청받을 때를 위해 꼭 필요한 서류만 올리세요.`,
   ],
   3: ["제출한 뒤에는 신청 내용을 고칠 수 없습니다. 내용을 다시 확인하세요."],
 }
+
+type FileSlot = "idCopy" | "evidence"
 
 type ApplyFlowProps = {
   item: MyPaymentStop
@@ -83,12 +90,17 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
   const [form, setForm] = React.useState<ApplyForm>(EMPTY_APPLY_FORM)
   const [formErrors, setFormErrors] = React.useState<ApplyFormErrors>({})
   const [files, setFiles] = React.useState<ApplyFiles>(EMPTY_APPLY_FILES)
-  const [checking, setChecking] = React.useState<"idCopy" | "evidence" | null>(
-    null,
-  )
+  // 칸마다 진행 중인 검사 수. 두 칸을 함께 고르거나 같은 칸에서 거듭 골라도 마지막
+  // 검사가 끝나야 풀린다
+  const [checking, setChecking] = React.useState<Record<FileSlot, number>>({
+    idCopy: 0,
+    evidence: 0,
+  })
   const [agreed, setAgreed] = React.useState(false)
   const [agreeError, setAgreeError] = React.useState<string | null>(null)
-  const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [submitError, setSubmitError] = React.useState<SubmitFailure | null>(
+    null,
+  )
 
   const formStepRef = React.useRef<ApplyFormStepHandle>(null)
   const agreeRef = React.useRef<HTMLInputElement>(null)
@@ -110,38 +122,47 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
     setFormErrors((prev) => ({ ...prev, [key]: undefined }))
   }
 
+  const trackChecking = (slot: FileSlot, delta: number) =>
+    setChecking((prev) => ({ ...prev, [slot]: prev[slot] + delta }))
+
+  // 합계와 개수는 상태 갱신 함수 안에서 최신 목록으로 센다. 검사 시작 때 목록으로 세면
+  // 두 칸의 검사가 겹칠 때 서로의 새 파일을 빼고 세어 30MB 를 넘는 조합이 통과한다.
   const handleSelectIdCopy = async (picked: File[]) => {
-    setChecking("idCopy")
-    const result = await selectObjectionFiles({
-      current: [],
-      incoming: picked.slice(0, 1),
-      maxCount: 1,
-      otherFiles: files.evidence,
+    trackChecking("idCopy", 1)
+    const inspected = await inspectObjectionFiles(picked.slice(0, 1))
+    setFiles((prev) => {
+      const result = mergeObjectionFiles({
+        current: [],
+        inspected,
+        maxCount: 1,
+        otherFiles: prev.evidence,
+      })
+      return {
+        ...prev,
+        // 통과하지 못하면 이전에 고른 신분증 사본을 그대로 둔다
+        idCopy: result.files.length > 0 ? result.files : prev.idCopy,
+        idCopyErrors: result.errors,
+      }
     })
-    setChecking(null)
-    setFiles((prev) => ({
-      ...prev,
-      // 통과하지 못하면 이전에 고른 신분증 사본을 그대로 둔다
-      idCopy: result.files.length > 0 ? result.files : prev.idCopy,
-      idCopyErrors: result.errors,
-    }))
+    trackChecking("idCopy", -1)
   }
 
   const handleSelectEvidence = async (picked: File[]) => {
-    setChecking("evidence")
-    const result = await selectObjectionFiles({
-      current: files.evidence,
-      incoming: picked,
-      maxCount: MAX_EVIDENCE_COUNT,
-      otherFiles: files.idCopy,
+    trackChecking("evidence", 1)
+    const inspected = await inspectObjectionFiles(picked)
+    setFiles((prev) => {
+      const result = mergeObjectionFiles({
+        current: prev.evidence,
+        inspected,
+        maxCount: MAX_EVIDENCE_COUNT,
+        otherFiles: prev.idCopy,
+      })
+      return { ...prev, evidence: result.files, evidenceErrors: result.errors }
     })
-    setChecking(null)
-    setFiles((prev) => ({
-      ...prev,
-      evidence: result.files,
-      evidenceErrors: result.errors,
-    }))
+    trackChecking("evidence", -1)
   }
+
+  const isChecking = checking.idCopy > 0 || checking.evidence > 0
 
   const handleNextFromForm = () => {
     const errors = validateApplyForm(form)
@@ -191,7 +212,7 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
           idempotency.reset()
           onSubmitted(response.objectionId ?? 0)
         },
-        onError: (error) => setSubmitError(toErrorMessage(error)),
+        onError: (error) => setSubmitError(toSubmitFailure(error)),
       },
     )
   }
@@ -226,7 +247,7 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
         <Button
           size="lg"
           className="min-w-40"
-          disabled={checking != null}
+          disabled={isChecking}
           onClick={handleNextFromAttach}
         >
           다음
@@ -246,10 +267,14 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
         <Button
           size="lg"
           className="min-w-40"
-          disabled={isSubmitting}
+          disabled={isSubmitting || submitError?.final === true}
           onClick={handleSubmit}
         >
-          {isSubmitting ? "제출 중" : submitError ? "다시 제출" : "제출"}
+          {isSubmitting
+            ? "제출 중"
+            : submitError && !submitError.final
+              ? "다시 제출"
+              : "제출"}
         </Button>
       </>
     )
@@ -280,7 +305,10 @@ const ApplyFlow = ({ item, onSubmitted }: ApplyFlowProps) => {
         {step === 2 && (
           <ApplyAttachStep
             files={files}
-            checking={checking}
+            checking={{
+              idCopy: checking.idCopy > 0,
+              evidence: checking.evidence > 0,
+            }}
             onSelectIdCopy={(picked) => void handleSelectIdCopy(picked)}
             onSelectEvidence={(picked) => void handleSelectEvidence(picked)}
             onRemoveIdCopy={() =>

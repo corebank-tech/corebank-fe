@@ -20,6 +20,23 @@ export const MY_OBJECTION_STATUS_LABEL: Record<string, string> = {
 
 export const SUPPLEMENT_REQUESTED = "SUPPLEMENT_REQUESTED"
 
+/**
+ * 확정된 심사결과(계약 §4 `decisionResult`). 확정되면 상태 이름 대신 이 결과를 보인다.
+ * 받아들여지지 않은 결과를 "완료"로만 보이면 고객이 해제된 줄 안다.
+ */
+export const MY_DECISION_RESULT_LABEL: Record<string, string> = {
+  ACCEPTED: "이의제기 수용",
+  PARTIAL: "일부 수용",
+  REJECTED: "이의제기 불수용",
+}
+
+/** 지급정지 사건 상태(계약 §4 `caseStatus`). 판정 뒤 계좌가 지금 어떤지 보인다. */
+export const MY_CASE_STATUS_LABEL: Record<string, string> = {
+  STOPPED: "지급정지 중",
+  PARTIAL: "일부 금액만 지급정지 중",
+  RELEASED: "지급정지 해제",
+}
+
 /** 사유 조항마다 고객이 고를 때 읽는 한 줄 설명. */
 export const CLAUSE_HELP: Record<ObjectionClause, string> = {
   1: "이 계좌를 남에게 빌려주거나 팔지 않았고 사기에 쓰인 계좌가 아닌 경우입니다.",

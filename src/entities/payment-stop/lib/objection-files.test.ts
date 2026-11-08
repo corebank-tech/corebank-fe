@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 import {
   MAX_FILE_BYTES,
   inspectObjectionFile,
+  inspectObjectionFiles,
   kindFromBytes,
+  mergeObjectionFiles,
   selectObjectionFiles,
 } from "@/entities/payment-stop/lib/objection-files"
 
@@ -28,26 +30,25 @@ describe("kindFromBytes", () => {
 })
 
 describe("inspectObjectionFile", () => {
-  it("허용 형식이고 내용이 확장자와 맞으면 통과한다", async () => {
+  it("내용이 PDF, PNG, JPEG 이면 이름과 관계없이 통과한다", async () => {
     expect(await inspectObjectionFile(makeFile("a.PDF", PDF_HEAD))).toBeNull()
     expect(await inspectObjectionFile(makeFile("b.jpeg", JPEG_HEAD))).toBeNull()
-    expect(await inspectObjectionFile(makeFile("c.jpg", JPEG_HEAD))).toBeNull()
+    // 서버(DocumentPolicy)는 확장자를 보지 않는다. 같은 파일을 화면도 받는다
+    expect(await inspectObjectionFile(makeFile("scan", PDF_HEAD))).toBeNull()
+    expect(
+      await inspectObjectionFile(makeFile("capture.jpg", PNG_HEAD)),
+    ).toBeNull()
   })
 
-  it("허용하지 않는 확장자는 바이트를 읽기 전에 거부한다", async () => {
-    expect(await inspectObjectionFile(makeFile("memo.txt", PDF_HEAD))).toMatch(
-      "memo.txt: PDF, PNG, JPG 파일만",
-    )
-  })
-
-  it("이름만 바꾼 파일은 매직 바이트로 거부한다", async () => {
+  it("내용이 허용 형식이 아니면 이름이 맞아도 거부한다", async () => {
     expect(
       await inspectObjectionFile(makeFile("scan.pdf", [0x50, 0x4b, 3, 4])),
-    ).toMatch("확장자만 바꾼 파일")
-    // 확장자와 내용 형식이 서로 다르면 둘 다 허용 형식이어도 거부한다
+    ).toBe(
+      "scan.pdf: PDF, PNG, JPG 파일만 올릴 수 있습니다. 파일 이름이 아니라 내용으로 형식을 봅니다.",
+    )
     expect(
-      await inspectObjectionFile(makeFile("photo.png", JPEG_HEAD)),
-    ).toMatch("확장자만 바꾼 파일")
+      await inspectObjectionFile(makeFile("memo.txt", [0x68, 0x69, 0x0a])),
+    ).toMatch("memo.txt: PDF, PNG, JPG 파일만")
   })
 
   it("10MB 를 넘거나 빈 파일이면 거부한다", async () => {
@@ -96,6 +97,33 @@ describe("selectObjectionFiles", () => {
     expect(result.files.map((file) => file.name)).toEqual(["a.pdf", "b.pdf"])
     expect(result.errors).toEqual([
       "c.pdf: 첨부 파일 합계는 30MB까지입니다. 이 파일을 넣으면 31MB입니다.",
+    ])
+  })
+
+  it("검사가 겹쳐도 최신 목록에 합치면 먼저 들어간 파일까지 세어 합계를 본다", async () => {
+    // 두 칸의 검사를 같은 출발 상태에서 돌리고, 끝난 순서대로 최신 상태에 합친다
+    const [idInspected, evidenceInspected] = await Promise.all([
+      inspectObjectionFiles([makeFile("id.png", PNG_HEAD, 9 * MB)]),
+      inspectObjectionFiles([
+        makeFile("a.pdf", PDF_HEAD, 9 * MB),
+        makeFile("b.pdf", PDF_HEAD, 9 * MB),
+        makeFile("c.pdf", PDF_HEAD, 9 * MB),
+      ]),
+    ])
+    const idCopy = mergeObjectionFiles({
+      current: [],
+      inspected: idInspected,
+      maxCount: 1,
+    }).files
+    const evidence = mergeObjectionFiles({
+      current: [],
+      inspected: evidenceInspected,
+      maxCount: 9,
+      otherFiles: idCopy,
+    })
+    expect(evidence.files.map((file) => file.name)).toEqual(["a.pdf", "b.pdf"])
+    expect(evidence.errors).toEqual([
+      "c.pdf: 첨부 파일 합계는 30MB까지입니다. 이 파일을 넣으면 36MB입니다.",
     ])
   })
 })

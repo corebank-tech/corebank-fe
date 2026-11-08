@@ -12,6 +12,7 @@ import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import {
   CaseInfoRows,
   CasesLoadError,
+  DecisionResultRows,
   LoadingCases,
   StatusBadge,
   SupplementRequestNotice,
@@ -95,6 +96,7 @@ const CaseCard = ({ item, today }: { item: MyPaymentStop; today: string }) => {
           <span className="text-base text-ink">{item.objectionId}</span>
         </FormRow>
       )}
+      <DecisionResultRows item={item} />
       <div className="mt-3 flex flex-col gap-3">
         <SupplementRequestNotice item={item} />
         <div className="flex justify-end">
@@ -139,7 +141,7 @@ export const H01MyPaymentStops = () => {
           "피해구제 신청으로 지급정지된 돈이 정당하게 받은 돈이면 이의제기를 신청할 수 있습니다.",
           "이의제기는 사건마다 한 번 신청합니다. 신청 기한이 지나면 신청할 수 없습니다.",
           "신분증 사본은 꼭 첨부해야 합니다. 증빙 서류는 PDF, PNG, JPG 파일로 올립니다.",
-          "소명 자료가 모두 갖춰진 날부터 5영업일 안에 심사 결과를 알려 드립니다.",
+          "소명 자료가 모두 갖춰진 날부터 5영업일 안에 심사 결과가 나옵니다. 진행 상황과 결과는 이 화면에서 확인하세요.",
         ]}
       />
     </div>

@@ -9,7 +9,8 @@ import type { ApplyFiles } from "@/pages/objection/h02-apply-draft"
 
 type Props = {
   files: ApplyFiles
-  checking: "idCopy" | "evidence" | null
+  /** 칸마다 고른 파일을 검사하는 중인지 */
+  checking: { idCopy: boolean; evidence: boolean }
   onSelectIdCopy: (picked: File[]) => void
   onSelectEvidence: (picked: File[]) => void
   onRemoveIdCopy: () => void
@@ -34,7 +35,7 @@ export const ApplyAttachStep = ({
         label="신분증 사본"
         accept={OBJECTION_FILE_ACCEPT}
         files={files.idCopy}
-        busy={checking === "idCopy"}
+        busy={checking.idCopy}
         errors={files.idCopyErrors}
         required
         hint="주민등록증, 운전면허증, 여권 중 하나를 1개 올립니다. 주민등록번호 뒷자리는 가리고 올리세요. 신분증 사본은 암호화해 보관하고 본인 확인에만 씁니다."
@@ -49,9 +50,9 @@ export const ApplyAttachStep = ({
         accept={OBJECTION_FILE_ACCEPT}
         multiple
         files={files.evidence}
-        busy={checking === "evidence"}
+        busy={checking.evidence}
         errors={files.evidenceErrors}
-        hint={`정당한 거래임을 보여 주는 서류를 ${MAX_EVIDENCE_COUNT}개까지 올립니다. 예: 거래상대방과의 대화 내역, 계약서, 세금계산서, 거래명세서`}
+        hint={`정당한 거래임을 보여 주는 서류를 올립니다. 한 번에 ${MAX_EVIDENCE_COUNT}개까지이고, 신분증 사본과 나중에 낼 보완 서류까지 합쳐 모두 10개, 30MB까지입니다. 예: 거래상대방과의 대화 내역, 계약서, 세금계산서, 거래명세서`}
         onSelect={onSelectEvidence}
         onRemove={onRemoveEvidence}
       />

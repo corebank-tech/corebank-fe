@@ -408,9 +408,11 @@ export const paymentStopReviewApiHandlers = [
         requireMockPermission("PAYMENT_STOP_WRITE") ??
         requireIdempotencyKey(request)
       if (denied) return denied
-      const kind = new URL(request.url).searchParams.get("kind")
+      // 서버는 kind 를 multipart 본문 항목으로 받는다(주소 query 가 아님)
+      const form = await request.formData()
+      const kind = form.get("kind")
       if (kind !== "EVIDENCE" && kind !== "ID_COPY") return missingInput()
-      const files = (await request.formData())
+      const files = form
         .getAll("files")
         .filter((value): value is File => value instanceof File)
       const state = readState()

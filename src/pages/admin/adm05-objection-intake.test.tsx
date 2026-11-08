@@ -151,7 +151,7 @@ describe("Adm05ObjectionIntake", () => {
           // 본문 글자에서 파일 칸 수만 센다.
           const body = await request.text()
           const call = {
-            kind: new URL(request.url).searchParams.get("kind"),
+            kind: body.match(/name="kind"\r?\n\r?\n([A-Z_]+)/)?.[1] ?? null,
             key: request.headers.get("Idempotency-Key"),
             files: [...body.matchAll(/name="files"; filename="([^"]+)"/g)].map(
               (match) => match[1],

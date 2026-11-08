@@ -278,8 +278,7 @@ export const useUploadObjectionDocuments = () => {
       (
         await uploadObjectionDocuments(
           objectionId,
-          { kind },
-          { files },
+          { kind, files },
           {
             ...withIdempotencyKey({}, idempotencyKey),
             timeoutMs: UPLOAD_TIMEOUT_MS,

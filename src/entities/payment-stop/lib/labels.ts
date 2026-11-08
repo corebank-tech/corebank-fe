@@ -38,7 +38,7 @@ export const CLAUSE_LABEL: Record<ObjectionClause, string> = {
 export const CLAUSE_SCOPE: Record<ObjectionClause, string> = {
   1: "수용 시 전부 해제",
   2: "수용 시 전부 해제",
-  3: "수용 시 피해금만 남기고 해제",
+  3: "일부 지급정지 시 피해금만 남기고 해제",
 }
 
 export const formatClause = (clause: number): string => {

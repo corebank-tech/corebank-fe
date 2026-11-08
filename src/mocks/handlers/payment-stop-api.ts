@@ -42,7 +42,8 @@ import { getToday } from "@/shared/config/clock"
  * 화면 흐름(목록 → 상세 → 판정 확정, 대리 접수)을 서버 없이 돌리기 위한 것이다.
  * 해제 요건 점검은 서버처럼 원장으로 계산하지 않는다. 사건마다 결과를 미리 적어 두고,
  * 대리 접수로 새로 만든 사건은 "판단 불가"로 둔다. 판정 허용 조건(사유 조항, 소송 계속)은
- * 서버 `GateResult.allowsRelease` 와 같게 계산한다.
+ * 서버 `GateResult.allowsRelease` 와 같게 계산한다. 점검이 닫았지만 소송 계속, 사유 조항 불일치,
+ * 외부 기관 부정 회신이 아니면 재량 판정(`discretionaryResults`)으로 열린다.
  *
  * 상태는 sessionStorage 에 둔다(새로고침해도 유지, 탭을 닫으면 처음으로).
  *
@@ -58,7 +59,8 @@ import { getToday } from "@/shared/config/clock"
 const MOCK_LATENCY_MS = 200
 // 2차 계약으로 상태 모양이 바뀌어 키를 바꾼다. 옛 탭의 저장 상태를 읽지 않게 한다.
 // 원장 방향 값을 서버와 같은 IN, OUT 으로 바꾸고 접수 경로를 더해 저장 모양이 바뀌었다.
-const STORE_KEY = "payment-stop:objections:v3"
+// 판정에 재량 판정 여부, 재량 사유, 작성 당시 점검 갈래를 더해 다시 바뀌었다.
+const STORE_KEY = "payment-stop:objections:v4"
 const RULES_VERSION = "2026-11-03.1"
 const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
 
@@ -278,6 +280,8 @@ const seed = (): MockState => {
           earlyReleaseBasis: `관계 거래 ${transactionNumber(addDays(d5, -92), 5)} 외 2건`,
           decidedBy: 2,
           decidedAt: at(addDays(today, -1), "17:10:00"),
+          discretionary: false,
+          gateBranchAtWrite: "NORMAL_ACCEPT",
         },
         notices: [receiptNotice(501, received5)],
         documents: [
@@ -601,6 +605,8 @@ const seed = (): MockState => {
           decidedAt: at(addDays(today, -6), "15:30:00"),
           approvedBy: 14,
           approvedAt: at(addDays(today, -5), "10:05:00"),
+          discretionary: false,
+          gateBranchAtWrite: "NORMAL_ACCEPT",
         },
         reviewDeadline: addBusinessDays(addDays(today, -8), 5),
         notices: [
@@ -695,6 +701,31 @@ export const allowedResults = (objection: MockObjection) => {
   }
 }
 
+/**
+ * 점검은 닫혔지만 담당자 재량 판정으로 쓸 수 있는 판정(`gate.discretionaryResults`). 소송 계속,
+ * 사유 조항 불일치(수용은 제1호와 제2호, 일부 지급정지는 제3호), 외부 기관 부정 회신은 재량으로도
+ * 넘지 못한다. 불수용은 점검이 늘 열어 언제나 `false` 다.
+ */
+export const discretionaryResults = (objection: MockObjection) => {
+  const allowed = allowedResults(objection)
+  const overridable =
+    !objection.litigationPending && !hasNegativeReply(objection)
+  return {
+    ACCEPTED:
+      !allowed.ACCEPTED &&
+      overridable &&
+      (objection.clause === 1 || objection.clause === 2),
+    PARTIAL: !allowed.PARTIAL && overridable && objection.clause === 3,
+    REJECTED: false,
+  }
+}
+
+/** 재량 판정 사유 길이(서버 `DecisionRequest.discretionaryReason`). */
+const DISCRETIONARY_REASON_LENGTH = { min: 20, max: 1000 }
+
+export const notOverridable = () =>
+  fail("PST0310", "재량 판정으로도 넘을 수 없는 해제 요건입니다.", 409)
+
 export const disputedTotal = (
   objection: Pick<MockObjection, "disputedTransfers">,
 ) => objection.disputedTransfers.reduce((sum, t) => sum + (t.amount ?? 0), 0)
@@ -757,6 +788,8 @@ export const toSummary = (
   deadlineAlert: isDeadlineAlert(objection),
   supplementDue: objection.supplementDue ?? undefined,
   supplementOverdue: isSupplementOverdue(objection),
+  discretionary:
+    (objection.pendingDecision ?? objection.decision)?.discretionary ?? false,
 })
 
 const toDetail = (objection: MockObjection): ObjectionDetailResponse => ({
@@ -772,6 +805,7 @@ const toDetail = (objection: MockObjection): ObjectionDetailResponse => ({
     simplifiedExcluded: false,
     rulesVersion: RULES_VERSION,
     allowedResults: allowedResults(objection),
+    discretionaryResults: discretionaryResults(objection),
     rules: gateRules(objection),
   },
   decision: objection.decision ?? undefined,
@@ -877,12 +911,28 @@ export const paymentStopApiHandlers = [
           400,
         )
       }
-      if (!allowedResults(objection)[body.result]) {
-        return fail(
-          "PST0301",
-          "해제 요건을 충족하지 않아 이 판정을 확정할 수 없습니다.",
-          409,
-        )
+      // 점검이 연 판정은 재량 판정이 아니다. 닫힌 판정은 재량으로 열렸고 요청이 재량 판정일
+      // 때만 받는다. 재량으로도 못 넘는 요건에 재량 판정을 보내면 `PST0310` 이다.
+      const gateOpen = allowedResults(objection)[body.result]
+      const discretionary = !gateOpen && body.discretionary === true
+      if (!gateOpen) {
+        if (!discretionary) {
+          return fail(
+            "PST0301",
+            "해제 요건을 충족하지 않아 이 판정을 확정할 수 없습니다.",
+            409,
+          )
+        }
+        if (!discretionaryResults(objection)[body.result]) {
+          return notOverridable()
+        }
+        const reasonLength = body.discretionaryReason?.trim().length ?? 0
+        if (
+          reasonLength < DISCRETIONARY_REASON_LENGTH.min ||
+          reasonLength > DISCRETIONARY_REASON_LENGTH.max
+        ) {
+          return fail("CMN0002", "필수 입력값이 누락되었습니다.", 400)
+        }
       }
 
       const total = disputedTotal(objection)
@@ -897,6 +947,11 @@ export const paymentStopApiHandlers = [
         requestedHoldAmount: body.result === "PARTIAL" ? total : undefined,
         decidedBy: currentAdminId(),
         decidedAt: now,
+        discretionary,
+        discretionaryReason: discretionary
+          ? body.discretionaryReason?.trim()
+          : undefined,
+        gateBranchAtWrite: effectiveBranch(objection),
       }
       if (releasing) {
         objection.pendingDecision = decision

@@ -1,5 +1,6 @@
 import { delay, http, HttpResponse } from "msw"
 import type {
+  ApproveRequest,
   DecisionResponse,
   ExternalCheckRequest,
   ReturnRequest,
@@ -11,8 +12,10 @@ import {
   CASE_STATUS_AFTER,
   allowedResults,
   currentAdminId,
+  discretionaryResults,
   disputedTotal,
   noticeOf,
+  notOverridable,
   objectionNotFound,
   readState,
   requireIdempotencyKey,
@@ -232,6 +235,10 @@ export const paymentStopReviewApiHandlers = [
         requireMockPermission("PAYMENT_STOP_APPROVE") ??
         requireIdempotencyKey(request)
       if (denied) return denied
+      // 본문은 선택이다. 재량 판정일 때만 `discretionaryAcknowledged` 를 본다.
+      const body = (await request
+        .json()
+        .catch(() => ({}))) as ApproveRequest | null
       return withObjection(params, (objection, save) => {
         // 다른 관리자가 먼저 승인했으면 이미 확정, 먼저 반려했으면 승인할 판정 없음이다.
         if (objection.objectionStatus === "DECIDED") return alreadyDecided()
@@ -247,8 +254,23 @@ export const paymentStopReviewApiHandlers = [
             409,
           )
         }
-        // 확정 직전에 해제 요건을 다시 계산한다(D11).
-        if (!allowedResults(objection)[pending.result as "ACCEPTED"]) {
+        const result = pending.result as "ACCEPTED" | "PARTIAL"
+        if (pending.discretionary && body?.discretionaryAcknowledged !== true) {
+          return fail(
+            "PST0311",
+            "재량 판정은 승인자가 재량 판정 사유를 확인해야 승인할 수 있습니다.",
+            409,
+          )
+        }
+        // 확정 직전에 해제 요건을 다시 계산한다(D11). 재량 판정은 재량으로 넘을 수 있는지를 본다.
+        if (pending.discretionary) {
+          if (
+            !allowedResults(objection)[result] &&
+            !discretionaryResults(objection)[result]
+          ) {
+            return notOverridable()
+          }
+        } else if (!allowedResults(objection)[result]) {
           return fail(
             "PST0301",
             "해제 요건을 충족하지 않아 이 판정을 확정할 수 없습니다.",

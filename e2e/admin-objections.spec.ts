@@ -93,6 +93,72 @@ test("완비 확인 뒤 수용을 작성하고 다른 관리자가 승인해 확
   ).toBeVisible()
 })
 
+test("판단 불가 건에 재량 수용을 쓰고 다른 관리자가 재량 사유를 확인해 승인한다", async ({
+  page,
+}) => {
+  await loginAs(page, ADMIN)
+  // 이의제기 2는 사기 정황 건이다. 명의인 무관 회신을 받으면 점검이 판단 불가로 바뀐다.
+  await page.goto("/admin/objections/2?reason=OPERATION")
+
+  const external = page.getByRole("region", { name: "외부 확인" })
+  await external.getByLabel("요청 기관").selectOption("POLICE")
+  await external.getByLabel("모의 회신").selectOption("OWNER_UNRELATED")
+  await external.getByRole("button", { name: "외부 확인 요청" }).click()
+
+  const radios = page.getByRole("radiogroup")
+  await expect(
+    radios.getByText(
+      "해제 요건 점검: 거래 기록으로 정상 근거를 확인하지 못했습니다.",
+    ),
+  ).toBeVisible()
+  // 점검이 닫았어도 수용은 재량 판정으로 고를 수 있고, 제1호라 일부 지급정지는 못 쓴다.
+  const accept = page.getByRole("radio", { name: "수용", exact: true })
+  await expect(accept).toBeEnabled()
+  await expect(
+    page.getByRole("radio", { name: "일부 지급정지" }),
+  ).toBeDisabled()
+
+  await accept.check()
+  await expect(
+    page.getByText(
+      "해제 요건 점검과 다른 판정입니다. 사유와 다른 관리자 승인이 필요하고 기록이 남습니다.",
+    ),
+  ).toBeVisible()
+  await page.getByLabel(/^\[필수\]판정 사유$/).fill("명의인 무관 회신")
+  await page.getByLabel("조기 해제 근거").fill("수사기관 명의인 무관 회신")
+  await page
+    .getByLabel("재량 판정 사유")
+    .fill("수사기관이 명의인 무관을 회신했고 소명과 원장 사이 모순이 없다")
+  await page.getByRole("button", { name: "승인 요청" }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(
+    dialog.getByText("아래 재량 판정을 승인 대기로 올립니다."),
+  ).toBeVisible()
+  await dialog.getByRole("button", { name: "확인" }).click()
+  await expect(
+    page.getByText(/수용 판정을 승인 대기로 올렸습니다/),
+  ).toBeVisible()
+
+  await page.getByRole("button", { name: "로그아웃" }).click()
+  await loginAs(page, APPROVER)
+  await page.goto("/admin/objections/2?reason=OPERATION")
+
+  const approval = page.getByRole("region", { name: "승인 대기 판정" })
+  await expect(
+    approval.getByText("해제 요건 점검과 다른 재량 판정"),
+  ).toBeVisible()
+  await expect(approval.getByText("거래 기록으로 판단 불가")).toBeVisible()
+  const approve = approval.getByRole("button", { name: "승인" })
+  await expect(approve).toBeDisabled()
+  await approval.getByLabel("재량 판정 사유를 확인했습니다").check()
+  await approve.click()
+  await page.getByRole("dialog").getByRole("button", { name: "확인" }).click()
+
+  await expect(page.getByText(/수용 판정을 승인해 확정했습니다/)).toBeVisible()
+  await expect(page.getByText("확정된 판정")).toBeVisible()
+  await expect(page.getByText("재량 판정", { exact: true })).toBeVisible()
+})
+
 test("심사 중인 건에 보완을 요청하면 심사 기한 대신 보완 기한이 걸린다", async ({
   page,
 }) => {
@@ -133,7 +199,7 @@ test("조회 권한만 있으면 대리 접수와 판정 입력이 보이지 않
   await expect(page.getByText("이 화면에 접근할 권한이 없습니다")).toBeVisible()
 })
 
-test("AI 분석 단계가 차례로 붙고, 끝나면 판정안과 갈래 차이 경고가 보인다", async ({
+test("AI 분석 단계가 차례로 붙고, 끝나면 AI 의견과 갈래 차이 경고가 보인다", async ({
   page,
 }) => {
   await loginAs(page, ADMIN)
@@ -144,9 +210,9 @@ test("AI 분석 단계가 차례로 붙고, 끝나면 판정안과 갈래 차이
   await expect(timeline.getByText("분석 작업 시작")).toBeVisible({
     timeout: 5_000,
   })
-  await expect(page.getByText("서버 규칙 결과와 AI 판정안이 다름")).toBeVisible(
-    { timeout: 20_000 },
-  )
+  await expect(page.getByText("서버 규칙 결과와 AI 의견이 다름")).toBeVisible({
+    timeout: 20_000,
+  })
   await expect(timeline.locator("li[data-seq]")).toHaveCount(8)
   await expect(page.getByText("다른 은행 거래내역서").first()).toBeVisible()
 })

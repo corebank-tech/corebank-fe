@@ -361,27 +361,36 @@ describe("AgentAnalysis", () => {
     ).toBeInTheDocument()
   })
 
-  it("판정안이 최근 실행 것이 아니면 이전 실행 결과라고 경고한다", async () => {
-    server.use(
-      http.get("*/admin/objections/:objectionId/agent-runs", () =>
-        envelope([{ runId: 8, status: "FAILED", attempt: 3 }]),
-      ),
-      http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
-        envelope([]),
-      ),
-      http.get("*/admin/objections/:objectionId/review-draft", () =>
-        envelope(DRAFT),
-      ),
-    )
-    renderAnalysis()
+  // 재분석이 실패로 끝났을 때와 아직 대기 중일 때 모두 이전 판정안을 현재 결과로 보이면 안 된다
+  it.each([
+    ["FAILED", "상태로 끝나 새 판정안이 없습니다"],
+    ["QUEUED", "상태라 새 판정안이 아직 없습니다"],
+  ])(
+    "최근 실행이 %s면 판정안을 이전 실행 결과라고 경고한다",
+    async (status, reason) => {
+      server.use(
+        http.get("*/admin/objections/:objectionId/agent-runs", () =>
+          envelope([{ runId: 8, status, attempt: 3 }]),
+        ),
+        http.get(
+          "*/admin/objections/:objectionId/agent-runs/:runId/steps",
+          () => envelope([]),
+        ),
+        http.get("*/admin/objections/:objectionId/review-draft", () =>
+          envelope(DRAFT),
+        ),
+      )
+      renderAnalysis()
 
-    const panel = await screen.findByRole("region", { name: "AI 판정안" })
-    expect(
-      await within(panel).findByText("이전 실행의 판정안"),
-    ).toBeInTheDocument()
-    expect(within(panel).getByText(/실행 7번 결과입니다/)).toBeInTheDocument()
-    expect(within(panel).getByText(/최근 실행 8번은/)).toBeInTheDocument()
-  })
+      const panel = await screen.findByRole("region", { name: "AI 판정안" })
+      expect(
+        await within(panel).findByText("이전 실행의 판정안"),
+      ).toBeInTheDocument()
+      expect(within(panel).getByText(/실행 7번 결과입니다/)).toBeInTheDocument()
+      expect(within(panel).getByText(/최근 실행 8번은/)).toBeInTheDocument()
+      expect(within(panel).getByText(new RegExp(reason))).toBeInTheDocument()
+    },
+  )
 
   it("대기만 1분 넘게 이어지면 폴링을 멈추고 다시 확인을 받는다", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })

@@ -53,7 +53,10 @@ export {
   addBusinessDays,
   businessDaysUntil,
 } from "@/entities/payment-stop/lib/business-days"
-export { closedDecisionReason } from "@/entities/payment-stop/lib/decision-availability"
+export {
+  decisionAvailability,
+  type DecisionAvailability,
+} from "@/entities/payment-stop/lib/decision-availability"
 
 export type {
   AgentRun,

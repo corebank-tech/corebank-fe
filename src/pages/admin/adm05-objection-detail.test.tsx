@@ -91,6 +91,24 @@ const FRAUD_DETAIL: ObjectionDetailResponse = {
   },
 }
 
+/**
+ * 해제 요건 점검이 판단 불가라 닫혔지만 수용은 재량 판정으로 쓸 수 있는 건. 일부 지급정지는
+ * 사유 조항(제2호) 때문에 재량으로도 못 쓴다.
+ */
+const DISCRETIONARY_DETAIL: ObjectionDetailResponse = {
+  ...NORMAL_ACCEPT_DETAIL,
+  objectionId: 6,
+  gate: {
+    ...NORMAL_ACCEPT_DETAIL.gate,
+    branch: "UNDETERMINED",
+    allowedResults: { ACCEPTED: false, PARTIAL: false, REJECTED: true },
+    discretionaryResults: { ACCEPTED: true, PARTIAL: false, REJECTED: false },
+  },
+}
+
+const DISCRETIONARY_REASON =
+  "송금인과 명의인의 거래처 관계를 통화 기록으로 확인함"
+
 type DecisionCall = { body: unknown; idempotencyKey: string | null }
 let decisionCalls: DecisionCall[] = []
 let detailReasons: (string | null)[] = []
@@ -176,6 +194,9 @@ const renderDetail = ({
   )
 }
 
+/** 판정 사유 입력. 재량 판정 사유 입력과 구분하려고 라벨 전체를 맞춘다. */
+const DECISION_REASON_LABEL = /^\[필수\]판정 사유$/
+
 const decisionRadio = (name: string) =>
   within(screen.getByRole("radiogroup")).getByRole("radio", { name })
 
@@ -186,7 +207,7 @@ const submitDecision = async (options: {
   basis?: string
 }) => {
   fireEvent.click(decisionRadio(options.result))
-  fireEvent.change(screen.getByLabelText(/판정 사유/), {
+  fireEvent.change(screen.getByLabelText(DECISION_REASON_LABEL), {
     target: { value: options.reason },
   })
   if (options.basis != null) {
@@ -220,6 +241,7 @@ const respondAgent = (runs: unknown[] = []) =>
 
 let sessionCalls: (string | null)[] = []
 let approveCalls: (string | null)[] = []
+let approveBodies: unknown[] = []
 let returnCalls: unknown[] = []
 let noticeCalls = 0
 
@@ -253,8 +275,9 @@ const respondReviewOps = (adminId = 2) =>
     http.get("*/admin/objections/:objectionId/ledger", () => okJson([])),
     http.post(
       "*/admin/objections/:objectionId/decisions/:decisionId/approve",
-      ({ request }) => {
+      async ({ request }) => {
         approveCalls.push(request.headers.get("Idempotency-Key"))
+        approveBodies.push(await request.json())
         return okJson({
           decisionId: 51,
           status: "CONFIRMED",
@@ -288,6 +311,7 @@ afterEach(() => {
   detailReasons = []
   sessionCalls = []
   approveCalls = []
+  approveBodies = []
   returnCalls = []
   noticeCalls = 0
 })
@@ -447,6 +471,7 @@ describe("Adm05ObjectionDetail", () => {
         "해제 요건을 충족하지 않아 이 판정을 확정할 수 없습니다.",
       ),
     ).toBeInTheDocument()
+    // 해제 요건 점검이 연 판정이라 재량 판정 필드(`discretionary`)를 싣지 않는다.
     expect(decisionCalls[0].body).toEqual({
       result: "ACCEPTED",
       reason: "정상 거래 관계가 확인됨",
@@ -653,6 +678,135 @@ describe("Adm05ObjectionDetail", () => {
     ).toBeInTheDocument()
   })
 
+  describe("재량 판정", () => {
+    it("점검이 닫았지만 재량으로 쓸 수 있는 판정은 막지 않고, 재량으로도 못 쓰는 판정만 잠근다", async () => {
+      respondDetail(DISCRETIONARY_DETAIL)
+      renderDetail({ path: "/admin/objections/6?reason=OPERATION" })
+      await screen.findByText("해제 요건 점검")
+
+      expect(decisionRadio("수용")).toBeEnabled()
+      expect(decisionRadio("수용")).toHaveAccessibleDescription(
+        "해제 요건 점검: 거래 기록으로 정상 근거를 확인하지 못했습니다.",
+      )
+      expect(
+        within(screen.getByRole("radiogroup")).getByText("재량 판정"),
+      ).toBeInTheDocument()
+      expect(decisionRadio("일부 지급정지")).toBeDisabled()
+      expect(decisionRadio("일부 지급정지")).toHaveAccessibleDescription(
+        "사유 제1호와 제2호는 일부 지급정지가 아니라 수용만 열립니다.",
+      )
+      // 고르기 전에는 경고와 재량 판정 사유 입력이 없다
+      expect(screen.queryByLabelText(/재량 판정 사유/)).not.toBeInTheDocument()
+
+      fireEvent.click(decisionRadio("수용"))
+      expect(
+        screen.getByText(
+          "해제 요건 점검과 다른 판정입니다. 사유와 다른 관리자 승인이 필요하고 기록이 남습니다.",
+        ),
+      ).toBeInTheDocument()
+      fireEvent.change(screen.getByLabelText(/재량 판정 사유/), {
+        target: { value: "거래처 관계 확인" },
+      })
+      expect(screen.getByText("9자 / 20~1000자")).toBeInTheDocument()
+      expect(screen.getByLabelText(/재량 판정 사유/)).toHaveAttribute(
+        "maxLength",
+        "1000",
+      )
+    })
+
+    it("재량 판정 사유가 20자보다 짧으면 요청하지 않는다", async () => {
+      respondDetail(DISCRETIONARY_DETAIL)
+      respondDecision(() => ({ code: "0000", message: "성공", status: 200 }))
+      renderDetail({ path: "/admin/objections/6?reason=OPERATION" })
+      await screen.findByText("해제 요건 점검")
+
+      fireEvent.click(decisionRadio("수용"))
+      fireEvent.change(screen.getByLabelText(DECISION_REASON_LABEL), {
+        target: { value: "정상 거래 관계" },
+      })
+      fireEvent.change(screen.getByLabelText(/조기 해제 근거/), {
+        target: { value: "통화 기록" },
+      })
+      fireEvent.change(screen.getByLabelText(/재량 판정 사유/), {
+        target: { value: "거래처 관계 확인" },
+      })
+      fireEvent.click(screen.getByRole("button", { name: "승인 요청" }))
+
+      expect(
+        await screen.findByText("재량 판정 사유를 20자 이상 입력하세요."),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(decisionCalls).toHaveLength(0)
+    })
+
+    it("재량 판정은 확인 창에 재량임을 적고, 요청에 discretionary 와 사유를 싣는다", async () => {
+      respondDetail(DISCRETIONARY_DETAIL)
+      respondDecision(() => ({ code: "0000", message: "성공", status: 200 }))
+      renderDetail({ path: "/admin/objections/6?reason=OPERATION" })
+      await screen.findByText("해제 요건 점검")
+
+      fireEvent.click(decisionRadio("수용"))
+      fireEvent.change(screen.getByLabelText(DECISION_REASON_LABEL), {
+        target: { value: "정상 거래 관계" },
+      })
+      fireEvent.change(screen.getByLabelText(/조기 해제 근거/), {
+        target: { value: "통화 기록" },
+      })
+      fireEvent.change(screen.getByLabelText(/재량 판정 사유/), {
+        target: { value: DISCRETIONARY_REASON },
+      })
+      fireEvent.click(screen.getByRole("button", { name: "승인 요청" }))
+
+      const dialog = await screen.findByRole("dialog")
+      expect(
+        within(dialog).getByText("아래 재량 판정을 승인 대기로 올립니다."),
+      ).toBeInTheDocument()
+      expect(within(dialog).getByText(/수용 \(재량 판정\)/)).toBeInTheDocument()
+      expect(
+        within(dialog).getByText(new RegExp(DISCRETIONARY_REASON)),
+      ).toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+      expect(
+        await screen.findByText(/수용 판정을 승인 대기로 올렸습니다/),
+      ).toBeInTheDocument()
+      expect(decisionCalls[0].body).toEqual({
+        result: "ACCEPTED",
+        reason: "정상 거래 관계",
+        earlyReleaseBasis: "통화 기록",
+        discretionary: true,
+        discretionaryReason: DISCRETIONARY_REASON,
+      })
+    })
+
+    it("재량으로도 넘을 수 없다는 PST0310 거부는 서버 문구를 보인다", async () => {
+      respondDetail(DISCRETIONARY_DETAIL)
+      respondDecision(() => ({
+        code: "PST0310",
+        message: "재량 판정으로도 넘을 수 없는 해제 요건입니다.",
+        status: 409,
+      }))
+      renderDetail({ path: "/admin/objections/6?reason=OPERATION" })
+      await screen.findByText("해제 요건 점검")
+
+      fireEvent.click(decisionRadio("수용"))
+      fireEvent.change(screen.getByLabelText(/재량 판정 사유/), {
+        target: { value: DISCRETIONARY_REASON },
+      })
+      await submitDecision({
+        result: "수용",
+        reason: "정상 거래 관계",
+        basis: "통화 기록",
+      })
+
+      expect(
+        await screen.findByText(
+          "재량 판정으로도 넘을 수 없는 해제 요건입니다.",
+        ),
+      ).toBeInTheDocument()
+    })
+  })
+
   describe("2인 승인", () => {
     const PENDING_DETAIL: ObjectionDetailResponse = {
       ...NORMAL_ACCEPT_DETAIL,
@@ -810,6 +964,156 @@ describe("Adm05ObjectionDetail", () => {
       ).toBeInTheDocument()
       expect(approveCalls).toHaveLength(1)
       expect(approveCalls[0]).toMatch(/^[0-9a-f-]{36}$/)
+    })
+
+    describe("재량 판정 승인", () => {
+      const DISCRETIONARY_PENDING: ObjectionDetailResponse = {
+        ...PENDING_DETAIL,
+        gate: DISCRETIONARY_DETAIL.gate,
+        pendingDecision: {
+          ...PENDING_DETAIL.pendingDecision,
+          discretionary: true,
+          discretionaryReason: DISCRETIONARY_REASON,
+          gateBranchAtWrite: "UNDETERMINED",
+        },
+      }
+
+      const openApproval = async () => {
+        respondDetail(DISCRETIONARY_PENDING)
+        respondReviewOps(14)
+        renderDetail({
+          path: "/admin/objections/5?reason=OPERATION",
+          permissions: APPROVER,
+        })
+        const panel = await screen.findByRole("region", {
+          name: "승인 대기 판정",
+        })
+        await screen.findByText("재량 판정 사유를 확인했습니다")
+        return panel
+      }
+
+      it("경고, 작성 당시 점검, 재량 사유를 보이고 체크 전에는 승인을 막는다", async () => {
+        const panel = await openApproval()
+
+        expect(
+          within(panel).getByText("해제 요건 점검과 다른 재량 판정"),
+        ).toBeInTheDocument()
+        expect(
+          within(panel).getByText("거래 기록으로 판단 불가"),
+        ).toBeInTheDocument()
+        expect(
+          within(panel).getByText(DISCRETIONARY_REASON),
+        ).toBeInTheDocument()
+        expect(
+          within(panel).getByRole("button", { name: "승인" }),
+        ).toBeDisabled()
+      })
+
+      it("확인 체크 뒤 승인하면 discretionaryAcknowledged=true 를 보낸다", async () => {
+        const panel = await openApproval()
+
+        fireEvent.click(
+          within(panel).getByRole("checkbox", {
+            name: "재량 판정 사유를 확인했습니다",
+          }),
+        )
+        const approve = within(panel).getByRole("button", { name: "승인" })
+        expect(approve).toBeEnabled()
+        fireEvent.click(approve)
+        const dialog = await screen.findByRole("dialog")
+        expect(
+          within(dialog).getByText(
+            "해제 요건 점검과 다른 아래 재량 판정을 승인합니다.",
+          ),
+        ).toBeInTheDocument()
+        fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+        expect(
+          await screen.findByText(/수용 판정을 승인해 확정했습니다/),
+        ).toBeInTheDocument()
+        expect(approveBodies).toEqual([{ discretionaryAcknowledged: true }])
+      })
+
+      it("반려는 확인 체크 없이 할 수 있다", async () => {
+        const panel = await openApproval()
+
+        fireEvent.click(within(panel).getByRole("button", { name: "반려" }))
+        fireEvent.change(within(panel).getByLabelText(/반려 사유/), {
+          target: { value: "재량 사유 근거 부족" },
+        })
+        fireEvent.click(
+          within(panel).getByRole("button", { name: "반려 확정" }),
+        )
+
+        expect(
+          await screen.findByText(/판정을 반려했습니다/),
+        ).toBeInTheDocument()
+        expect(returnCalls).toEqual([{ reason: "재량 사유 근거 부족" }])
+        expect(approveCalls).toHaveLength(0)
+      })
+
+      it("PST0311 거부는 서버 문구를 승인 패널에 보인다", async () => {
+        const panel = await openApproval()
+        server.use(
+          http.post(
+            "*/admin/objections/:objectionId/decisions/:decisionId/approve",
+            () =>
+              HttpResponse.json(
+                {
+                  code: "PST0311",
+                  message: "재량 판정은 재량 사유 확인이 필요합니다.",
+                },
+                { status: 409 },
+              ),
+          ),
+        )
+
+        fireEvent.click(
+          within(panel).getByRole("checkbox", {
+            name: "재량 판정 사유를 확인했습니다",
+          }),
+        )
+        fireEvent.click(within(panel).getByRole("button", { name: "승인" }))
+        const dialog = await screen.findByRole("dialog")
+        fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+        expect(
+          await within(panel).findByText(
+            "재량 판정은 재량 사유 확인이 필요합니다.",
+          ),
+        ).toBeInTheDocument()
+      })
+    })
+
+    it("확정된 재량 판정에는 재량 판정 표시와 사유를 보인다", async () => {
+      respondDetail({
+        ...NORMAL_ACCEPT_DETAIL,
+        objectionStatus: "DECIDED",
+        decision: {
+          decisionId: 51,
+          status: "CONFIRMED",
+          result: "ACCEPTED",
+          reason: "수강료 정기 입금",
+          earlyReleaseBasis: "관계 거래 3건",
+          decidedBy: 2,
+          decidedAt: "2026-11-05T17:10:00",
+          approvedBy: 14,
+          approvedAt: "2026-11-05T18:00:00",
+          discretionary: true,
+          discretionaryReason: DISCRETIONARY_REASON,
+          gateBranchAtWrite: "UNDETERMINED",
+        },
+      })
+      renderDetail()
+
+      await screen.findByText("확정된 판정")
+      expect(screen.getByText("재량 판정")).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /거래 기록으로 판단 불가 \(해제 요건 점검과 다른 재량 판정\)/,
+        ),
+      ).toBeInTheDocument()
+      expect(screen.getByText(DISCRETIONARY_REASON)).toBeInTheDocument()
     })
   })
 })

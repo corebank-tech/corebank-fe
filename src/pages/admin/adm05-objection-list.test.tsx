@@ -178,6 +178,28 @@ describe("Adm05ObjectionList", () => {
     expect(runRequests).toEqual([])
   })
 
+  it("재량 판정인 건에만 재량 판정 표시를 붙인다", async () => {
+    respond(() =>
+      HttpResponse.json({
+        code: "0000",
+        message: "성공",
+        data: SUMMARIES.map((row) =>
+          row.objectionId === 1 ? { ...row, discretionary: true } : row,
+        ),
+      }),
+    )
+    renderList(["PAYMENT_STOP_READ"])
+
+    const decidedRow = (
+      await screen.findByRole("link", { name: "이의제기 1 상세" })
+    ).closest("tr")!
+    expect(within(decidedRow).getByText("재량 판정")).toBeInTheDocument()
+    const otherRow = screen
+      .getByRole("link", { name: "이의제기 3 심사" })
+      .closest("tr")!
+    expect(within(otherRow).queryByText("재량 판정")).not.toBeInTheDocument()
+  })
+
   it("조회 권한만 있으면 대리 접수 버튼을 그리지 않는다", async () => {
     respond(() =>
       HttpResponse.json({ code: "0000", message: "성공", data: SUMMARIES }),

@@ -2,6 +2,7 @@ import * as React from "react"
 import { UserCheck } from "lucide-react"
 import {
   DECISION_LABEL,
+  GATE_BRANCH_LABEL,
   labelOf,
   useApproveDecision,
   useReturnDecision,
@@ -13,6 +14,7 @@ import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { Alert } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { Checkbox } from "@/shared/ui/checkbox"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { FormRow } from "@/shared/ui/form-row"
 import { LabelValueRow } from "@/shared/ui/label-value-row"
@@ -52,6 +54,11 @@ type Props = {
  * 눌러서 거부를 받는 건 이미 늦기 때문이다. 로그인한 관리자 번호를 아직 모르면 해제를 막는
  * 쪽으로 두어 승인 버튼을 잠근다.
  *
+ * 재량 판정(해제 요건 점검이 닫힌 판정을 작성자가 재량으로 쓴 것)이면 작성 당시 점검 갈래와
+ * 재량 판정 사유를 보이고, 승인자가 "재량 판정 사유를 확인했습니다"를 체크해야 승인 버튼이
+ * 열린다. 승인 요청에 `discretionaryAcknowledged: true` 를 싣는다. 빠지면 서버가 `PST0311` 로
+ * 거부한다. 반려는 해제를 막는 쪽이라 체크 없이 할 수 있다.
+ *
  * 반려는 작성자 본인도 할 수 있다(계약 v2 §10). 해제를 막는 쪽이라 잘못 올린 판정을 작성자가
  * 거둘 수 있어야 한다. 서버도 반려에는 작성자 검사를 두지 않는다.
  */
@@ -71,6 +78,7 @@ export const ApprovalPanel = ({
   const [isReturnOpen, setReturnOpen] = React.useState(false)
   const [returnReason, setReturnReason] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
+  const [isAcknowledged, setAcknowledged] = React.useState(false)
 
   const isAuthor =
     currentAdminId == null ||
@@ -79,7 +87,9 @@ export const ApprovalPanel = ({
     ? currentAdminId == null
       ? "로그인한 관리자를 확인하는 중입니다."
       : "본인이 작성한 판정은 승인할 수 없습니다. 다른 승인 관리자가 승인합니다. 잘못 올렸으면 반려할 수 있습니다."
-    : null
+    : decision.discretionary && !isAcknowledged
+      ? "재량 판정 사유를 확인했다고 체크해야 승인할 수 있습니다."
+      : null
   const decisionId = decision.decisionId
   const isBusy = approve.isPending || returnDecision.isPending
 
@@ -99,6 +109,7 @@ export const ApprovalPanel = ({
       {
         objectionId,
         decisionId,
+        discretionaryAcknowledged: decision.discretionary && isAcknowledged,
         idempotencyKey: approveKey.keyFor({ objectionId, decisionId }),
       },
       {
@@ -141,8 +152,23 @@ export const ApprovalPanel = ({
     <Panel aria-label="승인 대기 판정">
       <PanelHeader
         title="승인 대기 판정"
-        action={<Badge variant="warning">승인 대기</Badge>}
+        action={
+          <span className="inline-flex gap-1">
+            {decision.discretionary && (
+              <Badge variant="danger">재량 판정</Badge>
+            )}
+            <Badge variant="warning">승인 대기</Badge>
+          </span>
+        }
       />
+      {decision.discretionary && (
+        <div className="px-4 pb-3">
+          <Alert variant="warning" title="해제 요건 점검과 다른 재량 판정">
+            해제 요건 점검이 닫힌 판정을 작성자가 재량으로 썼습니다. 재량 판정
+            사유를 확인하고 승인하세요.
+          </Alert>
+        </div>
+      )}
       <LabelValueRow
         label="판정"
         value={labelOf(DECISION_LABEL, decision.result)}
@@ -158,6 +184,28 @@ export const ApprovalPanel = ({
         value={decision.earlyReleaseBasis ?? "-"}
         labelWidth={140}
       />
+      {decision.discretionary && (
+        <>
+          <LabelValueRow
+            label="작성 당시 점검"
+            value={
+              decision.gateBranchAtWrite
+                ? labelOf(GATE_BRANCH_LABEL, decision.gateBranchAtWrite)
+                : "-"
+            }
+            labelWidth={140}
+          />
+          <LabelValueRow
+            label="재량 판정 사유"
+            value={
+              <span className="whitespace-pre-wrap">
+                {decision.discretionaryReason ?? "-"}
+              </span>
+            }
+            labelWidth={140}
+          />
+        </>
+      )}
       {decision.result === "PARTIAL" && (
         <LabelValueRow
           label="요청 보류액"
@@ -194,6 +242,14 @@ export const ApprovalPanel = ({
           </Alert>
         ) : (
           <>
+            {decision.discretionary && !isAuthor && (
+              <Checkbox
+                label="재량 판정 사유를 확인했습니다"
+                checked={isAcknowledged}
+                disabled={isBusy}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+              />
+            )}
             {approveBlockedReason && (
               <Alert variant="warning">{approveBlockedReason}</Alert>
             )}
@@ -250,14 +306,21 @@ export const ApprovalPanel = ({
         open={isConfirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleApprove}
-        title="판정 승인"
+        title={decision.discretionary ? "재량 판정 승인" : "판정 승인"}
         messages={[
-          "아래 판정을 승인합니다.",
+          decision.discretionary
+            ? "해제 요건 점검과 다른 아래 재량 판정을 승인합니다."
+            : "아래 판정을 승인합니다.",
           "승인하면 계좌의 지급정지에 바로 반영되고 되돌릴 수 없습니다.",
         ]}
         items={[
           { label: "이의제기 번호", value: objectionId },
-          { label: "판정", value: labelOf(DECISION_LABEL, decision.result) },
+          {
+            label: "판정",
+            value: decision.discretionary
+              ? `${labelOf(DECISION_LABEL, decision.result)} (재량 판정)`
+              : labelOf(DECISION_LABEL, decision.result),
+          },
           {
             label: "작성자",
             value:

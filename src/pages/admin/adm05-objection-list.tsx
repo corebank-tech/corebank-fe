@@ -38,6 +38,9 @@ import { Panel } from "@/shared/ui/panel"
  * AI 분석 상태 칸과 심사 기한 칸은 목록 응답의 요약 필드(`latestRunStatus`,
  * `latestRunLastStepTitle`, `reviewDeadline`, `deadlineAlert`, `supplementOverdue`)로 그린다.
  * 이의제기마다 실행 목록을 따로 묻던 방식(N+1)은 걷어냈다.
+ *
+ * 승인 대기나 확정 판정이 해제 요건 점검과 다른 재량 판정이면(`discretionary`) 처리 상태 칸에
+ * "재량 판정"을 붙인다. 승인자가 목록에서 재량 사유를 확인할 건을 먼저 알아보게 한다.
  */
 
 const CASE_STATUS_TONE: Record<string, BadgeVariant> = {
@@ -190,6 +193,7 @@ export const Adm05ObjectionList = () => {
             {labelOf(OBJECTION_STATUS_LABEL, row.objectionStatus)}
           </Badge>
           {row.supplementOverdue && <Badge variant="danger">불수용 대상</Badge>}
+          {row.discretionary && <Badge variant="warning">재량 판정</Badge>}
         </span>
       ),
     },

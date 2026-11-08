@@ -5,7 +5,7 @@ import {
   GATE_BRANCH_LABEL,
   GATE_RULE_LABEL,
   RULE_BASIS_LABEL,
-  closedDecisionReason,
+  decisionAvailability,
   labelOf,
   type GateRuleCheck,
   type ObjectionDetail,
@@ -100,8 +100,9 @@ const columns: DataGridColumn<GateRuleCheck>[] = [
 /**
  * 해제 요건 점검 체크리스트(계획 D21 ⑥). 해제 판정이 왜 열리거나 잠겼는지를 보인다.
  *
- * 화면은 서버 계산을 그대로 그린다. 서버가 원장으로 다시 계산한 결과이고, AI 판정안은
+ * 화면은 서버 계산을 그대로 그린다. 서버가 원장으로 다시 계산한 결과이고, AI 의견은
  * 이 계산에 쓰이지 않는다(D9, D10). 수치 기준은 내부 기준이라는 것을 함께 밝힌다(D33).
+ * 점검이 닫았지만 재량으로 쓸 수 있는 판정은 잠그지 않고 "재량 판정 가능"으로 보인다.
  */
 export const GateChecklist = ({ objection }: Props) => {
   const { gate } = objection
@@ -146,8 +147,8 @@ export const GateChecklist = ({ objection }: Props) => {
         aria-label="판정별 해제 요건"
       >
         {DECISION_RESULTS.map((result) => {
-          const reason = closedDecisionReason(objection, result)
-          const isOpen = reason == null
+          const availability = decisionAvailability(objection, result)
+          const isOpen = availability.kind === "OPEN"
           return (
             <div
               key={result}
@@ -171,9 +172,18 @@ export const GateChecklist = ({ objection }: Props) => {
                   <Lock className="h-4 w-4" aria-hidden />
                 )}
                 {DECISION_LABEL[result]}
+                {availability.kind === "DISCRETIONARY" && (
+                  <Badge variant="warning">재량 판정 가능</Badge>
+                )}
               </p>
               <p className="text-xs leading-snug text-ink-muted">
-                {isOpen ? (isDecided ? "요건 충족" : "선택 가능") : reason}
+                {availability.kind === "OPEN"
+                  ? isDecided
+                    ? "요건 충족"
+                    : "선택 가능"
+                  : availability.kind === "DISCRETIONARY"
+                    ? `${availability.gateReason} 사유를 적고 다른 관리자가 승인하면 쓸 수 있습니다.`
+                    : availability.reason}
               </p>
             </div>
           )

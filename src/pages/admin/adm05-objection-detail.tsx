@@ -12,6 +12,7 @@ import {
   CASE_STATUS_LABEL,
   CLAUSE_SCOPE,
   DECISION_LABEL,
+  GATE_BRANCH_LABEL,
   OBJECTION_STATUS_LABEL,
   RECEIVED_CHANNEL_LABEL,
   formatClause,
@@ -199,9 +200,12 @@ const ConfirmedDecision = ({ decision }: { decision: ObjectionDecision }) => (
     <PanelHeader
       title="확정된 판정"
       action={
-        <Badge variant={DECISION_TONE[decision.result] ?? "neutral"}>
-          {labelOf(DECISION_LABEL, decision.result)}
-        </Badge>
+        <span className="inline-flex gap-1">
+          {decision.discretionary && <Badge variant="danger">재량 판정</Badge>}
+          <Badge variant={DECISION_TONE[decision.result] ?? "neutral"}>
+            {labelOf(DECISION_LABEL, decision.result)}
+          </Badge>
+        </span>
       }
     />
     <LabelValueRow
@@ -219,6 +223,28 @@ const ConfirmedDecision = ({ decision }: { decision: ObjectionDecision }) => (
       value={decision.earlyReleaseBasis ?? "-"}
       labelWidth={140}
     />
+    {decision.discretionary && (
+      <>
+        <LabelValueRow
+          label="작성 당시 점검"
+          value={
+            decision.gateBranchAtWrite
+              ? `${labelOf(GATE_BRANCH_LABEL, decision.gateBranchAtWrite)} (해제 요건 점검과 다른 재량 판정)`
+              : "해제 요건 점검과 다른 재량 판정"
+          }
+          labelWidth={140}
+        />
+        <LabelValueRow
+          label="재량 판정 사유"
+          value={
+            <span className="whitespace-pre-wrap">
+              {decision.discretionaryReason ?? "-"}
+            </span>
+          }
+          labelWidth={140}
+        />
+      </>
+    )}
     {decision.result === "PARTIAL" && (
       <>
         <LabelValueRow
@@ -605,8 +631,8 @@ export const Adm05ObjectionDetail = () => {
 
       <NoticeBoxFooter
         items={[
-          "해제 요건 점검은 서버가 원장으로 계산하며 AI 분석 결과는 해제 근거로 쓰이지 않습니다.",
-          "불수용은 언제나 고를 수 있고, 지급정지를 줄이는 판정은 요건을 충족할 때만 열립니다.",
+          "해제 요건 점검은 서버가 원장으로 계산하며 AI 의견은 판정을 막지 않고 해제 근거로 쓰이지 않습니다.",
+          "불수용은 언제나 고를 수 있습니다. 지급정지를 줄이는 판정은 해제 요건 점검이 닫아도 재량 판정 사유를 적고 다른 관리자가 확인해 승인하면 쓸 수 있습니다. 소송 계속, 사유 조항 불일치, 외부 기관 부정 회신은 재량으로도 넘을 수 없습니다.",
           "수용과 일부 지급정지는 작성한 관리자가 아닌 다른 관리자가 승인해야 계좌에 반영됩니다.",
           "심사 기한은 소명 완비 확인일부터 5영업일이고, 남은 일수는 주말만 빼고 셉니다. 공휴일은 서버 기한에 반영됩니다.",
           "해제 범위는 이의제기 사유가 정합니다. 제1호와 제2호는 수용, 제3호는 일부 지급정지입니다.",

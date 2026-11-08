@@ -1,6 +1,6 @@
 import type {
-  ObjectionDocumentResponse,
-  ObjectionLedgerEntryResponse,
+  DocumentResponse,
+  LedgerEntry,
   OcrPage,
 } from "@/shared/api/generated"
 import { addDays } from "@/shared/lib/date"
@@ -9,13 +9,14 @@ import { addDays } from "@/shared/lib/date"
  * 이의제기 심사 운영 목의 고정 자료(계약 v2 §3, §5). 첨부 서류, 판독 결과, 원장.
  *
  * 서류 그림은 판독 결과의 글자 영역 좌표에 글자를 그려 만든다. 그래야 화면의 영역 상자가
- * 그림 위 글자와 겹친다. 실제 서버는 PNG, JPEG, PDF 원본을 주지만 목은 같은 크기의 SVG를
- * 준다. 「시연용 견본」 표시를 넣고 이름과 계좌는 가명 처리된 값만 쓴다.
+ * 그림 위 글자와 겹친다. 서버는 PNG, JPEG, PDF 만 받아 원본을 주므로, 목도 같은 크기의 SVG를
+ * 그린 뒤 PNG, JPEG 로 구워 준다(`rasterizeSvg`). 「시연용 견본」 표시를 넣고 이름과 계좌는
+ * 가명 처리된 값만 쓴다.
  */
 
 export type MockDocument = Required<
   Pick<
-    ObjectionDocumentResponse,
+    DocumentResponse,
     | "documentId"
     | "kind"
     | "fileName"
@@ -26,6 +27,8 @@ export type MockDocument = Required<
     | "uploadedAt"
   >
 > & {
+  /** 올린 사람(서버 `UploaderRole`). 빠지면 명의인이다 */
+  uploaderRole?: "HOLDER" | "ADMIN"
   ocrStatus: string | null
   /** 판독 결과. 신분증 사본과 판독 전 서류는 `null` */
   pages: OcrPage[] | null
@@ -91,6 +94,56 @@ export const renderDocumentSvg = (page: OcrPage): string => {
 /** 신분증 사본 자리표시. 실제 신분증은 그리지 않는다. */
 export const renderIdCopySvg = (): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="sans-serif"><rect width="100%" height="100%" fill="#f3f5f8"/><rect x="40" y="60" width="160" height="200" fill="#c3c9d2"/><text x="240" y="120" font-size="28" fill="#17202e">신분증 사본</text><text x="240" y="170" font-size="20" fill="#4b5563">시연용 가림 처리</text><text x="600" y="360" font-size="16" text-anchor="end" fill="#d81e18">시연용 견본</text></svg>`
+
+/** 1x1 흰색 PNG. 그림을 굽지 못하는 환경(jsdom)에서 돌려주는 자리표시다. */
+const BLANK_PNG = Uint8Array.from(
+  atob(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+  ),
+  (char) => char.charCodeAt(0),
+)
+
+/**
+ * 서류 그림을 서버가 받는 형식(PNG, JPEG)으로 굽는다. 서버는 PDF, PNG, JPEG 만 받으므로 목도
+ * SVG 를 그대로 주지 않는다. 브라우저에서는 캔버스로 그리고, 캔버스가 없는 테스트 환경에서는
+ * 1x1 PNG 를 준다.
+ */
+export const rasterizeSvg = async (
+  svg: string,
+  contentType: string,
+): Promise<{ body: Uint8Array | Blob; contentType: string }> => {
+  const type = contentType === "image/jpeg" ? "image/jpeg" : "image/png"
+  const fallback = { body: BLANK_PNG, contentType: "image/png" }
+  if (
+    typeof document === "undefined" ||
+    typeof URL.createObjectURL !== "function" ||
+    typeof Image === "undefined"
+  ) {
+    return fallback
+  }
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }))
+  try {
+    const image = new Image()
+    image.src = url
+    await image.decode()
+    const canvas = document.createElement("canvas")
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    const context = canvas.getContext("2d")
+    if (!context) return fallback
+    context.fillStyle = "#ffffff"
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, type),
+    )
+    return blob ? { body: blob, contentType: type } : fallback
+  } catch {
+    return fallback
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
 
 /** 한 쪽짜리 PDF. 화면이 PDF 를 그림으로 못 그릴 때의 안내를 확인하는 용도다. */
 export const MINIMAL_PDF =
@@ -174,7 +227,7 @@ export const idCopy = (
 
 type LedgerInput = {
   number: string
-  direction: "DEPOSIT" | "WITHDRAWAL"
+  direction: "IN" | "OUT"
   amount: number
   occurredAt: string
   counterpartyAccountId?: number | null
@@ -185,9 +238,7 @@ type LedgerInput = {
  * 원장 행을 시각 순으로 정렬하고 `afterDispute` 를 채운다. 다툼 거래 중 가장 이른 시각
  * 이후의 거래가 대상이다(근거 제외 규칙).
  */
-export const ledger = (
-  inputs: LedgerInput[],
-): ObjectionLedgerEntryResponse[] => {
+export const ledger = (inputs: LedgerInput[]): LedgerEntry[] => {
   const firstDispute = inputs
     .filter((input) => input.disputed)
     .map((input) => input.occurredAt)
@@ -222,14 +273,14 @@ export const livingTransactions = (
     return [
       {
         number: number(salaryDate, seqBase + month * 2),
-        direction: "DEPOSIT" as const,
+        direction: "IN" as const,
         amount: 2_850_000,
         occurredAt: `${salaryDate}T09:00:00`,
         counterpartyAccountId: 4001,
       },
       {
         number: number(cardDate, seqBase + month * 2 + 1),
-        direction: "WITHDRAWAL" as const,
+        direction: "OUT" as const,
         amount: 640_000 + month * 21_000,
         occurredAt: `${cardDate}T12:30:00`,
         counterpartyAccountId: null,

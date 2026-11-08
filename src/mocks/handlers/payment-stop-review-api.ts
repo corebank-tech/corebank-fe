@@ -3,7 +3,7 @@ import type {
   DecisionResponse,
   ExternalCheckRequest,
   ReturnRequest,
-  SupplementRequest,
+  SupplementRequestBody,
 } from "@/shared/api/generated"
 import { addBusinessDays } from "@/entities/payment-stop"
 import { requireMockPermission } from "@/mocks/handlers/auth"
@@ -23,6 +23,7 @@ import {
 import { latestRunSummary } from "@/mocks/handlers/payment-stop-agent-api"
 import {
   MINIMAL_PDF,
+  rasterizeSvg,
   renderDocumentSvg,
   renderIdCopySvg,
 } from "@/mocks/handlers/payment-stop-review-fixtures"
@@ -45,11 +46,36 @@ const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
 const MAX_TEXT_LENGTH = 500
 const MAX_MISSING_DOCUMENTS = 20
 const SUPPLEMENT_DAYS: Record<number, number> = { 1: 5, 2: 3 }
+const MB = 1024 * 1024
+/** 서버 `DocumentPolicy`: 파일 하나 10MB, 이의제기당 합계 30MB, 10개까지. */
+const MAX_FILE_BYTES = 10 * MB
+const MAX_TOTAL_BYTES = 30 * MB
+const MAX_DOCUMENTS = 10
+
+const invalidDocument = () =>
+  fail("PST0007", "파일 형식, 크기, 개수가 허용 범위를 벗어났습니다.", 400)
+
+/** 매직 바이트로 형식을 본다. 서버처럼 확장자와 브라우저가 붙인 형식은 믿지 않는다. */
+const sniffContentType = async (file: File): Promise<string | null> => {
+  const head = new Uint8Array(await file.slice(0, 8).arrayBuffer())
+  const starts = (...bytes: number[]) =>
+    bytes.every((byte, index) => head[index] === byte)
+  if (starts(0x25, 0x50, 0x44, 0x46)) return "application/pdf"
+  if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) {
+    return "image/png"
+  }
+  if (starts(0xff, 0xd8, 0xff)) return "image/jpeg"
+  return null
+}
 
 const invalidState = () =>
   fail("PST0308", "지금 상태에서 할 수 없는 요청입니다.", 409)
 
 const missingInput = () => fail("CMN0002", "필수 입력값이 누락되었습니다.", 400)
+
+/** 서버 `Objection.requireNotDecided`. 확정된 뒤의 변경은 상태 오류가 아니라 이미 확정이다. */
+const alreadyDecided = () =>
+  fail("PST0302", "이미 판정이 확정된 이의제기입니다.", 409)
 
 const withObjection = (
   params: Record<string, unknown>,
@@ -121,7 +147,7 @@ export const paymentStopReviewApiHandlers = [
         }
         objection.objectionStatus = "UNDER_REVIEW"
         objection.reviewDeadline = addBusinessDays(getToday(), 5)
-        objection.supplementDue = null
+        // 서버는 다시 완비를 확인해도 지난 보완 기한을 지우지 않는다(`Objection.confirmCompleteness`).
         save()
         return ok({ reviewDeadline: objection.reviewDeadline })
       })
@@ -136,7 +162,7 @@ export const paymentStopReviewApiHandlers = [
         requireMockPermission("PAYMENT_STOP_WRITE") ??
         requireIdempotencyKey(request)
       if (denied) return denied
-      const body = (await request.json()) as SupplementRequest
+      const body = (await request.json()) as SupplementRequestBody
       if (
         !body.reason?.trim() ||
         body.reason.length > MAX_TEXT_LENGTH ||
@@ -145,8 +171,8 @@ export const paymentStopReviewApiHandlers = [
         return missingInput()
       }
       return withObjection(params, (objection, save) => {
+        if (objection.objectionStatus === "DECIDED") return alreadyDecided()
         if (
-          objection.objectionStatus === "DECIDED" ||
           objection.objectionStatus === "PENDING_APPROVAL" ||
           objection.objectionStatus === "SUPPLEMENT_REQUESTED"
         ) {
@@ -163,6 +189,8 @@ export const paymentStopReviewApiHandlers = [
           SUPPLEMENT_DAYS[round],
         )
         objection.objectionStatus = "SUPPLEMENT_REQUESTED"
+        // 보완 중에는 심사 기한이 멈춘다. 보완 뒤 완비를 다시 확인할 때 새로 건다.
+        objection.reviewDeadline = null
         objection.notices.push(
           noticeOf(
             objection,
@@ -181,9 +209,11 @@ export const paymentStopReviewApiHandlers = [
 
   http.post(
     "*/admin/objections/:objectionId/review-sessions",
-    async ({ params }) => {
+    async ({ params, request }) => {
       await delay(MOCK_LATENCY_MS)
-      const denied = requireMockPermission("PAYMENT_STOP_READ")
+      const denied =
+        requireMockPermission("PAYMENT_STOP_READ") ??
+        requireIdempotencyKey(request)
       if (denied) return denied
       return withObjection(params, () =>
         ok({
@@ -203,6 +233,8 @@ export const paymentStopReviewApiHandlers = [
         requireIdempotencyKey(request)
       if (denied) return denied
       return withObjection(params, (objection, save) => {
+        // 다른 관리자가 먼저 승인했으면 이미 확정, 먼저 반려했으면 승인할 판정 없음이다.
+        if (objection.objectionStatus === "DECIDED") return alreadyDecided()
         const pending = objection.pendingDecision
         if (!pending || pending.decisionId !== Number(params.decisionId)) {
           return fail("PST0204", "승인할 판정이 없습니다.", 404)
@@ -256,6 +288,7 @@ export const paymentStopReviewApiHandlers = [
         return missingInput()
       }
       return withObjection(params, (objection, save) => {
+        if (objection.objectionStatus === "DECIDED") return alreadyDecided()
         const pending = objection.pendingDecision
         if (!pending || pending.decisionId !== Number(params.decisionId)) {
           return fail("PST0204", "승인할 판정이 없습니다.", 404)
@@ -293,6 +326,8 @@ export const paymentStopReviewApiHandlers = [
       if (denied) return denied
       const body = (await request.json()) as ExternalCheckRequest
       return withObjection(params, (objection, save) => {
+        // 서버는 확정된 뒤만 막는다(D9). 승인 대기 중에도 받는다.
+        if (objection.objectionStatus === "DECIDED") return alreadyDecided()
         // 같은 기관에 다시 요청하면 기존 행을 돌려준다(멱등).
         const existing = objection.externalChecks.find(
           (check) => check.agency === body.agency,
@@ -336,11 +371,69 @@ export const paymentStopReviewApiHandlers = [
           sha256: document.sha256,
           round: document.round,
           uploadedAt: document.uploadedAt,
+          uploaderRole: document.uploaderRole ?? "HOLDER",
           ocrStatus: document.ocrStatus ?? undefined,
         })),
       ),
     )
   }),
+
+  http.post(
+    "*/admin/objections/:objectionId/documents",
+    async ({ params, request }) => {
+      await delay(MOCK_LATENCY_MS)
+      const denied =
+        requireMockPermission("PAYMENT_STOP_WRITE") ??
+        requireIdempotencyKey(request)
+      if (denied) return denied
+      const kind = new URL(request.url).searchParams.get("kind")
+      if (kind !== "EVIDENCE" && kind !== "ID_COPY") return missingInput()
+      const files = (await request.formData())
+        .getAll("files")
+        .filter((value): value is File => value instanceof File)
+      const state = readState()
+      const objection = state.objections.find(
+        (item) => item.objectionId === Number(params.objectionId),
+      )
+      if (!objection) return objectionNotFound()
+      if (objection.objectionStatus === "DECIDED") return alreadyDecided()
+      // 서버 `DocumentStore.validate`: 이미 올린 서류까지 합쳐 개수와 용량을 센다.
+      const existingBytes = objection.documents.reduce(
+        (sum, document) => sum + document.size,
+        0,
+      )
+      const addedBytes = files.reduce((sum, file) => sum + file.size, 0)
+      if (
+        files.length === 0 ||
+        objection.documents.length + files.length > MAX_DOCUMENTS ||
+        files.some((file) => file.size === 0 || file.size > MAX_FILE_BYTES) ||
+        existingBytes + addedBytes > MAX_TOTAL_BYTES
+      ) {
+        return invalidDocument()
+      }
+      const types = await Promise.all(files.map(sniffContentType))
+      if (types.some((type) => type == null)) return invalidDocument()
+      const now = toLocalDateTime(new Date())
+      const added = files.map((file, index) => ({
+        documentId:
+          objection.objectionId * 100 + 50 + nextSequence("objection-document"),
+        kind,
+        fileName: file.name,
+        contentType: types[index] ?? "application/pdf",
+        size: file.size,
+        sha256: "",
+        round: objection.supplementRound,
+        uploadedAt: now,
+        uploaderRole: "ADMIN" as const,
+        // 신분증 사본은 판독하지 않는다(D37). 증빙은 다음 분석 실행에서 판독한다.
+        ocrStatus: kind === "ID_COPY" ? null : "PENDING",
+        pages: null,
+      }))
+      objection.documents.push(...added)
+      writeState(state)
+      return ok(added.map(({ pages: _pages, ...document }) => document))
+    },
+  ),
 
   http.get(
     "*/admin/objections/:objectionId/documents/:documentId/content",
@@ -353,24 +446,28 @@ export const paymentStopReviewApiHandlers = [
       ) {
         return fail("CMN0007", "조회 사유가 없거나 올바르지 않습니다.", 400)
       }
-      return withObjection(params, (objection) => {
-        const document = objection.documents.find(
-          (item) => item.documentId === Number(params.documentId),
-        )
-        if (!document) return fail("PST0205", "문서를 찾을 수 없습니다.", 404)
-        if (document.contentType === "application/pdf") {
-          return new HttpResponse(MINIMAL_PDF, {
-            headers: { "Content-Type": "application/pdf" },
-          })
-        }
-        const page = document.pages?.[0]
-        const svg =
-          document.kind === "ID_COPY" || !page
-            ? renderIdCopySvg()
-            : renderDocumentSvg(page)
-        return new HttpResponse(svg, {
-          headers: { "Content-Type": "image/svg+xml" },
+      const objection = readState().objections.find(
+        (item) => item.objectionId === Number(params.objectionId),
+      )
+      if (!objection) return objectionNotFound()
+      const document = objection.documents.find(
+        (item) => item.documentId === Number(params.documentId),
+      )
+      if (!document) return fail("PST0205", "문서를 찾을 수 없습니다.", 404)
+      if (document.contentType === "application/pdf") {
+        return new HttpResponse(MINIMAL_PDF, {
+          headers: { "Content-Type": "application/pdf" },
         })
+      }
+      const page = document.pages?.[0]
+      const svg =
+        document.kind === "ID_COPY" || !page
+          ? renderIdCopySvg()
+          : renderDocumentSvg(page)
+      // 서버는 PDF, PNG, JPEG 만 받아 저장하므로 목도 그 형식으로 준다.
+      const image = await rasterizeSvg(svg, document.contentType)
+      return new HttpResponse(image.body as BodyInit, {
+        headers: { "Content-Type": image.contentType },
       })
     },
   ),
@@ -385,10 +482,16 @@ export const paymentStopReviewApiHandlers = [
         const document = objection.documents.find(
           (item) => item.documentId === Number(params.documentId),
         )
-        if (!document) return fail("PST0205", "문서를 찾을 수 없습니다.", 404)
+        // 서버는 신분증 사본을 판독하지 않고 판독 조회도 문서 없음으로 막는다(D37).
+        if (!document || document.kind === "ID_COPY") {
+          return fail("PST0205", "문서를 찾을 수 없습니다.", 404)
+        }
         return ok({
           documentId: document.documentId,
-          pages: document.pages ?? [],
+          status: document.ocrStatus ?? "PENDING",
+          engine: "mock-ocr",
+          pages: document.ocrStatus === "DONE" ? (document.pages ?? []) : [],
+          updatedAt: document.uploadedAt,
         })
       })
     },

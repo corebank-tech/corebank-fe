@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test"
 /**
  * ADM-05 지급정지 이의제기 심사.
  *
- * 메뉴 진입 → 목록 → 조회 사유 → 소명 완비 확인 → 보완 요청 → 수용 작성 → 승인 대기 →
- * 다른 관리자 승인까지 한 흐름으로 본다.
+ * 메뉴 진입 → 목록 → 조회 사유 → 소명 완비 확인 → 수용 작성 → 승인 대기 → 다른 관리자
+ * 승인까지 한 흐름으로 본다. 수용과 일부 지급정지는 소명 완비 확인 뒤(심사 중)에만 쓸 수
+ * 있어(서버 `Objection.requireDecidable`) 보완 요청은 다른 건에서 따로 본다.
  * 닫힌 판정, 조기 해제 근거, 멱등키 재사용 같은 분기는 화면 테스트가 본다
  * (`src/pages/admin/adm05-objection-detail.test.tsx`).
  *
@@ -29,7 +30,7 @@ async function loginAs(
   await page.waitForURL("**/admin")
 }
 
-test("완비 확인, 보완 요청, 수용 작성 뒤 다른 관리자가 승인해 확정한다", async ({
+test("완비 확인 뒤 수용을 작성하고 다른 관리자가 승인해 확정한다", async ({
   page,
 }) => {
   await loginAs(page, ADMIN)
@@ -42,6 +43,15 @@ test("완비 확인, 보완 요청, 수용 작성 뒤 다른 관리자가 승인
   await page.getByLabel("조회 사유").selectOption("OPERATION")
   await page.getByRole("button", { name: "확인" }).click()
 
+  // 완비 확인 전에는 요건이 열려도 수용을 고를 수 없다.
+  const accept = page.getByRole("radio", { name: "수용", exact: true })
+  await expect(accept).toBeDisabled()
+  await expect(
+    page
+      .getByRole("radiogroup")
+      .getByText("소명 완비 확인 뒤 고를 수 있습니다."),
+  ).toBeVisible()
+
   const progress = page.getByRole("region", { name: "심사 진행" })
   await expect(progress.getByText("완비 확인 대기")).toBeVisible()
   await progress.getByRole("button", { name: "소명 완비 확인" }).click()
@@ -50,20 +60,10 @@ test("완비 확인, 보완 요청, 수용 작성 뒤 다른 관리자가 승인
     progress.getByRole("status", { name: /심사 기한/ }),
   ).toBeVisible()
 
-  await progress.getByRole("button", { name: "보완 요청 작성" }).click()
-  await expect(progress.getByText(/이번 요청은 1회째 보완입니다/)).toBeVisible()
-  await progress.getByLabel("요청 사유").fill("거래처 확인 자료 필요")
-  await progress.getByLabel("요청 서류").fill("거래처 사업자등록증")
-  await progress.getByRole("button", { name: "보완 요청", exact: true }).click()
-  await expect(
-    progress.getByRole("status", { name: /보완 기한/ }),
-  ).toBeVisible()
-  await expect(progress.getByText("보완 1회 / 최대 2회")).toBeVisible()
-
   await expect(
     page.getByRole("radio", { name: "일부 지급정지" }),
   ).toBeDisabled()
-  await page.getByRole("radio", { name: "수용", exact: true }).check()
+  await accept.check()
   await page.getByLabel("판정 사유").fill("다툼 이전 거래 관계가 확인됨")
   await page.getByLabel("조기 해제 근거").fill("관계 거래 3회")
   await page.getByRole("button", { name: "승인 요청" }).click()
@@ -91,6 +91,33 @@ test("완비 확인, 보완 요청, 수용 작성 뒤 다른 관리자가 승인
   await expect(
     page.getByRole("region", { name: "심사 진행" }).getByText("판정 확정"),
   ).toBeVisible()
+})
+
+test("심사 중인 건에 보완을 요청하면 심사 기한 대신 보완 기한이 걸린다", async ({
+  page,
+}) => {
+  await loginAs(page, ADMIN)
+  await page.goto("/admin/objections/2?reason=OPERATION")
+
+  const progress = page.getByRole("region", { name: "심사 진행" })
+  await expect(progress.getByText("심사 중")).toBeVisible()
+  await progress.getByRole("button", { name: "보완 요청 작성" }).click()
+  await expect(progress.getByText(/이번 요청은 1회째 보완입니다/)).toBeVisible()
+  await progress.getByLabel("요청 사유").fill("거래처 확인 자료 필요")
+  await progress.getByLabel("요청 서류").fill("거래처 사업자등록증")
+  await progress.getByRole("button", { name: "보완 요청", exact: true }).click()
+
+  // 폼은 닫혀도 결과 안내는 남는다.
+  await expect(progress.getByText(/1회째 보완을 요청했습니다/)).toBeVisible()
+  await expect(
+    progress.getByRole("status", { name: /보완 기한/ }),
+  ).toBeVisible()
+  await expect(progress.getByText("소명 완비 확인 뒤 정해집니다")).toBeVisible()
+  await expect(progress.getByText("보완 1회 / 최대 2회")).toBeVisible()
+  // 보완 중에는 수용을 쓸 수 없다.
+  await expect(
+    page.getByRole("radio", { name: "수용", exact: true }),
+  ).toBeDisabled()
 })
 
 test("조회 권한만 있으면 대리 접수와 판정 입력이 보이지 않고, 접수 주소는 막는다", async ({

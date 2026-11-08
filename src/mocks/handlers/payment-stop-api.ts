@@ -4,8 +4,8 @@ import type {
   DecisionResponse,
   ExternalCheckResponse,
   ObjectionDetailResponse,
-  ObjectionLedgerEntryResponse,
-  ObjectionNoticeResponse,
+  LedgerEntry,
+  NoticeResponse,
   ObjectionSummaryResponse,
   ReceiveRequest,
   RegisterRequest,
@@ -57,7 +57,8 @@ import { getToday } from "@/shared/config/clock"
 
 const MOCK_LATENCY_MS = 200
 // 2차 계약으로 상태 모양이 바뀌어 키를 바꾼다. 옛 탭의 저장 상태를 읽지 않게 한다.
-const STORE_KEY = "payment-stop:objections:v2"
+// 원장 방향 값을 서버와 같은 IN, OUT 으로 바꾸고 접수 경로를 더해 저장 모양이 바뀌었다.
+const STORE_KEY = "payment-stop:objections:v3"
 const RULES_VERSION = "2026-11-03.1"
 const ACCESS_REASONS = ["CUSTOMER_REQUEST", "INCIDENT", "AUDIT", "OPERATION"]
 
@@ -80,6 +81,8 @@ export type MockObjection = Required<
   >
 > & {
   senderAccountId: number | null
+  /** 접수 경로(서버 `ObjectionChannel`): `BRANCH` 영업점 대리, `ONLINE` 비대면 */
+  receivedChannel: string
   branch: string
   rules: NonNullable<ObjectionDetailResponse["gate"]>["rules"]
   decision: DecisionResponse | null
@@ -88,9 +91,9 @@ export type MockObjection = Required<
   supplementRound: number
   pendingDecision: DecisionResponse | null
   externalChecks: ExternalCheckResponse[]
-  notices: ObjectionNoticeResponse[]
+  notices: NoticeResponse[]
   documents: MockDocument[]
-  ledger: ObjectionLedgerEntryResponse[]
+  ledger: LedgerEntry[]
 }
 
 type MockState = {
@@ -141,6 +144,7 @@ const relationshipRule = (
 
 /** 이의제기마다 쓰지 않는 운영 필드의 기본값. */
 const opsDefaults = () => ({
+  receivedChannel: "ONLINE",
   reviewDeadline: null,
   supplementDue: null,
   supplementRound: 0,
@@ -173,14 +177,14 @@ const relationshipLedger = (
     ...livingTransactions(disputedDate, 5, 101, transactionNumber),
     ...relation.map((item) => ({
       number: transactionNumber(addDays(disputedDate, -item.days), item.seq),
-      direction: "DEPOSIT" as const,
+      direction: "IN" as const,
       amount: item.amount,
       occurredAt: at(addDays(disputedDate, -item.days), "15:20:00"),
       counterpartyAccountId: sender,
     })),
     {
       number: transactionNumber(disputedDate, disputedSeq),
-      direction: "DEPOSIT",
+      direction: "IN",
       amount,
       occurredAt: at(disputedDate, disputedTime),
       counterpartyAccountId: sender,
@@ -188,7 +192,7 @@ const relationshipLedger = (
     },
     {
       number: transactionNumber(addDays(disputedDate, 2), disputedSeq + 40),
-      direction: "WITHDRAWAL",
+      direction: "OUT",
       amount: 300_000,
       occurredAt: at(addDays(disputedDate, 2), "11:15:00"),
       counterpartyAccountId: null,
@@ -335,7 +339,8 @@ const seed = (): MockState => {
           ),
         ],
         decision: null,
-        reviewDeadline: addBusinessDays(addDays(today, -13), 5),
+        // 보완을 요청하면 서버가 심사 기한을 비운다. 보완 뒤 완비를 다시 확인할 때 새로 건다.
+        reviewDeadline: null,
         supplementRound: 1,
         // 보완 기한이 이틀 전에 지났다. 목록에 불수용 대상으로 보인다.
         supplementDue: addDays(today, -2),
@@ -358,7 +363,7 @@ const seed = (): MockState => {
           ...livingTransactions(d4, 4, 201, transactionNumber),
           {
             number: transactionNumber(d4, 41),
-            direction: "DEPOSIT",
+            direction: "IN",
             amount: 2_000_000,
             occurredAt: at(d4, "19:22:05"),
             counterpartyAccountId: null,
@@ -498,45 +503,45 @@ const seed = (): MockState => {
           ...livingTransactions(d2, 3, 301, transactionNumber),
           {
             number: fraudNumbers[0],
-            direction: "DEPOSIT",
+            direction: "IN",
             amount: 950_000,
             occurredAt: at(d2, "21:40:03"),
             disputed: true,
           },
           {
             number: fraudNumbers[1],
-            direction: "DEPOSIT",
+            direction: "IN",
             amount: 1_500_000,
             occurredAt: at(d2, "21:52:47"),
             disputed: true,
           },
           {
             number: fraudNumbers[2],
-            direction: "DEPOSIT",
+            direction: "IN",
             amount: 600_000,
             occurredAt: at(d2, "22:05:30"),
           },
           {
             number: fraudNumbers[3],
-            direction: "DEPOSIT",
+            direction: "IN",
             amount: 400_000,
             occurredAt: at(d2, "22:20:12"),
           },
           {
             number: transactionNumber(d2, 25),
-            direction: "WITHDRAWAL",
+            direction: "OUT",
             amount: 1_400_000,
             occurredAt: at(d2, "22:10:41"),
           },
           {
             number: transactionNumber(d2, 26),
-            direction: "WITHDRAWAL",
+            direction: "OUT",
             amount: 1_000_000,
             occurredAt: at(d2, "22:31:09"),
           },
           {
             number: transactionNumber(d2, 27),
-            direction: "WITHDRAWAL",
+            direction: "OUT",
             amount: 750_000,
             occurredAt: at(d2, "22:58:33"),
           },
@@ -652,17 +657,40 @@ const hasNegativeReply = (objection: MockObjection) =>
 export const readMockObjection = (objectionId: number) =>
   readState().objections.find((item) => item.objectionId === objectionId)
 
-/** 서버 `GateResult.allowsRelease` 와 같은 판정 허용 조건. */
+const hasReply = (objection: MockObjection, reply: string) =>
+  objection.externalChecks.some((check) => check.reply === reply)
+
+const EXTERNAL_REPLY_TEXT: Record<string, string> = {
+  INVOLVEMENT_SUSPECTED: "가담 의심",
+  DOCUMENT_FORGED: "서류 위조 판명",
+  OWNER_UNRELATED: "명의인 무관",
+}
+
+/**
+ * 외부 확인 회신을 반영한 갈래. 서버 `ReleaseGate` 의 순서를 따른다. 부정 회신은 원장
+ * 근거보다 앞서 사기 패턴이 되고(순서 1), 명의인 무관 회신은 수용 근거라 사기 패턴과 겹치면
+ * 판단 불가, 아니면 정상 수용이다. 목은 원장 규칙을 다시 계산하지 않으므로 사기 패턴 성립
+ * 여부는 저장한 규칙 행에서 읽는다.
+ */
+const effectiveBranch = (objection: MockObjection) => {
+  if (hasNegativeReply(objection)) return "FRAUD_PATTERN"
+  if (!hasReply(objection, "OWNER_UNRELATED")) return objection.branch
+  const fraudMatched = (objection.rules ?? []).some(
+    (rule) => rule.rule === "FRAUD_PATTERN" && rule.matched,
+  )
+  return fraudMatched ? "UNDETERMINED" : "NORMAL_ACCEPT"
+}
+
+/** 서버 `GateResult.allowsRelease` 와 같은 판정 허용 조건. 이의제기 상태는 보지 않는다. */
 export const allowedResults = (objection: MockObjection) => {
-  const normal = objection.branch === "NORMAL_ACCEPT"
-  const open = !objection.litigationPending && !hasNegativeReply(objection)
+  const branch = effectiveBranch(objection)
+  const normal = branch === "NORMAL_ACCEPT"
+  const open = !objection.litigationPending
   return {
     ACCEPTED:
       open && normal && (objection.clause === 1 || objection.clause === 2),
     PARTIAL:
-      open &&
-      (normal || objection.branch === "NORMAL_PARTIAL") &&
-      objection.clause === 3,
+      open && (normal || branch === "NORMAL_PARTIAL") && objection.clause === 3,
     REJECTED: true,
   }
 }
@@ -684,23 +712,33 @@ const isSupplementOverdue = (objection: MockObjection) =>
   objection.supplementDue != null &&
   getToday() > objection.supplementDue
 
-/** 외부 확인을 요청했으면 해제 요건 점검에 회신 규칙 행을 더한다. */
-const externalRule = (objection: MockObjection) =>
-  objection.externalChecks.length === 0
-    ? []
-    : [
-        {
-          rule: "EXTERNAL_CHECK",
-          description:
-            "수사기관, 관련 금융회사 회신에 가담이나 위조 확인이 있으면 해제 불가",
-          basis: "INTERNAL",
-          matched: hasNegativeReply(objection),
-          transactionNumbers: [],
-          detail: objection.externalChecks
-            .map((check) => `${check.agency} ${check.reply}`)
-            .join(", "),
-        },
-      ]
+/**
+ * 외부 확인 회신 규칙 행. 서버처럼 언제나 있고, 회신이 하나라도 있으면 성립(`matched`)이다.
+ * 성립이 곧 해제 불가는 아니다. 명의인 무관 회신은 수용 근거가 된다.
+ */
+const externalRule = (objection: MockObjection) => {
+  const replies = objection.externalChecks
+    .map((check) => EXTERNAL_REPLY_TEXT[check.reply ?? ""])
+    .filter((text): text is string => text != null)
+  return {
+    rule: "EXTERNAL_CHECK",
+    description: "수사기관과 관계 기관의 외부 확인 회신",
+    basis: "INTERNAL",
+    matched: replies.length > 0,
+    transactionNumbers: [],
+    detail:
+      replies.length > 0 ? `회신 ${replies.join(", ")}` : "외부 확인 회신 없음",
+  }
+}
+
+/** 서버 규칙 행 순서(간소화 제외, 외부 확인, 사기 패턴, 관계, 일부 요건)대로 둔다. */
+const gateRules = (objection: MockObjection) => {
+  const stored = (objection.rules ?? []).filter(
+    (rule) => rule.rule !== "EXTERNAL_CHECK",
+  )
+  const at = stored[0]?.rule === "SIMPLIFIED_EXCLUSION" ? 1 : 0
+  return [...stored.slice(0, at), externalRule(objection), ...stored.slice(at)]
+}
 
 export const toSummary = (
   objection: MockObjection,
@@ -714,8 +752,10 @@ export const toSummary = (
   disputedTotal: disputedTotal(objection),
   objectionDeadline: objection.objectionDeadline,
   receivedAt: objection.receivedAt,
+  receivedChannel: objection.receivedChannel,
   reviewDeadline: objection.reviewDeadline ?? undefined,
   deadlineAlert: isDeadlineAlert(objection),
+  supplementDue: objection.supplementDue ?? undefined,
   supplementOverdue: isSupplementOverdue(objection),
 })
 
@@ -728,14 +768,13 @@ const toDetail = (objection: MockObjection): ObjectionDetailResponse => ({
   idCopyConfirmed: objection.idCopyConfirmed,
   litigationPending: objection.litigationPending,
   gate: {
-    branch: objection.branch,
+    branch: effectiveBranch(objection),
     simplifiedExcluded: false,
     rulesVersion: RULES_VERSION,
     allowedResults: allowedResults(objection),
-    rules: [...(objection.rules ?? []), ...externalRule(objection)],
+    rules: gateRules(objection),
   },
   decision: objection.decision ?? undefined,
-  supplementDue: objection.supplementDue ?? undefined,
   supplementRound: objection.supplementRound,
   pendingDecision: objection.pendingDecision ?? undefined,
   externalChecks: objection.externalChecks,
@@ -773,7 +812,7 @@ export const noticeOf = (
   channel: string,
   recordedAt: string,
   basis = NOTICE_BASIS[kind] ?? kind,
-): ObjectionNoticeResponse => ({
+): NoticeResponse => ({
   noticeId:
     Math.max(
       objection.objectionId * 100,
@@ -821,10 +860,16 @@ export const paymentStopApiHandlers = [
       if (objection.decision) {
         return fail("PST0302", "이미 판정이 확정된 이의제기입니다.", 409)
       }
-      if (objection.pendingDecision) {
+      const releasing = body.result !== "REJECTED"
+      // 서버 `Objection.requireDecidable`: 승인 대기가 있으면 어느 판정도 못 쓰고, 수용과 일부
+      // 지급정지는 소명 완비 확인 뒤(`UNDER_REVIEW`)에만 쓴다.
+      if (
+        objection.pendingDecision ||
+        objection.objectionStatus === "PENDING_APPROVAL" ||
+        (releasing && objection.objectionStatus !== "UNDER_REVIEW")
+      ) {
         return fail("PST0308", "지금 상태에서 할 수 없는 요청입니다.", 409)
       }
-      const releasing = body.result !== "REJECTED"
       if (releasing && !body.earlyReleaseBasis?.trim()) {
         return fail(
           "PST0004",
@@ -913,13 +958,14 @@ export const paymentStopApiHandlers = [
       objectionStatus: "RECEIVED",
       receivedAt: toLocalDateTime(new Date()),
       ...opsDefaults(),
+      receivedChannel: "BRANCH",
       notices: [
         receiptNotice(objectionId * 100 + 1, toLocalDateTime(new Date())),
       ],
       ledger: ledger(
         pending.disputedTransfers.map((transfer) => ({
           number: transfer.transactionNumber ?? "",
-          direction: "DEPOSIT" as const,
+          direction: "IN" as const,
           amount: transfer.amount ?? 0,
           occurredAt: transfer.occurredAt ?? "",
           disputed: true,

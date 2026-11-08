@@ -31,7 +31,7 @@
 | ADM-02 | 시산표 | `/admin/trial-balance` | REQ-ADM-020~025 | `GL_READ` | PH-28 (P3) | S2 | 화면 완료 (#128·PR #152), 실연동 (#180) |
 | ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 화면 완료 (#146), 실제 숫자는 PH-77 ②(서버 #704) 뒤 |
 | ADM-04 | 대사 불일치 목록 | `/admin/ledger-reconciliation` | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 완료 (#130-①) |
-| ADM-05 | 지급정지 이의제기 심사 (목록, 상세, 대리 접수, 평가) | `/admin/objections`, `/admin/objections/:objectionId`, `/admin/objections/intake`, `/admin/objections/evaluation` | `corebank-server` `plans/261029-objection-review-agent` PA-07, PA-10~PA-15 | `PAYMENT_STOP_READ` 조회와 평가, `PAYMENT_STOP_WRITE` 대리 접수와 판정 작성, `PAYMENT_STOP_APPROVE` 승인과 반려 | PA-04, PA-10 (P3, 서버 `feat/paymentstop-review-ops`) | S4 | 화면 완료(2인 승인, 기한, 보완, 외부 확인, 통지 기록, 서류 판독, 원장 타임라인, AI 분석 타임라인과 재생, 평가) |
+| ADM-05 | 지급정지 이의제기 심사 (목록, 상세, 대리 접수, 평가) | `/admin/objections`, `/admin/objections/:objectionId`, `/admin/objections/intake`, `/admin/objections/evaluation` | `corebank-server` `plans/261029-objection-review-agent` PA-07, PA-10~PA-15 | `PAYMENT_STOP_READ` 조회와 평가, `PAYMENT_STOP_WRITE` 대리 접수와 판정 작성, `PAYMENT_STOP_APPROVE` 승인과 반려 | PA-04, PA-10 (P3, 서버 `feat/paymentstop-review-ops`) | S4 | 화면 완료(2인 승인, 담당자 재량 판정, 기한, 보완, 외부 확인, 통지 기록, 서류 판독, 원장 타임라인, AI 분석 타임라인과 재생, AI 의견(참고), 평가) |
 | ADM-90 | [공통] 관리자 셸 — 사이드바·헤더·세션 | 전 관리자 화면 | REQ-ADM-001~006 | — | — | S0 | 완료 (#126·PR #138) |
 | ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 완료 (#136) |
 | ADM-92 | [공통] 접근 권한 없음 | 라우트 없음 — 진입 URL 유지 | REQ-ADM-009 | — | — | S0 | 완료 |
@@ -73,7 +73,7 @@
 | `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:69` · 라우트 게이트 `admin-routes.tsx:105`) |
 | `PAYMENT_STOP_READ` | 지급정지 조회 | 이의제기 목록, 상세(소명 원문) — 2차 고정 5종 뒤 서버가 더했다(계획 D14) |
 | `PAYMENT_STOP_WRITE` | 지급정지 변경 | 지급정지 사건 등록, 이의제기 접수와 서류 대리 업로드, 소명 완비 확인, 보완 요청, 외부 확인, 판정 작성 |
-| `PAYMENT_STOP_APPROVE` | 지급정지 승인 | 승인 대기 판정(수용, 일부 지급정지)의 승인과 반려. 작성자 본인은 승인만 못 하고 반려는 할 수 있다(계약 v2 §10) |
+| `PAYMENT_STOP_APPROVE` | 지급정지 승인 | 승인 대기 판정(수용, 일부 지급정지)의 승인과 반려. 작성자 본인은 승인만 못 하고 반려는 할 수 있다(계약 v2 §10). 재량 판정은 승인자가 재량 판정 사유를 확인했다고 체크해야 승인하고(`discretionaryAcknowledged`), 반려는 체크 없이 한다 |
 
 구현: `src/shared/types/admin-permission.ts`(이름 집합) · `src/entities/auth/lib/session-role.ts`(판정 단일 출처).
 
@@ -264,3 +264,4 @@
 | 2026-10-29 | ADM-01 서버 API(PH-97) 연동과 조회 사유 입력(#199). 목 데이터와 화면 안 필터링을 걷어내고 REQ-ADM-010을 서버 검색 규칙으로 고침. REQ-ADM-019 구현. 개인정보 마스킹은 서버 값을 그대로 표시 |
 | 2026-11-05 | ADM-05 지급정지 이의제기 심사 화면 뼈대(계획 PA-07, 타임라인 제외). 권한 `PAYMENT_STOP_READ`, `PAYMENT_STOP_WRITE` 추가, 네비 "심사" 그룹 신설. 서버 Draft PR #916 스펙 기준 |
 | 2026-11-06 | ADM-05 심사 운영 반영. 권한 `PAYMENT_STOP_APPROVE` 추가, 평가 경로 `/admin/objections/evaluation` 추가. 수용과 일부 지급정지는 소명 완비 확인 뒤에만 작성, 대리 접수 뒤 서류 업로드. 서버 `feat/paymentstop-review-ops`(36a6a629) 스펙 기준 |
+| 2026-11-09 | ADM-05 담당자 재량 판정. 최종 판단은 사람이 하므로 해제 요건 점검이 닫아도 서버 `gate.discretionaryResults` 가 연 수용과 일부 지급정지는 라디오를 막지 않고 "재량 판정"으로 표시한다. 고르면 경고와 재량 판정 사유(20~1000자, 필수)를 받고 요청에 `discretionary`, `discretionaryReason` 을 싣는다. 소송 계속, 사유 조항 불일치, 외부 기관 부정 회신은 재량으로도 닫는다(`PST0310`). 승인 패널은 작성 당시 점검 갈래와 재량 사유를 보이고 확인 체크 뒤 승인한다(`PST0311`). 확정 판정과 목록에 재량 판정 표시. AI 판정안은 "AI 의견(참고)"로 바꾸고 판정을 막지 않는다고 밝힘. 서버 계약은 스냅샷에 손으로 반영(실서버 스펙 대조 전) |

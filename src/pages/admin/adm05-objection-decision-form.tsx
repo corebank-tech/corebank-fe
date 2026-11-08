@@ -44,8 +44,9 @@ type Props = {
  * 판정 입력. 불수용은 바로 확정되고, 수용과 일부 지급정지는 다른 관리자의 승인을 기다린다
  * (2인 승인, 계획 PA-10). 그래서 지급정지를 줄이는 판정은 버튼 이름이 "승인 요청"이다.
  *
- * 고를 수 있는 판정은 서버 해제 요건 점검(`gate.allowedResults`)이 정한다. 닫힌 판정은
- * 라디오를 잠그고 옆에 이유를 적는다 — 눌러서 서버 거부(`PST0301`)를 받는 건 이미 늦다.
+ * 고를 수 있는 판정은 서버 해제 요건 점검(`gate.allowedResults`)과 이의제기 상태가 함께
+ * 정한다. 수용과 일부 지급정지는 소명 완비 확인 뒤(`UNDER_REVIEW`)에만 쓸 수 있다. 닫힌 판정은
+ * 라디오를 잠그고 옆에 이유를 적는다 — 눌러서 서버 거부(`PST0301`, `PST0308`)를 받는 건 이미 늦다.
  *
  * 수용과 일부 지급정지는 법상 조기 해제라 근거가 필수다(D29). 화면이 먼저 막고, 서버도
  * `PST0004` 로 막는다.
@@ -67,10 +68,12 @@ export const Adm05ObjectionDecisionForm = ({
   const [serverError, setServerError] = React.useState<string | null>(null)
   const [isConfirmOpen, setConfirmOpen] = React.useState(false)
 
-  // 점검 결과가 다시 계산돼 고른 판정이 닫혔으면 선택을 버린다. 닫힌 라디오가 선택된 채
-  // 남으면 담당자는 왜 확정이 막히는지 알 수 없다.
+  // 점검 결과가 다시 계산되거나 상태가 바뀌어 고른 판정이 닫혔으면 선택을 버린다. 닫힌
+  // 라디오가 선택된 채 남으면 담당자는 왜 확정이 막히는지 알 수 없다.
   const selected =
-    result != null && objection.gate.allowedResults[result] ? result : null
+    result != null && closedDecisionReason(objection, result) == null
+      ? result
+      : null
   const needsBasis = selected != null && isReleasingDecision(selected)
   const scope = CLAUSE_SCOPE[objection.clause as ObjectionClause]
 

@@ -87,6 +87,12 @@ export const OBJECTION_STATUS_LABEL: Record<string, string> = {
   DECIDED: "판정 확정",
 }
 
+/** 이의제기 접수 경로(서버 `ObjectionChannel`, D34). */
+export const RECEIVED_CHANNEL_LABEL: Record<string, string> = {
+  BRANCH: "영업점 대리 접수",
+  ONLINE: "비대면 신청",
+}
+
 /** 판정을 아직 확정하지 않은 상태인가. 확정과 승인 대기 밖은 모두 심사 진행 중이다. */
 export const isObjectionOpen = (status: string): boolean =>
   status !== "DECIDED" && status !== "PENDING_APPROVAL"

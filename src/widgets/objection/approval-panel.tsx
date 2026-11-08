@@ -7,7 +7,7 @@ import {
   useReturnDecision,
   type ObjectionDecision,
 } from "@/entities/payment-stop"
-import { toErrorMessage } from "@/shared/api/api-error"
+import { isApiError, toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDateTime } from "@/shared/lib/format"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { Alert } from "@/shared/ui/alert"
@@ -21,6 +21,13 @@ import { Textarea } from "@/shared/ui/textarea"
 
 const MAX_RETURN_REASON_LENGTH = 500
 
+/**
+ * 다른 관리자가 먼저 처리했다는 뜻의 오류. 먼저 승인됐으면 `PST0302`(이미 확정), 먼저
+ * 반려됐으면 `PST0204`(승인할 판정 없음)다. 상세를 다시 받으면 이 패널이 사라지므로 오류를
+ * 패널 안에 두지 않고 화면으로 올린다.
+ */
+const SUPERSEDED_CODES = new Set(["PST0302", "PST0204"])
+
 type Props = {
   objectionId: number
   decision: ObjectionDecision
@@ -33,15 +40,20 @@ type Props = {
     outcome: "APPROVED" | "RETURNED",
     decision: ObjectionDecision,
   ) => void
+  /** 다른 관리자가 먼저 승인하거나 반려해 이번 요청이 거부됐을 때 */
+  onSuperseded: () => void
 }
 
 /**
  * 2인 승인(계획 PA-10, 내부 통제 D33). 수용과 일부 지급정지는 작성한 관리자가 아닌 다른
  * 관리자가 승인해야 계좌에 반영된다.
  *
- * 작성자 본인은 승인과 반려를 모두 막는다. 서버도 승인을 `PST0309` 로 거부한다 — 화면이 먼저
- * 막는 이유는 눌러서 거부를 받는 건 이미 늦기 때문이다. 로그인한 관리자 번호를 아직 모르면
- * 해제를 막는 쪽으로 두어 버튼을 잠근다.
+ * 작성자 본인은 승인만 막는다. 서버도 승인을 `PST0309` 로 거부한다 — 화면이 먼저 막는 이유는
+ * 눌러서 거부를 받는 건 이미 늦기 때문이다. 로그인한 관리자 번호를 아직 모르면 해제를 막는
+ * 쪽으로 두어 승인 버튼을 잠근다.
+ *
+ * 반려는 작성자 본인도 할 수 있다(계약 v2 §10). 해제를 막는 쪽이라 잘못 올린 판정을 작성자가
+ * 거둘 수 있어야 한다. 서버도 반려에는 작성자 검사를 두지 않는다.
  */
 export const ApprovalPanel = ({
   objectionId,
@@ -49,6 +61,7 @@ export const ApprovalPanel = ({
   canApprove,
   currentAdminId,
   onSettled,
+  onSuperseded,
 }: Props) => {
   const approve = useApproveDecision()
   const returnDecision = useReturnDecision()
@@ -62,13 +75,21 @@ export const ApprovalPanel = ({
   const isAuthor =
     currentAdminId == null ||
     (decision.decidedBy != null && decision.decidedBy === currentAdminId)
-  const blockedReason = isAuthor
+  const approveBlockedReason = isAuthor
     ? currentAdminId == null
       ? "로그인한 관리자를 확인하는 중입니다."
-      : "본인이 작성한 판정은 승인하거나 반려할 수 없습니다. 다른 승인 관리자가 처리합니다."
+      : "본인이 작성한 판정은 승인할 수 없습니다. 다른 승인 관리자가 승인합니다. 잘못 올렸으면 반려할 수 있습니다."
     : null
   const decisionId = decision.decisionId
   const isBusy = approve.isPending || returnDecision.isPending
+
+  const handleError = (cause: unknown) => {
+    if (isApiError(cause) && SUPERSEDED_CODES.has(cause.code)) {
+      onSuperseded()
+      return
+    }
+    setError(toErrorMessage(cause))
+  }
 
   const handleApprove = () => {
     setConfirmOpen(false)
@@ -85,7 +106,7 @@ export const ApprovalPanel = ({
           approveKey.reset()
           onSettled("APPROVED", approved)
         },
-        onError: (cause) => setError(toErrorMessage(cause)),
+        onError: handleError,
       },
     )
   }
@@ -111,7 +132,7 @@ export const ApprovalPanel = ({
           returnKey.reset()
           onSettled("RETURNED", returned)
         },
-        onError: (cause) => setError(toErrorMessage(cause)),
+        onError: handleError,
       },
     )
   }
@@ -173,11 +194,13 @@ export const ApprovalPanel = ({
           </Alert>
         ) : (
           <>
-            {blockedReason && <Alert variant="warning">{blockedReason}</Alert>}
+            {approveBlockedReason && (
+              <Alert variant="warning">{approveBlockedReason}</Alert>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"
-                disabled={blockedReason != null || isBusy}
+                disabled={approveBlockedReason != null || isBusy}
                 onClick={() => setConfirmOpen(true)}
               >
                 <UserCheck className="h-3.5 w-3.5" aria-hidden />
@@ -187,13 +210,13 @@ export const ApprovalPanel = ({
                 size="sm"
                 variant="outline"
                 aria-expanded={isReturnOpen}
-                disabled={blockedReason != null || isBusy}
+                disabled={isBusy}
                 onClick={() => setReturnOpen((open) => !open)}
               >
                 반려
               </Button>
             </div>
-            {isReturnOpen && blockedReason == null && (
+            {isReturnOpen && (
               <form onSubmit={handleReturn} noValidate aria-label="반려">
                 <FormRow
                   label="반려 사유"

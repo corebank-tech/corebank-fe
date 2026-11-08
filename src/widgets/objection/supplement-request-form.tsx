@@ -6,15 +6,18 @@ import {
 } from "@/entities/payment-stop"
 import { toErrorMessage } from "@/shared/api/api-error"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
-import { formatDate } from "@/shared/lib/format"
 import { Alert } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import { FormRow } from "@/shared/ui/form-row"
 import { Textarea } from "@/shared/ui/textarea"
 
-/** 서버 `SupplementRequest` 의 상한(계약 v2 §3). */
+/** 서버 `SupplementRequestBody` 의 상한(계약 v2 §3). */
 const MAX_REASON_LENGTH = 500
 const MAX_MISSING_DOCUMENTS = 20
+/** 서버가 요청 서류 한 줄마다 거는 `@Size(max = 100)`. */
+const MAX_DOCUMENT_LENGTH = 100
+
+export type SupplementRequested = { round: number; due: string | null }
 
 type Props = {
   objectionId: number
@@ -22,6 +25,11 @@ type Props = {
   supplementRound: number
   /** 누락 서류 입력의 처음 값. AI 판정안의 누락 소명자료를 넘긴다 */
   suggestedDocuments?: string[]
+  /**
+   * 요청이 받아들여졌을 때. 다시 받은 상세가 보완 요청 상태가 되면 이 폼이 사라지므로 결과
+   * 안내는 부모가 띄운다
+   */
+  onRequested: (result: SupplementRequested) => void
 }
 
 const parseDocuments = (text: string) =>
@@ -38,6 +46,7 @@ export const SupplementRequestForm = ({
   objectionId,
   supplementRound,
   suggestedDocuments = [],
+  onRequested,
 }: Props) => {
   const requestSupplement = useRequestSupplement()
   const idempotency = useIdempotencyKey()
@@ -46,10 +55,6 @@ export const SupplementRequestForm = ({
     suggestedDocuments.join("\n"),
   )
   const [error, setError] = React.useState<string | null>(null)
-  const [result, setResult] = React.useState<{
-    round: number
-    due: string | null
-  } | null>(null)
 
   const nextRound = supplementRound + 1
   if (nextRound > SUPPLEMENT_MAX_ROUNDS) {
@@ -78,6 +83,15 @@ export const SupplementRequestForm = ({
       setError(`요청할 서류는 ${MAX_MISSING_DOCUMENTS}개까지입니다.`)
       return
     }
+    const tooLong = documents.findIndex(
+      (document) => document.length > MAX_DOCUMENT_LENGTH,
+    )
+    if (tooLong >= 0) {
+      setError(
+        `요청 서류 ${tooLong + 1}번째 줄이 ${MAX_DOCUMENT_LENGTH}자를 넘습니다. 한 줄에 ${MAX_DOCUMENT_LENGTH}자까지 적습니다.`,
+      )
+      return
+    }
     const request = { reason: reason.trim(), missingDocuments: documents }
     requestSupplement.mutate(
       {
@@ -88,12 +102,12 @@ export const SupplementRequestForm = ({
       {
         onSuccess: (data) => {
           idempotency.reset()
-          setResult({
+          setReason("")
+          setDocumentsText("")
+          onRequested({
             round: data.round ?? nextRound,
             due: data.supplementDue ?? null,
           })
-          setReason("")
-          setDocumentsText("")
         },
         onError: (cause) => setError(toErrorMessage(cause)),
       },
@@ -129,13 +143,6 @@ export const SupplementRequestForm = ({
       {error && (
         <Alert variant="danger" className="mt-3">
           {error}
-        </Alert>
-      )}
-      {result && (
-        <Alert variant="success" className="mt-3">
-          {result.round}회째 보완을 요청했습니다.
-          {result.due && ` 보완 기한은 ${formatDate(result.due)}입니다.`} 명의인
-          통지를 기록했습니다.
         </Alert>
       )}
       <div className="mt-3 flex justify-end">

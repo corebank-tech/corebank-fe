@@ -17,7 +17,12 @@ import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 type Props = {
   objection: Pick<
     ObjectionDetail,
-    "gate" | "clause" | "litigationPending" | "decision"
+    | "gate"
+    | "clause"
+    | "litigationPending"
+    | "decision"
+    | "objectionStatus"
+    | "externalChecks"
   >
 }
 

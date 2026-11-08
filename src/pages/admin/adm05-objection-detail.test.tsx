@@ -50,7 +50,9 @@ const NORMAL_ACCEPT_DETAIL: ObjectionDetailResponse = {
   simplifiedRequested: false,
   idCopyConfirmed: true,
   litigationPending: false,
-  objectionStatus: "RECEIVED",
+  // 수용과 일부 지급정지는 소명 완비 확인 뒤(심사 중)에만 쓸 수 있다(서버 `requireDecidable`).
+  objectionStatus: "UNDER_REVIEW",
+  reviewDeadline: "2026-11-10",
   receivedAt: "2026-11-03T10:21:40",
   gate: {
     branch: "NORMAL_ACCEPT",
@@ -218,6 +220,8 @@ const respondAgent = (runs: unknown[] = []) =>
 
 let sessionCalls: (string | null)[] = []
 let approveCalls: (string | null)[] = []
+let returnCalls: unknown[] = []
+let noticeCalls = 0
 
 const okJson = (data: unknown) =>
   HttpResponse.json({ code: "0000", message: "성공", data })
@@ -239,7 +243,10 @@ const respondReviewOps = (adminId = 2) =>
       },
     ),
     http.get("*/admin/objections/:objectionId/documents", () => okJson([])),
-    http.get("*/admin/objections/:objectionId/notices", () => okJson([])),
+    http.get("*/admin/objections/:objectionId/notices", () => {
+      noticeCalls += 1
+      return okJson([])
+    }),
     http.get("*/admin/objections/:objectionId/external-checks", () =>
       okJson([]),
     ),
@@ -256,6 +263,18 @@ const respondReviewOps = (adminId = 2) =>
         })
       },
     ),
+    http.post(
+      "*/admin/objections/:objectionId/decisions/:decisionId/return",
+      async ({ request }) => {
+        returnCalls.push(await request.json())
+        return okJson({
+          decisionId: 51,
+          status: "RETURNED",
+          result: "ACCEPTED",
+          returnReason: "근거 거래 재확인 필요",
+        })
+      },
+    ),
   )
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
@@ -269,6 +288,8 @@ afterEach(() => {
   detailReasons = []
   sessionCalls = []
   approveCalls = []
+  returnCalls = []
+  noticeCalls = 0
 })
 afterAll(() => server.close())
 
@@ -323,6 +344,65 @@ describe("Adm05ObjectionDetail", () => {
     expect(decisionRadio("수용")).toHaveAccessibleDescription(
       "사기 패턴이 성립하고 정상 근거가 없어 해제할 수 없습니다.",
     )
+  })
+
+  it("소명 완비 확인 전에는 요건이 열려도 수용을 잠그고 불수용만 연다", async () => {
+    respondDetail({ ...NORMAL_ACCEPT_DETAIL, objectionStatus: "RECEIVED" })
+    renderDetail()
+    await screen.findByText("해제 요건 점검")
+
+    expect(decisionRadio("수용")).toBeDisabled()
+    expect(decisionRadio("수용")).toHaveAccessibleDescription(
+      "소명 완비 확인 뒤 고를 수 있습니다.",
+    )
+    expect(decisionRadio("불수용")).toBeEnabled()
+    const choices = screen.getByRole("list", { name: "판정별 해제 요건" })
+    expect(
+      within(choices).getByText("소명 완비 확인 뒤 고를 수 있습니다."),
+    ).toBeInTheDocument()
+  })
+
+  it("판정 작성이 상태 오류로 거부돼도 상세와 통지 기록을 다시 받는다", async () => {
+    respondDetail(NORMAL_ACCEPT_DETAIL)
+    respondDecision(() => ({
+      code: "PST0308",
+      message: "지금 상태에서 할 수 없는 요청입니다.",
+      status: 409,
+    }))
+    renderDetail()
+    await screen.findByText("해제 요건 점검")
+    await waitFor(() => expect(noticeCalls).toBe(1))
+    const detailCalls = detailReasons.length
+
+    await submitDecision({ result: "불수용", reason: "사기 정황" })
+
+    expect(
+      await screen.findByText("지금 상태에서 할 수 없는 요청입니다."),
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(detailReasons.length).toBeGreaterThan(detailCalls),
+    )
+    await waitFor(() => expect(noticeCalls).toBe(2))
+  })
+
+  it("통지 기록을 받지 못하면 기록 없음이 아니라 실패를 알린다", async () => {
+    respondDetail(NORMAL_ACCEPT_DETAIL)
+    server.use(
+      http.get("*/admin/objections/:objectionId/notices", () =>
+        HttpResponse.json(
+          { code: "CMN9999", message: "일시적인 오류입니다." },
+          { status: 500 },
+        ),
+      ),
+    )
+    renderDetail()
+
+    expect(
+      await screen.findByText(/통지 기록을 불러오지 못했습니다. 기록이 없다는/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText("남긴 통지 기록이 없습니다."),
+    ).not.toBeInTheDocument()
   })
 
   it("수용은 조기 해제 근거 없이 확정을 요청하지 않는다", async () => {
@@ -488,11 +568,56 @@ describe("Adm05ObjectionDetail", () => {
     })
     renderDetail()
 
-    const deadline = await screen.findByRole("status", {
-      name: /심사 기한 2026\.11\.10.*기한 임박/,
-    })
-    expect(deadline).toHaveClass("text-danger")
+    expect(
+      await screen.findByRole("status", {
+        name: /심사 기한 2026\.11\.10.*기한 임박/,
+      }),
+    ).toBeInTheDocument()
     expect(screen.getByText("심사 기한 임박")).toBeInTheDocument()
+  })
+
+  it("기한이 지났으면 하루 전이라고 말하지 않고, 승인 대기면 보완 요청을 권하지 않는다", async () => {
+    respondDetail({
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionStatus: "PENDING_APPROVAL",
+      reviewDeadline: "2026-01-05",
+      deadlineAlert: true,
+      pendingDecision: {
+        decisionId: 51,
+        status: "PENDING_APPROVAL",
+        result: "ACCEPTED",
+        reason: "수강료 정기 입금",
+        decidedBy: 2,
+        decidedAt: "2026-11-05T17:10:00",
+      },
+    })
+    renderDetail()
+
+    expect(await screen.findByText("심사 기한 경과")).toBeInTheDocument()
+    expect(screen.getByText(/심사 기한이 지났습니다/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/승인 대기 판정을 승인하거나 반려해야/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/보완을 요청하세요/)).not.toBeInTheDocument()
+  })
+
+  it("승인 대기 중에도 외부 확인을 요청할 수 있다", async () => {
+    respondDetail({
+      ...NORMAL_ACCEPT_DETAIL,
+      objectionStatus: "PENDING_APPROVAL",
+      pendingDecision: {
+        decisionId: 51,
+        status: "PENDING_APPROVAL",
+        result: "ACCEPTED",
+        reason: "수강료 정기 입금",
+        decidedBy: 2,
+        decidedAt: "2026-11-05T17:10:00",
+      },
+    })
+    renderDetail()
+
+    const panel = await screen.findByRole("region", { name: "외부 확인" })
+    expect(within(panel).getByLabelText("요청 기관")).toBeInTheDocument()
   })
 
   it("보완 2회를 다 쓰면 보완 요청 입력 대신 소진 안내를 보인다", async () => {
@@ -566,7 +691,7 @@ describe("Adm05ObjectionDetail", () => {
       expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument()
     })
 
-    it("작성자 본인은 승인 권한이 있어도 승인과 반려를 누를 수 없다", async () => {
+    it("작성자 본인은 승인할 수 없지만 반려로 거둘 수 있다", async () => {
       respondDetail(PENDING_DETAIL)
       respondReviewOps(2)
       renderDetail({
@@ -579,13 +704,88 @@ describe("Adm05ObjectionDetail", () => {
       })
       await waitFor(() =>
         expect(
-          within(panel).getByText(
-            /본인이 작성한 판정은 승인하거나 반려할 수 없습니다/,
-          ),
+          within(panel).getByText(/본인이 작성한 판정은 승인할 수 없습니다/),
         ).toBeInTheDocument(),
       )
       expect(within(panel).getByRole("button", { name: "승인" })).toBeDisabled()
-      expect(within(panel).getByRole("button", { name: "반려" })).toBeDisabled()
+
+      fireEvent.click(within(panel).getByRole("button", { name: "반려" }))
+      fireEvent.change(within(panel).getByLabelText(/반려 사유/), {
+        target: { value: "근거 거래 재확인 필요" },
+      })
+      fireEvent.click(within(panel).getByRole("button", { name: "반려 확정" }))
+
+      expect(await screen.findByText(/판정을 반려했습니다/)).toBeInTheDocument()
+      expect(returnCalls).toEqual([{ reason: "근거 거래 재확인 필요" }])
+    })
+
+    it.each([
+      ["PST0301", "해제 요건을 충족하지 않아 이 판정을 확정할 수 없습니다."],
+      ["PST0309", "판정 작성자는 그 판정을 승인할 수 없습니다."],
+    ])(
+      "승인이 %s 로 거부되면 서버 문구를 승인 패널에 보인다",
+      async (code, message) => {
+        respondDetail(PENDING_DETAIL)
+        respondReviewOps(14)
+        server.use(
+          http.post(
+            "*/admin/objections/:objectionId/decisions/:decisionId/approve",
+            () => HttpResponse.json({ code, message }, { status: 409 }),
+          ),
+        )
+        renderDetail({
+          path: "/admin/objections/5?reason=OPERATION",
+          permissions: APPROVER,
+        })
+
+        const panel = await screen.findByRole("region", {
+          name: "승인 대기 판정",
+        })
+        const approve = within(panel).getByRole("button", { name: "승인" })
+        await waitFor(() => expect(approve).toBeEnabled())
+        fireEvent.click(approve)
+        const dialog = await screen.findByRole("dialog")
+        fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+        expect(await within(panel).findByText(message)).toBeInTheDocument()
+        expect(screen.queryByText("이미 처리된 판정")).not.toBeInTheDocument()
+      },
+    )
+
+    it("다른 관리자가 먼저 승인했으면 이미 처리됐다고 알린다", async () => {
+      respondDetail(PENDING_DETAIL)
+      respondReviewOps(14)
+      server.use(
+        http.post(
+          "*/admin/objections/:objectionId/decisions/:decisionId/approve",
+          () =>
+            HttpResponse.json(
+              {
+                code: "PST0302",
+                message: "이미 판정이 확정된 이의제기입니다.",
+              },
+              { status: 409 },
+            ),
+        ),
+      )
+      renderDetail({
+        path: "/admin/objections/5?reason=OPERATION",
+        permissions: APPROVER,
+      })
+
+      const panel = await screen.findByRole("region", {
+        name: "승인 대기 판정",
+      })
+      const approve = within(panel).getByRole("button", { name: "승인" })
+      await waitFor(() => expect(approve).toBeEnabled())
+      fireEvent.click(approve)
+      const dialog = await screen.findByRole("dialog")
+      fireEvent.click(within(dialog).getByRole("button", { name: "확인" }))
+
+      expect(await screen.findByText("이미 처리된 판정")).toBeInTheDocument()
+      expect(
+        screen.getByText(/다른 관리자가 먼저 승인하거나 반려했습니다/),
+      ).toBeInTheDocument()
     })
 
     it("다른 승인 관리자는 확인 뒤 승인하고 멱등키를 보낸다", async () => {

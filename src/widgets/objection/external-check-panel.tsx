@@ -81,7 +81,10 @@ type Props = {
   initialChecks: ExternalCheck[]
   /** 변경 권한. 없으면 요청 입력을 그리지 않는다 */
   canWrite: boolean
-  /** 판정이 올라갔거나 확정됐으면 새 요청을 받지 않는다 */
+  /**
+   * 판정이 확정됐으면 새 요청을 받지 않는다. 승인 대기 중에는 받는다 — 막는 쪽 회신은 승인
+   * 직전 요건 재계산에 들어가 해제를 멈출 수 있다(서버 `ExternalCheckService`, D9)
+   */
   isClosed: boolean
 }
 

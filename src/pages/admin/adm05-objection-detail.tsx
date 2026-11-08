@@ -13,6 +13,7 @@ import {
   CLAUSE_SCOPE,
   DECISION_LABEL,
   OBJECTION_STATUS_LABEL,
+  RECEIVED_CHANNEL_LABEL,
   formatClause,
   isObjectionOpen,
   labelOf,
@@ -157,8 +158,17 @@ type Outcome =
   | { kind: "PENDING"; result: DecisionResult }
   | { kind: "APPROVED"; result: string }
   | { kind: "RETURNED"; result: string; reason: string | null }
+  | { kind: "SUPERSEDED" }
 
 const OutcomeAlert = ({ outcome }: { outcome: Outcome }) => {
+  if (outcome.kind === "SUPERSEDED") {
+    return (
+      <Alert variant="warning" title="이미 처리된 판정">
+        다른 관리자가 먼저 승인하거나 반려했습니다. 아래에 다시 받은 최신 상태를
+        확인하세요.
+      </Alert>
+    )
+  }
   const label = labelOf(DECISION_LABEL, outcome.result)
   if (outcome.kind === "PENDING") {
     return (
@@ -432,6 +442,24 @@ export const Adm05ObjectionDetail = () => {
             }
             labelWidth={140}
           />
+          <LabelValueRow
+            label="접수 경로"
+            value={
+              objection.receivedChannel
+                ? labelOf(RECEIVED_CHANNEL_LABEL, objection.receivedChannel)
+                : "-"
+            }
+            labelWidth={140}
+          />
+          <LabelValueRow
+            label="완비 확인 일시"
+            value={
+              objection.completenessConfirmedAt
+                ? formatDateTime(objection.completenessConfirmedAt)
+                : "확인 전"
+            }
+            labelWidth={140}
+          />
         </div>
       </Panel>
 
@@ -446,7 +474,8 @@ export const Adm05ObjectionDetail = () => {
             objectionId={objection.objectionId}
             initialChecks={objection.externalChecks}
             canWrite={canDecide}
-            isClosed={!isObjectionOpen(objection.objectionStatus)}
+            // 서버는 확정된 뒤만 막는다(D9). 승인 대기 중 회신은 승인 직전 요건 재계산에 들어간다
+            isClosed={objection.objectionStatus === "DECIDED"}
           />
         </div>
       </FormSection>
@@ -516,6 +545,7 @@ export const Adm05ObjectionDetail = () => {
           objectionId={objection.objectionId}
           isDecided={objection.decision != null}
           canRequest={canDecide}
+          serverBranch={objection.gate.branch || undefined}
         />
       </FormSection>
 
@@ -550,6 +580,7 @@ export const Adm05ObjectionDetail = () => {
                     },
               )
             }
+            onSuperseded={() => setOutcome({ kind: "SUPERSEDED" })}
           />
         ) : canDecide && canWriteDecision ? (
           <Adm05ObjectionDecisionForm

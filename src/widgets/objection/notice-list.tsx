@@ -7,6 +7,7 @@ import {
   type ObjectionNotice,
 } from "@/entities/payment-stop"
 import { formatDateTime } from "@/shared/lib/format"
+import { Alert } from "@/shared/ui/alert"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 
 const columns: DataGridColumn<ObjectionNotice>[] = [
@@ -50,15 +51,27 @@ const columns: DataGridColumn<ObjectionNotice>[] = [
  * 없고 기록만 있다. 최근 기록이 위로 오게 뒤집어 보인다.
  */
 export const NoticeList = ({ objectionId }: { objectionId: number }) => {
-  const { notices, isPending } = useObjectionNotices(objectionId)
+  const { notices, isPending, isError } = useObjectionNotices(objectionId)
+  // 통지는 법적 기록이라 조회 실패를 "기록 없음"으로 보이면 안 된다. 이미 받은 기록이 있으면
+  // 그대로 두고 실패만 알린다.
   return (
     <div className="flex flex-col gap-2">
+      {isError && (
+        <Alert variant="danger">
+          통지 기록을 불러오지 못했습니다. 기록이 없다는 뜻이 아니므로 잠시 뒤
+          다시 확인하세요.
+        </Alert>
+      )}
       <DataGrid
         columns={columns}
         rows={[...(notices ?? [])].reverse()}
         rowKey={(row) => String(row.noticeId)}
         loading={isPending}
-        emptyMessage="남긴 통지 기록이 없습니다."
+        emptyMessage={
+          isError
+            ? "통지 기록을 불러오지 못했습니다."
+            : "남긴 통지 기록이 없습니다."
+        }
       />
       <p className="text-2xs text-ink-faint">
         실제 문자와 서면 발송은 하지 않고 통지 기록만 남깁니다.

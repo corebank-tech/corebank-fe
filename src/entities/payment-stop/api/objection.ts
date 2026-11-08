@@ -1,8 +1,16 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import * as React from "react"
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query"
 import {
   confirmObjectionDecision,
   getGetObjectionDetailQueryKey,
+  getListObjectionExternalChecksQueryKey,
+  getListObjectionNoticesQueryKey,
   getListObjectionsQueryKey,
+  listObjections,
   receiveObjection,
   registerPaymentStopCase,
   useGetObjectionDetail,
@@ -17,7 +25,7 @@ import {
   type Rule,
 } from "@/shared/api/generated"
 import { withIdempotencyKey } from "@/shared/api/custom-fetch"
-import { isApiError } from "@/shared/api/api-error"
+import { useQueueStall } from "@/entities/payment-stop/api/agent-run"
 import {
   DECISION_RESULTS,
   type DecisionResult,
@@ -54,12 +62,16 @@ export type ObjectionSummary = {
   /** 이의제기 신청 기한(채권소멸 공고일 기준, D31). 통보 기한이 아니다 */
   objectionDeadline: string
   receivedAt: string
-  /** 심사 기한(완비 확인일 + 5영업일). 완비 확인 전이면 `null` */
+  /** 심사 기한(완비 확인일 + 5영업일). 완비 확인 전과 보완 요청 중이면 `null` */
   reviewDeadline: string | null
   /** 확정 전이고 심사 기한 1영업일 전부터 켜진다(설계 불변식 6). 서버가 계산한다 */
   deadlineAlert: boolean
+  /** 보완 기한. 보완 요청 중이 아니면 `null` */
+  supplementDue: string | null
   /** 보완 기한이 지났는데 보완이 오지 않았다. 불수용 대상이지만 자동 확정하지 않는다(D32) */
   supplementOverdue: boolean
+  /** 접수 경로(서버 `ObjectionChannel`): `BRANCH` 영업점 대리, `ONLINE` 비대면 */
+  receivedChannel: string
   /** 최근 AI 분석 실행 상태. 실행이 없으면 `null` */
   latestRunStatus: string | null
   /** 최근 실행의 마지막 단계 이름 */
@@ -143,6 +155,10 @@ export type ObjectionDetail = {
   litigationPending: boolean
   objectionStatus: string
   receivedAt: string
+  /** 접수 경로(서버 `ObjectionChannel`): `BRANCH` 영업점 대리, `ONLINE` 비대면 */
+  receivedChannel: string
+  /** 소명 완비를 확인한 시각. 확인 전이면 `null` */
+  completenessConfirmedAt: string | null
   gate: ReleaseGate
   decision: ObjectionDecision | null
   reviewDeadline: string | null
@@ -170,7 +186,9 @@ const toSummary = (response: ObjectionSummaryResponse): ObjectionSummary => ({
   receivedAt: response.receivedAt ?? "",
   reviewDeadline: response.reviewDeadline ?? null,
   deadlineAlert: response.deadlineAlert ?? false,
+  supplementDue: response.supplementDue ?? null,
   supplementOverdue: response.supplementOverdue ?? false,
+  receivedChannel: response.receivedChannel ?? "",
   latestRunStatus: response.latestRunStatus ?? null,
   latestRunLastStepTitle: response.latestRunLastStepTitle || null,
 })
@@ -232,6 +250,8 @@ const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
     litigationPending: response.litigationPending ?? false,
     objectionStatus: response.objectionStatus ?? "",
     receivedAt: response.receivedAt ?? "",
+    receivedChannel: response.receivedChannel ?? "",
+    completenessConfirmedAt: response.completenessConfirmedAt ?? null,
     gate: {
       branch: gate.branch ?? "",
       simplifiedExcluded: gate.simplifiedExcluded ?? false,
@@ -259,29 +279,67 @@ const toDetail = (response: ObjectionDetailResponse): ObjectionDetail => {
 /** 목록의 AI 분석 상태 칸을 다시 받는 간격. 상세보다 느슨하게 둔다. */
 const LIST_POLL_INTERVAL_MS = 2000
 
-const RUN_ACTIVE_STATUSES = new Set(["QUEUED", "RUNNING"])
+/** 대기 중인 행을 하나의 값으로 묶는다. 대기 행이 바뀌면 멈춤 시계를 다시 잰다. */
+const queuedRowsKey = (rows: readonly ObjectionSummaryResponse[]) => {
+  const ids = rows
+    .filter((row) => row.latestRunStatus === "QUEUED")
+    .map((row) => row.objectionId)
+  return ids.length > 0 ? ids.join(",") : null
+}
 
 /**
  * 이의제기 목록(`GET /admin/objections`). 서버가 최근 접수 순 200건을 준다.
  * 분석 중인 행이 있으면 목록을 2초마다 다시 받아 분석 상태 칸을 갱신한다.
+ *
+ * 다시 받기는 유휴 타이머의 활동으로 세지 않는다. 처음 받기(화면을 연 것)만 센다. 진행 중
+ * (`RUNNING`) 행 없이 대기(`QUEUED`) 행만 1분 넘게 그대로면 폴링을 멈춘다. 워커가 없는
+ * 환경에서는 대기가 끝나지 않아 200건 목록을 끝없이 다시 받게 되기 때문이다.
+ * `isQueueStalled` 가 켜지면 화면이 안내하고 `recheck` 로 다시 받는다.
  */
 export const useObjectionList = () => {
-  const { data, isPending, isFetching, isError, error } = useListObjections({
-    query: {
-      refetchInterval: (query) =>
-        query.state.data?.some((row) =>
-          RUN_ACTIVE_STATUSES.has(row.latestRunStatus ?? ""),
-        )
-          ? LIST_POLL_INTERVAL_MS
-          : false,
-    },
-  })
+  const queryClient = useQueryClient()
+  // 폴링 간격 함수는 렌더 밖에서 돈다. 멈춘 대상을 그 안에서 읽도록 ref 에 둔다.
+  const stalledKeyRef = React.useRef<string | null>(null)
+  const { data, isPending, isFetching, isError, error, refetch } =
+    useListObjections({
+      query: {
+        queryFn: ({ signal }) =>
+          listObjections({
+            signal,
+            background:
+              queryClient.getQueryData(getListObjectionsQueryKey()) !==
+              undefined,
+          }),
+        refetchInterval: (query) => {
+          const rows = query.state.data ?? []
+          if (rows.some((row) => row.latestRunStatus === "RUNNING")) {
+            return LIST_POLL_INTERVAL_MS
+          }
+          const key = queuedRowsKey(rows)
+          return key != null && stalledKeyRef.current !== key
+            ? LIST_POLL_INTERVAL_MS
+            : false
+        },
+      },
+    })
+  const hasRunning =
+    data?.some((row) => row.latestRunStatus === "RUNNING") ?? false
+  const { isStalled, resume } = useQueueStall(
+    hasRunning ? null : queuedRowsKey(data ?? []),
+    stalledKeyRef,
+  )
+  const recheck = React.useCallback(() => {
+    resume()
+    void refetch()
+  }, [refetch, resume])
   return {
     objections: data?.map(toSummary),
     isPending,
     isFetching,
     isError,
     error,
+    isQueueStalled: isStalled,
+    recheck,
   }
 }
 
@@ -317,8 +375,28 @@ export const useObjectionDetail = (
   }
 }
 
-/** 화면의 상세가 서버 상태보다 늦었다는 뜻의 오류 코드. */
-const STALE_DETAIL_CODES = new Set(["PST0301", "PST0302"])
+/**
+ * 이의제기 하나의 상태가 바뀐 뒤 다시 받을 쿼리. 상세(사유가 키 뒤에 붙는다), 목록,
+ * 통지 기록, 외부 확인을 다시 받는다. 분석 타임라인은 상태 변경과 무관해 건드리지 않는다.
+ * 통지 기록도 넣는 이유는 판정과 보완 요청이 서버에서 통지를 함께 기록하는데, 창에 초점이
+ * 돌아와도 다시 받지 않는 설정(`query-client.ts`)이라 저절로 갱신되지 않기 때문이다.
+ */
+export const invalidateObjection = (
+  queryClient: QueryClient,
+  objectionId: number,
+) =>
+  Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: getGetObjectionDetailQueryKey(objectionId),
+    }),
+    queryClient.invalidateQueries({ queryKey: getListObjectionsQueryKey() }),
+    queryClient.invalidateQueries({
+      queryKey: getListObjectionNoticesQueryKey(objectionId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: getListObjectionExternalChecksQueryKey(objectionId),
+    }),
+  ])
 
 /** 멱등키를 함께 받는 변경 요청. 키는 화면이 제출 한 건마다 정해 넘긴다. */
 type Keyed<TRequest> = { request: TRequest; idempotencyKey: string }
@@ -349,11 +427,12 @@ export const useReceiveObjection = () => {
  * 수용과 일부 지급정지는 승인 대기로 저장만 된다(2인 승인, 계약 v2 §3). 응답 `status` 로 가른다.
  *
  * 응답 시간 초과 뒤 같은 키로 다시 보내면 서버가 처음 결과를 그대로 돌려준다.
- * 작성 뒤 상세와 목록을 다시 받아 확정된 판정이나 승인 대기를 보인다.
+ * 작성 뒤 상세, 목록, 통지 기록을 다시 받아 확정된 판정이나 승인 대기를 보인다.
  *
- * 해제 요건 미충족(`PST0301`)과 이미 확정(`PST0302`)도 상세를 다시 받는다. 서버는 확정
- * 직전에 요건을 다시 계산하므로(D11) 화면을 연 뒤 원장이 바뀌었을 수 있고, 다른 담당자가
- * 먼저 확정했을 수도 있다. 화면이 옛 점검 결과를 계속 보이면 같은 실패를 되풀이한다.
+ * 실패해도 다시 받는다. 해제 요건 미충족(`PST0301`), 이미 확정(`PST0302`), 상태가 맞지
+ * 않음(`PST0308`)은 모두 화면의 상세가 서버보다 늦었다는 뜻이다. 서버는 확정 직전에 요건을
+ * 다시 계산하므로(D11) 화면을 연 뒤 원장이 바뀌었을 수 있고, 다른 담당자가 먼저 승인 대기를
+ * 올렸거나 보완을 요청했을 수도 있다. 화면이 옛 상태를 계속 보이면 같은 실패를 되풀이한다.
  */
 export const useConfirmObjectionDecision = () => {
   const queryClient = useQueryClient()
@@ -368,20 +447,7 @@ export const useConfirmObjectionDecision = () => {
         request,
         withIdempotencyKey({}, idempotencyKey),
       ),
-    onError: (error, { objectionId }) => {
-      if (!isApiError(error) || !STALE_DETAIL_CODES.has(error.code)) return
-      return queryClient.invalidateQueries({
-        queryKey: getGetObjectionDetailQueryKey(objectionId),
-      })
-    },
-    onSuccess: (_, { objectionId }) =>
-      Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: getGetObjectionDetailQueryKey(objectionId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: getListObjectionsQueryKey(),
-        }),
-      ]),
+    onSettled: (_data, _error, { objectionId }) =>
+      invalidateObjection(queryClient, objectionId),
   })
 }

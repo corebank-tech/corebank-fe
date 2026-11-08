@@ -3,6 +3,7 @@ import { FileText, ScanText } from "lucide-react"
 import {
   DOCUMENT_KIND_LABEL,
   OCR_STATUS_LABEL,
+  isDraftStale,
   labelOf,
   useAgentRuns,
   useDocumentContent,
@@ -245,19 +246,25 @@ const ClaimCard = ({
  * 서류 목록에서 고른 서류를 상세와 같은 조회 사유로 받아 그리고, 판독 영역 상자를 겹친다.
  * AI 판정안의 주장 중 서류에서 나온 것(`source=DOCUMENT`)은 그 영역과 서로 이어진다 —
  * 주장 카드를 누르면 영역이, 영역을 누르면 주장 카드가 강조된다.
+ *
+ * 서류는 담당자가 [보기]나 서류 주장 카드를 눌렀을 때만 연다. 처음부터 하나를 골라 두면
+ * 상세를 열기만 해도 파일을 받고 서버에 열람 감사가 남는다. 증빙이 없는 건이면 그게 신분증
+ * 사본이 된다.
  */
 export const DocumentEvidence = ({ objectionId, accessReason }: Props) => {
-  const { documents, isPending, isError } = useObjectionDocuments(objectionId)
   const { latestRun } = useAgentRuns(objectionId)
+  const { documents, isPending, isError } = useObjectionDocuments(
+    objectionId,
+    latestRun,
+  )
   const { draft } = useReviewDraft(objectionId, latestRun)
   const [chosenId, setChosenId] = React.useState<number | null>(null)
   const [selected, setSelected] = React.useState<RegionRef | null>(null)
 
   const list = documents ?? []
   const active =
-    list.find((document) => document.documentId === chosenId) ??
-    list.find((document) => !isIdCopy(document)) ??
-    list[0]
+    list.find((document) => document.documentId === chosenId) ?? null
+  const isStaleDraft = isDraftStale(draft, latestRun)
   const claims = draft?.claims ?? []
   const linkedIndexes = new Set(
     claims
@@ -288,7 +295,8 @@ export const DocumentEvidence = ({ objectionId, accessReason }: Props) => {
       header: "회차",
       align: "center",
       width: 80,
-      render: (row) => roundLabel(row.round),
+      render: (row) =>
+        `${roundLabel(row.round)}${row.uploaderRole === "ADMIN" ? ", 대리" : ""}`,
     },
     {
       key: "size",
@@ -344,32 +352,44 @@ export const DocumentEvidence = ({ objectionId, accessReason }: Props) => {
           isError ? "서류 목록을 불러오지 못했습니다." : "첨부 서류가 없습니다."
         }
       />
-      {active && (
+      {list.length > 0 && (
         <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start gap-4">
           <Panel aria-label="서류 보기">
             <div className="px-4 py-3">
-              <DocumentViewer
-                key={active.documentId}
-                objectionId={objectionId}
-                accessReason={accessReason}
-                document={active}
-                selectedIndex={
-                  selected?.documentId === active.documentId
-                    ? selected.index
-                    : null
-                }
-                linkedIndexes={linkedIndexes}
-                onSelectRegion={(index) =>
-                  setSelected({ documentId: active.documentId, index })
-                }
-              />
+              {active == null ? (
+                <p className="py-6 text-center text-base text-ink-faint">
+                  볼 서류의 [보기]를 누르세요. 서류를 열면 조회 사유와 함께 열람
+                  기록이 남습니다.
+                </p>
+              ) : (
+                <DocumentViewer
+                  key={active.documentId}
+                  objectionId={objectionId}
+                  accessReason={accessReason}
+                  document={active}
+                  selectedIndex={
+                    selected?.documentId === active.documentId
+                      ? selected.index
+                      : null
+                  }
+                  linkedIndexes={linkedIndexes}
+                  onSelectRegion={(index) =>
+                    setSelected({ documentId: active.documentId, index })
+                  }
+                />
+              )}
             </div>
           </Panel>
           <Panel aria-label="주장 카드">
             <PanelHeader
               title="주장 카드"
               action={
-                <span className="text-xs text-ink-muted">
+                <span className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
+                  {isStaleDraft && draft && (
+                    <Badge variant="warning">
+                      이전 실행 {draft.runId}번 결과
+                    </Badge>
+                  )}
                   AI 판정안 {claims.length}건
                 </span>
               }

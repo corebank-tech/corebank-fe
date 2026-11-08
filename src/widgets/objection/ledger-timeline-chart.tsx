@@ -69,11 +69,11 @@ const fillClass = (mark: Mark) => {
   if (mark.role === "DISPUTED") return "fill-warning"
   if (mark.role === "RELATIONSHIP" && mark.matched) return "fill-success"
   if (mark.role === "FRAUD" && mark.matched) return "fill-danger"
-  return mark.direction === "WITHDRAWAL" ? "fill-ink-muted" : "fill-ink-faint"
+  return mark.direction === "OUT" ? "fill-ink-muted" : "fill-ink-faint"
 }
 
 const describe = (mark: Mark) =>
-  `${mark.direction === "WITHDRAWAL" ? "출금" : "입금"} ${formatAmount(mark.amount)}, ${formatDateTime(mark.occurredAt)}, ${ROLE_LABEL[mark.role]}${mark.interbank ? ", 타행" : ""}`
+  `${mark.direction === "OUT" ? "출금" : "입금"} ${formatAmount(mark.amount)}, ${formatDateTime(mark.occurredAt)}, ${ROLE_LABEL[mark.role]}${mark.interbank ? ", 타행" : ""}`
 
 const MarkShape = ({
   mark,
@@ -81,6 +81,7 @@ const MarkShape = ({
   y,
   r,
   id,
+  focusable = true,
   isFocused,
   onSelect,
 }: {
@@ -89,13 +90,18 @@ const MarkShape = ({
   y: number
   r: number
   id?: string
+  /**
+   * 탭으로 들를 수 있는가. 확대 그림에 같은 거래가 있으면 개요 쪽은 끈다. 켜 두면 창 안 거래를
+   * 키보드로 두 번씩 지나간다. 마우스로 누르는 것은 그대로 된다
+   */
+  focusable?: boolean
   isFocused: boolean
   onSelect: (transactionNumber: string) => void
 }) => (
   <g
     id={id}
     role="button"
-    tabIndex={0}
+    tabIndex={focusable ? 0 : -1}
     aria-label={describe(mark)}
     aria-pressed={isFocused}
     data-role={mark.role}
@@ -119,7 +125,7 @@ const MarkShape = ({
         strokeWidth={3}
       />
     )}
-    {mark.direction === "WITHDRAWAL" ? (
+    {mark.direction === "OUT" ? (
       <rect
         x={x - r}
         y={y - r}
@@ -239,14 +245,13 @@ export const LedgerTimelineChart = ({
   // 다툼 거래와 그 뒤 입금에서 60분 안에 나간 출금.
   const outflows = zoomMarks
     .filter(
-      (mark) =>
-        mark.direction === "DEPOSIT" && (mark.disputed || mark.afterDispute),
+      (mark) => mark.direction === "IN" && (mark.disputed || mark.afterDispute),
     )
     .flatMap((deposit) =>
       zoomMarks
         .filter(
           (mark) =>
-            mark.direction === "WITHDRAWAL" &&
+            mark.direction === "OUT" &&
             mark.millis > deposit.millis &&
             mark.millis - deposit.millis <= OUTFLOW_MS,
         )
@@ -307,7 +312,7 @@ export const LedgerTimelineChart = ({
               mark={mark}
               x={xOverview(mark.millis)}
               y={
-                mark.direction === "WITHDRAWAL"
+                mark.direction === "OUT"
                   ? OVERVIEW_AXIS + 22
                   : OVERVIEW_AXIS - 22
               }
@@ -317,6 +322,7 @@ export const LedgerTimelineChart = ({
                   ? undefined
                   : `ledger-tx-${mark.transactionNumber}`
               }
+              focusable={!(hasWindow && inWindow(mark))}
               isFocused={mark.transactionNumber === focusedTransaction}
               onSelect={onSelectTransaction}
             />
@@ -342,7 +348,7 @@ export const LedgerTimelineChart = ({
                 : "border-border bg-surface",
             )}
             role="group"
-            aria-label="다툼 거래 전후 24시간 원장"
+            aria-label={`다툼 거래 전후 24시간 원장${fraudMatched ? ", 사기 패턴 해당" : ""}`}
             data-testid="fraud-window"
           >
             <defs>
@@ -407,11 +413,7 @@ export const LedgerTimelineChart = ({
                 key={mark.transactionNumber}
                 mark={mark}
                 x={xZoom(mark.millis)}
-                y={
-                  mark.direction === "WITHDRAWAL"
-                    ? ZOOM_AXIS + 40
-                    : ZOOM_AXIS - 40
-                }
+                y={mark.direction === "OUT" ? ZOOM_AXIS + 40 : ZOOM_AXIS - 40}
                 r={radius(mark.amount, 5)}
                 id={`ledger-tx-${mark.transactionNumber}`}
                 isFocused={mark.transactionNumber === focusedTransaction}

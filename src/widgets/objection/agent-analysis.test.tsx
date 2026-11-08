@@ -1,5 +1,14 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
+import {
+  act,
   fireEvent,
   render,
   screen,
@@ -148,10 +157,19 @@ const renderAnalysis = (
 
 const EXPECTED_TITLES = SCRIPT.map((item) => item.title)
 
-const renderedTitles = () =>
-  [...document.querySelectorAll("li[data-seq]")].map(
-    (item) => item.querySelector("span.font-bold")?.textContent,
-  )
+/** 타임라인에 보이는 단계 제목을 위에서부터 읽는다. 마크업 대신 보이는 글자로 가른다. */
+const renderedTitles = () => {
+  const list = screen.queryByRole("list", { name: "AI 분석 단계" })
+  if (!list) return []
+  return within(list)
+    .queryAllByRole("listitem")
+    .map((item) =>
+      EXPECTED_TITLES.find(
+        (title) => title != null && item.textContent?.includes(title),
+      ),
+    )
+    .filter((title) => title != null)
+}
 
 const sleep = (millis: number) =>
   new Promise((resolve) => setTimeout(resolve, millis))
@@ -200,12 +218,10 @@ describe("AgentAnalysis", () => {
       })
       // 종료를 보기 전에 떠난 after=4 요청이 있으면, 종료를 본 뒤 시작한 요청이 한 번 더 온다(부하가 클 때).
       // 그 한 번까지 받고 멈춰야 한다.
+      // 폴링 간격(1초)의 두 배 넘게 기다려도 그 한 번 말고는 더 오지 않는다.
       const callsAfterEnd = stepAfterValues.length
       await sleep(2_500)
-      const settled = stepAfterValues.length
-      expect(settled - callsAfterEnd).toBeLessThanOrEqual(1)
-      await sleep(2_500)
-      expect(stepAfterValues).toHaveLength(settled)
+      expect(stepAfterValues.length - callsAfterEnd).toBeLessThanOrEqual(1)
       expect(screen.queryByText("다음 단계 진행 중")).not.toBeInTheDocument()
     },
     POLLING_TEST_TIMEOUT_MS,
@@ -269,7 +285,7 @@ describe("AgentAnalysis", () => {
     )
   })
 
-  it("분석 중이거나 판정이 확정됐으면 재분석을 막는다", async () => {
+  it("분석 중이면 재분석을 막고 다음 단계를 기다리는 중임을 보인다", async () => {
     respondCompleted("RUNNING")
     renderAnalysis()
     await screen.findByText("분석 중")
@@ -319,5 +335,91 @@ describe("AgentAnalysis", () => {
       screen.queryByRole("button", { name: "재생 중지" }),
     ).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "2배 재생" })).toBeInTheDocument()
+  })
+
+  it("재분석 요청이 거부되면 서버 문구를 보인다", async () => {
+    respondCompleted()
+    server.use(
+      http.post("*/admin/objections/:objectionId/review-requests", () =>
+        HttpResponse.json(
+          {
+            code: "PST0306",
+            message: "진행 중인 분석이 있어 다시 요청할 수 없습니다.",
+          },
+          { status: 409 },
+        ),
+      ),
+    )
+    renderAnalysis()
+
+    const button = await screen.findByRole("button", { name: "재분석 요청" })
+    await waitFor(() => expect(button).toBeEnabled())
+    fireEvent.click(button)
+
+    expect(
+      await screen.findByText("진행 중인 분석이 있어 다시 요청할 수 없습니다."),
+    ).toBeInTheDocument()
+  })
+
+  it("판정안이 최근 실행 것이 아니면 이전 실행 결과라고 경고한다", async () => {
+    server.use(
+      http.get("*/admin/objections/:objectionId/agent-runs", () =>
+        envelope([{ runId: 8, status: "FAILED", attempt: 3 }]),
+      ),
+      http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
+        envelope([]),
+      ),
+      http.get("*/admin/objections/:objectionId/review-draft", () =>
+        envelope(DRAFT),
+      ),
+    )
+    renderAnalysis()
+
+    const panel = await screen.findByRole("region", { name: "AI 판정안" })
+    expect(
+      await within(panel).findByText("이전 실행의 판정안"),
+    ).toBeInTheDocument()
+    expect(within(panel).getByText(/실행 7번 결과입니다/)).toBeInTheDocument()
+    expect(within(panel).getByText(/최근 실행 8번은/)).toBeInTheDocument()
+  })
+
+  it("대기만 1분 넘게 이어지면 폴링을 멈추고 다시 확인을 받는다", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      let runCalls = 0
+      server.use(
+        http.get("*/admin/objections/:objectionId/agent-runs", () => {
+          runCalls += 1
+          return envelope([{ runId: 9, status: "QUEUED", attempt: 0 }])
+        }),
+        http.get(
+          "*/admin/objections/:objectionId/agent-runs/:runId/steps",
+          () => envelope([]),
+        ),
+        http.get("*/admin/objections/:objectionId/review-draft", () =>
+          envelope(null),
+        ),
+      )
+      renderAnalysis()
+      await screen.findByText("대기")
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(61_000)
+      })
+      expect(screen.getByText("분석 대기가 길어짐")).toBeInTheDocument()
+      const stoppedAt = runCalls
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(runCalls).toBe(stoppedAt)
+
+      fireEvent.click(screen.getByRole("button", { name: "다시 확인" }))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+      expect(runCalls).toBeGreaterThan(stoppedAt)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

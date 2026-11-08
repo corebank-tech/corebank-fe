@@ -7,17 +7,18 @@ import type {
  * 주장 대 원장 대조(계획 PA-11). AI 판정안에서 주장마다 원장과 맞는지를 가른다.
  *
  * - 모순: 판정안의 "주장과 원장의 차이"에 그 주장이 있다. 근거는 그 차이의 거래다
- * - 확인됨: 모순이 없고, 원문 인용이 있고, 판정안에 근거 거래가 있다
+ * - 근거 제시: 모순이 없고, 원문 인용이 있고, 판정안에 근거 거래가 있다
  * - 미확인: 그 밖. 인용이 없거나 원장 근거가 없다
  *
- * 판정안은 주장별 근거 거래를 따로 주지 않는다(계약 v2 §6). 그래서 확인됨의 근거는 판정안
- * 전체의 근거 거래다. 이 대조는 심사 참고이고 해제 근거가 아니다(D9).
+ * 판정안은 주장별 근거 거래를 따로 주지 않는다(계약 v2 §6). 그래서 근거 제시의 거래는 판정안
+ * 전체의 근거 거래이고, 그 주장을 원장으로 확인했다는 뜻이 아니다. 그래서 "확인됨"이라고
+ * 부르지 않는다. 이 대조는 심사 참고이고 해제 근거가 아니다(D9).
  */
 
-export type ClaimVerification = "CONFIRMED" | "CONTRADICTED" | "UNVERIFIED"
+export type ClaimVerification = "CITED" | "CONTRADICTED" | "UNVERIFIED"
 
 export const CLAIM_VERIFICATION_LABEL: Record<ClaimVerification, string> = {
-  CONFIRMED: "확인됨",
+  CITED: "근거 제시",
   CONTRADICTED: "모순",
   UNVERIFIED: "미확인",
 }
@@ -58,13 +59,13 @@ export const verifyClaims = (draft: ReviewDraft): ClaimCheck[] => {
         transactionNumbers: contradiction.transactionNumbers,
       }
     }
-    const confirmed =
+    const cited =
       claim.quote != null && draft.evidenceTransactionNumbers.length > 0
     return {
       claim,
-      status: confirmed ? "CONFIRMED" : "UNVERIFIED",
+      status: cited ? "CITED" : "UNVERIFIED",
       fact: null,
-      transactionNumbers: confirmed ? draft.evidenceTransactionNumbers : [],
+      transactionNumbers: cited ? draft.evidenceTransactionNumbers : [],
     }
   })
   // 주장 목록에 없는 모순도 빠뜨리지 않는다. 담당자가 꼭 봐야 할 줄이다.

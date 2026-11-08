@@ -15,7 +15,7 @@ import type { GateRuleCheck } from "@/entities/payment-stop"
 import { LedgerEvidence } from "@/widgets/objection/ledger-evidence"
 
 /**
- * 주장 대 원장 대조표와 원장 타임라인. 대조표 상태(확인됨, 모순, 미확인), 근거 거래를 누르면
+ * 주장 대 원장 대조표와 원장 타임라인. 대조표 상태(근거 제시, 모순, 미확인), 근거 거래를 누르면
  * 타임라인의 그 거래가 강조되는지, 타임라인에 다툼 거래와 사기 패턴 창과 60분 안 출금이
  * 그려지는지를 본다.
  */
@@ -75,7 +75,7 @@ const respond = () =>
       okJson([
         {
           transactionNumber: OLD,
-          direction: "DEPOSIT",
+          direction: "IN",
           interbank: false,
           counterpartyAccountId: 4001,
           amount: 2_850_000,
@@ -85,7 +85,7 @@ const respond = () =>
         },
         {
           transactionNumber: D1,
-          direction: "DEPOSIT",
+          direction: "IN",
           interbank: true,
           amount: 950_000,
           occurredAt: "2026-10-31T21:40:03",
@@ -94,7 +94,7 @@ const respond = () =>
         },
         {
           transactionNumber: D2,
-          direction: "DEPOSIT",
+          direction: "IN",
           interbank: true,
           amount: 1_500_000,
           occurredAt: "2026-10-31T21:52:47",
@@ -103,7 +103,7 @@ const respond = () =>
         },
         {
           transactionNumber: OUT,
-          direction: "WITHDRAWAL",
+          direction: "OUT",
           interbank: true,
           amount: 1_400_000,
           occurredAt: "2026-10-31T22:10:41",
@@ -131,7 +131,7 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe("LedgerEvidence", () => {
-  it("주장마다 확인됨, 모순, 미확인을 가르고 근거 거래를 누르면 타임라인에서 강조한다", async () => {
+  it("주장마다 근거 제시, 모순, 미확인을 가르고 근거 거래를 누르면 타임라인에서 강조한다", async () => {
     renderEvidence()
 
     const table = await screen.findByRole("region", {
@@ -140,8 +140,13 @@ describe("LedgerEvidence", () => {
     const rowOf = async (text: string) =>
       (await within(table).findByText(text)).closest("tr")!
 
-    const confirmed = await rowOf("모르는 사람이 보낸 돈이다")
-    expect(within(confirmed).getByText("확인됨")).toBeInTheDocument()
+    const cited = await rowOf("모르는 사람이 보낸 돈이다")
+    expect(within(cited).getByText("근거 제시")).toBeInTheDocument()
+    // 판정안 전체의 근거 거래라 원장으로 확인했다고 말하지 않는다
+    expect(within(cited).queryByText("확인됨")).not.toBeInTheDocument()
+    expect(
+      within(cited).getByText(/이 주장만의 근거는 아닙니다/),
+    ).toBeInTheDocument()
     const contradicted = await rowOf("계좌를 다른 사람에게 빌려준 적이 없다")
     expect(within(contradicted).getByText("모순")).toBeInTheDocument()
     expect(
@@ -166,19 +171,38 @@ describe("LedgerEvidence", () => {
   it("타임라인에 다툼 거래, 사기 패턴 24시간 창, 60분 안 출금 화살표를 그린다", async () => {
     renderEvidence()
 
-    const zoom = await screen.findByTestId("fraud-window")
-    expect(zoom).toHaveClass("bg-danger-tint")
-    expect(screen.getByTestId("fraud-window-overview")).toHaveClass(
-      "fill-danger-tint",
-    )
-    // 다툼 거래는 전체와 확대 양쪽에 그려지고 주의색이다.
-    const disputed = within(zoom)
-      .getAllByRole("button")
-      .filter((node) => node.getAttribute("data-role") === "DISPUTED")
+    // 사기 패턴 규칙이 성립하면 확대 그림이 그 사실을 이름으로 알린다.
+    const zoom = await screen.findByRole("group", {
+      name: "다툼 거래 전후 24시간 원장, 사기 패턴 해당",
+    })
+    // 다툼 거래는 입금으로 읽히고 다툼 거래라고 말한다.
+    const disputed = within(zoom).getAllByRole("button", {
+      name: /^입금 .*다툼 거래/,
+    })
     expect(disputed).toHaveLength(2)
-    expect(disputed[0].querySelector("circle")).toHaveClass("fill-warning")
+    // 출금(서버 direction=OUT)은 출금으로 읽힌다.
+    expect(
+      within(zoom).getByRole("button", { name: /^출금 1,400,000원/ }),
+    ).toBeInTheDocument()
     // 다툼 입금 2건 모두 60분 안에 같은 출금으로 이어진다.
     expect(within(zoom).getAllByTestId("outflow-arrow")).toHaveLength(2)
     expect(screen.getByText(/60분 안 출금 2건/)).toBeInTheDocument()
+  })
+
+  it("창 안 거래는 확대 그림에서만 탭으로 들르고 개요 쪽은 건너뛴다", async () => {
+    renderEvidence()
+
+    const zoom = await screen.findByTestId("fraud-window")
+    const overview = screen.getByRole("group", { name: "원장 타임라인 전체" })
+    const zoomNumbers = within(zoom)
+      .getAllByRole("button")
+      .map((node) => node.getAttribute("data-transaction"))
+    for (const node of within(overview).getAllByRole("button")) {
+      const inZoom = zoomNumbers.includes(node.getAttribute("data-transaction"))
+      expect(node).toHaveAttribute("tabindex", inZoom ? "-1" : "0")
+    }
+    for (const node of within(zoom).getAllByRole("button")) {
+      expect(node).toHaveAttribute("tabindex", "0")
+    }
   })
 })

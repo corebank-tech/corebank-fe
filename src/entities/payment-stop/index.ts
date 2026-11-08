@@ -39,6 +39,7 @@ export {
   OBJECTION_CLAUSES,
   OBJECTION_STATUS_LABEL,
   OCR_STATUS_LABEL,
+  RECEIVED_CHANNEL_LABEL,
   RULE_BASIS_LABEL,
   SUPPLEMENT_BUSINESS_DAYS,
   SUPPLEMENT_MAX_ROUNDS,
@@ -63,6 +64,8 @@ export type {
 } from "@/entities/payment-stop/api/agent-run"
 export {
   AGENT_POLL_INTERVAL_MS,
+  QUEUE_STALL_MS,
+  isDraftStale,
   isRunActive,
   useAgentRunAllSteps,
   useAgentRunSteps,
@@ -83,6 +86,7 @@ export type {
   ObjectionNotice,
   OcrPage,
   OcrRegion,
+  UploadDocumentKind,
 } from "@/entities/payment-stop/api/review-ops"
 export {
   useApproveDecision,
@@ -97,6 +101,7 @@ export {
   useRequestSupplement,
   useReturnDecision,
   useStartReviewSession,
+  useUploadObjectionDocuments,
 } from "@/entities/payment-stop/api/review-ops"
 
 export type {
@@ -114,6 +119,7 @@ export type {
   MyPaymentStop,
 } from "@/entities/payment-stop/api/my-objection"
 export {
+  MY_OBJECTION_FINAL_ERROR_CODES,
   myObjectionFingerprint,
   mySupplementFingerprint,
   useMyPaymentStops,
@@ -122,10 +128,15 @@ export {
 } from "@/entities/payment-stop/api/my-objection"
 export {
   CLAUSE_HELP,
+  MY_CASE_STATUS_LABEL,
+  MY_DECISION_RESULT_LABEL,
   MY_OBJECTION_STATUS_LABEL,
   SUPPLEMENT_REQUESTED,
 } from "@/entities/payment-stop/lib/my-objection-labels"
-export type { FileSelection } from "@/entities/payment-stop/lib/objection-files"
+export type {
+  FileSelection,
+  InspectedFile,
+} from "@/entities/payment-stop/lib/objection-files"
 export {
   MAX_EVIDENCE_COUNT,
   MAX_FILE_BYTES,
@@ -133,6 +144,8 @@ export {
   MAX_TOTAL_BYTES,
   OBJECTION_FILE_ACCEPT,
   inspectObjectionFile,
+  inspectObjectionFiles,
+  mergeObjectionFiles,
   readFileKind,
   selectObjectionFiles,
   summarizeFiles,

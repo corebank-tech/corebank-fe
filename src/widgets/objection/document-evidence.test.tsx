@@ -83,8 +83,9 @@ const respond = () =>
       "*/admin/objections/:objectionId/documents/:documentId/content",
       ({ request }) => {
         contentReasons.push(request.headers.get("X-Access-Reason"))
-        return new HttpResponse("<svg xmlns='http://www.w3.org/2000/svg'/>", {
-          headers: { "Content-Type": "image/svg+xml" },
+        // 서버는 PDF, PNG, JPEG 만 준다. 내용은 화면이 그림 주소로만 쓴다.
+        return new HttpResponse(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), {
+          headers: { "Content-Type": "image/png" },
         })
       },
     ),
@@ -154,15 +155,15 @@ describe("DocumentEvidence", () => {
   it("서류 주장 카드를 누르면 그 판독 영역이, 영역을 누르면 그 주장이 강조된다", async () => {
     renderEvidence()
 
+    // 서류는 누르기 전에는 열지 않는다. 주장 카드를 누르면 그 서류를 연다.
+    const documentClaim = await screen.findByRole("button", {
+      name: /서류에 적힌 금액은 1,200,000원이다/,
+    })
+    expect(contentReasons).toEqual([])
+    fireEvent.click(documentClaim)
     const region = await screen.findByRole("button", {
       name: "판독 영역 2: 월 공급 대금: 1,200,000원",
     })
-    expect(region).toHaveAttribute("aria-pressed", "false")
-
-    const documentClaim = screen.getByRole("button", {
-      name: /서류에 적힌 금액은 1,200,000원이다/,
-    })
-    fireEvent.click(documentClaim)
     expect(region).toHaveAttribute("aria-pressed", "true")
     expect(documentClaim).toHaveAttribute("aria-pressed", "true")
 
@@ -179,6 +180,92 @@ describe("DocumentEvidence", () => {
       screen.queryByRole("button", { name: /거래처에 납품한 물품 대금이다/ }),
     ).not.toBeInTheDocument()
     expect(contentReasons).toEqual(["AUDIT"])
+  })
+
+  it("상세를 열기만 해서는 어떤 서류도 받지 않는다. 증빙이 없어도 신분증 사본을 열지 않는다", async () => {
+    server.use(
+      http.get("*/admin/objections/:objectionId/documents", () =>
+        okJson([
+          {
+            documentId: 303,
+            kind: "ID_COPY",
+            fileName: "신분증_사본.jpg",
+            contentType: "image/jpeg",
+            size: 310_552,
+            round: 0,
+          },
+        ]),
+      ),
+    )
+    renderEvidence()
+
+    await screen.findByText("신분증_사본.jpg")
+    expect(
+      screen.getByText(/볼 서류의 \[보기\]를 누르세요/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("img", { name: "신분증_사본.jpg" }),
+    ).not.toBeInTheDocument()
+    // 서류 목록을 다시 받을 시간을 두어도 내용 요청(열람 감사)은 없다.
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(contentReasons).toEqual([])
+  })
+
+  it("판독이 끝나면 새로고침 없이 판독 영역이 나타난다", async () => {
+    let runCalls = 0
+    server.use(
+      http.get("*/admin/objections/:objectionId/agent-runs", () => {
+        runCalls += 1
+        return okJson([
+          {
+            runId: 31,
+            status: runCalls === 1 ? "RUNNING" : "COMPLETED",
+            attempt: 1,
+          },
+        ])
+      }),
+      http.get("*/admin/objections/:objectionId/agent-runs/:runId/steps", () =>
+        okJson([]),
+      ),
+      http.get("*/admin/objections/:objectionId/documents", () =>
+        okJson([
+          {
+            documentId: 301,
+            kind: "EVIDENCE",
+            fileName: "물품공급계약서.png",
+            contentType: "image/png",
+            size: 182_400,
+            round: 0,
+            // 워커가 실행 안에서 판독하므로 실행이 끝난 뒤의 목록에서 완료가 된다.
+            ocrStatus: runCalls <= 1 ? "PENDING" : "DONE",
+          },
+        ]),
+      ),
+    )
+    renderEvidence()
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "물품공급계약서.png 보기" }),
+    )
+    expect(await screen.findByText("판독 대기")).toBeInTheDocument()
+    expect(
+      await screen.findByRole(
+        "button",
+        { name: "판독 영역 2: 월 공급 대금: 1,200,000원" },
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("판정안이 최근 실행 것이 아니면 주장 카드에 이전 실행 결과라고 붙인다", async () => {
+    server.use(
+      http.get("*/admin/objections/:objectionId/agent-runs", () =>
+        okJson([{ runId: 32, status: "FAILED", attempt: 3 }]),
+      ),
+    )
+    renderEvidence()
+
+    expect(await screen.findByText("이전 실행 31번 결과")).toBeInTheDocument()
   })
 
   it("신분증 사본은 판독 안 함으로 보이고, 열어도 판독 영역이 없다", async () => {

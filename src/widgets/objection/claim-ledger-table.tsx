@@ -8,7 +8,8 @@ import { Badge, type BadgeVariant } from "@/shared/ui/badge"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
 
 const STATUS_TONE: Record<ClaimVerification, BadgeVariant> = {
-  CONFIRMED: "success",
+  // 주장별 확인이 아니라 성공색을 쓰지 않는다
+  CITED: "neutral",
   CONTRADICTED: "danger",
   UNVERIFIED: "neutral",
 }
@@ -22,7 +23,7 @@ type Props = {
 }
 
 /**
- * 주장 대 원장 대조표(계획 PA-11). 주장마다 확인됨, 모순, 미확인을 보이고 근거 거래를 누르면
+ * 주장 대 원장 대조표(계획 PA-11). 주장마다 근거 제시, 모순, 미확인을 보이고 근거 거래를 누르면
  * 원장 타임라인의 그 거래로 이동한다. 상태를 가르는 규칙은 `verifyClaims` 주석에 있다.
  */
 export const ClaimLedgerTable = ({
@@ -71,8 +72,10 @@ export const ClaimLedgerTable = ({
       render: (row) =>
         row.fact ? (
           <span className="text-danger">{row.fact}</span>
-        ) : row.status === "CONFIRMED" ? (
-          <span className="text-ink-muted">판정안 근거 거래로 확인</span>
+        ) : row.status === "CITED" ? (
+          <span className="text-ink-muted">
+            판정안 전체의 근거 거래입니다. 이 주장만의 근거는 아닙니다.
+          </span>
         ) : (
           <span className="text-ink-faint">원장 근거 없음</span>
         ),

@@ -4,6 +4,7 @@ import {
   AGENT_RUN_STATUS_LABEL,
   GATE_BRANCH_LABEL,
   gateComparisonOf,
+  isDraftStale,
   isRunActive,
   labelOf,
   toTimelineStep,
@@ -36,6 +37,11 @@ type Props = {
   isDecided: boolean
   /** 재분석 요청 권한(`PAYMENT_STOP_WRITE`). 없으면 버튼을 그리지 않는다 */
   canRequest: boolean
+  /**
+   * 서버 해제 요건 점검의 지금 갈래. 판정안이 최근 실행 것이 아니면 그 실행의 비교 단계가
+   * 없으므로 이 값과 판정안 갈래를 비교한다
+   */
+  serverBranch?: string
 }
 
 const RUN_STATUS_TONE: Record<string, BadgeVariant> = {
@@ -81,9 +87,11 @@ const EmptyText = ({ children }: { children: React.ReactNode }) => (
  */
 const DraftPanel = ({
   draft,
+  latestRun,
   comparison,
 }: {
   draft: ReviewDraft | null
+  latestRun: AgentRun | null
   comparison: { branch: string; agentBranch: string } | null
 }) => (
   <Panel aria-label="AI 판정안">
@@ -91,9 +99,12 @@ const DraftPanel = ({
       title="AI 판정안"
       action={
         draft && (
-          <Badge variant="coolViolet">
-            {labelOf(GATE_BRANCH_LABEL, draft.branch)}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-ink-muted">실행 {draft.runId}번</span>
+            <Badge variant="coolViolet">
+              {labelOf(GATE_BRANCH_LABEL, draft.branch)}
+            </Badge>
+          </span>
         )
       }
     />
@@ -101,6 +112,17 @@ const DraftPanel = ({
       <Alert variant="info">
         AI 판정안은 심사 참고안이며 지급정지 해제 근거로 쓰이지 않습니다.
       </Alert>
+      {isDraftStale(draft, latestRun) && latestRun && (
+        <Alert variant="warning" title="이전 실행의 판정안" className="mt-2">
+          아래 판정안은 실행 {draft?.runId}번 결과입니다. 최근 실행{" "}
+          {latestRun.runId}번은{" "}
+          {labelOf(AGENT_RUN_STATUS_LABEL, latestRun.status)}
+          {latestRun.status === "FAILED"
+            ? " 상태로 끝나 새 판정안이 없습니다."
+            : " 상태라 새 판정안이 아직 없습니다."}{" "}
+          보완 서류처럼 그 뒤에 들어온 자료는 반영되지 않았습니다.
+        </Alert>
+      )}
       {comparison && comparison.branch !== comparison.agentBranch && (
         <Alert
           variant="warning"
@@ -206,17 +228,21 @@ export const AgentAnalysis = ({
   objectionId,
   isDecided,
   canRequest,
+  serverBranch,
 }: Props) => {
   const {
     latestRun,
     isError: isRunsError,
     error: runsError,
+    isQueueStalled,
+    recheck,
   } = useAgentRuns(objectionId)
   const isActive = isRunActive(latestRun?.status)
   const { steps } = useAgentRunSteps(
     objectionId,
     latestRun?.runId ?? null,
     latestRun != null && !isActive,
+    latestRun?.status === "QUEUED",
   )
   const { draft } = useReviewDraft(objectionId, latestRun)
   const requestReview = useRequestObjectionReview()
@@ -238,7 +264,13 @@ export const AgentAnalysis = ({
   const timelineSteps = replay.isReplaying
     ? replay.visibleSteps
     : steps.map(toTimelineStep)
-  const comparison = gateComparisonOf(steps)
+  // 최근 실행의 비교 단계가 있으면 그것을 쓴다. 판정안이 이전 실행 것이면 그 단계가 없어,
+  // 서버의 지금 갈래와 판정안 갈래를 직접 비교한다.
+  const comparison =
+    (isDraftStale(draft, latestRun) ? null : gateComparisonOf(steps)) ??
+    (draft && serverBranch
+      ? { branch: serverBranch, agentBranch: draft.branch }
+      : null)
   const duration = latestRun ? runDuration(latestRun) : null
 
   const requestDisabledReason = (() => {
@@ -297,6 +329,22 @@ export const AgentAnalysis = ({
       </div>
 
       {requestError && <Alert variant="danger">{requestError}</Alert>}
+      {isQueueStalled && (
+        <Alert variant="info" title="분석 대기가 길어짐">
+          <p>
+            분석이 1분 넘게 대기에서 시작되지 않아 자동 갱신을 멈췄습니다. 분석
+            워커가 꺼져 있을 수 있습니다. 판정은 분석 없이도 할 수 있습니다.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2"
+            onClick={recheck}
+          >
+            다시 확인
+          </Button>
+        </Alert>
+      )}
       {latestRun?.status === "FAILED" && (
         <Alert variant="warning" title="AI 분석 중단">
           AI 분석이 끝나지 못했습니다. 판정은 해제 요건 점검과 담당자 검토로
@@ -352,7 +400,11 @@ export const AgentAnalysis = ({
             AI 권한: 이 이의제기의 소명과 원장 조회, 판정안 제출만 가능
           </p>
         </Panel>
-        <DraftPanel draft={draft} comparison={comparison} />
+        <DraftPanel
+          draft={draft}
+          latestRun={latestRun}
+          comparison={comparison}
+        />
       </div>
     </div>
   )

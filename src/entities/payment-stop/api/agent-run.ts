@@ -25,12 +25,58 @@ import { withIdempotencyKey } from "@/shared/api/custom-fetch"
  * 실시간 표시는 1초 폴링이다(D20). 실행 목록과 단계 모두 실행이 끝나면 폴링을 멈춘다.
  * 단계는 `after` 에 마지막으로 받은 순번을 넘겨 새 단계만 받고, 받은 것 뒤에 붙인다.
  *
+ * 폴링 요청은 유휴 타이머의 활동으로 세지 않는다(`background`). 세면 화면을 열어 둔 것만으로
+ * 관리자 30분 자동 로그아웃(POL-A01)이 오지 않는다. 실행이 대기(`QUEUED`)에서 1분 넘게
+ * 움직이지 않으면 폴링을 멈춘다. 서버 킬스위치 기본값이 꺼짐이고 대기 실행에는 만료가 없어서,
+ * 워커가 없는 환경에서는 대기가 끝나지 않는다. 멈춘 뒤에는 담당자가 다시 확인을 눌러 받는다.
+ *
  * 판정안과 단계 상세(`detail`, `content`)는 스펙상 자유 형식 JSON 이라 여기서 모양을
  * 확인하며 읽는다. 모르는 값은 버리고, 빠진 값은 빈 목록으로 둔다.
  */
 
 /** 실시간 표시 간격(D20). */
 export const AGENT_POLL_INTERVAL_MS = 1000
+
+/** 대기만 이어질 때 폴링을 멈추기까지 기다리는 시간. */
+export const QUEUE_STALL_MS = 60_000
+
+const queuedRunKey = (runId: number | undefined) => `run-${runId ?? 0}`
+
+/** 폴링 요청 설정. 유휴 타이머의 활동으로 세지 않는다. */
+const POLL_REQUEST = { background: true } as const
+
+/**
+ * 대기가 오래 이어지는지 본다. `queuedKey` 는 지금 대기 중인 대상(실행 번호 등)이고, 대기가
+ * 아니면 `null` 이다. 같은 대상이 `QUEUE_STALL_MS` 넘게 대기면 멈춘 것으로 본다. `resume` 은
+ * 담당자가 다시 확인을 눌렀을 때 시계를 처음부터 다시 잰다.
+ *
+ * `stalledKeyRef` 는 폴링 간격 함수가 렌더 밖에서 읽는 자리다. 시간이 다 되는 순간 함께 바꿔,
+ * 화면이 다시 그려지기 전의 폴링 한 번도 나가지 않게 한다.
+ */
+export const useQueueStall = (
+  queuedKey: string | null,
+  stalledKeyRef: React.RefObject<string | null>,
+) => {
+  const [stalledKey, setStalledKey] = React.useState<string | null>(null)
+  const [round, setRound] = React.useState(0)
+  React.useEffect(() => {
+    if (queuedKey == null) return
+    const id = setTimeout(() => {
+      stalledKeyRef.current = queuedKey
+      setStalledKey(queuedKey)
+    }, QUEUE_STALL_MS)
+    return () => clearTimeout(id)
+  }, [queuedKey, round, stalledKeyRef])
+  const resume = React.useCallback(() => {
+    stalledKeyRef.current = null
+    setStalledKey(null)
+    setRound((value) => value + 1)
+  }, [stalledKeyRef])
+  return {
+    isStalled: queuedKey != null && stalledKey === queuedKey,
+    resume,
+  }
+}
 
 export type AgentRunStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED"
 
@@ -92,6 +138,16 @@ export type ReviewDraft = {
   noticeDraft: string | null
   submittedAt: string | null
 }
+
+/**
+ * 판정안이 최근 실행 것이 아닌가. 서버는 이의제기별로 마지막에 저장된 판정안을 준다. 그래서
+ * 새 실행이 대기 중이거나 실패로 끝나면 판정안은 이전 실행 것이다.
+ */
+export const isDraftStale = (
+  draft: Pick<ReviewDraft, "runId"> | null,
+  latestRun: Pick<AgentRun, "runId"> | null,
+): boolean =>
+  draft != null && latestRun != null && draft.runId !== latestRun.runId
 
 /** 아직 끝나지 않은 실행인가. 이 동안만 폴링한다. */
 export const isRunActive = (status: string | undefined): boolean =>
@@ -179,22 +235,45 @@ const toDraft = (response: ReviewDraftResponse): ReviewDraft => {
 /**
  * 실행 목록(`GET /admin/objections/{id}/agent-runs`, 최근부터). 가장 최근 실행이
  * 끝나지 않았으면 1초마다 다시 받는다. 재분석 요청이 새 실행을 넣으면 다시 폴링이 걸린다.
+ * 대기만 1분 넘게 이어지면 멈추고 `isQueueStalled` 를 켠다. `recheck` 로 다시 받는다.
  */
 export const useAgentRuns = (objectionId: number, enabled = true) => {
-  const { data, isPending, isError, error } = useListObjectionAgentRuns(
-    objectionId,
-    {
+  // 폴링 간격 함수는 렌더 밖에서 돈다. 멈춘 대상을 그 안에서 읽도록 ref 에 둔다.
+  const stalledKeyRef = React.useRef<string | null>(null)
+  const { data, isPending, isError, error, refetch } =
+    useListObjectionAgentRuns(objectionId, {
       query: {
         enabled,
-        refetchInterval: (query) =>
-          isRunActive(query.state.data?.[0]?.status)
-            ? AGENT_POLL_INTERVAL_MS
-            : false,
+        refetchInterval: (query) => {
+          const latest = query.state.data?.[0]
+          if (!isRunActive(latest?.status)) return false
+          return latest?.status === "QUEUED" &&
+            stalledKeyRef.current === queuedRunKey(latest.runId)
+            ? false
+            : AGENT_POLL_INTERVAL_MS
+        },
       },
-    },
-  )
+      request: POLL_REQUEST,
+    })
   const runs = data?.map(toRun)
-  return { runs, latestRun: runs?.[0] ?? null, isPending, isError, error }
+  const latestRun = runs?.[0] ?? null
+  const { isStalled, resume } = useQueueStall(
+    latestRun?.status === "QUEUED" ? queuedRunKey(latestRun.runId) : null,
+    stalledKeyRef,
+  )
+  const recheck = React.useCallback(() => {
+    resume()
+    void refetch()
+  }, [refetch, resume])
+  return {
+    runs,
+    latestRun,
+    isPending,
+    isError,
+    error,
+    isQueueStalled: isStalled,
+    recheck,
+  }
 }
 
 type StepsCache = {
@@ -217,6 +296,8 @@ export const useAgentRunSteps = (
   objectionId: number,
   runId: number | null,
   isRunEnded: boolean,
+  /** 실행이 아직 대기 중인가. 대기 중에는 단계가 생기지 않아 폴링하지 않는다 */
+  isRunQueued = false,
 ) => {
   const queryClient = useQueryClient()
   // 폴링 함수는 렌더 밖에서 돈다. 최신 실행 상태를 그 안에서 읽도록 ref 에 둔다.
@@ -239,13 +320,15 @@ export const useAgentRunSteps = (
         objectionId,
         runId ?? 0,
         { after },
-        { signal },
+        { signal, ...POLL_REQUEST },
       )
       const appended = fresh.map(toStep).filter((step) => step.seq > after)
       return { steps: [...(previous?.steps ?? []), ...appended], isComplete }
     },
     refetchInterval: (query) =>
-      query.state.data?.isComplete ? false : AGENT_POLL_INTERVAL_MS,
+      query.state.data?.isComplete || isRunQueued
+        ? false
+        : AGENT_POLL_INTERVAL_MS,
   })
 
   return { steps: data?.steps ?? [], isError, error }
@@ -267,7 +350,9 @@ export const useReviewDraft = (
       latestRun?.runId ?? null,
       latestRun?.status ?? null,
     ],
-    queryFn: ({ signal }) => getObjectionReviewDraft(objectionId, { signal }),
+    // 실행 상태가 바뀔 때마다 다시 받는데, 그 변화는 폴링이 알려 준 것이라 활동으로 세지 않는다
+    queryFn: ({ signal }) =>
+      getObjectionReviewDraft(objectionId, { signal, ...POLL_REQUEST }),
     placeholderData: keepPreviousData,
   })
   return {

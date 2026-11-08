@@ -1,18 +1,15 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from "@tanstack/react-query"
 import {
   approveObjectionDecision,
   confirmObjectionCompleteness,
-  getGetObjectionDetailQueryKey,
   getGetObjectionDocumentContentQueryKey,
   getGetObjectionDocumentContentUrl,
-  getListObjectionExternalChecksQueryKey,
-  getListObjectionNoticesQueryKey,
-  getListObjectionsQueryKey,
+  getListObjectionDocumentsQueryKey,
   requestObjectionExternalCheck,
   requestObjectionSupplement,
   returnObjectionDecision,
@@ -22,15 +19,21 @@ import {
   useListObjectionExternalChecks,
   useListObjectionLedger,
   useListObjectionNotices,
+  uploadObjectionDocuments,
   type ExternalCheckRequest,
-  type ObjectionDocumentResponse,
-  type ObjectionLedgerEntryResponse,
-  type ObjectionNoticeResponse,
+  type DocumentResponse,
+  type LedgerEntry as LedgerEntryResponse,
+  type NoticeResponse,
   type OcrPage as OcrPageResponse,
-  type SupplementRequest,
+  type SupplementRequestBody,
 } from "@/shared/api/generated"
-import { fetchBinary, withIdempotencyKey } from "@/shared/api/custom-fetch"
 import {
+  UPLOAD_TIMEOUT_MS,
+  fetchBinary,
+  withIdempotencyKey,
+} from "@/shared/api/custom-fetch"
+import {
+  invalidateObjection,
   toDecision,
   toExternalCheck,
 } from "@/entities/payment-stop/api/objection"
@@ -45,24 +48,6 @@ import {
 const ACCESS_REASON_HEADER = "X-Access-Reason"
 
 type Keyed<T> = T & { objectionId: number; idempotencyKey: string }
-
-/**
- * 이의제기 하나의 상태가 바뀐 뒤 다시 받을 쿼리. 상세(사유가 키 뒤에 붙는다), 목록,
- * 통지 기록, 외부 확인을 다시 받는다. 분석 타임라인은 상태 변경과 무관해 건드리지 않는다.
- */
-const invalidateObjection = (queryClient: QueryClient, objectionId: number) =>
-  Promise.all([
-    queryClient.invalidateQueries({
-      queryKey: getGetObjectionDetailQueryKey(objectionId),
-    }),
-    queryClient.invalidateQueries({ queryKey: getListObjectionsQueryKey() }),
-    queryClient.invalidateQueries({
-      queryKey: getListObjectionNoticesQueryKey(objectionId),
-    }),
-    queryClient.invalidateQueries({
-      queryKey: getListObjectionExternalChecksQueryKey(objectionId),
-    }),
-  ])
 
 /** 소명 완비 확인. 심사 기한이 이때 정해진다. 다른 상태면 `PST0308` 이다. */
 export const useConfirmCompleteness = () => {
@@ -86,7 +71,7 @@ export const useRequestSupplement = () => {
       objectionId,
       request,
       idempotencyKey,
-    }: Keyed<{ request: SupplementRequest }>) =>
+    }: Keyed<{ request: SupplementRequestBody }>) =>
       requestObjectionSupplement(
         objectionId,
         request,
@@ -110,9 +95,10 @@ export const useStartReviewSession = () =>
   })
 
 /**
- * 승인 대기 판정 승인. 작성자와 같은 사람이면 `PST0309`, 이미 처리됐으면 `PST0204` 다.
- * 서버가 승인 직전에 해제 요건을 다시 계산하므로 `PST0301` 도 올 수 있다. 어느 쪽이든
- * 화면의 상세가 서버보다 늦었다는 뜻이라 성공과 실패 모두 다시 받는다.
+ * 승인 대기 판정 승인. 작성자와 같은 사람이면 `PST0309` 다. 다른 관리자가 먼저 승인했으면
+ * `PST0302`(이미 확정), 먼저 반려했으면 `PST0204`(승인할 판정 없음)다. 서버가 승인 직전에
+ * 해제 요건을 다시 계산하므로 `PST0301` 도 올 수 있다. 어느 쪽이든 화면의 상세가 서버보다
+ * 늦었다는 뜻이라 성공과 실패 모두 다시 받는다.
  */
 export const useApproveDecision = () => {
   const queryClient = useQueryClient()
@@ -199,7 +185,7 @@ export type ObjectionNotice = {
   recordedAt: string | null
 }
 
-const toNotice = (response: ObjectionNoticeResponse): ObjectionNotice => ({
+const toNotice = (response: NoticeResponse): ObjectionNotice => ({
   noticeId: response.noticeId ?? 0,
   target: response.target ?? "",
   kind: response.kind ?? "",
@@ -210,8 +196,8 @@ const toNotice = (response: ObjectionNoticeResponse): ObjectionNotice => ({
 
 /** 통지 기록. 실제 발송은 없고 기록만 있다(D30). */
 export const useObjectionNotices = (objectionId: number) => {
-  const { data, isPending } = useListObjectionNotices(objectionId)
-  return { notices: data?.map(toNotice), isPending }
+  const { data, isPending, isError } = useListObjectionNotices(objectionId)
+  return { notices: data?.map(toNotice), isPending, isError }
 }
 
 export type ObjectionDocument = {
@@ -224,14 +210,14 @@ export type ObjectionDocument = {
   sha256: string
   /** 0 접수, 1~2 보완 회차 */
   round: number
+  /** 올린 사람(서버 `UploaderRole`): `HOLDER` 명의인, `ADMIN` 관리자 대리 */
+  uploaderRole: string
   uploadedAt: string | null
   /** `PENDING`, `DONE`, `FAILED`. 신분증 사본은 판독하지 않아 `null` 이다 */
   ocrStatus: string | null
 }
 
-const toDocument = (
-  response: ObjectionDocumentResponse,
-): ObjectionDocument => ({
+const toDocument = (response: DocumentResponse): ObjectionDocument => ({
   documentId: response.documentId ?? 0,
   kind: response.kind ?? "",
   fileName: response.fileName ?? "",
@@ -239,13 +225,68 @@ const toDocument = (
   size: response.size ?? 0,
   sha256: response.sha256 ?? "",
   round: response.round ?? 0,
+  uploaderRole: response.uploaderRole ?? "",
   uploadedAt: response.uploadedAt ?? null,
   ocrStatus: response.ocrStatus || null,
 })
 
-export const useObjectionDocuments = (objectionId: number) => {
-  const { data, isPending, isError } = useListObjectionDocuments(objectionId)
+/**
+ * 서류 목록. 판독은 분석 실행 안에서 워커가 하므로, 쿼리 키에 최근 실행 번호와 상태를 넣어
+ * 실행이 움직일 때마다 다시 받는다. 그래야 판독이 끝난(`DONE`) 서류의 오버레이가 새로고침
+ * 없이 나타난다. 이 다시 받기는 폴링이 알려 준 변화라 활동으로 세지 않는다.
+ */
+export const useObjectionDocuments = (
+  objectionId: number,
+  latestRun: { runId: number; status: string } | null = null,
+) => {
+  const { data, isPending, isError } = useListObjectionDocuments(objectionId, {
+    query: {
+      queryKey: [
+        ...getListObjectionDocumentsQueryKey(objectionId),
+        latestRun?.runId ?? null,
+        latestRun?.status ?? null,
+      ],
+      placeholderData: keepPreviousData,
+    },
+    request: { background: true },
+  })
   return { documents: data?.map(toDocument), isPending, isError }
+}
+
+export type UploadDocumentKind = "EVIDENCE" | "ID_COPY"
+
+/**
+ * 서류 대리 업로드(`POST /admin/objections/{id}/documents`, D34). 영업점 대리 접수 뒤 신분증
+ * 사본과 증빙을 올린다. 종류마다 따로 보내므로 멱등키도 종류마다 화면이 따로 정한다.
+ *
+ * 서버는 이미 올린 서류까지 합쳐 10개, 30MB로 센다. 넘으면 `PST0007`, 확정 뒤면 `PST0302` 다.
+ * 큰 첨부라 기본 30초 대신 업로드 제한 시간을 쓴다.
+ */
+export const useUploadObjectionDocuments = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      objectionId,
+      kind,
+      files,
+      idempotencyKey,
+    }: Keyed<{ kind: UploadDocumentKind; files: File[] }>) =>
+      (
+        await uploadObjectionDocuments(
+          objectionId,
+          { kind },
+          { files },
+          {
+            ...withIdempotencyKey({}, idempotencyKey),
+            timeoutMs: UPLOAD_TIMEOUT_MS,
+          },
+        )
+      ).map(toDocument),
+    onSettled: (_data, _error, { objectionId }) =>
+      queryClient.invalidateQueries({
+        queryKey: getListObjectionDocumentsQueryKey(objectionId),
+      }),
+  })
 }
 
 export type OcrRegion = {
@@ -322,7 +363,7 @@ export const useDocumentContent = (
 
 export type LedgerEntry = {
   transactionNumber: string
-  /** `DEPOSIT`, `WITHDRAWAL` */
+  /** `IN`(입금), `OUT`(출금). 서버 `ObjectionQueryService` 가 주는 값이다 */
   direction: string
   interbank: boolean
   /** 상대 계좌. 타행이면 `null` */
@@ -334,9 +375,7 @@ export type LedgerEntry = {
   afterDispute: boolean
 }
 
-const toLedgerEntry = (
-  response: ObjectionLedgerEntryResponse,
-): LedgerEntry => ({
+const toLedgerEntry = (response: LedgerEntryResponse): LedgerEntry => ({
   transactionNumber: response.transactionNumber ?? "",
   direction: response.direction ?? "",
   interbank: response.interbank ?? false,

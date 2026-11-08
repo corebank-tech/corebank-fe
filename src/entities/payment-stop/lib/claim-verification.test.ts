@@ -24,7 +24,7 @@ const draft = (overrides: Partial<ReviewDraft>): ReviewDraft => ({
 })
 
 describe("verifyClaims", () => {
-  it("모순에 있는 주장은 모순, 인용과 근거 거래가 있으면 확인됨, 나머지는 미확인이다", () => {
+  it("모순에 있는 주장은 모순, 인용과 근거 거래가 있으면 근거 제시, 나머지는 미확인이다", () => {
     const checks = verifyClaims(
       draft({
         evidenceTransactionNumbers: ["TR1", "TR2"],
@@ -43,7 +43,7 @@ describe("verifyClaims", () => {
       }),
     )
     expect(checks.map((check) => check.status)).toEqual([
-      "CONFIRMED",
+      "CITED",
       "CONTRADICTED",
       "UNVERIFIED",
     ])

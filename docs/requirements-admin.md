@@ -31,7 +31,7 @@
 | ADM-02 | 시산표 | `/admin/trial-balance` | REQ-ADM-020~025 | `GL_READ` | PH-28 (P3) | S2 | 화면 완료 (#128·PR #152), 실연동 (#180) |
 | ADM-03 | 정보계 대시보드 | `/admin/info-dashboard` | REQ-ADM-030~033 | `GL_READ` | PH-77 (P5) | S4 | 화면 완료 (#146), 실제 숫자는 PH-77 ②(서버 #704) 뒤 |
 | ADM-04 | 대사 불일치 목록 | `/admin/ledger-reconciliation` | REQ-ADM-040~042 | `AUDIT_READ` | PH-38 목록 API (P4) | S3 | 완료 (#130-①) |
-| ADM-05 | 지급정지 이의제기 심사 (목록, 상세, 대리 접수) | `/admin/objections`, `/admin/objections/:objectionId`, `/admin/objections/intake` | `corebank-server` `plans/261029-objection-review-agent` PA-07 | `PAYMENT_STOP_READ` 조회, `PAYMENT_STOP_WRITE` 대리 접수와 판정 확정 | PA-04 (P3, 서버 Draft PR #916) | S4 | 화면 뼈대 완료, AI 분석 실행 타임라인은 PA-05 뒤 |
+| ADM-05 | 지급정지 이의제기 심사 (목록, 상세, 대리 접수, 평가) | `/admin/objections`, `/admin/objections/:objectionId`, `/admin/objections/intake`, `/admin/objections/evaluation` | `corebank-server` `plans/261029-objection-review-agent` PA-07, PA-10~PA-15 | `PAYMENT_STOP_READ` 조회와 평가, `PAYMENT_STOP_WRITE` 대리 접수와 판정 작성, `PAYMENT_STOP_APPROVE` 승인과 반려 | PA-04, PA-10 (P3, 서버 `feat/paymentstop-review-ops`) | S4 | 화면 완료(2인 승인, 기한, 보완, 외부 확인, 통지 기록, 서류 판독, 원장 타임라인, AI 분석 타임라인과 재생, 평가) |
 | ADM-90 | [공통] 관리자 셸 — 사이드바·헤더·세션 | 전 관리자 화면 | REQ-ADM-001~006 | — | — | S0 | 완료 (#126·PR #138) |
 | ADM-91 | 관리자 로그인 | `/admin/login` | REQ-ADM-007~008 | — | PH-49a `/admin/auth/login` (P1) | S2 | 완료 (#136) |
 | ADM-92 | [공통] 접근 권한 없음 | 라우트 없음 — 진입 URL 유지 | REQ-ADM-009 | — | — | S0 | 완료 |
@@ -46,7 +46,7 @@
 | ADM-02 | `src/pages/admin/adm02-trial-balance.tsx` |
 | ADM-03 | `src/pages/admin/adm03-info-dashboard.tsx` |
 | ADM-04 | `src/pages/admin/adm04-reconciliation-mismatches.tsx` |
-| ADM-05 | `src/pages/admin/adm05-objection-list.tsx`, `adm05-objection-detail.tsx`, `adm05-objection-decision-form.tsx`, `adm05-objection-intake.tsx`, `src/widgets/objection/gate-checklist.tsx` |
+| ADM-05 | `src/pages/admin/adm05-objection-list.tsx`, `adm05-objection-detail.tsx`, `adm05-objection-decision-form.tsx`, `adm05-objection-intake.tsx`, `adm05-objection-evaluation.tsx`, `src/widgets/objection/` |
 | ADM-90 | `src/widgets/admin-shell/admin-shell.tsx`, `src/app/layouts/admin-shell-layout.tsx`, `src/app/require-admin.tsx` |
 | ADM-91 | `src/pages/admin/admin-login.tsx` |
 | ADM-92 | `src/pages/admin/admin-forbidden.tsx` |
@@ -72,7 +72,8 @@
 | `CUSTOMER_WRITE` | 고객 변경 | 잠금 해제·비밀번호 초기화·상태 변경 |
 | `AUDIT_READ` | 감사 조회 | 감사 성격 조회 — ADM-04 대사 불일치 목록이 쓴다(메뉴 `admin-nav.ts:69` · 라우트 게이트 `admin-routes.tsx:105`) |
 | `PAYMENT_STOP_READ` | 지급정지 조회 | 이의제기 목록, 상세(소명 원문) — 2차 고정 5종 뒤 서버가 더했다(계획 D14) |
-| `PAYMENT_STOP_WRITE` | 지급정지 변경 | 지급정지 사건 등록, 이의제기 접수, 판정 확정 |
+| `PAYMENT_STOP_WRITE` | 지급정지 변경 | 지급정지 사건 등록, 이의제기 접수와 서류 대리 업로드, 소명 완비 확인, 보완 요청, 외부 확인, 판정 작성 |
+| `PAYMENT_STOP_APPROVE` | 지급정지 승인 | 승인 대기 판정(수용, 일부 지급정지)의 승인과 반려. 작성자 본인은 승인만 못 하고 반려는 할 수 있다(계약 v2 §10) |
 
 구현: `src/shared/types/admin-permission.ts`(이름 집합) · `src/entities/auth/lib/session-role.ts`(판정 단일 출처).
 
@@ -86,7 +87,7 @@
 | ADM-02 | `GL_READ` | `GL_READ` | 없음(조회 전용) | `admin-nav.ts:52` |
 | ADM-03 | `GL_READ` | `GL_READ` | 없음(조회 전용) | D-09 · `admin-nav.ts:58` · `admin-routes.tsx:97` |
 | ADM-04 | `AUDIT_READ` | `AUDIT_READ` | 없음(조회 전용) | `admin-nav.ts:69` · tasks.md `FE ADM-04` |
-| ADM-05 | `PAYMENT_STOP_READ` | `PAYMENT_STOP_READ` | `PAYMENT_STOP_WRITE` | `admin-nav.ts` "심사" 그룹, 대리 접수 라우트는 `PAYMENT_STOP_WRITE` |
+| ADM-05 | `PAYMENT_STOP_READ` | `PAYMENT_STOP_READ` | `PAYMENT_STOP_WRITE`, 승인과 반려는 `PAYMENT_STOP_APPROVE` | `admin-nav.ts` "심사" 그룹, 대리 접수 라우트는 `PAYMENT_STOP_WRITE`, 평가 라우트는 `PAYMENT_STOP_READ` |
 
 **ADM-03에 딱 맞는 권한이 고정 5종에 없었다.** 정보계 대시보드는 회계(GL)도 고객(CUSTOMER)도 감사(AUDIT)도 아니다. FE가 세 안(`GL_READ` 대용 / 권한 조건 없음 / 6번째 권한 신설)을 올렸고, **최종안 D-09가 `GL_READ`로 확정**했다 — 권한 집합 5종은 늘리지 않는다. 서버 PH-77도 같은 권한을 쓴다.
 
@@ -262,3 +263,4 @@
 | 2026-10-26 | ADM-03 화면(#146). 서버 PH-77 ① 스텁 스키마 기준. 경로 `/admin/info-dashboard` 확정, 네비 "회계" 그룹을 "리포트"로 바꿔 ADM-02와 묶음(부록 A 3번). "당월"은 asOf 가 속한 달로 정함(REQ-ADM-030) |
 | 2026-10-29 | ADM-01 서버 API(PH-97) 연동과 조회 사유 입력(#199). 목 데이터와 화면 안 필터링을 걷어내고 REQ-ADM-010을 서버 검색 규칙으로 고침. REQ-ADM-019 구현. 개인정보 마스킹은 서버 값을 그대로 표시 |
 | 2026-11-05 | ADM-05 지급정지 이의제기 심사 화면 뼈대(계획 PA-07, 타임라인 제외). 권한 `PAYMENT_STOP_READ`, `PAYMENT_STOP_WRITE` 추가, 네비 "심사" 그룹 신설. 서버 Draft PR #916 스펙 기준 |
+| 2026-11-06 | ADM-05 심사 운영 반영. 권한 `PAYMENT_STOP_APPROVE` 추가, 평가 경로 `/admin/objections/evaluation` 추가. 수용과 일부 지급정지는 소명 완비 확인 뒤에만 작성, 대리 접수 뒤 서류 업로드. 서버 `feat/paymentstop-review-ops`(36a6a629) 스펙 기준 |

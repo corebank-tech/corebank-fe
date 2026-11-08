@@ -82,8 +82,9 @@ const EmptyText = ({ children }: { children: React.ReactNode }) => (
 )
 
 /**
- * AI 판정안. 심사 참고안이고 해제 근거가 아니다(D9). 해제 요건 점검은 서버가 원장으로
- * 다시 계산하고, 그 결과가 판정안 갈래와 다르면 경고한다.
+ * AI 판정안을 "AI 의견(참고)"로 보인다. 심사 참고안이고 판정을 막지 않으며 해제 근거도 아니다
+ * (D9). 최종 판정은 담당자가 한다. 해제 요건 점검은 서버가 원장으로 다시 계산하고, 그 결과가
+ * AI 의견 갈래와 다르면 경고한다.
  */
 const DraftPanel = ({
   draft,
@@ -94,9 +95,9 @@ const DraftPanel = ({
   latestRun: AgentRun | null
   comparison: { branch: string; agentBranch: string } | null
 }) => (
-  <Panel aria-label="AI 판정안">
+  <Panel aria-label="AI 의견(참고)">
     <PanelHeader
-      title="AI 판정안"
+      title="AI 의견(참고)"
       action={
         draft && (
           <span className="inline-flex items-center gap-1.5">
@@ -110,28 +111,29 @@ const DraftPanel = ({
     />
     <div className="px-4 pb-3">
       <Alert variant="info">
-        AI 판정안은 심사 참고안이며 지급정지 해제 근거로 쓰이지 않습니다.
+        <p>AI 의견은 판정을 막지 않습니다. 최종 판정은 담당자가 합니다.</p>
+        <p>지급정지 해제 근거로도 쓰이지 않습니다.</p>
       </Alert>
       {isDraftStale(draft, latestRun) && latestRun && (
-        <Alert variant="warning" title="이전 실행의 판정안" className="mt-2">
-          아래 판정안은 실행 {draft?.runId}번 결과입니다. 최근 실행{" "}
+        <Alert variant="warning" title="이전 실행의 AI 의견" className="mt-2">
+          아래 AI 의견은 실행 {draft?.runId}번 결과입니다. 최근 실행{" "}
           {latestRun.runId}번은{" "}
           {labelOf(AGENT_RUN_STATUS_LABEL, latestRun.status)}
           {latestRun.status === "FAILED"
-            ? " 상태로 끝나 새 판정안이 없습니다."
-            : " 상태라 새 판정안이 아직 없습니다."}{" "}
+            ? " 상태로 끝나 새 AI 의견이 없습니다."
+            : " 상태라 새 AI 의견이 아직 없습니다."}{" "}
           보완 서류처럼 그 뒤에 들어온 자료는 반영되지 않았습니다.
         </Alert>
       )}
       {comparison && comparison.branch !== comparison.agentBranch && (
         <Alert
           variant="warning"
-          title="서버 규칙 결과와 AI 판정안이 다름"
+          title="서버 규칙 결과와 AI 의견이 다름"
           className="mt-2"
         >
-          서버 규칙은 {labelOf(GATE_BRANCH_LABEL, comparison.branch)}, AI
-          판정안은 {labelOf(GATE_BRANCH_LABEL, comparison.agentBranch)}입니다.
-          해제 여부는 서버 규칙 결과와 담당자 판정으로 정합니다.
+          서버 규칙은 {labelOf(GATE_BRANCH_LABEL, comparison.branch)}, AI 의견은{" "}
+          {labelOf(GATE_BRANCH_LABEL, comparison.agentBranch)}입니다. 해제
+          여부는 서버 규칙 결과와 담당자 판정으로 정합니다.
         </Alert>
       )}
     </div>
@@ -211,7 +213,7 @@ const DraftPanel = ({
       </>
     ) : (
       <p className="border-t border-border px-4 py-6 text-center text-base text-ink-faint">
-        AI 분석이 끝나면 판정안이 표시됩니다.
+        AI 분석이 끝나면 AI 의견이 표시됩니다.
       </p>
     )}
   </Panel>

@@ -249,14 +249,14 @@ describe("AgentAnalysis", () => {
     expect(screen.getAllByText("AI Agent")).toHaveLength(1)
   })
 
-  it("판정안을 참고안으로 보이고, 서버 규칙과 갈래가 다르면 경고한다", async () => {
+  it("판정안을 AI 의견(참고)로 보이고, 서버 규칙과 갈래가 다르면 경고한다", async () => {
     respondCompleted()
     renderAnalysis()
 
-    const panel = await screen.findByRole("region", { name: "AI 판정안" })
+    const panel = await screen.findByRole("region", { name: "AI 의견(참고)" })
     expect(
       within(panel).getByText(
-        "AI 판정안은 심사 참고안이며 지급정지 해제 근거로 쓰이지 않습니다.",
+        "AI 의견은 판정을 막지 않습니다. 최종 판정은 담당자가 합니다.",
       ),
     ).toBeInTheDocument()
     expect(
@@ -267,7 +267,7 @@ describe("AgentAnalysis", () => {
       within(panel).getByText("거래내역서를 제출해 주시기 바랍니다."),
     ).toBeInTheDocument()
     expect(
-      within(panel).getByText("서버 규칙 결과와 AI 판정안이 다름"),
+      within(panel).getByText("서버 규칙 결과와 AI 의견이 다름"),
     ).toBeInTheDocument()
   })
 
@@ -363,8 +363,8 @@ describe("AgentAnalysis", () => {
 
   // 재분석이 실패로 끝났을 때와 아직 대기 중일 때 모두 이전 판정안을 현재 결과로 보이면 안 된다
   it.each([
-    ["FAILED", "상태로 끝나 새 판정안이 없습니다"],
-    ["QUEUED", "상태라 새 판정안이 아직 없습니다"],
+    ["FAILED", "상태로 끝나 새 AI 의견이 없습니다"],
+    ["QUEUED", "상태라 새 AI 의견이 아직 없습니다"],
   ])(
     "최근 실행이 %s면 판정안을 이전 실행 결과라고 경고한다",
     async (status, reason) => {
@@ -382,9 +382,9 @@ describe("AgentAnalysis", () => {
       )
       renderAnalysis()
 
-      const panel = await screen.findByRole("region", { name: "AI 판정안" })
+      const panel = await screen.findByRole("region", { name: "AI 의견(참고)" })
       expect(
-        await within(panel).findByText("이전 실행의 판정안"),
+        await within(panel).findByText("이전 실행의 AI 의견"),
       ).toBeInTheDocument()
       expect(within(panel).getByText(/실행 7번 결과입니다/)).toBeInTheDocument()
       expect(within(panel).getByText(/최근 실행 8번은/)).toBeInTheDocument()

@@ -17,6 +17,7 @@ import { toErrorMessage } from "@/shared/api/api-error"
 import { formatAmount, formatDate, formatDateTime } from "@/shared/lib/format"
 import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { Loader2 } from "lucide-react"
+import { Alert } from "@/shared/ui/alert"
 import { Badge, type BadgeVariant } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { DataGrid, type DataGridColumn } from "@/shared/ui/data-grid"
@@ -58,10 +59,13 @@ export const Adm05ObjectionList = () => {
   const navigate = useNavigate()
   const { permissions } = useSession()
   const canWrite = hasPermission(permissions, "PAYMENT_STOP_WRITE")
-  const { objections, isPending, isError, error } = useObjectionList()
+  const { objections, isPending, isError, error, isQueueStalled, recheck } =
+    useObjectionList()
   const [page, setPage] = React.useState(1)
 
-  const rows = isError ? [] : (objections ?? [])
+  // 다시 받기가 한 번 실패해도 이미 받은 목록은 그대로 둔다. 오류는 따로 알린다.
+  const rows = objections ?? []
+  const hasStaleRows = isError && objections != null
   const totalPages = Math.ceil(rows.length / QUERY_DEFAULT_PAGE_SIZE)
   const pageRows = rows.slice(
     (page - 1) * QUERY_DEFAULT_PAGE_SIZE,
@@ -129,6 +133,15 @@ export const Adm05ObjectionList = () => {
           <span className="text-xs text-ink-faint">
             {row.reviewDeadline ? formatDate(row.reviewDeadline) : "-"}
           </span>
+        ) : row.objectionStatus === "SUPPLEMENT_REQUESTED" ? (
+          // 보완 중에는 서버가 심사 기한을 비운다. 대신 보완 기한을 보인다.
+          <DeadlineCountdown
+            label="보완 기한"
+            deadline={row.supplementDue}
+            alert={row.supplementOverdue}
+            pendingText="보완 기한 미정"
+            compact
+          />
         ) : (
           <DeadlineCountdown
             label="심사 기한"
@@ -191,15 +204,18 @@ export const Adm05ObjectionList = () => {
       header: "관리",
       align: "center",
       width: 70,
-      render: (row) => (
-        <Link
-          to={`/admin/objections/${row.objectionId}`}
-          aria-label={`이의제기 ${row.objectionId} 심사`}
-          className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          {isObjectionOpen(row.objectionStatus) ? "심사" : "상세"}
-        </Link>
-      ),
+      render: (row) => {
+        const action = isObjectionOpen(row.objectionStatus) ? "심사" : "상세"
+        return (
+          <Link
+            to={`/admin/objections/${row.objectionId}`}
+            aria-label={`이의제기 ${row.objectionId} ${action}`}
+            className="text-link hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            {action}
+          </Link>
+        )
+      },
     },
   ]
 
@@ -234,6 +250,30 @@ export const Adm05ObjectionList = () => {
           </span>
         </p>
 
+        {hasStaleRows && (
+          <Alert variant="warning" className="mb-2">
+            목록을 다시 받지 못했습니다. 아래는 마지막으로 받은 목록입니다.{" "}
+            {toErrorMessage(error)}
+          </Alert>
+        )}
+        {isQueueStalled && (
+          <Alert variant="info" title="분석 대기가 길어짐" className="mb-2">
+            <p>
+              AI 분석이 1분 넘게 대기에서 시작되지 않아 자동 갱신을 멈췄습니다.
+              분석 워커가 꺼져 있을 수 있습니다. 판정은 분석 없이도 할 수
+              있습니다.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={recheck}
+            >
+              다시 확인
+            </Button>
+          </Alert>
+        )}
+
         <DataGrid
           columns={columns}
           rows={pageRows}
@@ -241,7 +281,7 @@ export const Adm05ObjectionList = () => {
           loading={isPending}
           emptyMessage={
             isError
-              ? (toErrorMessage(error) ?? "")
+              ? (toErrorMessage(error) ?? "목록을 불러오지 못했습니다.")
               : "접수된 이의제기가 없습니다."
           }
         />

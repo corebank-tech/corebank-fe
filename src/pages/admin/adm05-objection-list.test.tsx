@@ -6,8 +6,9 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { MemoryRouter } from "react-router"
 import { http, HttpResponse } from "msw"
@@ -47,7 +48,8 @@ const SUMMARIES: ObjectionSummaryResponse[] = [
     disputedTotal: 2_000_000,
     objectionDeadline: "2026-12-15",
     receivedAt: "2026-10-23T13:40:00",
-    reviewDeadline: "2026-10-30",
+    // 서버는 보완을 요청하면 심사 기한을 비우고 보완 기한을 준다.
+    supplementDue: "2026-10-30",
     deadlineAlert: false,
     supplementOverdue: true,
     latestRunStatus: "COMPLETED",
@@ -138,8 +140,7 @@ describe("Adm05ObjectionList", () => {
     const deadline = within(waitingRow).getByRole("status", {
       name: /심사 기한 2026\.11\.10/,
     })
-    expect(deadline).toHaveAttribute("data-alert", "true")
-    expect(deadline).toHaveClass("text-danger")
+    expect(deadline).toHaveAccessibleName(/기한 임박/)
 
     // 보완 기한이 지난 건은 불수용 대상으로 표시한다.
     const overdueRow = screen
@@ -147,9 +148,19 @@ describe("Adm05ObjectionList", () => {
       .closest("tr")!
     expect(within(overdueRow).getByText("불수용 대상")).toBeInTheDocument()
     expect(within(overdueRow).getByText("보완 요청")).toBeInTheDocument()
+    // 보완 중에는 심사 기한 대신 보완 기한을 보인다.
+    expect(
+      within(overdueRow).getByRole("status", {
+        name: /보완 기한 2026\.10\.30.*기한 임박/,
+      }),
+    ).toBeInTheDocument()
+    expect(
+      within(overdueRow).queryByText("완비 확인 전"),
+    ).not.toBeInTheDocument()
 
+    // 링크의 접근 이름은 보이는 글자와 같은 동작을 말한다.
     const decidedRow = screen
-      .getByRole("link", { name: "이의제기 1 심사" })
+      .getByRole("link", { name: "이의제기 1 상세" })
       .closest("tr")!
     expect(within(decidedRow).getByText("일부 지급정지")).toBeInTheDocument()
     expect(within(decidedRow).getByText("판정 확정")).toBeInTheDocument()
@@ -191,5 +202,74 @@ describe("Adm05ObjectionList", () => {
     expect(
       await screen.findByText("해당 자원에 접근할 권한이 없습니다."),
     ).toBeInTheDocument()
+  })
+
+  it("다시 받기가 실패해도 이미 받은 목록은 그대로 두고 실패만 알린다", async () => {
+    let calls = 0
+    respond(() => {
+      calls += 1
+      return calls === 1
+        ? HttpResponse.json({ code: "0000", message: "성공", data: SUMMARIES })
+        : HttpResponse.json(
+            { code: "CMN9999", message: "일시적인 오류입니다." },
+            { status: 500 },
+          )
+    })
+    renderList(["PAYMENT_STOP_READ"])
+
+    await screen.findByText("[총 3건]")
+    // 분석 중인 행이 있어 2초 뒤 다시 받는다.
+    expect(
+      await screen.findByText(
+        /목록을 다시 받지 못했습니다/,
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText("[총 3건]")).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "이의제기 3 심사" }),
+    ).toBeInTheDocument()
+  })
+
+  it("대기 행만 1분 넘게 남으면 자동 갱신을 멈추고 다시 확인을 받는다", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      let calls = 0
+      respond(() => {
+        calls += 1
+        return HttpResponse.json({
+          code: "0000",
+          message: "성공",
+          data: SUMMARIES.map((row) =>
+            row.latestRunStatus === "RUNNING"
+              ? { ...row, latestRunStatus: "QUEUED" }
+              : row,
+          ),
+        })
+      })
+      renderList(["PAYMENT_STOP_READ"])
+      await screen.findByText("[총 3건]")
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(61_000)
+      })
+      expect(screen.getByText("분석 대기가 길어짐")).toBeInTheDocument()
+      const stoppedAt = calls
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(calls).toBe(stoppedAt)
+
+      fireEvent.click(screen.getByRole("button", { name: "다시 확인" }))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+      expect(calls).toBeGreaterThan(stoppedAt)
+      expect(screen.queryByText("분석 대기가 길어짐")).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

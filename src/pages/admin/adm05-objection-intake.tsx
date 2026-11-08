@@ -2,12 +2,19 @@ import * as React from "react"
 import { Link } from "react-router"
 import {
   CLAUSE_LABEL,
+  MAX_EVIDENCE_COUNT,
   OBJECTION_CLAUSES,
+  OBJECTION_FILE_ACCEPT,
+  inspectObjectionFiles,
+  mergeObjectionFiles,
   useReceiveObjection,
   useRegisterPaymentStopCase,
+  useUploadObjectionDocuments,
+  type FileSelection,
   type ObjectionClause,
+  type UploadDocumentKind,
 } from "@/entities/payment-stop"
-import { toErrorMessage } from "@/shared/api/api-error"
+import { isApiError, toErrorMessage } from "@/shared/api/api-error"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { onlyDigits } from "@/shared/lib/input-filter"
 import { Alert } from "@/shared/ui/alert"
@@ -15,6 +22,7 @@ import { Button } from "@/shared/ui/button"
 import { Checkbox } from "@/shared/ui/checkbox"
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog"
 import { FormRow } from "@/shared/ui/form-row"
+import { FileAttach } from "@/shared/ui/file-attach"
 import { FormSection } from "@/shared/ui/form-section"
 import { Input } from "@/shared/ui/input"
 import { NoticeBoxFooter } from "@/shared/ui/notice-box"
@@ -33,6 +41,9 @@ import { Textarea } from "@/shared/ui/textarea"
  *
  * 형식 검사(필수 칸, 거래 번호 모양)만 화면이 하고, 업무 규칙(입금 거래인지, 신청
  * 기한, 신분증 사본 확인)은 서버가 판정한다. 서버 문구를 그대로 보인다(REQ-CMN-008).
+ *
+ * 접수가 끝나면 받은 이의제기 번호로 서류를 올린다(D34, 계약 §3 대리 업로드). 접수와 업로드는
+ * 서로 다른 요청이라, 업로드가 실패해도 접수는 그대로 남고 업로드만 다시 한다.
  */
 
 /** 서버 `RegisterRequest` 의 거래 번호 형식과 건수 상한. */
@@ -261,6 +272,193 @@ const validateReceiveDraft = (draft: ReceiveDraft): string | null => {
   return null
 }
 
+const UPLOAD_KIND_LABEL: Record<UploadDocumentKind, string> = {
+  ID_COPY: "신분증 사본",
+  EVIDENCE: "증빙 서류",
+}
+
+const fileFingerprint = (file: File) => [
+  file.name,
+  file.size,
+  file.lastModified,
+]
+
+/** 서류를 다시 보내도 같은 거래로 보이게 하는 내용. 파일을 바꾸면 새 키다. */
+const uploadFingerprint = (
+  objectionId: number,
+  kind: UploadDocumentKind,
+  files: readonly File[],
+) => ({ objectionId, kind, files: files.map(fileFingerprint) })
+
+const EMPTY_SELECTION: FileSelection = { files: [], errors: [] }
+
+type UploadState =
+  { status: "DONE"; count: number } | { status: "FAILED"; message: string }
+
+/**
+ * 대리 접수한 이의제기의 서류 업로드. 신분증 사본과 증빙은 서버에 종류를 붙여 따로 보내므로
+ * 종류마다 결과와 멱등키를 따로 둔다. 한쪽만 실패하면 그쪽만 다시 보낸다.
+ *
+ * 형식과 크기는 화면이 먼저 보고(매직 바이트, 10MB, 합계 30MB), 서버가 다시 본다. 이미 올린
+ * 서류까지 합친 한도(10개, 30MB)는 서버만 알아 넘치면 `PST0007` 로 안내한다.
+ */
+const DocumentUploadSection = ({ objectionId }: { objectionId: number }) => {
+  const upload = useUploadObjectionDocuments()
+  const idCopyKey = useIdempotencyKey()
+  const evidenceKey = useIdempotencyKey()
+  const [selection, setSelection] = React.useState<
+    Record<UploadDocumentKind, FileSelection>
+  >({ ID_COPY: EMPTY_SELECTION, EVIDENCE: EMPTY_SELECTION })
+  const [checking, setChecking] = React.useState(0)
+  const [results, setResults] = React.useState<
+    Partial<Record<UploadDocumentKind, UploadState>>
+  >({})
+
+  const keyOf = (kind: UploadDocumentKind) =>
+    kind === "ID_COPY" ? idCopyKey : evidenceKey
+  const pendingKinds = (["ID_COPY", "EVIDENCE"] as const).filter(
+    (kind) =>
+      selection[kind].files.length > 0 && results[kind]?.status !== "DONE",
+  )
+
+  const handleSelect = async (kind: UploadDocumentKind, picked: File[]) => {
+    setChecking((count) => count + 1)
+    const inspected = await inspectObjectionFiles(picked)
+    // 두 칸의 검사가 겹쳐도 최신 목록으로 합계를 센다.
+    setSelection((prev) => ({
+      ...prev,
+      [kind]: mergeObjectionFiles({
+        current: prev[kind].files,
+        inspected,
+        maxCount: kind === "ID_COPY" ? 1 : MAX_EVIDENCE_COUNT,
+        otherFiles: prev[kind === "ID_COPY" ? "EVIDENCE" : "ID_COPY"].files,
+      }),
+    }))
+    setResults((prev) => ({ ...prev, [kind]: undefined }))
+    setChecking((count) => count - 1)
+  }
+
+  const handleRemove = (kind: UploadDocumentKind, index: number) => {
+    setSelection((prev) => ({
+      ...prev,
+      [kind]: {
+        files: prev[kind].files.filter((_, i) => i !== index),
+        errors: [],
+      },
+    }))
+    setResults((prev) => ({ ...prev, [kind]: undefined }))
+  }
+
+  const handleUpload = async () => {
+    for (const kind of pendingKinds) {
+      const key = keyOf(kind)
+      const chosen = selection[kind].files
+      try {
+        const uploaded = await upload.mutateAsync({
+          objectionId,
+          kind,
+          files: chosen,
+          idempotencyKey: key.keyFor(
+            uploadFingerprint(objectionId, kind, chosen),
+          ),
+        })
+        key.reset()
+        setResults((prev) => ({
+          ...prev,
+          [kind]: { status: "DONE", count: uploaded.length },
+        }))
+      } catch (caught) {
+        const message =
+          isApiError(caught) && caught.code === "PST0007"
+            ? "파일 형식이나 크기가 허용 범위를 벗어났습니다. 이 이의제기에 이미 올린 서류까지 합쳐 10개, 30MB까지 받습니다."
+            : (toErrorMessage(caught) ?? "업로드하지 못했습니다.")
+        setResults((prev) => ({
+          ...prev,
+          [kind]: { status: "FAILED", message },
+        }))
+      }
+    }
+  }
+
+  const failed = (["ID_COPY", "EVIDENCE"] as const).filter(
+    (kind) => results[kind]?.status === "FAILED",
+  )
+
+  return (
+    <section
+      aria-label="서류 업로드"
+      className="mt-4 border-t border-border pt-4"
+    >
+      <p className="mb-2 text-base font-bold text-ink">
+        이의제기 {objectionId} 서류 업로드
+      </p>
+      <p className="mb-3 text-xs text-ink-muted">
+        영업점에서 받은 신분증 사본과 증빙을 올립니다. PDF, PNG, JPG 파일만,
+        파일 하나 10MB, 이 이의제기 전체 10개, 30MB까지입니다. 신분증 사본은
+        암호화해 저장하고 판독하지 않습니다.
+      </p>
+      {(["ID_COPY", "EVIDENCE"] as const).map((kind) => (
+        <FormRow
+          key={kind}
+          label={UPLOAD_KIND_LABEL[kind]}
+          htmlFor={`adm-upload-${kind}`}
+        >
+          <FileAttach
+            id={`adm-upload-${kind}`}
+            label={UPLOAD_KIND_LABEL[kind]}
+            accept={OBJECTION_FILE_ACCEPT}
+            multiple={kind === "EVIDENCE"}
+            files={selection[kind].files}
+            busy={checking > 0}
+            disabled={upload.isPending || results[kind]?.status === "DONE"}
+            errors={selection[kind].errors}
+            hint={kind === "ID_COPY" ? "1개" : `${MAX_EVIDENCE_COUNT}개까지`}
+            onSelect={(picked) => void handleSelect(kind, picked)}
+            onRemove={(index) => handleRemove(kind, index)}
+          />
+        </FormRow>
+      ))}
+
+      {(["ID_COPY", "EVIDENCE"] as const).map((kind) => {
+        const result = results[kind]
+        if (result?.status === "DONE") {
+          return (
+            <Alert key={kind} variant="success" className="mt-3">
+              {UPLOAD_KIND_LABEL[kind]} {result.count}개를 올렸습니다.
+            </Alert>
+          )
+        }
+        if (result?.status === "FAILED") {
+          return (
+            <Alert key={kind} variant="danger" className="mt-3">
+              {UPLOAD_KIND_LABEL[kind]}를 올리지 못했습니다. {result.message}{" "}
+              이의제기 접수는 그대로 남아 있습니다.
+            </Alert>
+          )
+        }
+        return null
+      })}
+
+      <div className="mt-4 flex items-center justify-center">
+        <Button
+          type="button"
+          className="min-w-30"
+          disabled={
+            pendingKinds.length === 0 || upload.isPending || checking > 0
+          }
+          onClick={() => void handleUpload()}
+        >
+          {upload.isPending
+            ? "올리는 중"
+            : failed.length > 0
+              ? "실패한 서류 다시 올리기"
+              : "서류 올리기"}
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 const ReceiveObjectionSection = ({
   initialCaseId,
 }: {
@@ -396,7 +594,7 @@ const ReceiveObjectionSection = ({
         )}
         {receivedId != null && (
           <Alert variant="success" className="mt-3">
-            이의제기 번호 {receivedId}로 접수했습니다.{" "}
+            이의제기 번호 {receivedId}로 접수했습니다. 아래에서 서류를 올리세요.{" "}
             <Link
               to={`/admin/objections/${receivedId}`}
               className="font-bold text-link hover:underline"
@@ -416,6 +614,9 @@ const ReceiveObjectionSection = ({
           </Button>
         </div>
       </form>
+      {receivedId != null && (
+        <DocumentUploadSection key={receivedId} objectionId={receivedId} />
+      )}
     </FormSection>
   )
 }
@@ -447,7 +648,8 @@ export const Adm05ObjectionIntake = () => {
           "사건을 등록하면 다툼 거래가 입금된 계좌를 바로 전부 지급정지합니다.",
           "이미 다른 사건에 등록된 거래나 입금이 아닌 거래는 등록되지 않습니다.",
           "이의제기는 사건마다 한 번 접수합니다. 신청 기한이 지나면 접수되지 않습니다.",
-          "신분증 사본 확인과 소명 내용이 없으면 접수되지 않으며 보완을 요청합니다.",
+          "신분증 사본 확인과 소명 내용이 없으면 접수되지 않습니다.",
+          "서류는 접수 뒤 올립니다. 업로드가 실패해도 접수는 남고 실패한 서류만 다시 올립니다.",
         ]}
       />
     </div>

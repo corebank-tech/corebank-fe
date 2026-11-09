@@ -36,25 +36,11 @@ import {
   useWithdrawAccounts,
 } from "@/entities/account"
 import { ApiError } from "@/shared/api/api-error"
+import { FormRow } from "@/shared/ui/form-row"
+import { Input } from "@/shared/ui/input"
+import { onlyDigits } from "@/shared/lib/input-filter"
 
 const PASSWORD_LIMIT = 4
-
-/**
- * 신규 계좌 비밀번호. REQ-PRDT-006은 예적금 계좌가 비밀번호를 보유하지 않는다고
- * 정의해 입력받지 않는데, 서버는 이 값을 @NotNull로 받아 저장한다
- * (corebank-tech/corebank-server#275).
- *
- * 출금계좌 비밀번호를 재사용하면 고객이 모르는 사이 인증 수단이 다른 계좌로
- * 복제된다. 고정값은 모든 신규 계좌가 같은 비밀번호를 갖게 된다. 요구사항대로
- * 이 값이 쓰이지 않는다면 무엇을 넣든 상관없고, 쓰이게 된다면 그때는 정식 입력
- * 흐름이 필요하므로 어느 쪽이든 요청마다 새로 만든 값이 손해가 아니다.
- *
- * 모듈로 편향이 있지만 인증 강도를 기대하는 값이 아니라 그대로 둔다.
- */
-const generateNewAccountPassword = (): string =>
-  Array.from(crypto.getRandomValues(new Uint8Array(4)), (n) =>
-    String(n % 10),
-  ).join("")
 
 /** C-05 상품가입 3단계 · 확인 및 인증 (REQ-PRDT-010, REQ-ACCT-007) */
 export const C05ConfirmAuth = () => {
@@ -66,6 +52,12 @@ export const C05ConfirmAuth = () => {
 
   const [password, setPassword] = React.useState("")
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
+  const [newAccountPassword, setNewAccountPassword] = React.useState("")
+  const [newAccountPasswordConfirm, setNewAccountPasswordConfirm] =
+    React.useState("")
+  const [newAccountPasswordError, setNewAccountPasswordError] = React.useState<
+    string | null
+  >(null)
   const [accountPasswordAuthToken, setAccountPasswordAuthToken] =
     React.useState<string | null>(null)
   const [otpOpen, setOtpOpen] = React.useState(false)
@@ -128,9 +120,25 @@ export const C05ConfirmAuth = () => {
    */
   const handleAuthenticate = async () => {
     if (password.length !== PASSWORD_LIMIT) {
-      setPasswordError("계좌비밀번호 4자리를 모두 입력하세요.")
+      setPasswordError("출금계좌 비밀번호 4자리를 모두 입력하세요.")
       return
     }
+
+    if (!/^\d{4}$/.test(newAccountPassword)) {
+      setNewAccountPasswordError(
+        "신규 계좌 비밀번호는 숫자 4자리로 입력하세요.",
+      )
+      return
+    }
+
+    if (newAccountPassword !== newAccountPasswordConfirm) {
+      setNewAccountPasswordError(
+        "신규 계좌 비밀번호와 확인값이 일치하지 않습니다.",
+      )
+      return
+    }
+
+    setNewAccountPasswordError(null)
 
     if (otpTransactionData == null) {
       setExecuteError(
@@ -204,19 +212,25 @@ export const C05ConfirmAuth = () => {
     ) {
       return
     }
-    setOtpOpen(false)
 
-    // 요청마다 새로 만든다. 재시도 시 값이 달라지지만 서버가 두 필드의 일치만
-    // 검증하므로 문제되지 않는다.
-    const newAccountPassword = generateNewAccountPassword()
+    if (
+      !/^\d{4}$/.test(newAccountPassword) ||
+      newAccountPassword !== newAccountPasswordConfirm
+    ) {
+      setOtpOpen(false)
+      setNewAccountPasswordError("신규 계좌 비밀번호를 다시 확인해 주세요.")
+      return
+    }
+
+    setOtpOpen(false)
 
     setIsSubmitting(true)
     try {
       const response = await executeMutation.mutateAsync({
         data: {
           ...otpTransactionData,
-          newAccountPassword: newAccountPassword,
-          newAccountPasswordConfirm: newAccountPassword,
+          newAccountPassword,
+          newAccountPasswordConfirm,
           accountPasswordAuthToken,
           otpAuthToken,
           agreedTerms: form.agreedTerms,
@@ -264,6 +278,9 @@ export const C05ConfirmAuth = () => {
         e instanceof ApiError ? e.message : "상품가입에 실패했습니다.",
       )
     } finally {
+      executeMutation.reset()
+      setNewAccountPassword("")
+      setNewAccountPasswordConfirm("")
       setAccountPasswordAuthToken(null)
       setIsSubmitting(false)
     }
@@ -276,7 +293,7 @@ export const C05ConfirmAuth = () => {
         currentStep={3}
         title={`${product.name} 가입`}
         notice={[
-          "아래 가입 내용을 확인한 뒤 계좌비밀번호와 OTP 인증을 완료하면 가입이 실행됩니다.",
+          "출금계좌 비밀번호를 인증하고 신규 상품 계좌 비밀번호를 설정한 뒤 OTP 인증을 완료하면 가입이 실행됩니다.",
           "인증 완료 후에는 가입 내용을 취소할 수 없습니다.",
         ]}
         footer={
@@ -333,7 +350,7 @@ export const C05ConfirmAuth = () => {
           </p>
         </FormSection>
 
-        <FormSection title="계좌비밀번호 인증">
+        <FormSection title="출금계좌 비밀번호 인증">
           <div className="flex flex-col gap-2">
             <AccountPasswordField
               id="c05-password"
@@ -349,6 +366,72 @@ export const C05ConfirmAuth = () => {
               </p>
             )}
           </div>
+        </FormSection>
+        <FormSection title="신규 예·적금 계좌 비밀번호 설정">
+          <div>
+            <FormRow
+              label="신규 계좌 비밀번호"
+              required
+              htmlFor="c05-new-password"
+              labelWidth={220}
+            >
+              <Input
+                id="c05-new-password"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={PASSWORD_LIMIT}
+                value={newAccountPassword}
+                disabled={isSubmitting || verifyPasswordMutation.isPending}
+                onChange={(e) => {
+                  setNewAccountPassword(
+                    onlyDigits(e.target.value, PASSWORD_LIMIT),
+                  )
+                  setNewAccountPasswordError(null)
+                }}
+                className="w-32 text-center tracking-4"
+              />
+            </FormRow>
+
+            <FormRow
+              label="신규 계좌 비밀번호 확인"
+              required
+              htmlFor="c05-new-password-confirm"
+              labelWidth={220}
+            >
+              <Input
+                id="c05-new-password-confirm"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={PASSWORD_LIMIT}
+                value={newAccountPasswordConfirm}
+                disabled={isSubmitting || verifyPasswordMutation.isPending}
+                onChange={(e) => {
+                  setNewAccountPasswordConfirm(
+                    onlyDigits(e.target.value, PASSWORD_LIMIT),
+                  )
+                  setNewAccountPasswordError(null)
+                }}
+                className="w-32 text-center tracking-4"
+              />
+            </FormRow>
+          </div>
+
+          {newAccountPasswordError && (
+            <p
+              id="c05-new-password-error"
+              role="alert"
+              className="mt-2 text-xs font-bold text-danger"
+            >
+              {newAccountPasswordError}
+            </p>
+          )}
+
+          <p className="mt-2 text-2xs text-ink-muted">
+            ※ 신규 계좌 비밀번호는 숫자 4자리이며, 만기해지·중도해지 및
+            계좌비밀번호 변경 시 사용됩니다. 설정한 비밀번호를 기억해 주세요.
+          </p>
         </FormSection>
       </StepLayout>
 

@@ -96,7 +96,8 @@ export const C04InputInfo = () => {
     amount <= product.maxAmount &&
     // 정기예금만 출금가능금액을 검증한다(REQ-PRDT-008). 정기적금은 가입 시점에 출금이 발생하지 않는다.
     (product.category === "정기적금" ||
-      (selectedAccount != null && amount <= selectedAccount.withdrawable))
+      (selectedAccount?.withdrawable != null &&
+        amount <= selectedAccount.withdrawable))
 
   const canSubmit = termValid && amountValid && fromAccount !== ""
 
@@ -172,7 +173,7 @@ export const C04InputInfo = () => {
         title={`${product.name} 가입`}
         notice={[
           "가입기간과 가입금액은 상품별 허용 범위 내에서만 입력할 수 있습니다.",
-          "예적금 계좌는 별도의 계좌비밀번호를 사용하지 않으므로 이 단계에서 입력받지 않습니다.",
+          "신규 예·적금 계좌의 비밀번호는 다음 단계(확인 및 인증)에서 설정합니다.",
         ]}
         footer={
           <Button
@@ -239,18 +240,29 @@ export const C04InputInfo = () => {
               htmlFor="c04-amount"
               labelWidth={220}
             >
-              <JoinAmountField
-                id="c04-amount"
-                value={amount}
-                onChange={setAmount}
-                min={product.minAmount}
-                max={product.maxAmount}
-                withdrawable={
-                  product.category === "정기예금"
-                    ? selectedAccount?.withdrawable
-                    : undefined
-                }
-              />
+              <div className="flex w-full flex-col gap-2">
+                <JoinAmountField
+                  id="c04-amount"
+                  value={amount}
+                  onChange={setAmount}
+                  min={product.minAmount}
+                  max={product.maxAmount}
+                  withdrawable={
+                    product.category === "정기예금"
+                      ? (selectedAccount?.withdrawable ?? undefined)
+                      : undefined
+                  }
+                />
+
+                {product.category === "정기예금" &&
+                  fromAccount !== "" &&
+                  selectedAccount?.withdrawable == null && (
+                    <p role="alert" className="text-xs font-bold text-danger">
+                      출금가능금액을 확인할 수 없어 가입금액을 검증할 수
+                      없습니다. 잠시 후 새로고침하여 다시 시도하세요.
+                    </p>
+                  )}
+              </div>
             </FormRow>
             <FormRow label="만기 시 처리방법" labelWidth={220}>
               <div className="flex flex-col gap-1">

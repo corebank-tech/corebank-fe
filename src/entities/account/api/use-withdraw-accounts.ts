@@ -3,6 +3,15 @@ import { useAccountOverviewQuery } from "@/entities/account/api/account-overview
 import type { AccountItemResponse } from "@/shared/api/generated"
 import type { AccountOption } from "@/shared/types/account"
 
+export const toWithdrawAccountOption = (
+  account: AccountItemResponse,
+): AccountOption => ({
+  alias: account.accountName ?? "",
+  accountNo: account.accountNumber ?? "",
+  balance: account.balance ?? null,
+  withdrawable: account.availableBalance ?? null,
+})
+
 /**
  * 출금계좌로 쓸 수 있는 보유 계좌 목록.
  *
@@ -36,14 +45,7 @@ export const useWithdrawAccounts = (): {
   }, [overview])
 
   const options = React.useMemo(
-    () =>
-      accounts.map((a) => ({
-        alias: a.accountName ?? "",
-        accountNo: a.accountNumber ?? "",
-        balance: a.balance ?? 0,
-        // AccountItemResponse 에 출금가능금액 필드가 없어 잔액을 그대로 쓴다.
-        withdrawable: a.balance ?? 0,
-      })),
+    () => accounts.map(toWithdrawAccountOption),
     [accounts],
   )
 

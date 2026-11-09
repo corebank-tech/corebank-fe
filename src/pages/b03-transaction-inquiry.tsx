@@ -29,6 +29,7 @@ import {
 import {
   getAccountStatusBadgeVariant,
   getAccountStatusLabel,
+  getMaturityNotice,
   useAccountDetailQuery,
   useInquirableAccounts,
 } from "@/entities/account"
@@ -51,6 +52,7 @@ import { checkPeriodRange } from "@/entities/transaction"
 import { recentPeriod } from "@/shared/config/query-period"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
+import { parseISO } from "@/shared/lib/date"
 
 /**
  * 조회조건 한 벌. [조회]를 통과한 값만 결과 영역에 반영한다(REQ-INQR-009 인수기준:
@@ -287,6 +289,11 @@ export const B03TransactionInquiry = () => {
   const totalPages = transactionData?.totalPages ?? 0
 
   const accountStatus = getAccountStatusLabel(accountDetail?.status)
+  const maturityNotice = getMaturityNotice(
+    accountDetail?.maturityDate,
+    accountDetail?.status,
+    TODAY,
+  )
   const columns: DataGridColumn<Transaction>[] = [
     {
       key: "date",
@@ -562,6 +569,25 @@ export const B03TransactionInquiry = () => {
               ]}
             />
           </div>
+          {accountDetail?.maturityDate && accountDetail.status !== "CLOSED" && (
+            <div className="border-t border-border">
+              <InfoRow
+                gridCols="grid-cols-2"
+                items={[
+                  {
+                    term: "만기일",
+                    desc: renderAccountDetailValue(
+                      formatDate(parseISO(accountDetail.maturityDate)),
+                    ),
+                  },
+                  {
+                    term: "만기 안내",
+                    desc: renderAccountDetailValue(maturityNotice ?? "-"),
+                  },
+                ]}
+              />
+            </div>
+          )}
           {isAccountDetailError && (
             <div
               role="alert"

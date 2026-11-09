@@ -54,3 +54,8 @@ export { ADMIN_PERMISSION_LABELS } from "@/entities/auth/lib/permission-label"
  */
 export type { AdminPermission } from "@/shared/types/admin-permission"
 export { resolveLoginFailureMessage } from "@/entities/auth/lib/login-failure-message"
+export {
+  useFindIdMutation,
+  useIssuePasswordResetMutation,
+  useResetPasswordMutation,
+} from "@/entities/auth/api/account-recovery"

@@ -1,6 +1,10 @@
 /**
- * 아이디·비밀번호 규칙 실시간 판정. POL-009(아이디), POL-010(비밀번호), POL-011(금칙).
- * A-04 정보입력과 A-08 비밀번호 재설정이 동일 규칙을 공유한다(REQ-AUTH-033 인수기준).
+ * 아이디·비밀번호 규칙 실시간 판정.
+ * A-04 회원가입과 A-08 비밀번호 재설정이 공통 규칙을 사용한다.
+ *
+ * 비밀번호 규칙은 서버 구현을 기준으로 한다.
+ * REQ-AUTH-011의 '4종 중 3종' 정책과 서버의 '영문·숫자·특수문자 필수'
+ * 정책 사이 불일치는 요구사항 담당자 확인이 필요하다.
  */
 
 export type RuleCheck = {
@@ -49,29 +53,27 @@ function hasFourRepeating(value: string): boolean {
 
 function hasFourSequential(value: string): boolean {
   for (let i = 0; i <= value.length - 4; i++) {
-    const a = value.charCodeAt(i)
-    const b = value.charCodeAt(i + 1)
-    const c = value.charCodeAt(i + 2)
-    const d = value.charCodeAt(i + 3)
-    const ascending = b - a === 1 && c - b === 1 && d - c === 1
-    const descending = a - b === 1 && b - c === 1 && c - d === 1
-    if (ascending || descending) return true
+    const part = value.slice(i, i + 4)
+    if (!/^\d{4}$/.test(part)) continue
+
+    const gap = part.charCodeAt(1) - part.charCodeAt(0)
+    if (
+      (gap === 1 || gap === -1) &&
+      part.charCodeAt(2) - part.charCodeAt(1) === gap &&
+      part.charCodeAt(3) - part.charCodeAt(2) === gap
+    ) {
+      return true
+    }
   }
+
   return false
 }
 
-/** POL-010·POL-011: 8~15자 / 4종 중 3종 이상 / 아이디 미포함 / 동일문자·연속증감 4자리 금지. */
+/** 서버 공통 비밀번호 정책: 8~15자 / 영문·숫자·특수문자 필수 / 공백·금칙 패턴 불가. */
 export function evaluatePasswordRules(
   password: string,
   id: string,
 ): RuleCheck[] {
-  const kinds = [
-    /[A-Z]/.test(password),
-    /[a-z]/.test(password),
-    /[0-9]/.test(password),
-    /[^A-Za-z0-9]/.test(password),
-  ].filter(Boolean).length
-
   return [
     {
       key: "length",
@@ -80,24 +82,27 @@ export function evaluatePasswordRules(
     },
     {
       key: "combination",
-      label: "영문 대문자·소문자·숫자·특수문자 중 3종 이상을 조합합니다",
-      passed: kinds >= 3,
+      label: "영문자·숫자·특수문자를 모두 포함하며 공백은 사용할 수 없습니다",
+      passed:
+        /[A-Za-z]/.test(password) &&
+        /\d/.test(password) &&
+        /[^A-Za-z0-9\s]/.test(password) &&
+        !/\s/.test(password),
     },
     {
       key: "no-id",
       label: "아이디를 포함하지 않습니다",
-      passed: !(
-        id.length > 0 && password.toLowerCase().includes(id.toLowerCase())
-      ),
+      passed:
+        id.length === 0 || !password.toLowerCase().includes(id.toLowerCase()),
     },
     {
       key: "no-repeat",
-      label: "동일한 문자를 4자리 이상 연속 사용하지 않습니다(예: aaaa)",
+      label: "동일한 문자를 4자리 이상 연속 사용하지 않습니다",
       passed: !hasFourRepeating(password),
     },
     {
       key: "no-sequential",
-      label: "연속 증감 숫자를 4자리 이상 사용하지 않습니다(예: 1234, 4321)",
+      label: "연속 증가·감소 숫자 4자리를 사용하지 않습니다",
       passed: !hasFourSequential(password),
     },
   ]

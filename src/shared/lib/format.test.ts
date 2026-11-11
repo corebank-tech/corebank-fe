@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   formatAccountLabel,
   formatAccountNo,
@@ -6,6 +6,9 @@ import {
   maskAccountNo,
   maskEmail,
   maskName,
+  formatDate,
+  formatDateTime,
+  maskBirthDate,
 } from "@/shared/lib/format"
 
 describe("maskName", () => {
@@ -92,3 +95,41 @@ describe("formatSessionClock", () => {
     expect(formatSessionClock(-120)).toBe("00:00")
   })
 })
+
+describe.each(["Asia/Seoul", "UTC", "America/Los_Angeles"])(
+  "날짜 파싱 (%s)",
+  (timeZone) => {
+    it("날짜 전용 문자열은 같은 달력 날짜로 표시한다", () => {
+      vi.stubEnv("TZ", timeZone)
+
+      try {
+        expect(formatDate("2026-11-05")).toBe("2026.11.05")
+        expect(formatDateTime("2026-11-05")).toBe("2026.11.05 00:00:00")
+
+        expect(maskBirthDate("1994-05-22")).toBe("1994.**.**")
+        expect(maskBirthDate("2000-01-01")).toBe("2000.**.**")
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+
+    it("Date 객체와 시각 문자열의 기존 해석을 유지한다", () => {
+      vi.stubEnv("TZ", timeZone)
+
+      try {
+        const localDate = new Date(2026, 10, 5, 12, 34, 56)
+
+        expect(formatDate(localDate)).toBe("2026.11.05")
+        expect(formatDateTime(localDate)).toBe("2026.11.05 12:34:56")
+
+        const timestamp = "2026-11-05T12:34:56+09:00"
+        const expected = new Date(timestamp)
+
+        expect(formatDate(timestamp)).toBe(formatDate(expected))
+        expect(formatDateTime(timestamp)).toBe(formatDateTime(expected))
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+  },
+)

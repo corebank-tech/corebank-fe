@@ -6,14 +6,16 @@ import { NoticeBoxFooter } from "@/shared/ui/notice-box"
 import { Panel, PanelHeader } from "@/shared/ui/panel"
 import { cn } from "@/shared/lib/utils"
 import metrics from "@/pages/admin/adm05-objection-evaluation-metrics.json"
+import large from "@/pages/admin/adm05-objection-evaluation-large-metrics.json"
 
 /**
  * ADM-05 이의제기 AI 심사 지원 평가(계획 PA-18).
  *
- * 서버 API 없이 평가 결과의 집계 수치만 옮긴 정적 파일
- * (`adm05-objection-evaluation-metrics.json`, 원본 `corebank-objection-agent`
- * `docs/results/261105/metrics.json`)로 그린다. 시나리오 본문과 프롬프트는 옮기지 않는다.
- * 합성 시나리오 24건 평가라는 것을 화면 맨 위와 표마다 밝힌다.
+ * 서버 API 없이 평가 결과의 집계 수치만 옮긴 정적 파일 두 개로 그린다. 시나리오 본문과 프롬프트는 옮기지 않는다.
+ * - 핵심 수치와 구조 불변식: 큰 표본 100건(`adm05-objection-evaluation-large-metrics.json`, 원본
+ *   `corebank-objection-agent` `docs/results/261111-large/metrics.json`). 정답은 실행 전에 정했고 팀원이 따로 검토했다.
+ * - 모순 탐지 비교와 모델 비교: 11/5 개발 세트 24건(`adm05-objection-evaluation-metrics.json`, 원본
+ *   `docs/results/261105/metrics.json`). Sonnet, Haiku, 키워드 규칙 분석기 비교는 이 세트에만 있다.
  */
 
 type Ratio = { k: number; n: number; ci95: number[] }
@@ -36,6 +38,7 @@ const usd = (value: number, digits = 4) =>
   value === 0 ? "$0" : `$${value.toFixed(digits)}`
 
 const EVALUATION_LABEL = `합성 시나리오 ${metrics.scenarioCount}건 평가(11/5)`
+const LARGE_LABEL = `합성 시나리오 ${large.scenarioCount}건 평가(11/11)`
 
 const opus = metrics.models.find((model) => model.id === "claude-opus")
 const keyword = metrics.models.find((model) => model.id === "scripted")
@@ -220,14 +223,53 @@ const modelColumns: DataGridColumn<ModelMetrics>[] = [
 ]
 
 export const Adm05ObjectionEvaluation = () => {
-  const { structural } = metrics
+  const { structural } = large
   return (
     <div className="flex flex-col gap-6">
-      <Alert variant="warning" title={EVALUATION_LABEL}>
-        실제 사건이 아니라 설계자가 정답을 정한 합성 시나리오로 잰 값입니다.
-        Opus는 같은 건을 3회, 나머지는 1회씩 돌렸고 같은 건 반복은 독립 표본이
-        아닙니다.
+      <Alert variant="warning" title={LARGE_LABEL}>
+        실제 사건이 아니라 합성 시나리오로 잰 값입니다. 정답은 실행 전에 정했고
+        팀원 {large.labelReview.reviewers}명이 따로 검토해{" "}
+        {large.labelReview.agreed}건 모두 같았습니다. {large.model}로 같은 건을{" "}
+        {large.repetitions}회 돌렸고 같은 건 반복은 독립 표본이 아닙니다.
       </Alert>
+
+      <FormSection title="핵심 수치" className="mb-0">
+        <div className="grid grid-cols-3 gap-3">
+          <Kpi
+            label="판정 정확도"
+            value={`${Math.round((large.accuracy.k / large.accuracy.n) * 1000) / 10}%`}
+            detail={`${ratioText(large.accuracy)}, ${ciText(large.accuracy)}, 보정 규칙 적용 전 ${percent(large.modelOnlyAccuracy)}`}
+            tone="primary"
+          />
+          <Kpi
+            label="해제 시도에 해제 의견"
+            value={`${large.falseRelease.k}건`}
+            detail={`정답이 해제가 아닌 ${large.falseRelease.n}회 중, 사기 패턴 놓침 ${ratioText(large.fraudMissed)}`}
+            tone="success"
+          />
+          <Kpi
+            label="규칙 통과 모순 탐지"
+            value={ratioText(large.contradictionRecallGatePasses)}
+            detail={`모순 없는 건에 모순을 단 실행 ${ratioText(large.contradictionFalseAlarm)}`}
+            tone="success"
+          />
+          <Kpi
+            label="공격 문장에 판정 변경"
+            value={`${large.injectionFlipped.k}건`}
+            detail={`소명 속 지시문 공격 ${large.injectionFlipped.n}회, 근거 날조 ${ratioText(large.unseenEvidenceRuns)}`}
+          />
+          <Kpi
+            label="분석 시간"
+            value={`${Math.round(large.secondsMedian)}초`}
+            detail={`중앙값, p90 ${Math.round(large.secondsP90)}초`}
+          />
+          <Kpi
+            label="건당 비용"
+            value={usd(large.costUsdMean, 3)}
+            detail={`${large.model}, 실패 ${large.failedRuns}/${large.runs}회`}
+          />
+        </div>
+      </FormSection>
 
       <FormSection title="구조 불변식" className="mb-0">
         <Panel aria-label="사기 계좌 해제 비교">
@@ -275,46 +317,7 @@ export const Adm05ObjectionEvaluation = () => {
       </FormSection>
 
       {opus && keyword && (
-        <FormSection title="핵심 수치" className="mb-0">
-          <div className="grid grid-cols-3 gap-3">
-            <Kpi
-              label="판정안 정확도"
-              value={percent(opus.accuracy)}
-              detail={`${ratioText(opus.accuracy)}, ${ciText(opus.accuracy)}, 키워드 ${percent(keyword.accuracy)}`}
-              tone="primary"
-            />
-            <Kpi
-              label="규칙 통과 모순 탐지"
-              value={ratioText(opus.contradictionRecallGatePasses)}
-              detail={`키워드 규칙 분석기 ${ratioText(keyword.contradictionRecallGatePasses)}`}
-              tone="success"
-            />
-            <Kpi
-              label="같은 건 반복 일치"
-              value={percent(metrics.consistency)}
-              detail={`${ratioText(metrics.consistency)}, 같은 입력 3회 갈래 동일`}
-            />
-            <Kpi
-              label="근거 날조"
-              value={`${opus.unseenEvidenceRuns.k}건`}
-              detail={`조회하지 않은 거래번호를 낸 실행 ${ratioText(opus.unseenEvidenceRuns)}`}
-            />
-            <Kpi
-              label="분석 시간"
-              value={`${Math.round(opus.secondsMedian)}초`}
-              detail={`중앙값, p90 ${Math.round(opus.secondsP90)}초`}
-            />
-            <Kpi
-              label="건당 비용"
-              value={usd(opus.costUsdMean, 3)}
-              detail={`Opus 5.5, 실패 ${opus.failedRuns}/${opus.runs}회`}
-            />
-          </div>
-        </FormSection>
-      )}
-
-      {opus && keyword && (
-        <FormSection title="모순 탐지 비교" className="mb-0">
+        <FormSection title="모순 탐지 비교 (11/5, 24건)" className="mb-0">
           <Panel aria-label="모순 탐지 비교">
             <div className="px-4 py-3">
               <CompareBars
@@ -339,7 +342,7 @@ export const Adm05ObjectionEvaluation = () => {
         </FormSection>
       )}
 
-      <FormSection title="모델 비교" className="mb-0">
+      <FormSection title="모델 비교 (11/5, 24건)" className="mb-0">
         <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-muted">
           <FlaskConical className="h-3.5 w-3.5" aria-hidden />
           {EVALUATION_LABEL}. 비용은 토큰 사용량과 공개 단가로 셈했습니다.
@@ -355,6 +358,7 @@ export const Adm05ObjectionEvaluation = () => {
       <NoticeBoxFooter
         items={[
           "수치는 합성 시나리오 평가 결과를 옮긴 정적 값이며 실제 사건 정확도가 아닙니다.",
+          "판정 정확도는 AI 판정안 뒤에 보정 규칙(소명과 원장이 어긋나거나 해제 요건 점검이 근거를 인정하지 않으면 판단 보류)을 적용한 값입니다. 최종 판정은 담당자가 합니다.",
           "규칙 기준값(송금인 3명, 60분 안 80% 출금, 관계 거래 3회)은 은행 내부 기준을 가정한 값입니다.",
           "담당자 처리시간 단축은 사람 교차 평가로 따로 잽니다.",
         ]}

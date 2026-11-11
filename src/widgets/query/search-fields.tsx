@@ -41,7 +41,7 @@ export const AccountSelectField = ({
     >
       {options.map((o) => (
         <option key={o.accountNo} value={o.accountNo}>
-          {`${o.alias} / ${formatAccountNo(o.accountNo)} / ${formatAmount(o.balance)}`}
+          {`${o.alias} / ${formatAccountNo(o.accountNo)} / ${o.balance == null ? "조회 불가" : formatAmount(o.balance)}`}
         </option>
       ))}
     </Select>

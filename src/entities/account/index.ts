@@ -51,3 +51,4 @@ export {
   getAccountStatusBadgeVariant,
   type AccountStatusLabel,
 } from "@/entities/account/lib/account-status"
+export { getMaturityNotice } from "@/entities/account/lib/maturity-notice"

@@ -1,6 +1,7 @@
 /**
- * 회원가입(A-02~A-06) · 아이디 찾기(A-07) · 비밀번호 재설정(A-08) 목업 데이터.
- * 실제 인증서·SMS·메일 발송 없이 화면 표시형(Mock)으로만 동작한다.
+ * 회원가입·로그인 목업 및 MSW 테스트에서 사용하는 데이터.
+ * A-07 아이디 찾기와 A-08 비밀번호 재설정은 실제 서버 API를 호출한다.
+ * 실제 인증서·SMS·메일 발송 기능은 제공하지 않는다.
  */
 import type { TermItem } from "@/shared/types/term"
 
@@ -20,7 +21,7 @@ export type Member = VerifyAccount & {
   loginPassword: string
 }
 
-/** REQ-AUTH-032·033: 아이디 찾기·비밀번호 재설정 대상 기가입 회원. */
+/** 회원가입·로그인 목업 및 MSW 테스트용 기존 회원 픽스처. */
 export const MOCK_MEMBERS: Member[] = [
   {
     accountNo: "110632892336",

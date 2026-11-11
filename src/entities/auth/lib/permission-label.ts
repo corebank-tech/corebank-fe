@@ -14,4 +14,7 @@ export const ADMIN_PERMISSION_LABELS: Record<AdminPermission, string> = {
   CUSTOMER_READ: "고객 조회",
   CUSTOMER_WRITE: "고객 변경",
   AUDIT_READ: "감사 조회",
+  PAYMENT_STOP_READ: "지급정지 조회",
+  PAYMENT_STOP_WRITE: "지급정지 변경",
+  PAYMENT_STOP_APPROVE: "지급정지 승인",
 }

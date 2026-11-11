@@ -8,6 +8,7 @@ import { TransferResponseStatus } from "@/shared/api/generated"
  * (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
  *
  * 새 값이 생겨도 미확정으로 떨어지도록 긍정형으로 둔다 — 서버가 같은 이유로 긍정형을 쓴다.
+ * 보류된 이체(지연이체)는 서버가 `status` 를 `null` 로 주므로 역시 미확정으로 떨어진다.
  */
 export const isConfirmedTransferStatus = (
   status: string | null | undefined,

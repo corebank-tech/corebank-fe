@@ -10,7 +10,7 @@ import { TransferResponseStatus } from "@/shared/api/generated"
  * 새 값이 생겨도 미확정으로 떨어지도록 긍정형으로 둔다 — 서버가 같은 이유로 긍정형을 쓴다.
  */
 export const isConfirmedTransferStatus = (
-  status: string | undefined,
+  status: string | null | undefined,
 ): boolean =>
   status === TransferResponseStatus.SUCCESS ||
   status === TransferResponseStatus.ERROR

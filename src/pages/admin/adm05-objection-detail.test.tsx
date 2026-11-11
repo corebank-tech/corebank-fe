@@ -6,6 +6,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest"
 import {
   fireEvent,
@@ -585,20 +586,27 @@ describe("Adm05ObjectionDetail", () => {
   })
 
   it("심사 기한 경보가 켜지면 빨간 기한과 경고를 보인다", async () => {
-    respondDetail({
-      ...NORMAL_ACCEPT_DETAIL,
-      objectionStatus: "UNDER_REVIEW",
-      reviewDeadline: "2026-11-10",
-      deadlineAlert: true,
-    })
-    renderDetail()
+    // 임박과 경과는 오늘 날짜로 가른다. 오늘을 기한 전날(월요일)로 고정해야 날짜가 지나도 임박을 본다
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 10, 9, 10, 0))
+    try {
+      respondDetail({
+        ...NORMAL_ACCEPT_DETAIL,
+        objectionStatus: "UNDER_REVIEW",
+        reviewDeadline: "2026-11-10",
+        deadlineAlert: true,
+      })
+      renderDetail()
 
-    expect(
-      await screen.findByRole("status", {
-        name: /심사 기한 2026\.11\.10.*기한 임박/,
-      }),
-    ).toBeInTheDocument()
-    expect(screen.getByText("심사 기한 임박")).toBeInTheDocument()
+      expect(
+        await screen.findByRole("status", {
+          name: /심사 기한 2026\.11\.10.*기한 임박/,
+        }),
+      ).toBeInTheDocument()
+      expect(screen.getByText("심사 기한 임박")).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("기한이 지났으면 하루 전이라고 말하지 않고, 승인 대기면 보완 요청을 권하지 않는다", async () => {

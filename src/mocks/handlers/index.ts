@@ -6,6 +6,7 @@ import { authHandlers } from "@/mocks/handlers/auth"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
 import { infoApiHandlers } from "@/mocks/handlers/info-api"
 import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconciliation-api"
+import { notificationsApiHandlers } from "@/mocks/handlers/notifications-api"
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
 import { paymentStopAgentApiHandlers } from "@/mocks/handlers/payment-stop-agent-api"
 import { paymentStopApiHandlers } from "@/mocks/handlers/payment-stop-api"
@@ -26,6 +27,7 @@ export const handlers = [
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,
   ...transferApiHandlers,
+  ...notificationsApiHandlers,
   ...glApiHandlers,
   ...ledgerReconciliationApiHandlers,
   ...adminCustomersApiHandlers,

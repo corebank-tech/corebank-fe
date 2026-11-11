@@ -19,5 +19,6 @@ describe("isConfirmedTransferStatus", () => {
   it("스펙에 없는 값과 빈 값은 미확정으로 본다", () => {
     expect(isConfirmedTransferStatus("REVERSED")).toBe(false)
     expect(isConfirmedTransferStatus(undefined)).toBe(false)
+    expect(isConfirmedTransferStatus(null)).toBe(false)
   })
 })

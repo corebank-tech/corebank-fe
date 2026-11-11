@@ -9,32 +9,50 @@ import { TextViewModal } from "@/shared/ui/text-view-modal"
 import { downloadCsv } from "@/shared/lib/csv"
 import { useSavedConditionAlert } from "@/shared/lib/hooks/use-saved-condition-alert"
 import { formatDateTime } from "@/shared/lib/format"
-import type { NotificationInboxRow } from "@/entities/notification"
-import { useNotifications } from "@/features/notifications"
+import { toErrorMessage } from "@/shared/api/api-error"
+import { ErrorDialog } from "@/shared/ui/error-dialog"
+import {
+  useMarkNotificationReadMutation,
+  useNotificationInboxQuery,
+  useUnreadNotificationCountQuery,
+  type NotificationInboxRow,
+} from "@/entities/notification"
 import { cn } from "@/shared/lib/utils"
 import { getToday } from "@/shared/config/clock"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 import { useBaseTime } from "@/shared/lib/hooks/use-base-time"
 
 /** F-02 알림함. REQ-MYPG-004·005. */
 export const F02NotificationInbox = () => {
   const BASE_TIME = useBaseTime()
   const TODAY = getToday()
-  const { notifications: rows, unreadCount, markRead } = useNotifications()
-  const [pageSize, setPageSize] = React.useState<number | "all">(10)
+  const [pageSize, setPageSize] = React.useState<number | "all">(
+    QUERY_DEFAULT_PAGE_SIZE,
+  )
   const [page, setPage] = React.useState(1)
   const [brailleOpen, setBrailleOpen] = React.useState(false)
   const downloadComplete = useSavedConditionAlert()
 
-  const size = pageSize === "all" ? rows.length || 1 : pageSize
-  const totalPages = Math.max(1, Math.ceil(rows.length / size))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * size, safePage * size)
+  const { inboxPage, isLoading, isError, error } = useNotificationInboxQuery({
+    page,
+    size: pageSize,
+  })
+  const { unreadCount } = useUnreadNotificationCountQuery({ enabled: true })
+  const markRead = useMarkNotificationReadMutation()
+
+  const rows = isError ? [] : (inboxPage?.notifications ?? [])
+  const isAllRows = pageSize === "all"
+
+  const handleNotificationOpen = (row: NotificationInboxRow) => {
+    if (row.isRead || markRead.isPending) return
+    markRead.mutate({ notificationId: row.notificationId })
+  }
 
   const exportHeaders = ["상태", "발생일시", "구분", "제목", "내용"]
   const exportRows = rows.map((r) => [
-    r.read ? "읽음" : "안읽음",
+    r.isRead ? "읽음" : "안읽음",
     formatDateTime(r.occurredAt),
-    r.category,
+    r.typeName,
     r.title,
     r.content,
   ])
@@ -46,7 +64,7 @@ export const F02NotificationInbox = () => {
       align: "center",
       width: 60,
       render: (r) =>
-        r.read ? (
+        r.isRead ? (
           <span className="text-xs text-ink-faint">읽음</span>
         ) : (
           <span className="text-xs font-bold text-primary">안읽음</span>
@@ -56,22 +74,18 @@ export const F02NotificationInbox = () => {
       key: "occurredAt",
       header: "발생일시",
       width: 150,
-      // 정렬을 켜지 않는다 — `DataGrid` 는 넘겨받은 rows 안에서만 정렬하는데 이 화면은
-      // 클라이언트에서 잘라낸 현재 페이지(`pageRows`)를 넘긴다. 켜면 그 페이지 안에서만
-      // 재배열되면서 사용자는 전체 정렬로 읽는다(#148).
-      //
-      // "전체 보기"를 고르면 `pageRows` 가 전체라 정렬이 맞게 돌지만, 기본값(10건)에서
-      // 틀리므로 선택지에 따라 맞았다 틀렸다 하는 컨트롤을 남기지 않는다.
+      // 정렬을 켜지 않는다 — 현재 페이지 안에서만 재배열되면서 사용자는 전체
+      // 정렬로 읽는다(#148). 순서는 서버의 발생일시 최신순(REQ-MYPG-004)을 따른다.
       render: (r) => (
         <span className="text-ink-muted">{formatDateTime(r.occurredAt)}</span>
       ),
     },
     {
-      key: "category",
+      key: "typeName",
       header: "구분",
       align: "center",
       width: 90,
-      render: (r) => <Badge variant="neutral">{r.category}</Badge>,
+      render: (r) => <Badge variant="neutral">{r.typeName}</Badge>,
     },
     {
       key: "title",
@@ -80,13 +94,13 @@ export const F02NotificationInbox = () => {
       render: (r) => (
         <button
           type="button"
-          onClick={() => markRead(r.id)}
+          onClick={() => handleNotificationOpen(r)}
           className="flex w-full flex-col items-start gap-1 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <span
             className={cn(
               "text-base",
-              r.read ? "text-ink" : "font-bold text-ink",
+              r.isRead ? "text-ink" : "font-bold text-ink",
             )}
           >
             {r.title}
@@ -108,22 +122,31 @@ export const F02NotificationInbox = () => {
         "알림을 클릭하면 읽음 상태로 전환되며, 헤더의 미읽음 건수 배지에 즉시 반영됩니다(REQ-MYPG-005).",
       ]}
       modals={
-        <TextViewModal
-          open={brailleOpen}
-          onClose={() => setBrailleOpen(false)}
-          title="알림함 점자보기"
-          headers={exportHeaders}
-          rows={exportRows}
-        />
+        <>
+          <TextViewModal
+            open={brailleOpen}
+            onClose={() => setBrailleOpen(false)}
+            title="알림함 점자보기"
+            headers={exportHeaders}
+            rows={exportRows}
+          />
+          <ErrorDialog
+            open={markRead.isError}
+            onClose={() => markRead.reset()}
+            title="읽음 처리 실패"
+            messages={[toErrorMessage(markRead.error) ?? ""]}
+          />
+        </>
       }
     >
       <FormSection title="알림함" className="mb-0">
         <p className="mb-4 text-base text-ink-muted">
-          미읽음 <span className="font-bold text-primary">{unreadCount}</span>건
+          미읽음{" "}
+          <span className="font-bold text-primary">{unreadCount ?? "-"}</span>건
         </p>
 
         <GridToolbar
-          totalCount={rows.length}
+          totalCount={inboxPage?.totalCount ?? 0}
           pageSize={pageSize}
           onPageSizeChange={(s) => {
             setPageSize(s)
@@ -136,19 +159,22 @@ export const F02NotificationInbox = () => {
             downloadCsv(`알림함_${TODAY}.csv`, exportHeaders, exportRows)
             downloadComplete.save()
           }}
-          resultLabel="알림함"
+          resultLabel={isAllRows ? "알림함" : "현재 페이지 알림함"}
         />
 
         <DataGrid
           columns={columns}
-          rows={pageRows}
-          rowKey={(r) => r.id}
-          emptyMessage="도착한 알림이 없습니다."
+          rows={rows}
+          rowKey={(r) => String(r.notificationId)}
+          loading={isLoading}
+          emptyMessage={
+            isError ? (toErrorMessage(error) ?? "") : "도착한 알림이 없습니다."
+          }
         />
 
         <Pagination
-          page={safePage}
-          totalPages={totalPages}
+          page={page}
+          totalPages={Math.max(1, inboxPage?.totalPages ?? 1)}
           onPageChange={setPage}
         />
 

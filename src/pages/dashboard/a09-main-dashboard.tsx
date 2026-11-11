@@ -41,6 +41,10 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.lastTxDate +
   ACCOUNT_COLUMN_WIDTHS.balance
 
+/** 미읽음이 남아 있지만 최근 알림 첫 페이지에는 없을 때. 요약이 "없음"으로 읽히지 않게 알림함으로 보낸다. */
+const UNREAD_OUTSIDE_RECENT_MESSAGE =
+  "최근 알림에는 미읽음 알림이 없습니다. 알림함에서 전체 알림을 확인하세요."
+
 type A09MainDashboardProps = {
   shortcuts?: ShortcutLink[]
   onInquiry?: (accountId: number) => void
@@ -71,6 +75,12 @@ export const A09MainDashboard = ({
   const unreadNotifications = (latestNotifications?.notifications ?? []).filter(
     (notification) => !notification.isRead,
   )
+  const notificationSummaryEmptyMessage = (() => {
+    if (isNotificationsError) return toErrorMessage(notificationsError) ?? ""
+    if (unreadCount != null && unreadCount > 0)
+      return UNREAD_OUTSIDE_RECENT_MESSAGE
+    return undefined
+  })()
 
   const {
     accounts: inquirableAccounts,
@@ -274,11 +284,7 @@ export const A09MainDashboard = ({
       <NotificationSummary
         items={unreadNotifications}
         totalCount={unreadCount}
-        emptyMessage={
-          isNotificationsError
-            ? (toErrorMessage(notificationsError) ?? "")
-            : undefined
-        }
+        emptyMessage={notificationSummaryEmptyMessage}
         onOpenInbox={handleOpenInbox}
       />
     </div>

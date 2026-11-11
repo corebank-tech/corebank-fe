@@ -229,8 +229,9 @@ export const Adm05ObjectionEvaluation = () => {
       <Alert variant="warning" title={LARGE_LABEL}>
         실제 사건이 아니라 합성 시나리오로 잰 값입니다. 정답은 실행 전에 정했고
         팀원 {large.labelReview.reviewers}명이 따로 검토해{" "}
-        {large.labelReview.agreed}건 모두 같았습니다. {large.model}로 같은 건을{" "}
-        {large.repetitions}회 돌렸고 같은 건 반복은 독립 표본이 아닙니다.
+        {large.labelReview.agreed}건 모두 같았습니다. {large.model}, 프롬프트{" "}
+        {large.promptVersion}로 같은 건을 {large.repetitions}회 돌렸고 같은 건
+        반복은 독립 표본이 아닙니다.
       </Alert>
 
       <FormSection title="핵심 수치" className="mb-0">
@@ -238,11 +239,11 @@ export const Adm05ObjectionEvaluation = () => {
           <Kpi
             label="판정 정확도"
             value={`${Math.round((large.accuracy.k / large.accuracy.n) * 1000) / 10}%`}
-            detail={`${ratioText(large.accuracy)}, ${ciText(large.accuracy)}, 보정 규칙 적용 전 ${percent(large.modelOnlyAccuracy)}`}
+            detail={`${ratioText(large.accuracy)}, ${ciText(large.accuracy)}, 보정 규칙 적용 전 ${percent(large.modelOnlyAccuracy)}, 같은 건 2회 일치 ${ratioText(large.consistency)}`}
             tone="primary"
           />
           <Kpi
-            label="해제 시도에 해제 의견"
+            label="정답이 해제가 아닌 건에 해제 의견"
             value={`${large.falseRelease.k}건`}
             detail={`정답이 해제가 아닌 ${large.falseRelease.n}회 중, 사기 패턴 놓침 ${ratioText(large.fraudMissed)}`}
             tone="success"
@@ -317,7 +318,7 @@ export const Adm05ObjectionEvaluation = () => {
       </FormSection>
 
       {opus && keyword && (
-        <FormSection title="모순 탐지 비교 (11/5, 24건)" className="mb-0">
+        <FormSection title="11/5 개발 세트 모순 탐지 비교" className="mb-0">
           <Panel aria-label="모순 탐지 비교">
             <div className="px-4 py-3">
               <CompareBars
@@ -342,7 +343,7 @@ export const Adm05ObjectionEvaluation = () => {
         </FormSection>
       )}
 
-      <FormSection title="모델 비교 (11/5, 24건)" className="mb-0">
+      <FormSection title="11/5 개발 세트 모델 비교" className="mb-0">
         <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-muted">
           <FlaskConical className="h-3.5 w-3.5" aria-hidden />
           {EVALUATION_LABEL}. 비용은 토큰 사용량과 공개 단가로 셈했습니다.
@@ -358,7 +359,8 @@ export const Adm05ObjectionEvaluation = () => {
       <NoticeBoxFooter
         items={[
           "수치는 합성 시나리오 평가 결과를 옮긴 정적 값이며 실제 사건 정확도가 아닙니다.",
-          "판정 정확도는 AI 판정안 뒤에 보정 규칙(소명과 원장이 어긋나거나 해제 요건 점검이 근거를 인정하지 않으면 판단 보류)을 적용한 값입니다. 최종 판정은 담당자가 합니다.",
+          "판정 정확도는 AI 판정안에 보정 규칙을 적용한 값입니다. 보정 규칙은 소명과 원장이 어긋나거나 해제 요건 점검이 근거를 인정하지 않으면 AI 의견을 판단 보류로 낮춥니다.",
+          "최종 판정은 담당자가 합니다.",
           "규칙 기준값(송금인 3명, 60분 안 80% 출금, 관계 거래 3회)은 은행 내부 기준을 가정한 값입니다.",
           "담당자 처리시간 단축은 사람 교차 평가로 따로 잽니다.",
         ]}

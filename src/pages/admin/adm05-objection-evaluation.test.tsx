@@ -10,6 +10,7 @@ describe("Adm05ObjectionEvaluation", () => {
       screen.getByText(/합성 시나리오 100건 평가\(11\/11\)/),
     ).toBeInTheDocument()
     expect(screen.getByText(/팀원 1명이 따로 검토해/)).toBeInTheDocument()
+    expect(screen.getByText(/프롬프트 objection-v2\.2로/)).toBeInTheDocument()
     expect(
       screen.getByText(/사기 계좌 해제 0\/35 대 서류 기준 35\/35/),
     ).toBeInTheDocument()
@@ -18,12 +19,12 @@ describe("Adm05ObjectionEvaluation", () => {
     expect(within(accuracy).getByText("99.5%")).toBeInTheDocument()
     expect(
       within(accuracy).getByText(
-        /199\/200, 95% CI 97\.2~99\.9%, 보정 규칙 적용 전 95%/,
+        /199\/200, 95% CI 97\.2~99\.9%, 보정 규칙 적용 전 95%, 같은 건 2회 일치 99\/100/,
       ),
     ).toBeInTheDocument()
 
     const release = screen.getByRole("region", {
-      name: "해제 시도에 해제 의견",
+      name: "정답이 해제가 아닌 건에 해제 의견",
     })
     expect(within(release).getByText("0건")).toBeInTheDocument()
     expect(
@@ -58,8 +59,10 @@ describe("Adm05ObjectionEvaluation", () => {
   it("11/5 개발 세트 모순 탐지 비교와 모델 비교는 날짜와 건수를 붙여 따로 보인다", () => {
     render(<Adm05ObjectionEvaluation />)
 
-    expect(screen.getByText("모순 탐지 비교 (11/5, 24건)")).toBeInTheDocument()
-    expect(screen.getByText("모델 비교 (11/5, 24건)")).toBeInTheDocument()
+    expect(
+      screen.getByText("11/5 개발 세트 모순 탐지 비교"),
+    ).toBeInTheDocument()
+    expect(screen.getByText("11/5 개발 세트 모델 비교")).toBeInTheDocument()
     expect(
       screen.getByText(/합성 시나리오 24건 평가\(11\/5\)/),
     ).toBeInTheDocument()

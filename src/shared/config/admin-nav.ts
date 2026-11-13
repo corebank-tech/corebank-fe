@@ -89,4 +89,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       },
     ],
   },
+  {
+    title: "이상거래 사후 심사",
+    items: [
+      {
+        label: "FDS 보류 거래",
+        path: "/admin/fds/held-transfers",
+        requiresPermission: "CUSTOMER_READ",
+      },
+    ],
+  },
 ]

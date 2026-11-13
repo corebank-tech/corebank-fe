@@ -93,6 +93,11 @@ const DEV_ROUTES: DevRoute[] = [
     label: "대사 불일치 목록",
     path: "/admin/ledger-reconciliation",
   },
+  {
+    screenId: "ADM-FDS",
+    label: "FDS 보류 거래",
+    path: "/admin/fds/held-transfers",
+  },
 
   { screenId: "DS", label: "디자인 시스템", path: "/design-system" },
 ]

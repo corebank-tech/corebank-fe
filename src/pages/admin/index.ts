@@ -6,3 +6,5 @@ export { Adm04ReconciliationMismatches } from "@/pages/admin/adm04-reconciliatio
 export { AdminForbidden } from "@/pages/admin/admin-forbidden"
 export { AdminHome } from "@/pages/admin/admin-home"
 export { AdminLogin } from "@/pages/admin/admin-login"
+export { FdsHeldTransferDetail } from "@/pages/admin/fds-held-transfer-detail"
+export { FdsHeldTransferList } from "@/pages/admin/fds-held-transfer-list"

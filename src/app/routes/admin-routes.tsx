@@ -108,6 +108,24 @@ export const adminRoutes: RouteObject = {
             return Adm04ReconciliationMismatches
           }),
         },
+        {
+          // TODO(#225-follow-up): FDS 전용 관리자 권한이 확정되면
+          // guardedLazy로 목록·상세에 동일한 직접 URL 가드를 적용한다.
+          path: "fds/held-transfers",
+          handle: { title: "FDS 보류 거래" },
+          lazy: async () => {
+            const { FdsHeldTransferList } = await import("@/pages/admin")
+            return { Component: FdsHeldTransferList }
+          },
+        },
+        {
+          path: "fds/held-transfers/:heldTransferId",
+          handle: { title: "FDS 보류 거래 상세" },
+          lazy: async () => {
+            const { FdsHeldTransferDetail } = await import("@/pages/admin")
+            return { Component: FdsHeldTransferDetail }
+          },
+        },
       ],
     },
   ],

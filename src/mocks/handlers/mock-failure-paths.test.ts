@@ -145,13 +145,13 @@ describe("계좌비밀번호 검증 목 — 서버 AccountPasswordVerificationSe
     ).toBe("INVALID")
   })
 
-  it("비밀번호 픽스처가 없는 계좌(예적금)는 ACC0201(404)이다", async () => {
+  it("예적금 상품 계좌는 통일된 목 비밀번호로 인증된다", async () => {
     const deposit = MOCK_ACCOUNT_ITEMS.find(
       (e) => e.account.group === "deposit",
     )!
     const { status, body } = await verify(deposit.item.accountId!, "1234")
-    expect(status).toBe(404)
-    expect(body.code).toBe("ACC0201")
+    expect(status).toBe(200)
+    expect(body.data).toMatchObject({ isMatched: true })
   })
 
   it("로그인하지 않으면 401 CMN0101 이다", async () => {

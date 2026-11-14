@@ -16,9 +16,13 @@ import {
 import { cn } from "@/shared/lib/utils"
 import { useDisclosure } from "@/shared/lib/hooks/use-disclosure"
 import { Badge } from "@/shared/ui/badge"
+import { getToday } from "@/shared/config/clock"
 import {
   getAccountStatusBadgeVariant,
   getAccountStatusLabel,
+  getDepositTerminationAction,
+  getDepositTerminationPath,
+  getMaturityNotice,
   useAccountOverviewQuery,
 } from "@/entities/account"
 
@@ -84,6 +88,7 @@ export const B02DepositAccounts = () => {
     })
   }, [depositGroup])
 
+  const today = getToday()
   const groupTotal = rows.reduce((sum, account) => sum + account.balance, 0)
   const columns: DataGridColumn<DepositAccountRow>[] = [
     {
@@ -114,11 +119,24 @@ export const B02DepositAccounts = () => {
       header: "만기일",
       align: "center",
       width: 120,
-      render: (r) => (
-        <span className="text-ink-muted">
-          {r.maturityDate ? formatDate(r.maturityDate) : "-"}
-        </span>
-      ),
+      render: (r) => {
+        const maturityNotice = getMaturityNotice(
+          r.maturityDate,
+          r.status,
+          today,
+        )
+
+        return (
+          <span className="text-ink-muted">
+            {r.maturityDate ? formatDate(r.maturityDate) : "-"}
+            {maturityNotice && (
+              <span className="ml-1 text-2xs font-bold text-primary">
+                {maturityNotice}
+              </span>
+            )}
+          </span>
+        )
+      },
     },
     {
       key: "status",
@@ -146,16 +164,49 @@ export const B02DepositAccounts = () => {
       key: "actions",
       header: "업무",
       align: "center",
-      width: 100,
-      render: (r) => (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => navigate(`/inquiry?accountId=${r.accountId}`)}
-        >
-          조회
-        </Button>
-      ),
+      width: 200,
+      render: (r) => {
+        const terminationAction = getDepositTerminationAction(
+          r.status,
+          r.maturityDate,
+          today,
+        )
+
+        return (
+          <div className="flex items-center justify-center gap-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/inquiry?accountId=${r.accountId}`)}
+            >
+              조회
+            </Button>
+            {terminationAction.available ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  navigate(
+                    getDepositTerminationPath(
+                      r.accountId,
+                      terminationAction.kind,
+                      1,
+                    ),
+                  )
+                }
+              >
+                {terminationAction.kind === "maturity"
+                  ? "만기해지"
+                  : "중도해지"}
+              </Button>
+            ) : (
+              <span className="text-2xs text-ink-muted">
+                {terminationAction.message}
+              </span>
+            )}
+          </div>
+        )
+      },
     },
   ]
 
@@ -186,6 +237,7 @@ export const B02DepositAccounts = () => {
         "계좌 잔액은 조회 시점 기준으로 표시되며 실제 처리 결과와 다를 수 있습니다(REQ-INQR-002).",
         "계좌명은 별명이 등록된 경우 별명을 우선 표시합니다(REQ-ACCT-013).",
         "[조회]는 해당 계좌의 거래내역조회로 이동합니다(REQ-INQR-005).",
+        "만기가 도달한 계좌는 [만기해지], 만기 전 정상 계좌는 [중도해지]로 해지할 수 있습니다.",
         "상품군 그룹은 접기·펼치기가 가능하며 기본 상태는 펼침입니다(REQ-INQR-006).",
       ]}
     >

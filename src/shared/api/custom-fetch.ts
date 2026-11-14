@@ -13,7 +13,7 @@ import {
 } from "@/shared/api/session-events"
 import { createCorrelationId } from "@/shared/api/correlation-id"
 
-/** 공백과 보이지 않는 문자를 거른다. 빈 문자열은 프록시를 쓰는 로컬·테스트의 정상값이다. */
+/** 공백과 보이지 않는 문자를 거른다. */
 const PRINTABLE_ASCII_ONLY = /^[\x21-\x7E]*$/
 
 /**
@@ -22,7 +22,7 @@ const PRINTABLE_ASCII_ONLY = /^[\x21-\x7E]*$/
  */
 const resolveApiBaseUrl = (): string => {
   const rawBaseUrl = import.meta.env.VITE_API_BASE_URL
-  if (typeof rawBaseUrl !== "string") {
+  if (typeof rawBaseUrl !== "string" || rawBaseUrl === "") {
     throw new Error(
       "VITE_API_BASE_URL 이 설정되지 않았습니다. 배포 환경변수를 확인하세요.",
     )

@@ -13,15 +13,9 @@ import { customFetch, withIdempotencyKey } from "@/shared/api/custom-fetch"
 import { isApiError } from "@/shared/api/api-error"
 import { onApiActivity, onSessionExpired } from "@/shared/api/session-events"
 
-beforeAll(() => {
-  vi.stubEnv("VITE_API_BASE_URL", "")
-  server.listen({ onUnhandledRequest: "error" })
-})
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
 afterEach(() => server.resetHandlers())
-afterAll(() => {
-  server.close()
-  vi.unstubAllEnvs()
-})
+afterAll(() => server.close())
 
 describe("customFetch 봉투 해제 (REQ-CMN-007)", () => {
   it("성공 응답의 data 만 반환한다", async () => {
@@ -331,9 +325,7 @@ describe("VITE_API_BASE_URL 검증", () => {
     return import("@/shared/api/custom-fetch")
   }
 
-  afterEach(() => {
-    vi.stubEnv("VITE_API_BASE_URL", "")
-  })
+  afterEach(() => vi.unstubAllEnvs())
 
   it("값이 없으면 모듈 로드 시점에 막는다", async () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined)
@@ -348,11 +340,10 @@ describe("VITE_API_BASE_URL 검증", () => {
     await expect(importFresh()).rejects.toThrow("보이지 않는 문자")
   })
 
-  it("프록시를 쓰는 상대경로와 빈 문자열은 통과한다", async () => {
-    vi.stubEnv("VITE_API_BASE_URL", "/api/v1")
-    await expect(importFresh()).resolves.toBeDefined()
-
+  it("빈 문자열도 모듈 로드 시점에 막는다", async () => {
+    // 프록시는 `/api/v1` 에서만 동작한다. 빈 값은 요청을 FE 자기 오리진으로 보낸다.
     vi.stubEnv("VITE_API_BASE_URL", "")
-    await expect(importFresh()).resolves.toBeDefined()
+
+    await expect(importFresh()).rejects.toThrow("설정되지 않았습니다")
   })
 })

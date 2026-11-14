@@ -70,3 +70,12 @@ export const toErrorMessage = (error: unknown): string | null => {
   if (error.code === SESSION_EXPIRED_CODE) return null
   return error.message
 }
+
+/**
+ * 처리 여부를 모르는 오류인지 본다 — status 0(전송 실패)과 5xx(서버가 처리 도중 터짐)다.
+ * code 는 보지 않는다. 장애가 envelope 에 실려 와(`CMN9999` + 500) CMN9000 을 요구하면 놓친다.
+ * 모르는 건을 실패로 단정하면 고객이 같은 거래를 다시 넣어 두 번 빠져나간다(REQ-TRSF-016).
+ */
+export const isUnknownOutcomeError = (error: unknown): boolean =>
+  isApiError(error) &&
+  (error.status === NETWORK_ERROR_STATUS || error.status >= 500)

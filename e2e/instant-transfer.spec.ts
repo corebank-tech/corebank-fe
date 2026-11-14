@@ -19,6 +19,7 @@ const INTERBANK = {
   UNCONFIRMED: "1234567890009",
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
+  LOST_RESPONSE: "1234567890005",
 } as const
 
 async function login(page: Page) {
@@ -137,6 +138,25 @@ test("타행 TIMEOUT 이면 결과 확인 중 안내가 뜨고 새 이체를 열
   ).toBeVisible()
   await expect(page.getByRole("button", { name: "이체결과조회" })).toBeVisible()
   await expect(newTransferButton(page)).toHaveCount(0)
+})
+
+// 응답을 못 받으면 처리 여부를 모른다. 실패로 단정하면 고객이 화면을 떠나 멱등키를 잃고
+// 같은 이체가 새 키로 다시 나간다(REQ-TRSF-016).
+test("응답이 유실되면 실패로 단정하지 않고 미확정 결과로 보낸다", async ({
+  page,
+}) => {
+  await confirmPayee(page, OTHER_BANK, INTERBANK.LOST_RESPONSE)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+
+  await expect(page.getByText("이체 결과를 확인하는 중입니다.")).toBeVisible()
+  await expect(
+    page.getByText("서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다."),
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: "이체결과조회" })).toBeVisible()
+  await expect(newTransferButton(page)).toHaveCount(0)
+  // 1단계로 되돌리면 금액칸이 다시 보인다. 사라진 문구로 단언하면 무엇을 바꿔도 통과한다.
+  await expect(page.locator("#it-amount")).toHaveCount(0)
 })
 
 // 타행은 보낸 뒤 실패하면 출금을 되돌린다 — "거래내역이 변동하지 않는다"는 당행 안내를

@@ -17,6 +17,11 @@ import {
   SignupFlow,
 } from "@/pages/auth"
 import { A09MainDashboard } from "@/pages/dashboard"
+import {
+  TerminationAuth,
+  TerminationComplete,
+  TerminationPreview,
+} from "@/pages/deposit-termination"
 import { DesignSystemPage } from "@/pages/design-system"
 import {
   B01AllAccounts,
@@ -146,6 +151,21 @@ const authedRoutes: RouteObject = {
               path: "accounts/deposits",
               element: <B02DepositAccounts />,
               handle: { crumb: "예금·적금", title: "예금/적금 계좌조회" },
+            },
+            {
+              path: "accounts/deposits/:accountId/termination/:kind/1",
+              element: <TerminationPreview />,
+              handle: { crumb: "해지" },
+            },
+            {
+              path: "accounts/deposits/:accountId/termination/:kind/2",
+              element: <TerminationAuth />,
+              handle: { crumb: "해지" },
+            },
+            {
+              path: "accounts/deposits/:accountId/termination/:kind/3",
+              element: <TerminationComplete />,
+              handle: { crumb: "해지" },
             },
             {
               path: "inquiry",

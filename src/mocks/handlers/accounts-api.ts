@@ -12,6 +12,7 @@ import type {
 import { getToday } from "@/shared/config/clock"
 import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
 import { ok } from "@/mocks/lib/envelope"
+import { readTerminatedAccountIds } from "@/mocks/lib/terminated-accounts"
 
 const MOCK_LATENCY_MS = 200
 
@@ -82,16 +83,20 @@ export const MOCK_ACCOUNT_OWNER_ID = MOCK_MEMBERS.find(
 
 const isOwner = (memberId: string) => memberId === MOCK_ACCOUNT_OWNER_ID
 
+/** 해지로 종료된 계좌는 서버처럼 없는 계좌로 본다. */
 export const findMockAccount = (accountId: number, memberId: string) =>
-  isOwner(memberId)
+  isOwner(memberId) && !readTerminatedAccountIds().includes(accountId)
     ? MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
     : undefined
 
 const buildOverview = (memberId: string): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
+    const terminatedIds = readTerminatedAccountIds()
     const accounts = isOwner(memberId)
       ? MOCK_ACCOUNT_ITEMS.filter(
-          (entry) => entry.account.group === group.id,
+          (entry) =>
+            entry.account.group === group.id &&
+            !terminatedIds.includes(entry.item.accountId ?? 0),
         ).map((entry) => entry.item)
       : []
 

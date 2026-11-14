@@ -1,4 +1,4 @@
-import { delay, http } from "msw"
+import { HttpResponse, delay, http } from "msw"
 import type {
   FavoriteAccountResponse,
   InterbankBankResponse,
@@ -38,6 +38,7 @@ const MOCK_LATENCY_MS = 200
  * | `1234567890006` | 정상, 1초 늦게 (늦은 응답 장면) | 200 + `SUCCESS` |
  * | `1234567890007` | 정상 | 200 + `ERROR` `TRF0308` |
  * | `1234567890008` | 정상 | 200 + `TIMEOUT` |
+ * | `1234567890005` | 정상 | 처리·멱등키 기록 후 응답 없음 (같은 키 재시도 시 `SUCCESS` replay) |
  * | 그 밖의 숫자 1~16자리 | 정상 | 200 + `SUCCESS` |
  *
  * 잔액은 저장하지 않는다 — 이체 후 잔액은 실행 시점 픽스처 잔액에서 뺀 값이다.
@@ -108,6 +109,7 @@ const INTERBANK_SCENARIO = {
   SLOW: "1234567890006",
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
+  LOST_RESPONSE: "1234567890005",
 } as const
 
 const INTERBANK_PAYEE_NAME = "박*준"
@@ -376,6 +378,11 @@ export const transferApiHandlers = [
       }
     }
     remember(key, req, data)
+    // 서버는 처리를 끝내고 멱등키까지 기록했는데 응답만 닿지 않는 장면이다.
+    // 같은 키로 다시 보내면 위 replayOrConflict 가 여기서 만든 결과를 돌려준다.
+    if (req.depositAccountNumber === INTERBANK_SCENARIO.LOST_RESPONSE) {
+      return HttpResponse.error()
+    }
     return ok(data)
   }),
 ]

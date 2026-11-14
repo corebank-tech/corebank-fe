@@ -42,6 +42,10 @@ const riskVariant = (
 ): BadgeVariant =>
   status === "MATCH" ? "danger" : status === "NO_MATCH" ? "success" : "warning"
 
+const fixtureTime = (receivedAt: string) =>
+  receivedAt.match(/T(\d{2}:\d{2})/)?.[1] ??
+  formatDateTime(receivedAt).slice(11, 16)
+
 const EvidenceTimeline = ({ fixture }: { fixture: FdsHeldTransferView }) => (
   <Panel className="p-5">
     <h2 className="font-bold text-ink">10분 반복 이체</h2>
@@ -77,7 +81,9 @@ const EvidenceTimeline = ({ fixture }: { fixture: FdsHeldTransferView }) => (
             <p className="mt-3 font-bold">{formatWon(fixture.amount)}</p>
             <small className="mt-2 flex items-center gap-1 text-ink-muted">
               {index === 2 ? <LockKeyhole size={13} /> : <Clock3 size={13} />}
-              {index === 2 ? "09:10 · 미기표" : `09:0${index + 6} · 기표 완료`}
+              {index === 2
+                ? `${fixtureTime(fixture.receivedAt)} · 미기표`
+                : `09:0${index + 6} · 기표 완료`}
             </small>
           </li>
         </React.Fragment>
@@ -338,18 +344,17 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
             </Panel>
           )}
 
-          {(reveal.agentFinding ?? fixture.agentFinding) &&
-            fixture.agentStatus !== "FAILED" && (
-              <Panel className="p-5">
-                <h2 className="font-bold">Agent 추가 확인 사항</h2>
-                <p className="mt-3 border-t border-border pt-3 text-base">
-                  {reveal.agentFinding ?? fixture.agentFinding}
-                </p>
-                <p className="text-sm mt-2 text-ink-faint">
-                  서버 보류 사유가 아닌 fixture 조사의 추가 관찰 사항입니다.
-                </p>
-              </Panel>
-            )}
+          {reveal.agentFinding && fixture.agentStatus !== "FAILED" && (
+            <Panel className="p-5">
+              <h2 className="font-bold">Agent 추가 확인 사항</h2>
+              <p className="mt-3 border-t border-border pt-3 text-base">
+                {reveal.agentFinding}
+              </p>
+              <p className="text-sm mt-2 text-ink-faint">
+                서버 보류 사유가 아닌 fixture 조사의 추가 관찰 사항입니다.
+              </p>
+            </Panel>
+          )}
 
           {reveal.agentError && (
             <Panel className="border-warning p-5">
@@ -396,7 +401,7 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
               <div className="mt-5 flex flex-wrap gap-2">
                 {!riskMatch && (
                   <Button
-                    disabled={!callResult}
+                    disabled={callResult !== "CONFIRMED"}
                     onClick={() => setDecision("APPROVE")}
                   >
                     승인 UI 확인
@@ -404,7 +409,7 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
                 )}
                 <Button
                   variant={riskMatch ? "danger" : "secondary"}
-                  disabled={!riskMatch && !callResult}
+                  disabled={!riskMatch && callResult !== "DENIED"}
                   onClick={() => setDecision("REJECT")}
                 >
                   {riskMatch ? "RISK_ACCOUNT_MATCH로 거절" : "거절 UI 확인"}

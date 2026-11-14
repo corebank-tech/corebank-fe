@@ -33,6 +33,13 @@ const PASSWORD_LIMIT = 4
 const UNCONFIRMED_MESSAGE =
   "해지 결과를 확인하지 못했습니다. 예·적금 계좌목록에서 계좌 상태를 확인한 뒤 다시 시도하세요."
 
+/**
+ * 해지가 끝나지 못한 이유. 서버가 거절한 건과 응답을 받지 못한 건을 한 state 로 묶어
+ * 제목과 문구가 따로 갈리지 않게 한다 — 결과를 모르는 건을 "실패" 로 단정하면 고객이
+ * 끝난 해지를 안 끝난 것으로 읽는다.
+ */
+type TerminationFailure = { title: string; message: string }
+
 /** 예·적금 해지 2단계 · 상품 계좌 비밀번호 인증과 해지 확정 */
 export const TerminationAuth = () => {
   const { accountId: accountIdParam, kind: kindParam } = useParams()
@@ -91,7 +98,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
 
   const [password, setPassword] = React.useState("")
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
-  const [executeError, setExecuteError] = React.useState<string | null>(null)
+  const [failure, setFailure] = React.useState<TerminationFailure | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const { account: productAccount } = useOverviewAccount(accountId)
@@ -120,7 +127,11 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
       const isRejected =
         error instanceof ApiError && error.code !== NETWORK_ERROR_CODE
       if (isRejected) idempotency.reset()
-      setExecuteError(isRejected ? error.message : UNCONFIRMED_MESSAGE)
+      setFailure(
+        isRejected
+          ? { title: `${label} 실패`, message: error.message }
+          : { title: `${label} 결과 확인 필요`, message: UNCONFIRMED_MESSAGE },
+      )
     } finally {
       terminateMutation.reset()
       void invalidateAccountQueries(queryClient)
@@ -227,10 +238,10 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
       </StepLayout>
 
       <ErrorDialog
-        open={executeError != null}
-        onClose={() => setExecuteError(null)}
-        title={`${label} 실패`}
-        messages={executeError ? [executeError] : []}
+        open={failure != null}
+        onClose={() => setFailure(null)}
+        title={failure?.title ?? ""}
+        messages={failure ? [failure.message] : []}
       />
     </>
   )

@@ -10,6 +10,8 @@ import { expect, test, type Page } from "@playwright/test"
 const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
 const WITHDRAWAL_ACCOUNT_NO = "110632892336"
 const ACCOUNT_PASSWORD = "1234"
+/** 신규 예·적금 계좌에 설정할 비밀번호. 출금계좌 비밀번호와 다른 값을 쓴다. */
+const NEW_ACCOUNT_PASSWORD = "5678"
 
 async function login(page: Page) {
   await page.goto("/")
@@ -65,9 +67,16 @@ async function fillAccountPassword(page: Page, password: string) {
   }
 }
 
-/** C-05 — 계좌비밀번호 인증 → OTP 발급·검증 → 가입 실행. */
+/** C-05 신규 예·적금 계좌 비밀번호 설정. 비우면 출금계좌 비밀번호 검증 전에 막힌다. */
+async function fillNewAccountPassword(page: Page) {
+  await page.locator("#c05-new-password").fill(NEW_ACCOUNT_PASSWORD)
+  await page.locator("#c05-new-password-confirm").fill(NEW_ACCOUNT_PASSWORD)
+}
+
+/** C-05 — 출금계좌 비밀번호 인증 → 신규 계좌 비밀번호 설정 → OTP 발급·검증 → 가입 실행. */
 async function authenticateAndSubscribe(page: Page) {
   await fillAccountPassword(page, ACCOUNT_PASSWORD)
+  await fillNewAccountPassword(page)
   await page.getByRole("button", { name: "인증하고 가입하기" }).click()
 
   const dialog = page.getByRole("dialog")
@@ -126,6 +135,7 @@ test("계좌비밀번호가 틀리면 서버 문구를 보여주고 OTP 로 넘�
   await fillJoinInfo(page, 1, { termMonths: 12, amount: 1_000_000 })
 
   await fillAccountPassword(page, "9999")
+  await fillNewAccountPassword(page)
   await page.getByRole("button", { name: "인증하고 가입하기" }).click()
 
   await expect(page.getByRole("alert")).toContainText(

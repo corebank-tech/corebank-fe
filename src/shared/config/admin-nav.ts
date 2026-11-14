@@ -71,6 +71,25 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    // 고객 계정 운영과 달리 계좌의 지급정지를 풀고 묶는 심사 업무라 따로 묶는다.
+    title: "심사",
+    items: [
+      {
+        label: "지급정지 이의제기",
+        path: "/admin/objections",
+        // 목록과 상세는 조회 권한으로 연다. 대리 접수와 판정 확정은 화면 안에서
+        // PAYMENT_STOP_WRITE 를 따로 묻는다.
+        requiresPermission: "PAYMENT_STOP_READ",
+      },
+      {
+        label: "AI 심사 지원 평가",
+        path: "/admin/objections/evaluation",
+        // 합성 시나리오 평가 결과(정적 수치). 심사 화면과 같은 조회 권한으로 연다.
+        requiresPermission: "PAYMENT_STOP_READ",
+      },
+    ],
+  },
+  {
     // TODO(#225-follow-up): 서버의 FDS 전용 권한 계약이 확정되면
     // 메뉴와 라우트에 같은 requiresPermission 가드를 적용한다.
     // 현재는 기존 AUDIT_READ를 임의로 재사용하지 않는 UI fixture 범위다.

@@ -1,5 +1,6 @@
-export type {
-  NotificationCategory,
-  NotificationInboxRow,
-} from "@/entities/notification/api/f02-notifications"
-export { MOCK_NOTIFICATION_INBOX } from "@/entities/notification/api/f02-notifications"
+export type { NotificationInboxRow } from "@/entities/notification/api/notifications"
+export {
+  useMarkNotificationReadMutation,
+  useNotificationInboxQuery,
+  useUnreadNotificationCountQuery,
+} from "@/entities/notification/api/notifications"

@@ -1,13 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { FdsHeldTransferDetail } from "@/pages/admin/fds-held-transfer-detail"
 
-const renderPage = () =>
+const renderPage = (id = "policy-b-no-match") =>
   render(
-    <MemoryRouter
-      initialEntries={["/admin/fds/held-transfers/policy-b-no-match"]}
-    >
+    <MemoryRouter initialEntries={[`/admin/fds/held-transfers/${id}`]}>
       <Routes>
         <Route
           path="/admin/fds/held-transfers/:heldTransferId"
@@ -18,11 +16,14 @@ const renderPage = () =>
   )
 
 const moveToHumanDecision = () => {
-  const next = screen.getByRole("button", { name: "다음" })
-  for (let index = 0; index < 6; index += 1) fireEvent.click(next)
+  for (let index = 0; index < 7; index += 1) {
+    act(() => vi.runOnlyPendingTimers())
+  }
 }
 
 describe("FdsHeldTransferDetail", () => {
+  afterEach(() => vi.useRealTimers())
+
   it("fixture 요청 시각을 타임라인에 표시한다", () => {
     renderPage()
 
@@ -38,12 +39,13 @@ describe("FdsHeldTransferDetail", () => {
   })
 
   it("콜 결과에 맞는 승인·거절 조합만 허용한다", () => {
+    vi.useFakeTimers()
     renderPage()
     moveToHumanDecision()
 
     const select = screen.getByLabelText("콜 결과")
-    const approve = screen.getByRole("button", { name: "승인 UI 확인" })
-    const reject = screen.getByRole("button", { name: "거절 UI 확인" })
+    const approve = screen.getByRole("button", { name: "승인" })
+    const reject = screen.getByRole("button", { name: "거절" })
 
     fireEvent.change(select, { target: { value: "DENIED" } })
     expect(approve).toBeDisabled()
@@ -56,5 +58,25 @@ describe("FdsHeldTransferDetail", () => {
     fireEvent.change(select, { target: { value: "UNREACHABLE" } })
     expect(approve).toBeDisabled()
     expect(reject).toBeDisabled()
+  })
+
+  it("조사 장애 건도 고객 확인 결과에 따라 승인·거절한다", () => {
+    vi.useFakeTimers()
+    renderPage("agent-failure-unavailable")
+    moveToHumanDecision()
+
+    const select = screen.getByLabelText("콜 결과")
+    const approve = screen.getByRole("button", { name: "승인" })
+    const reject = screen.getByRole("button", { name: "거절" })
+
+    fireEvent.change(select, { target: { value: "CONFIRMED" } })
+    expect(approve).toBeEnabled()
+    expect(reject).toBeDisabled()
+
+    fireEvent.change(select, { target: { value: "DENIED" } })
+    expect(approve).toBeDisabled()
+    expect(reject).toBeEnabled()
+    fireEvent.click(reject)
+    expect(screen.getByText("거절 · CUSTOMER_DENIED")).toBeInTheDocument()
   })
 })

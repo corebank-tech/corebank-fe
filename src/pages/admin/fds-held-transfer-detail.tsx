@@ -181,7 +181,7 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
   const riskRevealed = riskStepIndex >= 0 && player.index >= riskStepIndex
 
   return (
-    <div className="flex flex-col gap-5 pb-24">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-ink-muted">
@@ -316,9 +316,6 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
               <p className="border-t border-border p-4 text-base">
                 {fixture.riskReason}
               </p>
-              <p className="text-sm border-t border-border bg-surface p-4 text-ink-muted">
-                {fixture.sourceNotice}
-              </p>
             </Panel>
           )}
 
@@ -351,7 +348,7 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
                 {reveal.agentFinding}
               </p>
               <p className="text-sm mt-2 text-ink-faint">
-                서버 보류 사유가 아닌 fixture 조사의 추가 관찰 사항입니다.
+                서버 보류 사유가 아닌 조사 과정의 추가 관찰 사항입니다.
               </p>
             </Panel>
           )}
@@ -369,10 +366,6 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
           {human && (
             <Panel className="p-6">
               <h2 className="text-h2 font-bold">고객 확인 기록</h2>
-              <p className="text-sm my-3 text-ink-muted">
-                UI fixture의 로컬 상태만 변경됩니다. 서버에 저장하거나 이체를
-                실행하지 않습니다.
-              </p>
               {riskMatch ? (
                 <div className="border-l-4 border-danger bg-danger-tint p-4 font-bold text-danger">
                   위험 계좌 일치 건은 아웃바운드 콜 없이 거절만 가능합니다.
@@ -401,18 +394,19 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
               <div className="mt-5 flex flex-wrap gap-2">
                 {!riskMatch && (
                   <Button
+                    variant="success"
                     disabled={callResult !== "CONFIRMED"}
                     onClick={() => setDecision("APPROVE")}
                   >
-                    승인 UI 확인
+                    승인
                   </Button>
                 )}
                 <Button
-                  variant={riskMatch ? "danger" : "secondary"}
+                  variant="danger"
                   disabled={!riskMatch && callResult !== "DENIED"}
                   onClick={() => setDecision("REJECT")}
                 >
-                  {riskMatch ? "RISK_ACCOUNT_MATCH로 거절" : "거절 UI 확인"}
+                  {riskMatch ? "위험 계좌 일치로 거절" : "거절"}
                 </Button>
               </div>
               {decision && (
@@ -422,60 +416,16 @@ const DetailContent = ({ fixture }: { fixture: FdsHeldTransferView }) => {
                 >
                   <strong>
                     {decision === "APPROVE"
-                      ? "승인 화면 상태"
-                      : "거절 화면 상태"}
+                      ? "승인"
+                      : riskMatch
+                        ? "거절 · RISK_ACCOUNT_MATCH"
+                        : "거절 · CUSTOMER_DENIED"}
                   </strong>
-                  <p className="text-sm mt-2">
-                    API를 호출하지 않았으며 새로고침하면 사라지는 UI 검증용
-                    결과입니다.
-                  </p>
                 </div>
               )}
             </Panel>
           )}
         </div>
-      </div>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-elevated px-6 py-3 shadow-pop">
-        <span className="text-sm mr-auto font-bold text-primary">
-          fixture 재생 · {actorLabel[player.step.actor]} · {player.index + 1}/
-          {fixture.steps.length}
-        </span>
-        <Button size="sm" variant="secondary" onClick={player.reset}>
-          처음
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={player.prev}
-          disabled={player.index === 0}
-        >
-          이전
-        </Button>
-        <Button
-          size="sm"
-          onClick={player.next}
-          disabled={player.index === fixture.steps.length - 1}
-        >
-          다음
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={player.waitingHuman}
-          onClick={() => player.setPlaying(!player.playing)}
-        >
-          {player.playing ? "멈춤" : "자동"}
-        </Button>
-        <Select
-          aria-label="재생 속도"
-          className="h-8 w-20"
-          value={player.speed}
-          onChange={(event) => player.setSpeed(Number(event.target.value))}
-        >
-          <option value={1}>1배</option>
-          <option value={2}>2배</option>
-        </Select>
       </div>
     </div>
   )
@@ -490,7 +440,7 @@ export const FdsHeldTransferDetail = () => {
     return (
       <EmptyState
         message="보류 거래를 찾을 수 없습니다."
-        description="fixture에 없는 사건 ID입니다."
+        description="존재하지 않는 사건 ID입니다."
         action={
           <Button onClick={() => navigate("/admin/fds/held-transfers")}>
             목록으로

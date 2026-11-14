@@ -89,4 +89,16 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       },
     ],
   },
+  {
+    // TODO(#225-follow-up): 서버의 FDS 전용 권한 계약이 확정되면
+    // 메뉴와 라우트에 같은 requiresPermission 가드를 적용한다.
+    // 현재는 기존 AUDIT_READ를 임의로 재사용하지 않는 UI fixture 범위다.
+    title: "이상거래 사후 심사",
+    items: [
+      {
+        label: "FDS 보류 거래",
+        path: "/admin/fds/held-transfers",
+      },
+    ],
+  },
 ]

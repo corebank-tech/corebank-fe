@@ -35,6 +35,8 @@ storybook-static
 *.xls
 /docs/*
 /prompt
+/corebank-fe-fds-demo/
+/corebank-fe-objection-demo/
 
 # 예외 — 관리자 요구사항 정의서는 팀이 읽어야 한다 (#156).
 # 1차 요구사항정의서에 관리자 화면이 0건이라 이 문서가 유일한 정본이다.

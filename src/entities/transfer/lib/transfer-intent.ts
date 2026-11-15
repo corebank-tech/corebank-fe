@@ -15,6 +15,8 @@ import type {
 } from "@/shared/api/generated"
 
 export type TransferIntent = {
+  /** 당행 즉시이체의 FDS 행동 흐름. 타행 요청에는 보내지 않는다. */
+  flowId: string | null
   withdrawalAccountId: number | null
   /** 입금 은행코드. `null` 이면 당행이다 — 타행 실행·OTP 는 이 값이 있을 때만 은행코드를 싣는다. */
   payeeBankCode: string | null
@@ -31,6 +33,7 @@ export type TransferIntent = {
  * `TransferRequest` 는 필드가 전부 optional 이라 어긋나도 타입이 잡아주지 않는다.
  */
 export const toTransferRequest = (intent: TransferIntent): TransferRequest => ({
+  flowId: intent.flowId ?? undefined,
   withdrawalAccountId: intent.withdrawalAccountId ?? undefined,
   depositAccountNumber: intent.depositAccountNumber,
   amount: intent.amount ?? undefined,
@@ -45,7 +48,11 @@ export const toTransferRequest = (intent: TransferIntent): TransferRequest => ({
 export const toInterbankTransferRequest = (
   intent: TransferIntent,
 ): InterbankTransferRequest => ({
-  ...toTransferRequest(intent),
+  withdrawalAccountId: intent.withdrawalAccountId ?? undefined,
+  depositAccountNumber: intent.depositAccountNumber,
+  amount: intent.amount ?? undefined,
+  myPassbookMemo: intent.myPassbookMemo || undefined,
+  recipientPassbookMemo: intent.recipientPassbookMemo || undefined,
   payeeBankCode: intent.payeeBankCode ?? undefined,
 })
 
@@ -68,6 +75,7 @@ export const isSameTransferIntent = (
   b: TransferIntent,
 ): boolean =>
   a != null &&
+  a.flowId === b.flowId &&
   a.withdrawalAccountId === b.withdrawalAccountId &&
   a.payeeBankCode === b.payeeBankCode &&
   a.depositAccountNumber === b.depositAccountNumber &&

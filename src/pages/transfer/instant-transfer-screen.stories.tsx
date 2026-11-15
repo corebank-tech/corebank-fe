@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { PageShell } from "@/app/page-shell"
 import { InstantTransferScreen } from "@/pages/transfer/instant-transfer-screen"
 import { MOCK_TRANSFER_ACCOUNTS } from "@/entities/transfer"
+import { FDS_BEHAVIOR_SCENARIOS } from "@/entities/fds"
 import { WithAuthenticatedPage } from "../../../.storybook/decorators/page-providers"
 
 /**
@@ -26,6 +27,20 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
+
+/**
+ * 정책 A 시연 절차의 정본 이벤트/서버 판정 fixture. 실제 화면 조작에서는 확인→입력
+ * 복귀를 두 번 수행하며 MSW가 원시 이벤트 배치를 수신한다.
+ */
+export const PolicyAHesitation: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: `정책 A 시연: ${FDS_BEHAVIOR_SCENARIOS.policyA.eventTypes.join(" → ")}. hesitationWarning과 policyCode는 서버 fixture 값입니다.`,
+      },
+    },
+  },
+}
 
 /**
  * 전체계좌조회(B-01) 등에서 [이체] 진입 시 `?from=`으로 넘어온 출금계좌가

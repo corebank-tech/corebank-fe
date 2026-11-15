@@ -52,6 +52,7 @@ import {
 } from "@/pages/transfer/instant-transfer/deposit-target"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
 import { InstantTransferStep3 } from "@/pages/transfer/instant-transfer/d03-result"
+import { createFdsBehaviorFlow, submitFdsBehaviorEvents } from "@/entities/fds"
 
 export type InstantTransferForm = {
   fromAccount: string
@@ -108,6 +109,58 @@ export const InstantTransferScreen = () => {
   const [searchParams] = useSearchParams()
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<InstantTransferForm>(INITIAL_FORM)
+  const latestFormRef = React.useRef(form)
+  const [behaviorFlow, setBehaviorFlow] = React.useState(() =>
+    createFdsBehaviorFlow(),
+  )
+  const stepRef = React.useRef(step)
+  const ignoreHistoryPopRef = React.useRef(false)
+
+  React.useEffect(() => {
+    stepRef.current = step
+  }, [step])
+
+  React.useEffect(() => {
+    latestFormRef.current = form
+  }, [form])
+
+  React.useEffect(() => {
+    const onVisibilityChange = () =>
+      behaviorFlow.setVisible(document.visibilityState === "visible")
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+  }, [behaviorFlow])
+
+  const removeConfirmHistoryEntry = React.useCallback(() => {
+    if (window.history.state?.fdsFlowId !== behaviorFlow.flowId) return
+    ignoreHistoryPopRef.current = true
+    window.history.back()
+  }, [behaviorFlow.flowId])
+
+  const returnToInput = React.useCallback(
+    (historyAlreadyPopped = false) => {
+      // 열린 CONFIRM_ENTER를 닫은 최초 호출만 STEP_BACK을 만든다. 버튼과 popstate가
+      // 같은 동작에서 연달아 와도 두 번째 호출은 false라 중복 전송되지 않는다.
+      if (!behaviorFlow.returnToInput()) return false
+      setStep(1)
+      if (!historyAlreadyPopped) removeConfirmHistoryEntry()
+      return true
+    },
+    [behaviorFlow, removeConfirmHistoryEntry],
+  )
+
+  React.useEffect(() => {
+    const onPopState = () => {
+      if (ignoreHistoryPopRef.current) {
+        ignoreHistoryPopRef.current = false
+        return
+      }
+      if (stepRef.current === 2) returnToInput(true)
+    }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [returnToInput])
 
   const {
     accounts: withdrawAccounts,
@@ -224,6 +277,7 @@ export const InstantTransferScreen = () => {
    * 이 값에서 만들어, 거래 내용을 말하는 자리를 하나로 둔다.
    */
   const currentIntent: TransferIntent = {
+    flowId: form.payeeBankCode == null ? behaviorFlow.flowId : null,
     withdrawalAccountId: selectedAccountId ?? null,
     payeeBankCode: form.payeeBankCode,
     depositAccountNumber: form.toAccount,
@@ -257,6 +311,14 @@ export const InstantTransferScreen = () => {
       accountNo,
       displayForm.fromAccount,
     )
+    const latestForm = latestFormRef.current
+    const responseIsCurrent =
+      latestForm.fromAccount === requestedFromAccount &&
+      latestForm.toAccount === accountNo &&
+      latestForm.payeeBankCode === payeeBankCode
+    if (checked.toConfirmed && responseIsCurrent) {
+      behaviorFlow.recipientConfirmed()
+    }
     setForm((f) =>
       f.fromAccount === requestedFromAccount &&
       f.toAccount === accountNo &&
@@ -322,6 +384,8 @@ export const InstantTransferScreen = () => {
 
     const handleConfirmDialogConfirm = async () => {
       setConfirmOpen(false)
+      behaviorFlow.leaveConfirm()
+      removeConfirmHistoryEntry()
 
       if (!checkCurrentWithdrawable()) {
         setPasswordAuthToken(null)
@@ -393,6 +457,12 @@ export const InstantTransferScreen = () => {
       }
       const executedAt = transactionAt ?? getNow()
       try {
+        behaviorFlow.submitRequested()
+        await submitFdsBehaviorEvents(
+          behaviorFlow.flowId,
+          behaviorFlow.batch(),
+          behaviorFlow.idempotencyKey,
+        )
         const executed = await executeMutation.mutateAsync({
           intent: currentIntent,
           accountPasswordAuthToken: passwordAuthToken,
@@ -520,7 +590,7 @@ export const InstantTransferScreen = () => {
           payeeMemo={form.payeeMemo || "-"}
           myMemo={form.myMemo || "-"}
           authError={authError}
-          onPrev={() => setStep(1)}
+          onPrev={() => returnToInput()}
           onSubmit={handleTransferClick}
         />
 
@@ -701,6 +771,7 @@ export const InstantTransferScreen = () => {
           setFavoriteError(null)
           setIdempotencyKey("")
           setKeyedIntent(null)
+          setBehaviorFlow(createFdsBehaviorFlow())
           setStep(1)
         }}
         resultSlot={
@@ -793,6 +864,14 @@ export const InstantTransferScreen = () => {
         // 1단계 안내를 보고 다시 진행하는 것이므로 이전 시도의 문구를 지운다.
         // 남겨두면 2단계가 열리자마자 아직 누르지도 않은 실패가 떠 있다.
         setAuthError(null)
+        if (form.amount == null || !behaviorFlow.enterConfirm(form.amount)) {
+          return
+        }
+        window.history.pushState(
+          { ...window.history.state, fdsFlowId: behaviorFlow.flowId },
+          "",
+          window.location.href,
+        )
         setStep(2)
       }}
       bankOptions={bankOptions}

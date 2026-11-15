@@ -8,6 +8,7 @@ import {
 } from "@/entities/transfer/lib/transfer-intent"
 
 const intent = (over: Partial<TransferIntent> = {}): TransferIntent => ({
+  flowId: "flow-1",
   withdrawalAccountId: 1,
   payeeBankCode: null,
   depositAccountNumber: "333330730135",
@@ -48,6 +49,7 @@ describe("isSameTransferIntent", () => {
 describe("toTransferRequest", () => {
   it("거래 내용을 그대로 요청 본문으로 옮긴다", () => {
     expect(toTransferRequest(intent())).toEqual({
+      flowId: "flow-1",
       withdrawalAccountId: 1,
       depositAccountNumber: "333330730135",
       amount: 500_000,
@@ -106,5 +108,12 @@ describe("toOtpTransactionData", () => {
 
   it("당행이면 은행코드 키를 만들지 않는다 — 기존 당행 대조값이 그대로다", () => {
     expect(toOtpTransactionData(intent())).not.toHaveProperty("payeeBankCode")
+  })
+
+  it("FDS flowId는 OTP 대조값과 타행 요청에 싣지 않는다", () => {
+    expect(toOtpTransactionData(intent())).not.toHaveProperty("flowId")
+    expect(
+      toInterbankTransferRequest(intent({ payeeBankCode: "004" })),
+    ).not.toHaveProperty("flowId")
   })
 })

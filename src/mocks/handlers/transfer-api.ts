@@ -22,6 +22,7 @@ import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
 import { consumeOtpAuthToken, otpError } from "@/mocks/handlers/otp-api"
 import { fail, ok } from "@/mocks/lib/envelope"
 import { readStore } from "@/mocks/lib/mock-store"
+import type { FdsBehaviorEventBatch } from "@/entities/fds"
 
 const MOCK_LATENCY_MS = 200
 
@@ -184,6 +185,20 @@ const balanceAfter = (
   (findMockAccount(withdrawalAccountId, memberId)?.item.balance ?? 0) - amount
 
 export const transferApiHandlers = [
+  http.post(
+    "*/fds/behavior-flows/:flowId/events",
+    async ({ params, request }) => {
+      await delay(MOCK_LATENCY_MS)
+      if (readSignedInMemberId() == null) return unauthorized()
+      const batch = (await request.json()) as FdsBehaviorEventBatch
+      // MSW는 원시 이벤트 수신만 흉내 낸다. backCount·망설임·정책은 FE에서 계산하지 않는다.
+      return ok({
+        flowId: String(params.flowId),
+        acceptedCount: batch.events.length,
+      })
+    },
+  ),
+
   http.get("*/transfer-limits", async () => {
     await delay(MOCK_LATENCY_MS)
     if (readSignedInMemberId() == null) return unauthorized()

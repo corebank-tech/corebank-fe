@@ -73,6 +73,7 @@ describe("fetchPayeeFor", () => {
 
 describe("executeTransferIntent", () => {
   const intent = (over: Partial<TransferIntent> = {}): TransferIntent => ({
+    flowId: "flow-1",
     withdrawalAccountId: 1,
     payeeBankCode: null,
     depositAccountNumber: "333330730135",

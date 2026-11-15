@@ -3,7 +3,14 @@ export type FdsRiskStatus = "MATCH" | "NO_MATCH" | "UNAVAILABLE"
 export type FdsAgentStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED"
 export type FdsActor = "SERVER" | "AGENT" | "HUMAN"
 export type FdsCallResult = "CONFIRMED" | "DENIED" | "UNREACHABLE"
-export type FdsDecision = "APPROVE" | "REJECT"
+export type FdsDecision = "APPROVE" | "REJECT" | "FRAUD_REJECT"
+
+export type FdsBehaviorSummary = {
+  backCount: number
+  amountRevisionCount: number
+  confirmActiveSeconds: number
+  hesitationWarning: boolean
+}
 
 export type FdsStepReveal = {
   history?: string[]
@@ -30,6 +37,7 @@ export type FdsInvestigationStep = {
  */
 export type FdsHeldTransferView = {
   id: string
+  transferHoldId: number
   caseNo: string
   flowId: string
   receivedAt: string
@@ -42,6 +50,8 @@ export type FdsHeldTransferView = {
   amount: number
   policy: FdsPolicy
   serverHoldReason: string
+  /** 서버가 계산해 응답한 값. 화면 fixture도 임계값을 다시 판정하지 않는다. */
+  behaviorSummary: FdsBehaviorSummary
   agentStatus: FdsAgentStatus
   agentFinding?: string
   sourceNotice: string

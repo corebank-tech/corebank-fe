@@ -4,6 +4,7 @@ import { accountHandlers } from "@/mocks/handlers/account"
 import { adminCustomersApiHandlers } from "@/mocks/handlers/admin-customers-api"
 import { authHandlers } from "@/mocks/handlers/auth"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
+import { fdsAdminApiHandlers } from "@/mocks/handlers/fds-admin-api"
 import { infoApiHandlers } from "@/mocks/handlers/info-api"
 import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconciliation-api"
 import { notificationsApiHandlers } from "@/mocks/handlers/notifications-api"
@@ -29,6 +30,7 @@ export const handlers = [
   ...transferApiHandlers,
   ...notificationsApiHandlers,
   ...glApiHandlers,
+  ...fdsAdminApiHandlers,
   ...ledgerReconciliationApiHandlers,
   ...adminCustomersApiHandlers,
   ...infoApiHandlers,

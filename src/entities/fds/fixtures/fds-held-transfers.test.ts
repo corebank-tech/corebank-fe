@@ -38,4 +38,20 @@ describe("FDS 보류 거래 UI fixture", () => {
       ),
     ).toBe(true)
   })
+
+  it("backCount 1은 망설임 신호 불충족이고 2회 정책 A 값은 서버 판정으로 표시한다", () => {
+    expect(
+      findFdsHeldTransfer("policy-b-no-match")?.behaviorSummary,
+    ).toMatchObject({
+      backCount: 1,
+      hesitationWarning: false,
+    })
+    expect(
+      findFdsHeldTransfer("policy-a-risk-match")?.behaviorSummary,
+    ).toMatchObject({
+      backCount: 2,
+      amountRevisionCount: 2,
+      hesitationWarning: true,
+    })
+  })
 })

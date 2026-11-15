@@ -95,6 +95,7 @@ const policyBReason =
 export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
   {
     id: "policy-a-risk-match",
+    transferHoldId: 101,
     caseNo: "FDS-DEMO-A01",
     flowId: "flow-demo-a-20261108-001",
     receivedAt: "2026-11-08T09:10:00+09:00",
@@ -107,6 +108,12 @@ export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
     amount: 500_000,
     policy: "A",
     serverHoldReason: policyAReason,
+    behaviorSummary: {
+      backCount: 2,
+      amountRevisionCount: 2,
+      confirmActiveSeconds: 65,
+      hesitationWarning: true,
+    },
     agentStatus: "COMPLETED",
     agentFinding:
       "조회된 두 성공 이체 모두 같은 수취계좌입니다. 수취인과 송금 목적을 확인할 필요가 있습니다.",
@@ -130,6 +137,7 @@ export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
   },
   {
     id: "policy-b-no-match",
+    transferHoldId: 102,
     caseNo: "FDS-DEMO-B01",
     flowId: "flow-demo-b-20261108-001",
     receivedAt: "2026-11-08T09:12:00+09:00",
@@ -142,6 +150,12 @@ export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
     amount: 1_000_000,
     policy: "B",
     serverHoldReason: policyBReason,
+    behaviorSummary: {
+      backCount: 1,
+      amountRevisionCount: 1,
+      confirmActiveSeconds: 59,
+      hesitationWarning: false,
+    },
     agentStatus: "COMPLETED",
     agentFinding:
       "반복된 송금으로 수취인과 거래 목적에 대한 고객 확인이 필요합니다.",
@@ -162,6 +176,7 @@ export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
   },
   {
     id: "agent-failure-unavailable",
+    transferHoldId: 103,
     caseNo: "FDS-DEMO-E01",
     flowId: "flow-demo-e-20261108-001",
     receivedAt: "2026-11-08T09:11:00+09:00",
@@ -174,6 +189,12 @@ export const FDS_HELD_TRANSFER_FIXTURES: FdsHeldTransferView[] = [
     amount: 1_000_000,
     policy: "B",
     serverHoldReason: policyBReason,
+    behaviorSummary: {
+      backCount: 0,
+      amountRevisionCount: 0,
+      confirmActiveSeconds: 0,
+      hesitationWarning: false,
+    },
     agentStatus: "FAILED",
     sourceNotice:
       "조사 장애 fixture이며 Agent 실패와 관계없이 HELD가 유지됩니다.",

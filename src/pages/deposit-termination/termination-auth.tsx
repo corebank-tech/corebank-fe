@@ -30,6 +30,12 @@ import {
 
 const PASSWORD_LIMIT = 4
 
+/** 같은 멱등키의 앞선 요청이 아직 끝나지 않았을 때 서버가 주는 코드. */
+const IN_PROGRESS_CODE = "CMN0301"
+
+const IN_PROGRESS_MESSAGE =
+  "같은 해지 요청이 아직 처리 중입니다. 잠시 뒤 이 화면에서 다시 시도하거나 예·적금 계좌목록에서 계좌 상태를 확인하세요."
+
 const UNCONFIRMED_MESSAGE =
   "해지 결과를 확인하지 못했습니다. 예·적금 계좌목록에서 계좌 상태를 확인한 뒤 다시 시도하세요."
 
@@ -122,15 +128,24 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
         replace: true,
       })
     } catch (error) {
-      // 응답을 받지 못한 요청은 서버가 처리했는지 알 수 없어 키를 유지한 채 재시도하게 둔다.
-      // 서버가 거절한 요청은 처리되지 않았으므로 다음 시도는 새 거래다.
+      // 응답을 받지 못한 요청과 처리 중인 요청은 서버가 끝냈는지 알 수 없어 키를 유지한 채
+      // 재시도하게 둔다. 서버가 거절한 요청은 처리되지 않았으므로 다음 시도는 새 거래다.
+      const isInProgress =
+        error instanceof ApiError && error.code === IN_PROGRESS_CODE
       const isRejected =
-        error instanceof ApiError && error.code !== NETWORK_ERROR_CODE
+        error instanceof ApiError &&
+        error.code !== NETWORK_ERROR_CODE &&
+        !isInProgress
       if (isRejected) idempotency.reset()
       setFailure(
         isRejected
           ? { title: `${label} 실패`, message: error.message }
-          : { title: `${label} 결과 확인 필요`, message: UNCONFIRMED_MESSAGE },
+          : {
+              title: isInProgress
+                ? `${label} 처리 중`
+                : `${label} 결과 확인 필요`,
+              message: isInProgress ? IN_PROGRESS_MESSAGE : UNCONFIRMED_MESSAGE,
+            },
       )
     } finally {
       terminateMutation.reset()

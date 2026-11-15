@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   isSameTransferIntent,
+  isSameTransferBusinessIntent,
   toInterbankTransferRequest,
   toOtpTransactionData,
   toTransferRequest,
@@ -43,6 +44,23 @@ describe("isSameTransferIntent", () => {
 
   it("입력 중이라 금액이 비어 있어도 이전 값과 다르면 다른 거래다", () => {
     expect(isSameTransferIntent(intent(), intent({ amount: null }))).toBe(false)
+  })
+})
+
+describe("isSameTransferBusinessIntent", () => {
+  it("행동 이벤트 실패로 flowId가 빠져도 같은 이체로 보아 멱등키를 유지한다", () => {
+    expect(
+      isSameTransferBusinessIntent(intent({ flowId: null }), intent()),
+    ).toBe(true)
+  })
+
+  it("결과 불명 뒤 금액을 바꾸면 다른 이체로 보아 새 flow와 키를 쓴다", () => {
+    expect(
+      isSameTransferBusinessIntent(
+        intent({ flowId: null }),
+        intent({ amount: 400_000 }),
+      ),
+    ).toBe(false)
   })
 })
 

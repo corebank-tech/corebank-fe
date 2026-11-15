@@ -16,6 +16,7 @@ import {
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   isConfirmedTransferStatus,
+  isSameTransferBusinessIntent,
   isSameTransferIntent,
   toOtpTransactionData,
   getTransferLimitQueryKey,
@@ -120,6 +121,7 @@ export const InstantTransferScreen = () => {
   const stepRef = React.useRef(step)
   const ignoreHistoryPopRef = React.useRef(false)
   const unknownExecutionIntentRef = React.useRef<TransferIntent | null>(null)
+  const lastExecutionIntentRef = React.useRef<TransferIntent | null>(null)
 
   React.useEffect(() => {
     stepRef.current = step
@@ -147,7 +149,14 @@ export const InstantTransferScreen = () => {
     (historyAlreadyPopped = false) => {
       // 열린 CONFIRM_ENTER를 닫은 최초 호출만 STEP_BACK을 만든다. 버튼과 popstate가
       // 같은 동작에서 연달아 와도 두 번째 호출은 false라 중복 전송되지 않는다.
-      if (!behaviorFlow.returnToInput()) return false
+      if (!behaviorFlow.returnToInput()) {
+        // 결과 불명 재시도는 이미 제출된 행동 flow를 다시 열지 않고 D-02만
+        // 표시한다. 이 경우 STEP_BACK을 추가할 수는 없지만 화면 이동은 막지 않는다.
+        if (!behaviorFlow.isSubmitted()) return false
+        setStep(1)
+        if (!historyAlreadyPopped) removeConfirmHistoryEntry()
+        return true
+      }
       setStep(1)
       if (!historyAlreadyPopped) removeConfirmHistoryEntry()
       return true
@@ -426,7 +435,14 @@ export const InstantTransferScreen = () => {
         // 유지한다. 내용이 달라졌으면 다른 거래라 새 키를 쓴다 — 같은 키로 보내면
         // 서버가 앞선 거래의 결과를 돌려주고 화면은 바뀐 내용으로 이체된 것처럼
         // 표시한다.
-        if (!isSameTransferIntent(keyedIntent, currentIntent)) {
+        const sameUnknownTransfer = isSameTransferBusinessIntent(
+          unknownExecutionIntentRef.current,
+          currentIntent,
+        )
+        if (
+          !sameUnknownTransfer &&
+          !isSameTransferIntent(keyedIntent, currentIntent)
+        ) {
           setIdempotencyKey(crypto.randomUUID())
           setKeyedIntent(currentIntent)
         }
@@ -480,6 +496,7 @@ export const InstantTransferScreen = () => {
             setKeyedIntent(executionIntent)
           }
         }
+        lastExecutionIntentRef.current = executionIntent
         const executed = await executeMutation.mutateAsync({
           intent: executionIntent,
           accountPasswordAuthToken: passwordAuthToken,
@@ -571,12 +588,16 @@ export const InstantTransferScreen = () => {
         // 멱등키와 흐름을 유지해 중복 이체를 막는다.
         if (error instanceof ApiError && error.code !== NETWORK_ERROR_CODE) {
           unknownExecutionIntentRef.current = null
+          lastExecutionIntentRef.current = null
           setBehaviorFlow(createFdsBehaviorFlow())
           setIdempotencyKey("")
           setKeyedIntent(null)
         } else {
           unknownExecutionIntentRef.current =
-            unknownExecutionIntentRef.current ?? keyedIntent ?? currentIntent
+            lastExecutionIntentRef.current ??
+            unknownExecutionIntentRef.current ??
+            keyedIntent ??
+            currentIntent
         }
         setStep(1)
         return
@@ -585,6 +606,7 @@ export const InstantTransferScreen = () => {
       // 다음 이체는 새 키를 쓴다.
       setIdempotencyKey("")
       unknownExecutionIntentRef.current = null
+      lastExecutionIntentRef.current = null
       setKeyedIntent(null)
       setPasswordAuthToken(null)
       setStep(3)
@@ -803,6 +825,7 @@ export const InstantTransferScreen = () => {
           setKeyedIntent(null)
           setBehaviorFlow(createFdsBehaviorFlow())
           unknownExecutionIntentRef.current = null
+          lastExecutionIntentRef.current = null
           setStep(1)
         }}
         resultSlot={
@@ -898,14 +921,38 @@ export const InstantTransferScreen = () => {
         if (form.amount == null) return
         // 결과 불명 실행을 동일 내용으로 재시도할 때 행동 배치를 다시 만들지 않는다.
         // 이체 API는 기존 멱등키를 그대로 사용한다.
-        if (
-          behaviorFlow.isSubmitted() &&
-          unknownExecutionIntentRef.current != null &&
-          isSameTransferIntent(unknownExecutionIntentRef.current, {
-            ...currentIntent,
-            flowId: unknownExecutionIntentRef.current.flowId,
-          })
-        ) {
+        if (behaviorFlow.isSubmitted()) {
+          if (
+            isSameTransferBusinessIntent(
+              unknownExecutionIntentRef.current,
+              currentIntent,
+            )
+          ) {
+            // 제출 완료 flow를 다시 열지는 않지만, 이전 버튼/브라우저 뒤로가기가
+            // D-01로 돌아올 수 있도록 재시도용 히스토리 항목은 유지한다.
+            window.history.pushState(
+              { ...window.history.state, fdsFlowId: behaviorFlow.flowId },
+              "",
+              window.location.href,
+            )
+            setStep(2)
+            return
+          }
+
+          // 결과 불명 뒤 거래 내용을 바꾸면 REQ-TRSF-016상 다른 이체다.
+          // 종료된 flow를 재사용하지 않고 새 flow·새 이체 멱등키로 시작한다.
+          const nextFlow = createFdsBehaviorFlow()
+          unknownExecutionIntentRef.current = null
+          lastExecutionIntentRef.current = null
+          setBehaviorFlow(nextFlow)
+          setIdempotencyKey("")
+          setKeyedIntent(null)
+          if (!nextFlow.enterConfirm(form.amount)) return
+          window.history.pushState(
+            { ...window.history.state, fdsFlowId: nextFlow.flowId },
+            "",
+            window.location.href,
+          )
           setStep(2)
           return
         }

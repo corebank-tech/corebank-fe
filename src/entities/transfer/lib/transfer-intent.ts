@@ -82,3 +82,20 @@ export const isSameTransferIntent = (
   a.amount === b.amount &&
   a.myPassbookMemo === b.myPassbookMemo &&
   a.recipientPassbookMemo === b.recipientPassbookMemo
+
+/**
+ * 결과 불명 이체를 재시도할 때의 거래 동일성. flowId는 FDS 수집 연결값이지
+ * 출금 거래 내용이 아니므로, 행동 이벤트 제출 실패로 flowId를 뺀 요청과 화면의
+ * 원래 요청도 같은 이체로 본다. 이 비교가 true인 동안 이체 멱등키를 유지한다.
+ */
+export const isSameTransferBusinessIntent = (
+  a: TransferIntent | null,
+  b: TransferIntent,
+): boolean =>
+  a != null &&
+  a.withdrawalAccountId === b.withdrawalAccountId &&
+  a.payeeBankCode === b.payeeBankCode &&
+  a.depositAccountNumber === b.depositAccountNumber &&
+  a.amount === b.amount &&
+  a.myPassbookMemo === b.myPassbookMemo &&
+  a.recipientPassbookMemo === b.recipientPassbookMemo

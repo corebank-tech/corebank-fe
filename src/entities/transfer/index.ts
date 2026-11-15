@@ -90,6 +90,7 @@ export {
 
 export {
   isSameTransferIntent,
+  isSameTransferBusinessIntent,
   toOtpTransactionData,
 } from "@/entities/transfer/lib/transfer-intent"
 export type { TransferIntent } from "@/entities/transfer/lib/transfer-intent"

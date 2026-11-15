@@ -71,4 +71,15 @@ describe("FDS 행동 흐름", () => {
     expect(sameRenderReference.idempotencyKey).toBe(first.idempotencyKey)
     expect(nextTransfer.flowId).not.toBe(first.flowId)
   })
+
+  it("제출된 flow는 STEP_BACK을 추가하지 않아 화면이 별도 이전 이동으로 처리할 수 있다", () => {
+    const flow = createFdsBehaviorFlow({ flowId: "flow-1" })
+    flow.enterConfirm(100_000)
+    flow.leaveConfirm()
+    flow.submitRequested()
+
+    expect(flow.isSubmitted()).toBe(true)
+    expect(flow.returnToInput()).toBe(false)
+    expect(eventTypes(flow)).not.toContain("STEP_BACK")
+  })
 })

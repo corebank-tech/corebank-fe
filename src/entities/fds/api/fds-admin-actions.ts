@@ -1,81 +1,78 @@
-import { customFetch, withIdempotencyKey } from "@/shared/api/custom-fetch"
+import {
+  approveFdsHeldTransfer as approveGenerated,
+  confirmFraudAndRejectFdsHeldTransfer,
+  getFdsHeldTransferDetail,
+  getFdsHeldTransfers,
+  recordFdsAdminCallResult as recordCallGenerated,
+  rejectFdsHeldTransfer as rejectGenerated,
+  useGetFdsHeldTransferDetail,
+  useGetFdsHeldTransfers,
+  type CallRequestResult,
+  type FdsHoldDetail,
+  type FdsHoldListItem,
+  type FdsHoldListPage,
+  type GetFdsHeldTransfersParams,
+  type RejectRequestReasonCode,
+  type Action,
+} from "@/shared/api/generated"
+import { withIdempotencyKey } from "@/shared/api/custom-fetch"
 
-export type FdsGeneralRejectReason = "CUSTOMER_DENIED" | "RISK_ACCOUNT_MATCH"
+export const FDS_ACCESS_REASON = "INCIDENT"
+const readOptions = { headers: { "X-Access-Reason": FDS_ACCESS_REASON } }
+const writeOptions = (idempotencyKey: string) =>
+  withIdempotencyKey(readOptions, idempotencyKey)
 
-export type FdsAdminActionState = {
-  actionId?: string
-  actionType: "APPROVE" | "REJECT" | "FRAUD_REJECT"
-  status: "PENDING" | "COMPLETED" | "FAILED" | "CONFLICT"
-  reasonCode?: string | null
-  failureReason?: string | null
-  recoveryRequired?: boolean
+export type FdsGeneralRejectReason = RejectRequestReasonCode
+export type FdsCallResult = CallRequestResult
+export type FdsDecision = "APPROVE" | "REJECT" | "FRAUD_REJECT"
+export type FdsAdminActionState = Action
+export type {
+  FdsHoldDetail,
+  FdsHoldListItem,
+  FdsHoldListPage,
+  GetFdsHeldTransfersParams,
 }
 
-export type FdsHeldTransferActionDetail = {
-  transferHoldId: number
-  holdStatus: string
-  adminAction?: FdsAdminActionState | null
-  riskRegistration?: {
-    status: "PENDING" | "ACTIVE" | "FAILED"
-    failureReason?: string | null
-    recoveryRequired?: boolean
-  } | null
-}
-
-const actionPath = (heldTransferId: number, action: string) =>
-  `/admin/fds/holds/${heldTransferId}/${action}`
-
-const post = (path: string, idempotencyKey: string, body?: unknown) =>
-  customFetch<FdsAdminActionState>(
-    path,
-    withIdempotencyKey(
-      {
-        method: "POST",
-        ...(body !== undefined && { body: JSON.stringify(body) }),
-      },
-      idempotencyKey,
-    ),
-  )
-
+export const useFdsHeldTransfers = (params: GetFdsHeldTransfersParams) =>
+  useGetFdsHeldTransfers(params, { request: readOptions })
+export const useFdsHeldTransferDetail = (transferHoldId: number) =>
+  useGetFdsHeldTransferDetail(transferHoldId, {
+    query: {
+      enabled: Number.isSafeInteger(transferHoldId) && transferHoldId > 0,
+    },
+    request: readOptions,
+  })
+export const fetchFdsHeldTransfers = (params: GetFdsHeldTransfersParams) =>
+  getFdsHeldTransfers(params, readOptions)
+export const fetchFdsHeldTransferDetail = (transferHoldId: number) =>
+  getFdsHeldTransferDetail(transferHoldId, readOptions)
 export const approveFdsHeldTransfer = (
-  heldTransferId: number,
+  transferHoldId: number,
   idempotencyKey: string,
-) => post(actionPath(heldTransferId, "approve"), idempotencyKey)
-
+) => approveGenerated(transferHoldId, writeOptions(idempotencyKey))
 export const rejectFdsHeldTransfer = (
-  heldTransferId: number,
+  transferHoldId: number,
   reasonCode: FdsGeneralRejectReason,
   idempotencyKey: string,
-) => post(actionPath(heldTransferId, "reject"), idempotencyKey, { reasonCode })
-
-/** FRAUD_CONFIRMED는 일반 reject DTO에 넣지 않고 전용 API로 보낸다. */
+) =>
+  rejectGenerated(transferHoldId, { reasonCode }, writeOptions(idempotencyKey))
+/** FRAUD_CONFIRMED는 일반 reject DTO가 아니라 전용 API로만 전송한다. */
 export const fraudRejectFdsHeldTransfer = (
-  heldTransferId: number,
+  transferHoldId: number,
   idempotencyKey: string,
-) => post(actionPath(heldTransferId, "fraud-reject"), idempotencyKey)
-
+) =>
+  confirmFraudAndRejectFdsHeldTransfer(
+    transferHoldId,
+    writeOptions(idempotencyKey),
+  )
 export const recordFdsAdminCallResult = (
-  heldTransferId: number,
-  result:
-    "CUSTOMER_CONFIRMED" | "CUSTOMER_DENIED" | "NO_ANSWER" | "INCONCLUSIVE",
+  transferHoldId: number,
+  result: FdsCallResult,
   investigationReason: string,
   idempotencyKey: string,
 ) =>
-  customFetch<unknown>(
-    actionPath(heldTransferId, "call-record"),
-    withIdempotencyKey(
-      {
-        method: "POST",
-        headers: { "X-Access-Reason": "INCIDENT" },
-        body: JSON.stringify({ result, investigationReason }),
-      },
-      idempotencyKey,
-    ),
-  )
-
-/** 새로고침·응답 유실 뒤 서버의 내구화된 관리자 조치를 정본으로 복원한다. */
-export const getFdsHeldTransferActionDetail = (heldTransferId: number) =>
-  customFetch<FdsHeldTransferActionDetail>(
-    `/admin/fds/holds/${heldTransferId}`,
-    { headers: { "X-Access-Reason": "INCIDENT" } },
+  recordCallGenerated(
+    transferHoldId,
+    { result, investigationReason },
+    writeOptions(idempotencyKey),
   )

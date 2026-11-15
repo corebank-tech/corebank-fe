@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { FDS_BEHAVIOR_SCENARIOS } from "@/entities/fds/fixtures/fds-behavior-scenarios"
+import { FDS_BEHAVIOR_SCENARIOS } from "@/mocks/fixtures/fds-behavior-scenarios"
 
 describe("FDS 정책 시연 fixture", () => {
   it("정책 A는 STEP_BACK 두 건과 다른 참 조건을 서버 판정값으로 제공한다", () => {

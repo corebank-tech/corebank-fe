@@ -28,7 +28,11 @@ import {
   useVerifyAccountPasswordMutation,
 } from "@/entities/account"
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
-import { ApiError, toErrorMessage } from "@/shared/api/api-error"
+import {
+  ApiError,
+  NETWORK_ERROR_CODE,
+  toErrorMessage,
+} from "@/shared/api/api-error"
 import { TransferResponseStatus } from "@/entities/transfer"
 import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
@@ -115,6 +119,7 @@ export const InstantTransferScreen = () => {
   )
   const stepRef = React.useRef(step)
   const ignoreHistoryPopRef = React.useRef(false)
+  const unknownExecutionIntentRef = React.useRef<TransferIntent | null>(null)
 
   React.useEffect(() => {
     stepRef.current = step
@@ -384,8 +389,6 @@ export const InstantTransferScreen = () => {
 
     const handleConfirmDialogConfirm = async () => {
       setConfirmOpen(false)
-      behaviorFlow.leaveConfirm()
-      removeConfirmHistoryEntry()
 
       if (!checkCurrentWithdrawable()) {
         setPasswordAuthToken(null)
@@ -457,14 +460,28 @@ export const InstantTransferScreen = () => {
       }
       const executedAt = transactionAt ?? getNow()
       try {
-        behaviorFlow.submitRequested()
-        await submitFdsBehaviorEvents(
-          behaviorFlow.flowId,
-          behaviorFlow.batch(),
-          behaviorFlow.idempotencyKey,
-        )
+        // OTP를 실제 제출할 때까지 D-02 확인 구간을 열어 둔다. OTP 취소는 D-02에
+        // 머무르므로 이전 버튼과 브라우저 뒤로가기가 정상적으로 STEP_BACK을 만든다.
+        let executionIntent = unknownExecutionIntentRef.current ?? currentIntent
+        if (!behaviorFlow.isSubmitted()) {
+          behaviorFlow.leaveConfirm()
+          removeConfirmHistoryEntry()
+          behaviorFlow.submitRequested()
+          try {
+            await submitFdsBehaviorEvents(
+              behaviorFlow.flowId,
+              behaviorFlow.batch(),
+              behaviorFlow.idempotencyKey,
+            )
+          } catch {
+            // 행동 이벤트 저장 장애는 이체 장애가 아니다. 서버가 모르는 flowId를
+            // 이체에 싣지 않고 이체 실행은 계속한다.
+            executionIntent = { ...currentIntent, flowId: null }
+            setKeyedIntent(executionIntent)
+          }
+        }
         const executed = await executeMutation.mutateAsync({
-          intent: currentIntent,
+          intent: executionIntent,
           accountPasswordAuthToken: passwordAuthToken,
           otpAuthToken,
           idempotencyKey,
@@ -549,12 +566,25 @@ export const InstantTransferScreen = () => {
             : "이체 실행에 실패했습니다. 계좌비밀번호를 다시 입력해 주세요.",
         )
         setPasswordAuthToken(null)
+        // 서버가 명시적으로 거부한 실행은 끝난 시도이므로 새 행동 흐름으로 다시
+        // 입력할 수 있게 한다. 전송 결과가 불명확한 네트워크 오류는 같은 이체
+        // 멱등키와 흐름을 유지해 중복 이체를 막는다.
+        if (error instanceof ApiError && error.code !== NETWORK_ERROR_CODE) {
+          unknownExecutionIntentRef.current = null
+          setBehaviorFlow(createFdsBehaviorFlow())
+          setIdempotencyKey("")
+          setKeyedIntent(null)
+        } else {
+          unknownExecutionIntentRef.current =
+            unknownExecutionIntentRef.current ?? keyedIntent ?? currentIntent
+        }
         setStep(1)
         return
       }
       // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 으로 답했으면 요청이 접수된 것이다.
       // 다음 이체는 새 키를 쓴다.
       setIdempotencyKey("")
+      unknownExecutionIntentRef.current = null
       setKeyedIntent(null)
       setPasswordAuthToken(null)
       setStep(3)
@@ -772,6 +802,7 @@ export const InstantTransferScreen = () => {
           setIdempotencyKey("")
           setKeyedIntent(null)
           setBehaviorFlow(createFdsBehaviorFlow())
+          unknownExecutionIntentRef.current = null
           setStep(1)
         }}
         resultSlot={
@@ -864,7 +895,21 @@ export const InstantTransferScreen = () => {
         // 1단계 안내를 보고 다시 진행하는 것이므로 이전 시도의 문구를 지운다.
         // 남겨두면 2단계가 열리자마자 아직 누르지도 않은 실패가 떠 있다.
         setAuthError(null)
-        if (form.amount == null || !behaviorFlow.enterConfirm(form.amount)) {
+        if (form.amount == null) return
+        // 결과 불명 실행을 동일 내용으로 재시도할 때 행동 배치를 다시 만들지 않는다.
+        // 이체 API는 기존 멱등키를 그대로 사용한다.
+        if (
+          behaviorFlow.isSubmitted() &&
+          unknownExecutionIntentRef.current != null &&
+          isSameTransferIntent(unknownExecutionIntentRef.current, {
+            ...currentIntent,
+            flowId: unknownExecutionIntentRef.current.flowId,
+          })
+        ) {
+          setStep(2)
+          return
+        }
+        if (!behaviorFlow.enterConfirm(form.amount)) {
           return
         }
         window.history.pushState(

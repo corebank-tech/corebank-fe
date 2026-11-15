@@ -33,8 +33,16 @@
       "description": "로그인과 비밀번호 관리 API"
     },
     {
+      "name": "만기해지",
+      "description": "예·적금 만기해지 및 예상 원리금 조회"
+    },
+    {
       "name": "관리자 GL 정합성 점검",
       "description": "전표 차대변 점검과 원장↔전표 대사 API"
+    },
+    {
+      "name": "FDS Agent 내부 API",
+      "description": "FDS_AGENT_SERVICE_TOKEN 전용 Tool·보고서 API"
     },
     {
       "name": "FDS 행동 이벤트",
@@ -105,6 +113,14 @@
       "description": "상품가입 사전검증·실행·결과조회 API"
     },
     {
+      "name": "FDS 위험 계좌",
+      "description": "활성 위험 계좌와 관리자 사기 확정 선정 근거"
+    },
+    {
+      "name": "중도해지",
+      "description": "예·적금 중도해지 및 원리금 지급 API"
+    },
+    {
       "name": "자동이체",
       "description": "자동이체 등록·조회·변경·해지 및 처리결과 조회 API"
     },
@@ -115,6 +131,10 @@
     {
       "name": "만기해지",
       "description": "예·적금 만기해지 및 원리금 지급 API"
+    },
+    {
+      "name": "FDS 관리자 조치",
+      "description": "위험 상태 재검증 후 P4 승인·거절"
     },
     {
       "name": "관리자 정보계 조회",
@@ -135,6 +155,10 @@
     {
       "name": "이체한도",
       "description": "이체한도 조회·변경 API"
+    },
+    {
+      "name": "중도해지",
+      "description": "예·적금 중도해지 및 예상 원리금 조회"
     },
     {
       "name": "관리자 시산표",
@@ -534,6 +558,69 @@
             }
           }
         }
+      }
+    },
+    "/internal/fds/investigations/{investigationId}/report": {
+      "put": {
+        "tags": [
+          "FDS Agent 내부 API"
+        ],
+        "summary": "조사 보고서 제출",
+        "description": "FDS_AGENT_SERVICE_TOKEN과 investigationId와 같은 Idempotency-Key가 필요합니다. 실행 요청에서 받은 attemptNo를 본문에 그대로 포함해야 하며 이전 세대의 늦은 보고서는 거부합니다.",
+        "operationId": "submitFdsInvestigationReport",
+        "parameters": [
+          {
+            "name": "investigationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAcknowledgement"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/customers/me/password": {
@@ -2272,8 +2359,8 @@
           "FDS 행동 이벤트"
         ],
         "summary": "행동 이벤트 제출",
-        "description": "한 flow의 순번·소유권을 검증하고 중복 이벤트는 다시 저장하지 않습니다.",
-        "operationId": "submit",
+        "description": "FE가 생성한 flowId를 최초 제출 고객에게 귀속합니다. 한 flow는 최초 수신부터 30분, 최대 100개와 요청 본문 32 KiB 제한을 적용하며 동일 이벤트 재전송은 멱등 처리하고 충돌·종료 후 추가 제출은 거부합니다.",
+        "operationId": "submitFdsBehaviorEvents",
         "parameters": [
           {
             "name": "flowId",
@@ -3843,6 +3930,292 @@
         }
       }
     },
+    "/admin/fds/holds/{transferHoldId}/reject": {
+      "post": {
+        "tags": [
+          "FDS 관리자 조치"
+        ],
+        "summary": "보류 거절",
+        "description": "CUSTOMER_WRITE와 CSRF, Idempotency-Key가 필요합니다. MATCH는 RISK_ACCOUNT_MATCH만, 그 외는 최신 CUSTOMER_DENIED 콜 뒤 거절합니다. 충돌로 확정된 요청과 재전달은 FDS0301을 반환합니다.",
+        "operationId": "rejectFdsHeldTransfer",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "성공: 보류 거절 완료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "FDS0302 거절 가능한 콜 결과 조건 미충족",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FDS0301 멱등키 충돌 또는 보류 상태 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/fds/holds/{transferHoldId}/fraud-reject": {
+      "post": {
+        "tags": [
+          "FDS 관리자 조치"
+        ],
+        "summary": "사기 확정 및 보류 거절",
+        "description": "FDS_FRAUD_CONFIRM 권한, CSRF, Idempotency-Key와 최신 CUSTOMER_DENIED 콜이 필요합니다. 보류 위험 상태가 NO_MATCH 또는 UNAVAILABLE이어야 하며 MATCH 상태에서는 FRAUD_REJECT가 불가합니다. P4의 REJECTED·actorId·FRAUD_CONFIRMED가 일치한 뒤 등록 의도를 ACTIVE로 전환합니다.",
+        "operationId": "confirmFraudAndRejectFdsHeldTransfer",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공: 사기 확정 거절 및 위험 계좌 활성화 완료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "FDS0302 최신 CUSTOMER_DENIED 콜 누락 또는 MATCH 상태에서 호출",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FDS0301 멱등키 충돌 또는 상태 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "FDS9002 P4 거절 후 위험 계좌 활성화 실패",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/fds/holds/{transferHoldId}/call-record": {
+      "post": {
+        "tags": [
+          "FDS 관리자 조치"
+        ],
+        "summary": "고객 콜 결과 추가",
+        "description": "CUSTOMER_WRITE와 CSRF, Idempotency-Key가 필요하며 기존 기록을 수정하지 않고 추가합니다.",
+        "operationId": "recordFdsAdminCallResult",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "성공: 고객 콜 결과 저장 완료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCallRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FDS0301 동일 멱등키 다른 요청 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCallRecord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/fds/holds/{transferHoldId}/approve": {
+      "post": {
+        "tags": [
+          "FDS 관리자 조치"
+        ],
+        "summary": "보류 승인",
+        "description": "CUSTOMER_WRITE와 CSRF, Idempotency-Key가 필요합니다. NO_MATCH·UNAVAILABLE이고 최신 CUSTOMER_CONFIRMED 콜이 있어야 합니다. 콜 조건 실패는 FDS0302, 충돌로 확정된 요청과 재전달은 FDS0301을 반환합니다.",
+        "operationId": "approveFdsHeldTransfer",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공: 보류 승인 완료",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "FDS0302 승인 가능한 콜 결과 조건 미충족",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FDS0301 멱등키 충돌 또는 보류 상태 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/customers/{customerId}/unlock": {
       "post": {
         "tags": [
@@ -4533,6 +4906,56 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/early-termination": {
+      "post": {
+        "tags": [
+          "중도해지"
+        ],
+        "summary": "예·적금 중도해지 실행",
+        "description": "본인 소유 ACTIVE 예·적금 계좌를 중도해지합니다. 가입 시 등록한 수취계좌로 원리금을 이체하며, Idempotency-Key와 Account-Password-Auth-Token이 필요합니다.",
+        "operationId": "earlyTerminateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Account-Password-Auth-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEarlyTerminationResponse"
                 }
               }
             }
@@ -5903,6 +6326,120 @@
         }
       }
     },
+    "/internal/fds/holds/{transferHoldId}/recipient-context": {
+      "get": {
+        "tags": [
+          "FDS Agent 내부 API"
+        ],
+        "summary": "수취인 성공 이력 요약",
+        "description": "FDS_AGENT_SERVICE_TOKEN과 실행 요청에서 받은 attemptNo로 현재 실행 세대를 검증한 뒤, 보류 원본의 고객·수취계좌·출금계좌 범위만 조회합니다.",
+        "operationId": "getFdsAgentRecipientContext",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "attemptNo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecipientData"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/fds/holds/{transferHoldId}/history": {
+      "get": {
+        "tags": [
+          "FDS Agent 내부 API"
+        ],
+        "summary": "최근 성공 이체 조회",
+        "description": "FDS_AGENT_SERVICE_TOKEN과 실행 요청에서 받은 attemptNo로 현재 실행 세대를 검증한 뒤, 보류 고객의 heldAt 이전 24시간을 최신순 100건까지 조회합니다.",
+        "operationId": "getFdsAgentTransferHistory",
+        "parameters": [
+          {
+            "name": "transferHoldId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "attemptNo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHistoryData"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/dashboard/login-status": {
       "get": {
         "tags": [
@@ -6872,14 +7409,203 @@
         }
       }
     },
+    "/admin/fds/risk-accounts": {
+      "get": {
+        "tags": [
+          "FDS 위험 계좌"
+        ],
+        "summary": "활성 위험 계좌 목록",
+        "description": "CUSTOMER_READ와 X-Access-Reason 헤더가 필요하며 마스킹된 계좌번호와 선정 근거 수를 반환합니다.",
+        "operationId": "findFdsRiskAccounts",
+        "parameters": [
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공: 위험 계좌 목록 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRiskAccountSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/fds/risk-accounts/{riskAccountId}": {
+      "get": {
+        "tags": [
+          "FDS 위험 계좌"
+        ],
+        "summary": "위험 계좌와 사건별 선정 근거 상세",
+        "description": "CUSTOMER_READ와 X-Access-Reason 헤더가 필요하며 사건별 선정 근거 목록을 반환합니다.",
+        "operationId": "findFdsRiskAccount",
+        "parameters": [
+          {
+            "name": "riskAccountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          },
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공: 위험 계좌 상세 및 근거 반환",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRiskAccountDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "CMN0401 위험 계좌 미존재",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRiskAccountDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/fds/holds": {
+      "get": {
+        "tags": [
+          "FDS 관리자"
+        ],
+        "summary": "FDS 보류 거래 목록",
+        "description": "CUSTOMER_READ 권한과 X-Access-Reason이 필요합니다. heldAt·transferHoldId 내림차순이며 page는 0 이상, size는 1~100(기본 20)입니다.",
+        "operationId": "getFdsHeldTransfers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "holdStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "riskStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "investigationStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Access-Reason",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_REQUEST",
+                "INCIDENT",
+                "AUDIT",
+                "OPERATION"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseFdsHoldListPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/fds/holds/{transferHoldId}": {
       "get": {
         "tags": [
           "FDS 관리자"
         ],
         "summary": "보류 상세 조회",
-        "description": "CUSTOMER_READ 권한과 X-Access-Reason이 필요합니다. P6에 저장된 점수 상태(PENDING/AVAILABLE/UNAVAILABLE), 점수·모델·피처 버전, 사용 불가 사유를 표시하며 조회 사유를 감사에 남깁니다.",
-        "operationId": "get",
+        "description": "CUSTOMER_READ 권한과 X-Access-Reason이 필요합니다. 기존 최상위 필드와 확장 상세 객체를 함께 반환하며 Agent가 실제 인용한 Tool 이력만 usedAsEvidence=true로 표시합니다.",
+        "operationId": "getFdsHeldTransferDetail",
         "parameters": [
           {
             "name": "transferHoldId",
@@ -7410,6 +8136,74 @@
         }
       }
     },
+    "/accounts/{accountId}/maturity-termination/preview": {
+      "get": {
+        "tags": [
+          "만기해지"
+        ],
+        "summary": "만기해지 예상 원리금 조회",
+        "description": "만기 도래한 본인 예·적금 계좌의 예상 지급액을 조회합니다. 계좌 잔액이나 상태를 변경하지 않으며 실제 해지 금액은 달라질 수 있습니다.",
+        "operationId": "previewMaturityTermination",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/early-termination/preview": {
+      "get": {
+        "tags": [
+          "중도해지"
+        ],
+        "summary": "중도해지 예상 원리금 조회",
+        "description": "만기 전 본인 예·적금 계좌의 중도해지 예상 지급액을 조회합니다. 중도해지이율을 적용하며 실제 해지는 실행하지 않습니다.",
+        "operationId": "previewEarlyTermination",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/customers/{customerId}/permissions/{permission}": {
       "delete": {
         "tags": [
@@ -7443,6 +8237,7 @@
                 "GL_WRITE",
                 "CUSTOMER_READ",
                 "CUSTOMER_WRITE",
+                "FDS_FRAUD_CONFIRM",
                 "AUDIT_READ",
                 "PAYMENT_STOP_READ",
                 "PAYMENT_STOP_WRITE",
@@ -7766,6 +8561,31 @@
             "format": "int64",
             "description": "당일 잔여 이체가능금액. 음수가 되지 않는다",
             "example": 4700000
+          }
+        }
+      },
+      "Acknowledgement": {
+        "type": "object",
+        "properties": {
+          "investigationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseAcknowledgement": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Acknowledgement"
           }
         }
       },
@@ -10578,6 +11398,139 @@
           }
         }
       },
+      "RejectRequest": {
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "description": "거절 사유 코드",
+            "enum": [
+              "RISK_ACCOUNT_MATCH",
+              "CUSTOMER_DENIED"
+            ],
+            "maxLength": 40,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "reasonCode"
+        ]
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "holdId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actionType": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "callRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "riskStatus": {
+            "type": "string"
+          },
+          "riskAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseAction": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Action"
+          }
+        }
+      },
+      "CallRequest": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "고객 확인 결과",
+            "enum": [
+              "CUSTOMER_CONFIRMED",
+              "CUSTOMER_DENIED",
+              "NO_ANSWER",
+              "INCONCLUSIVE"
+            ],
+            "minLength": 1
+          },
+          "investigationReason": {
+            "type": "string",
+            "description": "콜 기록 사유",
+            "maxLength": 200,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "investigationReason",
+          "result"
+        ]
+      },
+      "ApiResponseCallRecord": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CallRecord"
+          }
+        }
+      },
+      "CallRecord": {
+        "type": "object",
+        "properties": {
+          "callRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "callResult": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminUnlockResponse": {
         "type": "object",
         "properties": {
@@ -10673,6 +11626,7 @@
               "GL_WRITE",
               "CUSTOMER_READ",
               "CUSTOMER_WRITE",
+              "FDS_FRAUD_CONFIRM",
               "AUDIT_READ",
               "PAYMENT_STOP_READ",
               "PAYMENT_STOP_WRITE",
@@ -10704,6 +11658,7 @@
                 "GL_WRITE",
                 "CUSTOMER_READ",
                 "CUSTOMER_WRITE",
+                "FDS_FRAUD_CONFIRM",
                 "AUDIT_READ",
                 "PAYMENT_STOP_READ",
                 "PAYMENT_STOP_WRITE",
@@ -10840,6 +11795,64 @@
         }
       },
       "MaturityTerminationResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "withdrawalAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "principal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grossInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tax": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalTransferred": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transactionNumber": {
+            "type": "string"
+          },
+          "tradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseEarlyTerminationResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EarlyTerminationResponse"
+          }
+        }
+      },
+      "EarlyTerminationResponse": {
         "type": "object",
         "properties": {
           "accountId": {
@@ -12344,6 +13357,92 @@
           }
         }
       },
+      "ApiResponseRecipientData": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RecipientData"
+          }
+        }
+      },
+      "RecipientData": {
+        "type": "object",
+        "properties": {
+          "transferHoldId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hasSucceededBeforeWindow": {
+            "type": "boolean"
+          },
+          "firstSucceededAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "otherWithdrawalAccountCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseHistoryData": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HistoryData"
+          }
+        }
+      },
+      "HistoryData": {
+        "type": "object",
+        "properties": {
+          "transferHoldId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "HistoryItem": {
+        "type": "object",
+        "properties": {
+          "refId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transferredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recipientAccountMasked": {
+            "type": "string"
+          }
+        }
+      },
       "ApiResponseLoginStatusResponse": {
         "type": "object",
         "properties": {
@@ -12458,6 +13557,7 @@
                 "GL_WRITE",
                 "CUSTOMER_READ",
                 "CUSTOMER_WRITE",
+                "FDS_FRAUD_CONFIRM",
                 "AUDIT_READ",
                 "PAYMENT_STOP_READ",
                 "PAYMENT_STOP_WRITE",
@@ -14020,6 +15120,364 @@
           }
         }
       },
+      "ApiResponseListRiskAccountSummary": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskAccountSummary"
+            }
+          }
+        }
+      },
+      "RiskAccountSummary": {
+        "type": "object",
+        "properties": {
+          "riskAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bankCode": {
+            "type": "string"
+          },
+          "accountNumberMasked": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "evidenceCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AgentFinding": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseRiskAccountDetail": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RiskAccountDetail"
+          }
+        }
+      },
+      "RiskAccountDetail": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/RiskAccountSummary"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskEvidence"
+            }
+          }
+        }
+      },
+      "RiskEvidence": {
+        "type": "object",
+        "properties": {
+          "evidenceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transferHoldId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actionId": {
+            "type": "string"
+          },
+          "investigationId": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "callRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "policyCode": {
+            "type": "string"
+          },
+          "agentFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentFinding"
+            }
+          },
+          "evidenceTransferIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "scoreStatus": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "featureVersion": {
+            "type": "string"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseFdsHoldListPage": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FdsHoldListPage"
+          }
+        }
+      },
+      "FdsHoldListItem": {
+        "type": "object",
+        "description": "관리자 FDS 보류 거래 목록 항목",
+        "properties": {
+          "transferHoldId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "heldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipientBankCode": {
+            "type": "string"
+          },
+          "recipientAccountMasked": {
+            "type": "string"
+          },
+          "policyCode": {
+            "type": "string"
+          },
+          "holdStatus": {
+            "type": "string"
+          },
+          "investigationStatus": {
+            "type": "string"
+          },
+          "behaviorScoreStatus": {
+            "type": "string"
+          },
+          "riskAccountStatus": {
+            "type": "string"
+          },
+          "riskRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "latestCallResult": {
+            "type": "string"
+          },
+          "latestActionStatus": {
+            "type": "string"
+          },
+          "availablePath": {
+            "type": "string"
+          }
+        }
+      },
+      "FdsHoldListPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FdsHoldListItem"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AdminAction": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "actionType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "FAILED",
+              "CONFLICT"
+            ]
+          },
+          "actorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "callRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "riskStatus": {
+            "type": "string"
+          },
+          "riskAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "p4Status": {
+            "type": "string"
+          },
+          "p4ActorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "p4ReasonCode": {
+            "type": "string"
+          },
+          "failureReason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recoveryRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentReport": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string"
+          },
+          "investigationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "secondaryFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "missingInformation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestedQuestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ApiResponseFdsHoldDetail": {
         "type": "object",
         "properties": {
@@ -14034,8 +15492,253 @@
           }
         }
       },
+      "BehaviorScore": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "AVAILABLE",
+              "UNAVAILABLE"
+            ]
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "featureVersion": {
+            "type": "string"
+          },
+          "unavailableReason": {
+            "type": "string"
+          }
+        }
+      },
+      "BehaviorSummary": {
+        "type": "object",
+        "properties": {
+          "backCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amountRevisionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "confirmActiveSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "behaviorScoreStatus": {
+            "type": "string"
+          },
+          "behaviorRiskScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "featureVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "FdsHoldCallRecord": {
+        "type": "object",
+        "properties": {
+          "callRecordId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "callResult": {
+            "type": "string"
+          },
+          "adminId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "investigationReason": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selectedByAction": {
+            "type": "boolean"
+          }
+        }
+      },
       "FdsHoldDetail": {
         "type": "object",
+        "properties": {
+          "transferHoldId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "holdStatus": {
+            "type": "string"
+          },
+          "recipientAccountMasked": {
+            "type": "string"
+          },
+          "investigationStatus": {
+            "type": "string"
+          },
+          "behaviorScoreStatus": {
+            "type": "string"
+          },
+          "behaviorRiskScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "featureVersion": {
+            "type": "string"
+          },
+          "behaviorScoreUnavailableReason": {
+            "type": "string"
+          },
+          "secondaryFindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "originalTransfer": {
+            "$ref": "#/components/schemas/OriginalTransfer"
+          },
+          "serverPolicy": {
+            "$ref": "#/components/schemas/ServerPolicy"
+          },
+          "behaviorSummary": {
+            "$ref": "#/components/schemas/BehaviorSummary"
+          },
+          "behaviorScore": {
+            "$ref": "#/components/schemas/BehaviorScore"
+          },
+          "riskAccountCheck": {
+            "$ref": "#/components/schemas/RiskAccountCheck"
+          },
+          "investigation": {
+            "$ref": "#/components/schemas/Investigation"
+          },
+          "toolResults": {
+            "$ref": "#/components/schemas/ToolResults"
+          },
+          "agentReport": {
+            "$ref": "#/components/schemas/AgentReport"
+          },
+          "callRecords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FdsHoldCallRecord"
+            }
+          },
+          "adminAction": {
+            "$ref": "#/components/schemas/AdminAction"
+          },
+          "riskRegistration": {
+            "$ref": "#/components/schemas/RiskRegistration"
+          }
+        }
+      },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "evidenceTransferIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "HistoryTool": {
+        "type": "object",
+        "properties": {
+          "executed": {
+            "type": "boolean"
+          },
+          "rangeFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rangeTo": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "providedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            }
+          }
+        }
+      },
+      "Investigation": {
+        "type": "object",
+        "properties": {
+          "investigationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": "string"
+          }
+        }
+      },
+      "OriginalTransfer": {
+        "type": "object",
+        "description": "P4 공개 계약에 없는 수취인명은 제공하지 않고 마스킹 계좌만 표시한다.",
         "properties": {
           "transferHoldId": {
             "type": "integer",
@@ -14044,67 +15747,127 @@
           "holdStatus": {
             "type": "string"
           },
+          "heldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "amount": {
             "type": "integer",
             "format": "int64"
           },
+          "recipientBankCode": {
+            "type": "string"
+          },
           "recipientAccountMasked": {
             "type": "string"
           },
-          "serverPolicy": {
-            "$ref": "#/components/schemas/ServerPolicy"
+          "releaseMode": {
+            "type": "string"
           },
-          "behaviorSummary": {},
-          "behaviorScoreStatus": {
+          "processedActorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "completedAt": {
             "type": "string",
-            "description": "보류 후 비동기 점수 상태",
+            "format": "date-time"
+          }
+        }
+      },
+      "RecipientContextTool": {
+        "type": "object",
+        "properties": {
+          "executed": {
+            "type": "boolean"
+          },
+          "firstSucceededAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasSucceededBeforeWindow": {
+            "type": "boolean"
+          },
+          "otherWithdrawalAccountCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "providedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RiskAccountCheck": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
             "enum": [
-              "PENDING",
-              "AVAILABLE",
+              "MATCH",
+              "NO_MATCH",
               "UNAVAILABLE"
             ]
           },
-          "behaviorRiskScore": {
-            "type": [
-              "number",
-              "null"
-            ],
-            "format": "double",
-            "description": "합성 행동 모델의 보조 점수. AVAILABLE일 때만 제공하며 실제 사기 확률이 아님",
-            "maximum": 1,
-            "minimum": 0
+          "riskAccountId": {
+            "type": "integer",
+            "format": "int64"
           },
-          "modelVersion": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "점수를 산출한 모델 버전. AVAILABLE일 때만 제공"
-          },
-          "featureVersion": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "점수에 사용한 피처 버전. AVAILABLE일 때만 제공"
-          },
-          "behaviorScoreUnavailableReason": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "점수 참고 불가 사유. UNAVAILABLE일 때만 제공"
-          },
-          "investigationStatus": {
+          "datasetVersion": {
             "type": "string"
           },
-          "secondaryFindings": {
-            "type": "array",
-            "items": {}
+          "unavailableReason": {
+            "type": "string"
           },
-          "callRecords": {
-            "type": "array",
-            "items": {}
+          "revalidateBeforeAction": {
+            "type": "boolean",
+            "description": "관리자 조치 직전에 활성 데이터셋으로 다시 판정함"
+          }
+        }
+      },
+      "RiskRegistration": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ACTIVE",
+              "FAILED"
+            ]
+          },
+          "riskAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decisionDatasetVersion": {
+            "type": "string"
+          },
+          "datasetVersion": {
+            "type": "string"
+          },
+          "failureReason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recoveryRequired": {
+            "type": "boolean"
           }
         }
       },
@@ -14112,7 +15875,36 @@
         "type": "object",
         "properties": {
           "policyCode": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "A",
+              "B"
+            ]
+          },
+          "count10m": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount10m": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hesitationInWindow": {
+            "type": "boolean"
+          },
+          "newRecipientAtWindowStart": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ToolResults": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "$ref": "#/components/schemas/HistoryTool"
+          },
+          "recipientContext": {
+            "$ref": "#/components/schemas/RecipientContextTool"
           }
         }
       },
@@ -14699,6 +16491,68 @@
           "reversalId": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ApiResponseTerminationPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TerminationPreviewResponse"
+          }
+        }
+      },
+      "TerminationPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "terminationType": {
+            "type": "string",
+            "enum": [
+              "MATURITY",
+              "EARLY_TERMINATION"
+            ]
+          },
+          "withdrawalAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "principal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grossInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tax": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalExpectedAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "calculationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

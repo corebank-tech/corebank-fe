@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { PageShell } from "@/app/page-shell"
 import { InstantTransferScreen } from "@/pages/transfer/instant-transfer-screen"
 import { MOCK_TRANSFER_ACCOUNTS } from "@/entities/transfer"
-import { FDS_BEHAVIOR_SCENARIOS } from "@/entities/fds"
+import { FDS_BEHAVIOR_SCENARIOS } from "@/mocks/fixtures/fds-behavior-scenarios"
 import { WithAuthenticatedPage } from "../../../.storybook/decorators/page-providers"
 
 /**

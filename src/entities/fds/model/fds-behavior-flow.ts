@@ -119,6 +119,9 @@ export const createFdsBehaviorFlow = ({
       append("SUBMIT_REQUESTED", "D-02")
       return true
     },
+    isSubmitted() {
+      return submitted
+    },
     batch(): FdsBehaviorEventBatch {
       return {
         events: [...events],

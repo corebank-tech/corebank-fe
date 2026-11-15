@@ -1,14 +1,15 @@
-import type { FdsDecision } from "@/entities/fds/model/fds-held-transfer-view"
+import type {
+  FdsDecision,
+  FdsGeneralRejectReason,
+} from "@/entities/fds/api/fds-admin-actions"
 
 export type PendingFdsAdminAction = {
-  decision: FdsDecision
+  actionType: FdsDecision
+  reasonCode: FdsGeneralRejectReason | "FRAUD_CONFIRMED" | null
   idempotencyKey: string
-  callRecordIdempotencyKey?: string
 }
-
 const keyOf = (transferHoldId: number) =>
   `corebank:fds-admin-action:${transferHoldId}`
-
 export const readPendingFdsAdminAction = (
   transferHoldId: number,
 ): PendingFdsAdminAction | null => {
@@ -19,7 +20,6 @@ export const readPendingFdsAdminAction = (
     return null
   }
 }
-
 export const writePendingFdsAdminAction = (
   transferHoldId: number,
   pending: PendingFdsAdminAction,
@@ -27,14 +27,13 @@ export const writePendingFdsAdminAction = (
   try {
     sessionStorage.setItem(keyOf(transferHoldId), JSON.stringify(pending))
   } catch {
-    // 저장소를 쓸 수 없으면 현재 요청은 계속하고 서버 상세 재조회로 복원한다.
+    /* 서버 상세이 최종 정본이다. */
   }
 }
-
 export const clearPendingFdsAdminAction = (transferHoldId: number) => {
   try {
     sessionStorage.removeItem(keyOf(transferHoldId))
   } catch {
-    // 서버 상태가 정본이므로 로컬 정리에 실패해도 다음 상세 조회에서 완료로 수렴한다.
+    /* 서버 상태로 수렴한다. */
   }
 }

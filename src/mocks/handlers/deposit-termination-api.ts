@@ -19,10 +19,13 @@ import { readStore, toLocalDateTime, writeStore } from "@/mocks/lib/mock-store"
 import {
   markAccountTerminated,
   readTerminatedAccountIds,
+  recordTerminationPayout,
 } from "@/mocks/lib/terminated-accounts"
 
 const MOCK_LATENCY_MS = 200
 const REPLAYS_KEY = "deposit-termination-replays"
+/** e2e 가 실행 응답을 주입하는 자리. 오류 코드를 담은 배열을 앞에서부터 하나씩 소비한다. */
+const INJECTED_ERRORS_KEY = "termination:injected-errors"
 /** 이자 세율(이자소득세 14% + 지방소득세 1.4%). */
 const INTEREST_TAX_RATE = 0.154
 const MATURITY_ANNUAL_RATE = 0.03
@@ -51,7 +54,6 @@ type TerminationQuote = Required<
  * 같은 멱등키로 다시 보내면 최초 성공 응답을 그대로 돌려준다. 수취 계좌는 입출금
  * 첫 계좌로 고정한다.
  *
- * 계좌 픽스처에는 만기가 지난 계좌가 없어서 만기해지는 이 목으로 화면까지 가지 못한다.
  */
 const quoteTermination = (
   kind: TerminationKind,
@@ -107,11 +109,20 @@ const resolveTarget = (
     }
   }
 
+  // 서버는 날짜와 별개로 계좌 상태도 본다 — 만기해지는 MATURED, 중도해지는 ACTIVE 만 받는다.
   const isMatured = daysBetween(getToday(), item.maturityDate) <= 0
-  if (kind === "maturity" && !isMatured) {
-    return { error: fail("ACC0306", "실제 만기일이 도래하지 않았습니다.", 409) }
-  }
-  if (kind === "early" && isMatured) {
+  if (kind === "maturity") {
+    if (!isMatured) {
+      return {
+        error: fail("ACC0306", "실제 만기일이 도래하지 않았습니다.", 409),
+      }
+    }
+    if (item.status !== "MATURED") {
+      return {
+        error: fail("ACC0301", "계좌 상태가 해지 가능한 상태가 아닙니다.", 409),
+      }
+    }
+  } else if (item.status !== "ACTIVE" || isMatured) {
     return {
       error: fail("ACC0301", "계좌 상태가 해지 가능한 상태가 아닙니다.", 409),
     }
@@ -182,6 +193,15 @@ const executeHandler = (kind: TerminationKind) =>
         )
       }
 
+      const [injectedCode, ...remainingCodes] = readStore<string[]>(
+        INJECTED_ERRORS_KEY,
+        [],
+      )
+      if (injectedCode != null) {
+        writeStore(INJECTED_ERRORS_KEY, remainingCodes)
+        return fail(injectedCode, "주입한 응답", 409)
+      }
+
       const accountId = Number(params.accountId)
       const replays = readStore<Record<string, TerminationReplay>>(
         REPLAYS_KEY,
@@ -231,6 +251,9 @@ const executeHandler = (kind: TerminationKind) =>
       }
 
       markAccountTerminated(accountId)
+      if (result.withdrawalAccountId != null) {
+        recordTerminationPayout(result.withdrawalAccountId, quote.totalAmount)
+      }
       writeStore(REPLAYS_KEY, {
         ...replays,
         [idempotencyKey]: { accountId, kind, response: result },

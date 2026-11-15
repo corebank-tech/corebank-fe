@@ -19,6 +19,31 @@ const DEPOSIT_ACCOUNT_ID = MOCK_ACCOUNT_ITEMS.find(
   (e) => e.account.group === "deposit",
 )!.item.accountId!
 
+/** 만기일이 지나 서버가 MATURED 로 바꿔 둔 예금. 만기해지만 받는다. */
+const MATURED_ACCOUNT_ID = MOCK_ACCOUNT_ITEMS.find(
+  (e) => e.item.status === "MATURED",
+)!.item.accountId!
+
+const maturityTerminate = (
+  accountId: number,
+  idempotencyKey: string,
+  authToken: string,
+) =>
+  request("POST", `/accounts/${accountId}/maturity-termination`, {
+    "Idempotency-Key": idempotencyKey,
+    "Account-Password-Auth-Token": authToken,
+  })
+
+const readAccountBalance = async (accountId: number) => {
+  const overview = await request("GET", "/accounts")
+  const accounts = (
+    overview.body.data.items as {
+      accounts: { accountId: number; balance: number }[]
+    }[]
+  ).flatMap((group) => group.accounts)
+  return accounts.find((a) => a.accountId === accountId)?.balance
+}
+
 type Envelope = { code: string; data: Record<string, unknown> }
 
 const request = async (
@@ -194,5 +219,56 @@ describe("해지 실행", () => {
       { accountPassword: DEPOSIT_PASSWORD },
     )
     expect(verifyClosed.status).toBe(404)
+  })
+})
+
+describe("만기 도래 계좌(MATURED)", () => {
+  it("만기해지 예상이 나오고, 중도해지 예상은 ACC0301(409)이다", async () => {
+    const maturity = await request(
+      "GET",
+      `/accounts/${MATURED_ACCOUNT_ID}/maturity-termination/preview`,
+    )
+    expect(maturity.status).toBe(200)
+    expect(maturity.body.data).toMatchObject({
+      accountId: MATURED_ACCOUNT_ID,
+      terminationType: "MATURITY",
+    })
+
+    const early = await request(
+      "GET",
+      `/accounts/${MATURED_ACCOUNT_ID}/early-termination/preview`,
+    )
+    expect(early.status).toBe(409)
+    expect(early.body.code).toBe("ACC0301")
+  })
+
+  it("만기해지하면 수취 계좌에 지급액이 더해지고, 같은 멱등키 재생은 다시 더하지 않는다", async () => {
+    const preview = await request(
+      "GET",
+      `/accounts/${MATURED_ACCOUNT_ID}/maturity-termination/preview`,
+    )
+    const withdrawalAccountId = preview.body.data.withdrawalAccountId as number
+    const before = await readAccountBalance(withdrawalAccountId)
+
+    const first = await maturityTerminate(
+      MATURED_ACCOUNT_ID,
+      "key-maturity",
+      await issueAuthToken(MATURED_ACCOUNT_ID),
+    )
+    expect(first.status).toBe(200)
+    const totalTransferred = first.body.data.totalTransferred as number
+    expect(await readAccountBalance(withdrawalAccountId)).toBe(
+      before! + totalTransferred,
+    )
+
+    const replay = await maturityTerminate(
+      MATURED_ACCOUNT_ID,
+      "key-maturity",
+      "used-token",
+    )
+    expect(replay.body.data).toEqual(first.body.data)
+    expect(await readAccountBalance(withdrawalAccountId)).toBe(
+      before! + totalTransferred,
+    )
   })
 })

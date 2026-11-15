@@ -10,11 +10,17 @@ import type {
   GroupResponse,
 } from "@/shared/api/generated"
 import { getToday } from "@/shared/config/clock"
+import { daysBetween } from "@/shared/lib/date"
 import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
-import { ok } from "@/mocks/lib/envelope"
-import { readTerminatedAccountIds } from "@/mocks/lib/terminated-accounts"
+import { fail, ok } from "@/mocks/lib/envelope"
+import { readStore } from "@/mocks/lib/mock-store"
+import {
+  readTerminatedAccountIds,
+  readTerminationPayouts,
+} from "@/mocks/lib/terminated-accounts"
 
 const MOCK_LATENCY_MS = 200
+const OVERVIEW_UNAVAILABLE_KEY = "accounts:overview-unavailable"
 
 /**
  * `GET /accounts` 목. 전체계좌조회(B-01)·예적금 계좌조회(B-02)·대시보드(A-09)가
@@ -46,7 +52,12 @@ const toAccountItem = (
   // 정본은 예금과 적금을 구분하지 않는다. 화면들이 보는 것은
   // DEMAND_DEPOSIT 여부뿐이라(B-05 출금계좌 자격) 예적금은 하나로 둔다.
   accountType: account.group === "checking" ? "DEMAND_DEPOSIT" : "TIME_DEPOSIT",
-  status: "ACTIVE",
+  // 만기일이 지난 예적금은 서버가 MATURED 로 바꿔 둔 상태다.
+  status:
+    account.isMaturityDate &&
+    daysBetween(getToday(), account.lastActivityDate) <= 0
+      ? "MATURED"
+      : "ACTIVE",
   balance: account.balance,
   // 정본에 보류액 개념이 없고 전 계좌가 ACTIVE 라 출금가능액은 원장잔액과 같다.
   availableBalance: account.balance,
@@ -92,12 +103,20 @@ export const findMockAccount = (accountId: number, memberId: string) =>
 const buildOverview = (memberId: string): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
     const terminatedIds = readTerminatedAccountIds()
+    const payouts = readTerminationPayouts()
     const accounts = isOwner(memberId)
       ? MOCK_ACCOUNT_ITEMS.filter(
           (entry) =>
             entry.account.group === group.id &&
             !terminatedIds.includes(entry.item.accountId ?? 0),
-        ).map((entry) => entry.item)
+        ).map(({ item }) => {
+          const payout = payouts[item.accountId ?? 0] ?? 0
+          return {
+            ...item,
+            balance: (item.balance ?? 0) + payout,
+            availableBalance: (item.availableBalance ?? 0) + payout,
+          }
+        })
       : []
 
     return {
@@ -124,6 +143,11 @@ export const accountsApiHandlers = [
 
     const memberId = readSignedInMemberId()
     if (memberId == null) return unauthorized()
+
+    // e2e 가 계좌 개요 조회 실패를 재현하는 스위치.
+    if (readStore<boolean>(OVERVIEW_UNAVAILABLE_KEY, false)) {
+      return fail("CMN9999", "일시적인 오류가 발생했습니다.", 500)
+    }
 
     return ok(buildOverview(memberId))
   }),

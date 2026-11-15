@@ -9,6 +9,7 @@ const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
 const DEPOSIT_PASSWORD = "1234"
 const WRONG_PASSWORD = "0000"
 const TARGET_ACCOUNT = "정기예금 1년"
+const MATURED_ACCOUNT = "만기도래 정기예금"
 
 async function login(page: Page) {
   await page.goto("/")
@@ -26,6 +27,9 @@ async function fillAccountPassword(page: Page, password: string) {
 
 const targetRow = (page: Page) =>
   page.getByRole("row", { name: new RegExp(TARGET_ACCOUNT) })
+
+const maturedRow = (page: Page) =>
+  page.getByRole("row", { name: new RegExp(MATURED_ACCOUNT) })
 
 async function openEarlyTermination(page: Page) {
   await page.goto("/accounts/deposits")
@@ -112,4 +116,89 @@ test("해지 뒤 뒤로 가기로 인증 단계가 다시 열리지 않는다", 
   await expect(page.getByRole("button", { name: "중도해지하기" })).toHaveCount(
     0,
   )
+})
+
+test("만기 도래 계좌는 [만기해지]로 주의 확인 없이 완료까지 간다", async ({
+  page,
+}) => {
+  await page.goto("/accounts/deposits")
+  await expect(maturedRow(page).getByText("만기 도달")).toBeVisible()
+  await maturedRow(page).getByRole("button", { name: "만기해지" }).click()
+  await expect(page.getByText("예상 지급액", { exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "다음" }).click()
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "만기해지하기" }).click()
+
+  await expect(page.getByText("만기해지가 완료되었습니다.")).toBeVisible()
+  await page.getByRole("button", { name: "예·적금 계좌목록" }).click()
+  await expect(maturedRow(page)).toHaveCount(0)
+})
+
+test("계좌 개요를 못 받으면 해지 계좌를 확인할 때까지 다음으로 가지 못한다", async ({
+  page,
+}) => {
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "corebank-mock:accounts:overview-unavailable",
+      "true",
+    ),
+  )
+
+  await page.goto("/accounts/deposits/6/termination/early/1")
+
+  await expect(
+    page.getByText("해지 계좌 정보를 확인하지 못했습니다."),
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: "다음" })).toHaveCount(0)
+
+  await page.evaluate(() =>
+    sessionStorage.removeItem("corebank-mock:accounts:overview-unavailable"),
+  )
+  await page.getByRole("button", { name: "다시 시도" }).click()
+
+  await expect(page.getByRole("button", { name: "다음" })).toBeVisible()
+})
+
+test("처리 중(CMN0301) 응답 뒤 재시도는 같은 멱등키를 쓰고, 서버가 거절하면 새 키를 쓴다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (/\/accounts\/\d+\/early-termination$/.test(request.url())) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "corebank-mock:termination:injected-errors",
+      JSON.stringify(["CMN0301", "ACC0301"]),
+    ),
+  )
+
+  await openEarlyTermination(page)
+  await page.getByLabel(/중도해지이율 적용과 해지 후 복구할 수 없음/).check()
+  await page.getByRole("button", { name: "다음" }).click()
+
+  const submit = async () => {
+    await fillAccountPassword(page, DEPOSIT_PASSWORD)
+    await page.getByRole("button", { name: "중도해지하기" }).click()
+  }
+  const closeDialog = () =>
+    page.getByRole("dialog").getByRole("button", { name: "확인" }).click()
+
+  await submit() // CMN0301: 처리 중
+  await expect(page.getByRole("dialog")).toContainText("처리 중")
+  await closeDialog()
+
+  await submit() // 같은 키로 재시도 -> ACC0301: 서버가 거절
+  await expect(page.getByRole("dialog")).toContainText("중도해지 실패")
+  await closeDialog()
+
+  await submit() // 새 키로 재시도 -> 통과
+  await expect(page.getByText("중도해지가 완료되었습니다.")).toBeVisible()
+
+  expect(idempotencyKeys).toHaveLength(3)
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
+  expect(idempotencyKeys[2]).not.toBe(idempotencyKeys[1])
 })

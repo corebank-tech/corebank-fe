@@ -38,14 +38,19 @@ async function fillAccountPassword(page: Page) {
   }
 }
 
-/** D-01 — 은행·계좌를 넣고 계좌확인까지 한다. */
-async function confirmPayee(page: Page, bank: string, accountNo: string) {
-  await page.goto("/instant-transfer")
+/** D-01 — 은행·계좌를 넣고 계좌확인까지 한다. 화면은 이미 열려 있어야 한다. */
+async function fillPayee(page: Page, bank: string, accountNo: string) {
   // 은행 목록 응답이 와야 선택지가 생긴다 — selectOption 이 그때까지 기다린다.
   await page.locator("#it-bank").selectOption({ label: bank })
   await fillAccountPassword(page)
   await page.locator("#it-to").fill(accountNo)
   await page.getByRole("button", { name: "계좌확인" }).click()
+}
+
+/** D-01 — 화면을 새로 열고 은행·계좌를 넣어 계좌확인까지 한다. */
+async function confirmPayee(page: Page, bank: string, accountNo: string) {
+  await page.goto("/instant-transfer")
+  await fillPayee(page, bank, accountNo)
 }
 
 /** D-01 금액 → D-02 확인 → 거래내용 확인 → 계좌비밀번호 → OTP → D-03. */
@@ -157,6 +162,69 @@ test("응답이 유실되면 실패로 단정하지 않고 미확정 결과로 �
   await expect(newTransferButton(page)).toHaveCount(0)
   // 1단계로 되돌리면 금액칸이 다시 보인다. 사라진 문구로 단언하면 무엇을 바꿔도 통과한다.
   await expect(page.locator("#it-amount")).toHaveCount(0)
+})
+
+// 키가 화면 state 에만 있으면 이체결과조회로 갔다 돌아오는 순간 사라지고, 같은 이체가 새 키로
+// 나가 첫 요청이 처리됐다면 이중 출금이 된다(REQ-TRSF-016).
+test("응답이 유실된 뒤 화면을 떠났다 돌아와 같은 이체를 보내면 같은 멱등키를 쓴다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      /\/transfers\/interbank$/.test(request.url())
+    ) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+
+  await confirmPayee(page, OTHER_BANK, INTERBANK.LOST_RESPONSE)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+  await expect(page.getByText("이체 결과를 확인하는 중입니다.")).toBeVisible()
+
+  await page.getByRole("button", { name: "이체결과조회" }).click()
+  // 주소만 바뀌고 이체 화면이 아직 남아 있는 사이에 돌아가면 화면을 떠난 것이 아니다.
+  await expect(
+    page.getByRole("heading", { name: "이체결과조회", level: 1 }),
+  ).toBeVisible()
+
+  // 화면을 새로 열면 목 서버의 처리 기록도 사라진다. 같은 앱 안에서 되돌아온다.
+  await page.goBack()
+  await fillPayee(page, OTHER_BANK, INTERBANK.LOST_RESPONSE)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+
+  await expect(page.getByText("이체가 완료되었습니다.")).toBeVisible()
+  expect(idempotencyKeys).toHaveLength(2)
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
+})
+
+test("응답이 유실된 뒤 내용을 바꿔 보내면 새 멱등키를 쓴다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      /\/transfers\/interbank$/.test(request.url())
+    ) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+
+  await confirmPayee(page, OTHER_BANK, INTERBANK.LOST_RESPONSE)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+  await expect(page.getByText("이체 결과를 확인하는 중입니다.")).toBeVisible()
+
+  await confirmPayee(page, OTHER_BANK, INTERBANK.LOST_RESPONSE)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 40_000)
+
+  await expect.poll(() => idempotencyKeys.length).toBe(2)
+  expect(idempotencyKeys[1]).not.toBe(idempotencyKeys[0])
 })
 
 // 타행은 보낸 뒤 실패하면 출금을 되돌린다 — "거래내역이 변동하지 않는다"는 당행 안내를

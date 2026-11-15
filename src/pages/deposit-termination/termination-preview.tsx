@@ -13,7 +13,7 @@ import {
   parseDepositTerminationKind,
   toDepositTerminationPreview,
   useDepositTerminationPreviewQuery,
-  useOverviewAccount,
+  useOverviewAccountLookup,
   type DepositTerminationKind,
   DEPOSIT_ACCOUNTS_PATH,
   getDepositTerminationPath,
@@ -83,14 +83,15 @@ const TerminationPreviewBody = ({
   const [isCautionChecked, setIsCautionChecked] = React.useState(false)
   const label = TERMINATION_LABELS[kind]
 
-  const { account: productAccount } = useOverviewAccount(accountId)
+  const accountLookup = useOverviewAccountLookup()
   const previewQuery = useDepositTerminationPreviewQuery(accountId, kind)
   const preview = toDepositTerminationPreview(previewQuery.data)
-  const { account: withdrawalAccount } = useOverviewAccount(
+  const productAccount = accountLookup.findAccount(accountId)
+  const withdrawalAccount = accountLookup.findAccount(
     preview?.withdrawalAccountId,
   )
 
-  if (previewQuery.isLoading) {
+  if (previewQuery.isLoading || accountLookup.isLoading) {
     return (
       <div className="py-20 text-center text-ink-muted">
         예상 지급액을 불러오는 중입니다.
@@ -116,6 +117,40 @@ const TerminationPreviewBody = ({
           >
             예·적금 계좌목록
           </Button>
+        }
+      />
+    )
+  }
+
+  // 수취 계좌는 가입 때 정해진 실제 지급 대상이라, 고객이 두 계좌를 모두 확인한 뒤에만 진행한다.
+  if (
+    accountLookup.isError ||
+    productAccount == null ||
+    withdrawalAccount == null
+  ) {
+    return (
+      <EmptyState
+        message="해지 계좌 정보를 확인하지 못했습니다."
+        description="상품 계좌와 수취 계좌를 확인할 수 없어 해지를 진행할 수 없습니다. 다시 시도해 주세요."
+        action={
+          <>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="min-w-40"
+              onClick={() => navigate(DEPOSIT_ACCOUNTS_PATH)}
+            >
+              예·적금 계좌목록
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              className="min-w-40"
+              onClick={() => void accountLookup.refetch()}
+            >
+              다시 시도
+            </Button>
+          </>
         }
       />
     )

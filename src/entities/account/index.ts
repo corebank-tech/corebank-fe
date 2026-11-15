@@ -65,6 +65,7 @@ export {
   toDepositTerminationPreview,
   useDepositTerminationPreviewQuery,
   useOverviewAccount,
+  useOverviewAccountLookup,
   useTerminateDepositMutation,
   type DepositTerminationPreview,
   type DepositTerminationResult,

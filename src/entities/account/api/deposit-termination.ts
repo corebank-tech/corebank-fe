@@ -107,12 +107,24 @@ export const invalidateAccountQueries = (queryClient: QueryClient) =>
     predicate: (query) => isAccountQueryKey(query.queryKey[0]),
   })
 
-/** 전체계좌 개요에서 계좌 ID 로 계좌 하나를 찾는다. */
-export const useOverviewAccount = (accountId: number | null | undefined) => {
-  const { data: overview, isLoading, isError } = useAccountOverviewQuery()
+/** 전체계좌 개요를 한 번 읽고, 계좌 ID 로 계좌를 찾는 함수를 준다. */
+export const useOverviewAccountLookup = () => {
+  const {
+    data: overview,
+    isLoading,
+    isError,
+    refetch,
+  } = useAccountOverviewQuery()
 
   const accounts = overview?.items?.flatMap((group) => group.accounts ?? [])
-  const account = accounts?.find((item) => item.accountId === accountId)
+  const findAccount = (accountId: number | null | undefined) =>
+    accounts?.find((item) => item.accountId === accountId)
 
-  return { account, isLoading, isError }
+  return { findAccount, isLoading, isError, refetch }
+}
+
+export const useOverviewAccount = (accountId: number | null | undefined) => {
+  const { findAccount, isLoading, isError } = useOverviewAccountLookup()
+
+  return { account: findAccount(accountId), isLoading, isError }
 }

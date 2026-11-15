@@ -94,29 +94,42 @@ export const MOCK_ACCOUNT_OWNER_ID = MOCK_MEMBERS.find(
 
 const isOwner = (memberId: string) => memberId === MOCK_ACCOUNT_OWNER_ID
 
+/**
+ * 해지 지급액을 받은 계좌의 현재 잔액. 계좌 개요와 이체 응답처럼 잔액을 말하는 목이 같은 값을
+ * 쓰도록 계좌를 읽는 자리(`findMockAccount`·개요)에서 한 번만 더한다.
+ */
+const withTerminationPayout = (
+  item: AccountItemResponse,
+): AccountItemResponse => {
+  const payout = readTerminationPayouts()[item.accountId ?? 0] ?? 0
+  return {
+    ...item,
+    balance: (item.balance ?? 0) + payout,
+    availableBalance: (item.availableBalance ?? 0) + payout,
+  }
+}
+
 /** 해지로 종료된 계좌는 서버처럼 없는 계좌로 본다. */
-export const findMockAccount = (accountId: number, memberId: string) =>
-  isOwner(memberId) && !readTerminatedAccountIds().includes(accountId)
-    ? MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
-    : undefined
+export const findMockAccount = (accountId: number, memberId: string) => {
+  if (!isOwner(memberId) || readTerminatedAccountIds().includes(accountId)) {
+    return undefined
+  }
+
+  const entry = MOCK_ACCOUNT_ITEMS.find(
+    (candidate) => candidate.item.accountId === accountId,
+  )
+  return entry && { ...entry, item: withTerminationPayout(entry.item) }
+}
 
 const buildOverview = (memberId: string): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
     const terminatedIds = readTerminatedAccountIds()
-    const payouts = readTerminationPayouts()
     const accounts = isOwner(memberId)
       ? MOCK_ACCOUNT_ITEMS.filter(
           (entry) =>
             entry.account.group === group.id &&
             !terminatedIds.includes(entry.item.accountId ?? 0),
-        ).map(({ item }) => {
-          const payout = payouts[item.accountId ?? 0] ?? 0
-          return {
-            ...item,
-            balance: (item.balance ?? 0) + payout,
-            availableBalance: (item.availableBalance ?? 0) + payout,
-          }
-        })
+        ).map(({ item }) => withTerminationPayout(item))
       : []
 
     return {

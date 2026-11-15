@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { MOCK_WITHDRAWAL_ACCOUNTS } from "@/entities/account"
 import { server } from "@/mocks/server"
 import {
   MOCK_ACCOUNT_ITEMS,
@@ -269,6 +270,77 @@ describe("만기 도래 계좌(MATURED)", () => {
     expect(replay.body.data).toEqual(first.body.data)
     expect(await readAccountBalance(withdrawalAccountId)).toBe(
       before! + totalTransferred,
+    )
+  })
+
+  it("지급액을 받은 계좌에서 이체하면 이체 후 잔액이 개요 잔액을 기준으로 계산된다", async () => {
+    const preview = await request(
+      "GET",
+      `/accounts/${MATURED_ACCOUNT_ID}/maturity-termination/preview`,
+    )
+    const withdrawalAccountId = preview.body.data.withdrawalAccountId as number
+    const terminated = await maturityTerminate(
+      MATURED_ACCOUNT_ID,
+      "key-maturity-for-transfer",
+      await issueAuthToken(MATURED_ACCOUNT_ID),
+    )
+    const totalTransferred = terminated.body.data.totalTransferred as number
+    const overviewBalance = await readAccountBalance(withdrawalAccountId)
+
+    const accountNo = MOCK_ACCOUNT_ITEMS.find(
+      (e) => e.item.accountId === withdrawalAccountId,
+    )!.account.accountNo
+    const password = MOCK_WITHDRAWAL_ACCOUNTS.find(
+      (w) => w.accountNo === accountNo,
+    )!.mockPassword
+    const transfer = {
+      withdrawalAccountId,
+      depositAccountNumber: "333330730135",
+      amount: 10_000,
+    }
+    const passwordToken = (
+      await request(
+        "POST",
+        `/accounts/${withdrawalAccountId}/password/verify`,
+        {},
+        { accountPassword: password },
+      )
+    ).body.data.accountPasswordAuthToken as string
+    const issued = (
+      await request(
+        "POST",
+        "/otp/issue",
+        {},
+        { transactionType: "IMMEDIATE_TRANSFER", transactionData: transfer },
+      )
+    ).body.data
+    const otpAuthToken = (
+      await request(
+        "POST",
+        "/otp/verify",
+        {},
+        { otpRequestId: issued.otpRequestId, otpCode: issued.otpCode },
+      )
+    ).body.data.otpAuthToken as string
+
+    const result = await request(
+      "POST",
+      "/transfers",
+      {
+        "Idempotency-Key": "key-transfer-after-payout",
+        "Account-Password-Auth-Token": passwordToken,
+        "Otp-Auth-Token": otpAuthToken,
+      },
+      transfer,
+    )
+
+    expect(result.status).toBe(200)
+    expect(overviewBalance).toBe(
+      MOCK_ACCOUNT_ITEMS.find((e) => e.item.accountId === withdrawalAccountId)!
+        .item.balance! + totalTransferred,
+    )
+    expect(result.body.data.withdrawalBalanceAfter).toBe(
+      overviewBalance! - transfer.amount,
     )
   })
 })

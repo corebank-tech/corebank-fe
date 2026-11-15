@@ -274,6 +274,15 @@ const CurrentScene = ({
   detail: FdsHoldDetail
 }) => {
   const copy = sceneCopy(stage, detail)
+  const activityNotice =
+    stage.state === "recovery"
+      ? "관리자 조치 복구 상태를 확인하고 있습니다."
+      : stage.id === "call"
+        ? "고객 확인 결과 입력을 기다리고 있습니다."
+        : stage.id === "decision"
+          ? "담당자의 최종 조치를 기다리고 있습니다."
+          : "실제 서버 처리 상태를 재조회하고 있습니다."
+  const serverActivity = stage.id !== "call" && stage.id !== "decision"
   const Icon =
     stage.state === "failed"
       ? AlertTriangle
@@ -306,9 +315,19 @@ const CurrentScene = ({
           <p className="mt-2 text-base text-ink-muted">{copy.description}</p>
         </div>
         {(stage.state === "active" || stage.state === "recovery") && (
-          <div className="fds-tool-pulse flex items-center gap-3 border border-primary bg-primary-tint px-5 py-3 text-primary">
-            <Database size={20} />
-            <strong>실제 서버 상태 재조회 중</strong>
+          <div
+            className={`${serverActivity ? "fds-tool-pulse" : ""} flex items-center gap-3 border border-primary bg-primary-tint px-5 py-3 text-primary`}
+          >
+            {serverActivity ? (
+              <Database size={20} />
+            ) : (
+              <span className="fds-wait-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
+            <strong>{activityNotice}</strong>
           </div>
         )}
       </div>

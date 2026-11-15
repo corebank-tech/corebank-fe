@@ -52,4 +52,19 @@ describe("FdsHeldTransferReview", () => {
     )
     expect(container.querySelector("pre")).not.toBeInTheDocument()
   })
+
+  it("고객 확인 단계에서는 서버 재조회가 아니라 관리자 입력 대기를 안내한다", () => {
+    const detail = structuredClone(FDS_ADMIN_SCENARIOS.investigationCompleted)
+    detail.callRecords = []
+    render(<FdsHeldTransferReview detail={detail} />)
+    const notice = screen
+      .getByText("고객 확인 결과 입력을 기다리고 있습니다.")
+      .closest("div")
+    expect(notice).toBeInTheDocument()
+    expect(notice?.querySelector(".fds-wait-dots")).toBeInTheDocument()
+    expect(notice?.querySelector(".lucide-database")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("실제 서버 처리 상태를 재조회하고 있습니다."),
+    ).not.toBeInTheDocument()
+  })
 })

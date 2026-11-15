@@ -153,4 +153,21 @@ export const NAV: NavCategory[] = [
       },
     ],
   },
+  {
+    id: "support",
+    label: "고객센터",
+    groups: [
+      {
+        title: "금융사기 피해",
+        items: [
+          {
+            label: "지급정지 이의제기",
+            // 화면 ID 는 고객 채널 담당과 정하기 전 임시 값이다(PH-14)
+            screenId: "H-01",
+            path: "/support/payment-stops",
+          },
+        ],
+      },
+    ],
+  },
 ]

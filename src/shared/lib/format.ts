@@ -1,3 +1,4 @@
+import { parseISO } from "@/shared/lib/date"
 /**
  * CoreBank display formatters. KRW single currency, Asia/Seoul.
  * Keep all presentation formatting here so components stay pure.
@@ -70,8 +71,12 @@ export function formatAccountNo(raw: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
 function toDate(input: Date | string): Date {
-  return input instanceof Date ? input : new Date(input)
+  if (input instanceof Date) return input
+
+  return DATE_ONLY_PATTERN.test(input) ? parseISO(input) : new Date(input)
 }
 
 function pad(n: number): string {

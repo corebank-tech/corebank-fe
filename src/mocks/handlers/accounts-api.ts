@@ -47,6 +47,8 @@ const toAccountItem = (
   accountType: account.group === "checking" ? "DEMAND_DEPOSIT" : "TIME_DEPOSIT",
   status: "ACTIVE",
   balance: account.balance,
+  // 정본에 보류액 개념이 없고 전 계좌가 ACTIVE 라 출금가능액은 원장잔액과 같다.
+  availableBalance: account.balance,
   openedDate: account.openedDate,
   // 정본은 한 필드(lastActivityDate)에 최근거래일과 만기일을 겸해 담고
   // isMaturityDate 로 구분한다. API 는 두 필드로 갈라져 있다.

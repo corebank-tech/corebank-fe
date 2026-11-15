@@ -10,7 +10,7 @@ import {
 } from "@/widgets/shell"
 import { NoticeBox } from "@/shared/ui/notice-box"
 import { cn } from "@/shared/lib/utils"
-import { useNotifications } from "@/features/notifications"
+import { useUnreadNotificationCountQuery } from "@/entities/notification"
 import { useSession } from "@/features/session"
 
 type PageShellProps = {
@@ -48,7 +48,9 @@ export const PageShell = ({
     extend,
     logout,
   } = useSession()
-  const { unreadCount } = useNotifications()
+  const { unreadCount } = useUnreadNotificationCountQuery({
+    enabled: isAuthenticated,
+  })
 
   const handleLogout = async () => {
     // 서버 세션을 끊고 나서 이동한다. logout 은 실패해도 던지지 않고 상태를 정리한다.

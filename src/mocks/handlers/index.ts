@@ -6,7 +6,12 @@ import { authHandlers } from "@/mocks/handlers/auth"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
 import { infoApiHandlers } from "@/mocks/handlers/info-api"
 import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconciliation-api"
+import { notificationsApiHandlers } from "@/mocks/handlers/notifications-api"
 import { otpApiHandlers } from "@/mocks/handlers/otp-api"
+import { paymentStopAgentApiHandlers } from "@/mocks/handlers/payment-stop-agent-api"
+import { paymentStopApiHandlers } from "@/mocks/handlers/payment-stop-api"
+import { paymentStopReviewApiHandlers } from "@/mocks/handlers/payment-stop-review-api"
+import { paymentStopCustomerApiHandlers } from "@/mocks/handlers/payment-stop-customer-api"
 import { productSubscriptionsApiHandlers } from "@/mocks/handlers/product-subscriptions-api"
 import { productsApiHandlers } from "@/mocks/handlers/products-api"
 import { transferApiHandlers } from "@/mocks/handlers/transfer-api"
@@ -22,10 +27,15 @@ export const handlers = [
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,
   ...transferApiHandlers,
+  ...notificationsApiHandlers,
   ...glApiHandlers,
   ...ledgerReconciliationApiHandlers,
   ...adminCustomersApiHandlers,
   ...infoApiHandlers,
+  ...paymentStopAgentApiHandlers,
+  ...paymentStopReviewApiHandlers,
+  ...paymentStopApiHandlers,
+  ...paymentStopCustomerApiHandlers,
   ...accountHandlers,
   ...authHandlers,
 ]

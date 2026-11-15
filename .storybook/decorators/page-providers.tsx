@@ -4,7 +4,6 @@ import type { InitialEntry } from "react-router"
 import { QueryClientProvider } from "@tanstack/react-query"
 import type { Decorator } from "@storybook/react-vite"
 import { createQueryClient } from "@/shared/api/query-client"
-import { NotificationsProvider } from "@/features/notifications"
 import { SessionProvider, useSession } from "@/features/session"
 
 /**
@@ -47,15 +46,13 @@ function PageProviders({
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <SessionProvider>
-          <NotificationsProvider>
-            {routePattern ? (
-              <Routes>
-                <Route path={routePattern} element={children} />
-              </Routes>
-            ) : (
-              children
-            )}
-          </NotificationsProvider>
+          {routePattern ? (
+            <Routes>
+              <Route path={routePattern} element={children} />
+            </Routes>
+          ) : (
+            children
+          )}
         </SessionProvider>
       </MemoryRouter>
     </QueryClientProvider>

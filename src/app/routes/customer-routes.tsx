@@ -30,6 +30,11 @@ import {
 } from "@/pages/inquiry"
 import { F01Profile } from "@/pages/mypage"
 import {
+  H01MyPaymentStops,
+  H02ObjectionApply,
+  H03ObjectionSupplement,
+} from "@/pages/objection"
+import {
   C01ProductList,
   C02ProductDetail,
   C03Terms,
@@ -296,6 +301,34 @@ const authedRoutes: RouteObject = {
             { path: "product/:productId/join/2", element: <C04InputInfo /> },
             { path: "product/:productId/join/3", element: <C05ConfirmAuth /> },
             { path: "product/:productId/join/4", element: <C06Complete /> },
+          ],
+        },
+      ],
+    },
+    {
+      handle: { crumb: "고객센터", activeId: "support" },
+      children: [
+        {
+          handle: { crumb: "금융사기 피해" },
+          children: [
+            {
+              path: "support/payment-stops",
+              element: <H01MyPaymentStops />,
+              handle: {
+                crumb: "지급정지 이의제기",
+                title: "지급정지 이의제기",
+              },
+            },
+            {
+              path: "support/payment-stops/:caseId/objection",
+              element: <H02ObjectionApply />,
+              handle: { crumb: "이의제기 신청" },
+            },
+            {
+              path: "support/payment-stops/:caseId/supplement",
+              element: <H03ObjectionSupplement />,
+              handle: { crumb: "보완 서류 제출", title: "보완 서류 제출" },
+            },
           ],
         },
       ],

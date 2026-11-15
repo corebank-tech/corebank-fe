@@ -9,7 +9,7 @@ import {
   SESSION_TIMEOUT_SECONDS,
 } from "@/shared/config/policy"
 import { maskName } from "@/shared/lib/format"
-import { readMockAuthority } from "@/mocks/handlers/admin"
+import { readMockAuthority, readMockCustomerId } from "@/mocks/handlers/admin"
 import { fail, ok } from "@/mocks/lib/envelope"
 
 const MOCK_LATENCY_MS = 200
@@ -89,7 +89,7 @@ const login = async (
 
   writeSignedInMemberId(member.memberId)
   return ok({
-    customerId: 1,
+    customerId: readMockCustomerId(member.memberId),
     userName: member.ownerName,
     sessionExpiresAt: new Date(
       Date.now() + timeoutSeconds * 1000,
@@ -120,7 +120,7 @@ export const authHandlers = [
     if (!member) return unauthorized()
 
     return ok({
-      customerId: 1,
+      customerId: readMockCustomerId(member.memberId),
       // 서버는 CustomerInfoResponse.userName 을 마스킹해 내려준다(REQ-CMN-018).
       userName: maskName(member.ownerName),
       userId: member.memberId,

@@ -28,7 +28,7 @@ export const createQueryClient = (): QueryClient =>
         // 10분 자동 로그아웃을 무력화한다. 그래서 전부 끈다.
         refetchOnWindowFocus: false,
         refetchInterval: false,
-        refetchOnReconnect: true,
+        refetchOnReconnect: false,
       },
       mutations: {
         // REQ-CMN-014: 자동 재시도는 멱등키 재사용을 보장할 수 없다. 재시도는 사용자 행위로만.

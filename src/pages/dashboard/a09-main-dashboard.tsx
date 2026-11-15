@@ -10,11 +10,11 @@ import {
   type ShortcutLink,
 } from "@/pages/dashboard/banking-shortcuts"
 import { NotificationSummary } from "@/pages/dashboard/notification-summary"
+import { useLoginStatusQuery } from "@/entities/dashboard"
 import {
-  MOCK_NOTIFICATIONS,
-  useLoginStatusQuery,
-  type NotificationItem,
-} from "@/entities/dashboard"
+  useNotificationInboxQuery,
+  useUnreadNotificationCountQuery,
+} from "@/entities/notification"
 import {
   useInquirableAccounts,
   type InquirableAccount,
@@ -22,6 +22,7 @@ import {
 import { toErrorMessage } from "@/shared/api/api-error"
 import { useSession } from "@/features/session"
 import { formatAccountNo, formatAmount, formatDate } from "@/shared/lib/format"
+import { QUERY_DEFAULT_PAGE_SIZE } from "@/shared/config/policy"
 
 const ACCOUNT_COLUMN_WIDTHS = {
   alias: 140,
@@ -40,8 +41,11 @@ const SUMMARY_LABEL_WIDTH =
   ACCOUNT_COLUMN_WIDTHS.lastTxDate +
   ACCOUNT_COLUMN_WIDTHS.balance
 
+/** 미읽음이 남아 있지만 최근 알림 첫 페이지에는 없을 때. 요약이 "없음"으로 읽히지 않게 알림함으로 보낸다. */
+const UNREAD_OUTSIDE_RECENT_MESSAGE =
+  "최근 알림에는 미읽음 알림이 없습니다. 알림함에서 전체 알림을 확인하세요."
+
 type A09MainDashboardProps = {
-  notifications?: NotificationItem[]
   shortcuts?: ShortcutLink[]
   onInquiry?: (accountId: number) => void
   onTransfer?: (accountId: number) => void
@@ -51,7 +55,6 @@ type A09MainDashboardProps = {
 }
 
 export const A09MainDashboard = ({
-  notifications = MOCK_NOTIFICATIONS,
   shortcuts,
   onInquiry,
   onTransfer,
@@ -63,6 +66,21 @@ export const A09MainDashboard = ({
   // REQ-CMN-024 ①: 인사말은 로그인한 고객이어야 한다. 헤더와 같은 출처를 쓴다.
   const { customerName } = useSession()
   const loginStatus = useLoginStatusQuery()
+  const { unreadCount } = useUnreadNotificationCountQuery({ enabled: true })
+  const {
+    inboxPage: latestNotifications,
+    isError: isNotificationsError,
+    error: notificationsError,
+  } = useNotificationInboxQuery({ page: 1, size: QUERY_DEFAULT_PAGE_SIZE })
+  const unreadNotifications = (latestNotifications?.notifications ?? []).filter(
+    (notification) => !notification.isRead,
+  )
+  const notificationSummaryEmptyMessage = (() => {
+    if (isNotificationsError) return toErrorMessage(notificationsError) ?? ""
+    if (unreadCount != null && unreadCount > 0)
+      return UNREAD_OUTSIDE_RECENT_MESSAGE
+    return undefined
+  })()
 
   const {
     accounts: inquirableAccounts,
@@ -264,7 +282,9 @@ export const A09MainDashboard = ({
 
       {/* [4] 미읽음 알림 */}
       <NotificationSummary
-        items={notifications}
+        items={unreadNotifications}
+        totalCount={unreadCount}
+        emptyMessage={notificationSummaryEmptyMessage}
         onOpenInbox={handleOpenInbox}
       />
     </div>

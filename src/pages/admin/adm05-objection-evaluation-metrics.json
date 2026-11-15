@@ -1,0 +1,203 @@
+{
+  "evaluatedOn": "2026-11-05",
+  "scenarioCount": 24,
+  "source": "corebank-objection-agent docs/results/261105 metrics.json, performance.md",
+  "structural": {
+    "fraudCases": 7,
+    "fraudReleasableByGate": 0,
+    "fraudReleasableByDocumentsOnly": 7,
+    "normalCases": 7,
+    "gateOpensAcceptButStatementContradicts": 5
+  },
+  "consistency": {
+    "k": 24,
+    "n": 24,
+    "ci95": [0.862, 1]
+  },
+  "models": [
+    {
+      "id": "claude-opus",
+      "label": "Opus 5.5",
+      "repetitions": 3,
+      "accuracy": {
+        "k": 69,
+        "n": 72,
+        "ci95": [0.885, 0.986]
+      },
+      "gateAgreement": {
+        "k": 60,
+        "n": 72,
+        "ci95": [0.731, 0.902]
+      },
+      "falseAccept": {
+        "k": 3,
+        "n": 51,
+        "ci95": [0.02, 0.159]
+      },
+      "fraudMissed": {
+        "k": 0,
+        "n": 21,
+        "ci95": [0, 0.155]
+      },
+      "contradictionRecallGatePasses": {
+        "k": 15,
+        "n": 15,
+        "ci95": [0.796, 1]
+      },
+      "quoteFidelity": {
+        "k": 158,
+        "n": 158,
+        "ci95": [0.976, 1]
+      },
+      "unseenEvidenceRuns": {
+        "k": 0,
+        "n": 72,
+        "ci95": [0, 0.051]
+      },
+      "costUsdMean": 0.0401,
+      "costPerCorrectUsd": 0.0419,
+      "secondsMedian": 16.7,
+      "secondsP90": 20.3,
+      "runs": 72,
+      "failedRuns": 0
+    },
+    {
+      "id": "claude-sonnet",
+      "label": "Sonnet 5.5",
+      "repetitions": 1,
+      "accuracy": {
+        "k": 23,
+        "n": 24,
+        "ci95": [0.798, 0.993]
+      },
+      "gateAgreement": {
+        "k": 18,
+        "n": 24,
+        "ci95": [0.551, 0.88]
+      },
+      "falseAccept": {
+        "k": 0,
+        "n": 17,
+        "ci95": [0, 0.184]
+      },
+      "fraudMissed": {
+        "k": 1,
+        "n": 7,
+        "ci95": [0.026, 0.513]
+      },
+      "contradictionRecallGatePasses": {
+        "k": 5,
+        "n": 5,
+        "ci95": [0.566, 1]
+      },
+      "quoteFidelity": {
+        "k": 51,
+        "n": 51,
+        "ci95": [0.93, 1]
+      },
+      "unseenEvidenceRuns": {
+        "k": 0,
+        "n": 24,
+        "ci95": [0, 0.138]
+      },
+      "costUsdMean": 0.0197,
+      "costPerCorrectUsd": 0.0206,
+      "secondsMedian": 11.9,
+      "secondsP90": 14.6,
+      "runs": 24,
+      "failedRuns": 0
+    },
+    {
+      "id": "claude-haiku",
+      "label": "Haiku 5.5",
+      "repetitions": 1,
+      "accuracy": {
+        "k": 23,
+        "n": 24,
+        "ci95": [0.798, 0.993]
+      },
+      "gateAgreement": {
+        "k": 18,
+        "n": 24,
+        "ci95": [0.551, 0.88]
+      },
+      "falseAccept": {
+        "k": 0,
+        "n": 17,
+        "ci95": [0, 0.184]
+      },
+      "fraudMissed": {
+        "k": 1,
+        "n": 7,
+        "ci95": [0.026, 0.513]
+      },
+      "contradictionRecallGatePasses": {
+        "k": 5,
+        "n": 5,
+        "ci95": [0.566, 1]
+      },
+      "quoteFidelity": {
+        "k": 61,
+        "n": 61,
+        "ci95": [0.941, 1]
+      },
+      "unseenEvidenceRuns": {
+        "k": 0,
+        "n": 24,
+        "ci95": [0, 0.138]
+      },
+      "costUsdMean": 0.0017,
+      "costPerCorrectUsd": 0.0018,
+      "secondsMedian": 14.6,
+      "secondsP90": 17.7,
+      "runs": 24,
+      "failedRuns": 0
+    },
+    {
+      "id": "scripted",
+      "label": "규칙 분석기(키워드)",
+      "repetitions": 1,
+      "accuracy": {
+        "k": 17,
+        "n": 24,
+        "ci95": [0.508, 0.851]
+      },
+      "gateAgreement": {
+        "k": 22,
+        "n": 24,
+        "ci95": [0.742, 0.977]
+      },
+      "falseAccept": {
+        "k": 7,
+        "n": 17,
+        "ci95": [0.216, 0.64]
+      },
+      "fraudMissed": {
+        "k": 0,
+        "n": 7,
+        "ci95": [0, 0.354]
+      },
+      "contradictionRecallGatePasses": {
+        "k": 0,
+        "n": 5,
+        "ci95": [0, 0.434]
+      },
+      "quoteFidelity": {
+        "k": 51,
+        "n": 51,
+        "ci95": [0.93, 1]
+      },
+      "unseenEvidenceRuns": {
+        "k": 0,
+        "n": 24,
+        "ci95": [0, 0.138]
+      },
+      "costUsdMean": 0.0,
+      "costPerCorrectUsd": 0.0,
+      "secondsMedian": 0.2,
+      "secondsP90": 0.4,
+      "runs": 24,
+      "failedRuns": 0
+    }
+  ]
+}

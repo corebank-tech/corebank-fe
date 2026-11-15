@@ -83,6 +83,23 @@ export const MOCK_MEMBERS: Member[] = [
     email: "minjun@corebank.example.com",
     loginPassword: "Corebank3!",
   },
+  /**
+   * 지급정지 판정 승인 관리자(계약 v2 §3 로컬 시드 `adminapprover`). 조회와 승인 권한만
+   * 갖는다. 작성자와 승인자가 달라야 하는 2인 승인을 서버 없이 확인할 계정이다.
+   *
+   * `accountNo` 는 다른 픽스처와 겹치지 않는 번호다 — 위 김다연 항목의 주석 참고.
+   */
+  {
+    accountNo: "606334455667",
+    ownerName: "최승인",
+    birth: "880920",
+    accountPassword: "3333",
+    errorCount: 0,
+    status: "정상",
+    memberId: "adminapprover",
+    email: "approver@corebank.example.com",
+    loginPassword: "Admin1234!",
+  },
 ]
 
 /** REQ-AUTH-003·004: 회원가입 1단계 약관(필수 2종). */

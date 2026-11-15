@@ -11,6 +11,10 @@ export default defineConfig({
   use: {
     baseURL: DEV_SERVER_URL,
     trace: "on-first-retry",
+    // 화면 시각의 기준은 KST 하나다. 목이 내려주는 시각에 +09:00 오프셋이 박혀 있고
+    // formatDateTime 은 브라우저 로컬 타임존으로 렌더하므로, 못박지 않으면 UTC 로 도는
+    // CI 러너에서만 9시간 밀린 값이 나와 기대값이 어긋난다.
+    timezoneId: "Asia/Seoul",
   },
   webServer: {
     // 로그인이 서버 API 라 mock 없이는 e2e 가 실서버 세션을 요구한다.

@@ -359,3 +359,20 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+/* AI 분석 실행 타임라인(shared/ui/agent-run-timeline)에서 새 단계가 붙을 때 쓴다.
+   동작 줄이기 설정을 켠 사용자에게는 움직이지 않는다. */
+@theme {
+  --animate-step-in: step-in 0.35s ease-out both;
+
+  @keyframes step-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

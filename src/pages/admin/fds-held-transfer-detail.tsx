@@ -23,6 +23,7 @@ import { Panel, PanelHeader } from "@/shared/ui/panel"
 import { Select } from "@/shared/ui/select"
 import { formatAmount, formatDateTime } from "@/shared/lib/format"
 import type { FdsHoldDetail } from "@/shared/api/generated"
+import { FdsHeldTransferReview } from "@/pages/admin/fds-held-transfer-review"
 
 const decisionLabel: Record<FdsDecision, string> = {
   APPROVE: "승인",
@@ -527,12 +528,22 @@ export const FdsHeldTransferDetail = () => {
   }
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-ink-muted">
-            사건 ID {detail.transferHoldId}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-ink-muted">
+              사건 ID {detail.transferHoldId}
+            </p>
+            <Badge variant="warning">{detail.holdStatus ?? "보류"}</Badge>
+            <Badge variant="neutral">
+              정책 {detail.serverPolicy?.policyCode ?? "-"}
+            </Badge>
+          </div>
+          <h2 className="mt-1 text-page font-bold">보류 사건 조사 상세</h2>
+          <p className="text-sm mt-2 text-ink-muted">
+            {formatAmount(detail.amount ?? 0)} · 수취계좌{" "}
+            {detail.recipientAccountMasked ?? "-"}
           </p>
-          <h2 className="text-page font-bold">보류 사건 조사 상세</h2>
         </div>
         <Button
           variant="secondary"
@@ -550,21 +561,7 @@ export const FdsHeldTransferDetail = () => {
           거절만 가능합니다.
         </div>
       )}
-      <Panel className="p-5">
-        <PanelHeader title="사건 요약" />
-        <div className="mt-3">
-          <LabelValueRow label="보류 상태" value={detail.holdStatus ?? "-"} />
-          <LabelValueRow
-            label="금액"
-            value={`${(detail.amount ?? 0).toLocaleString()}원`}
-          />
-          <LabelValueRow
-            label="수취계좌"
-            value={detail.recipientAccountMasked ?? "-"}
-          />
-          <LabelValueRow label="위험계좌 판정" value={risk ?? "-"} />
-        </div>
-      </Panel>
+      <FdsHeldTransferReview detail={detail} />
       <DetailInformation detail={detail} />
       <Panel className="p-5">
         <PanelHeader title="고객 확인 결과 기록" />

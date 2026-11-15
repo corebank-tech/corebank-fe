@@ -27,12 +27,17 @@
   background: var(--color-primary);
 }
 
-.fds-step-item[data-state="upcoming"] {
+.fds-step-item[data-state="waiting"] {
   opacity: 0.5;
 }
 
 .fds-step-item[data-state="active"] {
   background: var(--color-primary-tint);
+}
+
+.fds-step-item[data-state="failed"],
+.fds-step-item[data-state="recovery"] {
+  background: var(--color-danger-tint);
 }
 
 .fds-step-dot {
@@ -66,6 +71,12 @@
 .fds-step-item[data-state="active"][data-actor="HUMAN"] .fds-step-dot {
   border-color: var(--color-warning);
   color: var(--color-warning);
+}
+
+.fds-step-item[data-state="failed"] .fds-step-dot,
+.fds-step-item[data-state="recovery"] .fds-step-dot {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .fds-step-item strong,

@@ -1,6 +1,6 @@
 import type { FdsHoldDetail, FdsHoldListItem } from "@/shared/api/generated"
 
-const base = (
+export const createFdsAdminDetail = (
   id: number,
   risk: "MATCH" | "NO_MATCH" | "UNAVAILABLE",
 ): FdsHoldDetail => ({
@@ -55,7 +55,23 @@ const base = (
       executed: true,
       hasMore: false,
       providedAt: "2026-11-15T09:13:00+09:00",
-      items: [],
+      items:
+        id === 102
+          ? [
+              {
+                refId: 9001,
+                amount: 500_000,
+                transferredAt: "2026-11-15T09:04:00+09:00",
+                recipientAccountMasked: "110-***-123456",
+              },
+              {
+                refId: 9002,
+                amount: 700_000,
+                transferredAt: "2026-11-15T09:08:00+09:00",
+                recipientAccountMasked: "110-***-123456",
+              },
+            ]
+          : [],
     },
     recipientContext: {
       executed: true,
@@ -87,10 +103,66 @@ const base = (
 })
 
 export const FDS_ADMIN_DETAILS: Record<number, FdsHoldDetail> = {
-  101: base(101, "MATCH"),
-  102: base(102, "NO_MATCH"),
-  103: base(103, "UNAVAILABLE"),
+  101: createFdsAdminDetail(101, "MATCH"),
+  102: createFdsAdminDetail(102, "NO_MATCH"),
+  103: createFdsAdminDetail(103, "UNAVAILABLE"),
 }
+
+const withInvestigation = (
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED",
+): FdsHoldDetail => {
+  const detail = structuredClone(createFdsAdminDetail(201, "NO_MATCH"))
+  detail.investigation = {
+    ...detail.investigation,
+    status,
+    failureReason: status === "FAILED" ? "조사 서비스 응답 실패" : undefined,
+  }
+  detail.agentReport =
+    status === "COMPLETED"
+      ? detail.agentReport
+      : {
+          ...detail.agentReport,
+          status: status === "FAILED" ? "FAILED" : "PENDING",
+        }
+  if (status === "PENDING") detail.toolResults = undefined
+  if (status === "RUNNING") {
+    detail.toolResults = {
+      history: { executed: true, hasMore: false, items: [] },
+      recipientContext: { executed: false },
+    }
+  }
+  return detail
+}
+
+const withAdminAction = (
+  status: "PENDING" | "COMPLETED" | "FAILED" | "CONFLICT",
+  recoveryRequired = false,
+): FdsHoldDetail => ({
+  ...createFdsAdminDetail(205, "NO_MATCH"),
+  adminAction: {
+    actionId: `mock-${status.toLowerCase()}`,
+    actionType: "REJECT",
+    reasonCode: "CUSTOMER_DENIED",
+    status,
+    recoveryRequired,
+    failureReason: status === "FAILED" ? "관리자 조치 처리 실패" : undefined,
+  },
+})
+
+export const FDS_ADMIN_SCENARIOS = {
+  investigationPending: withInvestigation("PENDING"),
+  investigationRunning: withInvestigation("RUNNING"),
+  investigationCompleted: withInvestigation("COMPLETED"),
+  investigationFailed: withInvestigation("FAILED"),
+  riskMatch: createFdsAdminDetail(202, "MATCH"),
+  riskNoMatch: createFdsAdminDetail(203, "NO_MATCH"),
+  riskUnavailable: createFdsAdminDetail(204, "UNAVAILABLE"),
+  actionPending: withAdminAction("PENDING"),
+  actionCompleted: withAdminAction("COMPLETED"),
+  actionFailed: withAdminAction("FAILED"),
+  actionConflict: withAdminAction("CONFLICT"),
+  actionRecovery: withAdminAction("PENDING", true),
+} satisfies Record<string, FdsHoldDetail>
 export const FDS_ADMIN_LIST: FdsHoldListItem[] = Object.values(
   FDS_ADMIN_DETAILS,
 ).map((detail) => ({

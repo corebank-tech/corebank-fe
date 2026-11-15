@@ -16,6 +16,7 @@ import {
   type Action,
 } from "@/shared/api/generated"
 import { withIdempotencyKey } from "@/shared/api/custom-fetch"
+import { shouldPollFdsHoldDetail } from "@/entities/fds/model/fds-review-stages"
 
 export const FDS_ACCESS_REASON = "INCIDENT"
 const readOptions = { headers: { "X-Access-Reason": FDS_ACCESS_REASON } }
@@ -39,8 +40,11 @@ export const useFdsHeldTransferDetail = (transferHoldId: number) =>
   useGetFdsHeldTransferDetail(transferHoldId, {
     query: {
       enabled: Number.isSafeInteger(transferHoldId) && transferHoldId > 0,
+      refetchInterval: (query) =>
+        shouldPollFdsHoldDetail(query.state.data) ? 3_000 : false,
     },
-    request: readOptions,
+    // 진행 상태 폴링은 관리자 유휴시간을 연장하지 않는다.
+    request: { ...readOptions, background: true },
   })
 export const fetchFdsHeldTransfers = (params: GetFdsHeldTransfersParams) =>
   getFdsHeldTransfers(params, readOptions)

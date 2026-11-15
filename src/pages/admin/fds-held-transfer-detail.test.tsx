@@ -32,6 +32,9 @@ describe("FdsHeldTransferDetail", () => {
     renderPage()
     expect(await screen.findByText("사건 ID 102")).toBeInTheDocument()
     expect(screen.getAllByText(/고객 부인/).length).toBeGreaterThan(0)
+    expect(screen.getByText("10분 이체 건수")).toBeInTheDocument()
+    expect(screen.getByText("확인 화면 복귀")).toBeInTheDocument()
+    expect(screen.queryByText(/"backCount"/)).not.toBeInTheDocument()
   })
 
   it("NO_MATCH의 최신 고객 부인 결과에는 두 거절 조치만 허용한다", async () => {
@@ -66,7 +69,7 @@ describe("FdsHeldTransferDetail", () => {
     const view = renderPage()
     fireEvent.click(await screen.findByRole("button", { name: "일반 거절" }))
     fireEvent.click(screen.getByRole("button", { name: "조치 실행" }))
-    await screen.findByText("COMPLETED")
+    expect((await screen.findAllByText("COMPLETED")).length).toBeGreaterThan(0)
     view.unmount()
     renderPage()
     await waitFor(() =>

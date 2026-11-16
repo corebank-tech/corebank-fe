@@ -7,7 +7,7 @@ import { EmptyState } from "@/shared/ui/empty-state"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { FormSection } from "@/shared/ui/form-section"
 import { StepLayout } from "@/shared/ui/step-layout"
-import { ApiError } from "@/shared/api/api-error"
+import { ApiError, NETWORK_ERROR_CODE } from "@/shared/api/api-error"
 import { AccountPasswordField } from "@/widgets/transfer"
 import {
   clearPendingTerminationKey,
@@ -106,6 +106,8 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
   const [passwordError, setPasswordError] = React.useState<string | null>(null)
   const [failure, setFailure] = React.useState<TerminationFailure | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  // 같은 틱에 두 번 눌리면 state 는 아직 false 라서 별도로 막는다.
+  const isSubmittingRef = React.useRef(false)
 
   const { account: productAccount } = useOverviewAccount(accountId)
   const { verify } = useAccountPasswordVerification()
@@ -121,6 +123,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
       })
 
       clearPendingTerminationKey(accountId, kind)
+      void invalidateAccountQueries(queryClient)
       const completeState: TerminationCompleteState = { result }
       // 뒤로 가기로 인증 단계가 다시 열려 이미 끝난 해지를 재요청하지 않도록 이력을 바꾼다.
       navigate(getDepositTerminationPath(accountId, kind, 3), {
@@ -128,14 +131,18 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
         replace: true,
       })
     } catch (error) {
-      // 서버가 4xx 로 거절한 요청만 처리되지 않았다고 본다. 응답을 받지 못한 요청, 5xx, 처리 중인
-      // 요청은 서버가 끝냈는지 알 수 없어 키를 유지한 채 재시도하게 둔다(인계 문서 §6).
+      // 서버가 봉투로 4xx 를 돌려준 요청만 처리되지 않았다고 본다. 응답을 받지 못한 요청, 5xx,
+      // 게이트웨이 시간 초과(408·429), 처리 중인 요청은 서버가 끝냈는지 알 수 없어 키를 유지한 채
+      // 재시도하게 둔다(인계 문서 §6).
       const isInProgress =
         error instanceof ApiError && error.code === IN_PROGRESS_CODE
       const isRejected =
         error instanceof ApiError &&
+        error.code !== NETWORK_ERROR_CODE &&
         error.status >= 400 &&
         error.status < 500 &&
+        error.status !== 408 &&
+        error.status !== 429 &&
         !isInProgress
       if (isRejected) clearPendingTerminationKey(accountId, kind)
       setFailure(
@@ -150,7 +157,6 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
       )
     } finally {
       terminateMutation.reset()
-      void invalidateAccountQueries(queryClient)
     }
   }
 
@@ -159,7 +165,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
    * 상태에 남기지 않고 이 함수 안에서만 들고 있다.
    */
   const handleTerminate = async () => {
-    if (isSubmitting) return
+    if (isSubmittingRef.current) return
 
     if (password.length !== PASSWORD_LIMIT) {
       setPasswordError("상품 계좌 비밀번호 4자리를 모두 입력하세요.")
@@ -167,6 +173,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
     }
 
     setPasswordError(null)
+    isSubmittingRef.current = true
     setIsSubmitting(true)
 
     try {
@@ -183,6 +190,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
 
       await executeTermination(verification.token)
     } finally {
+      isSubmittingRef.current = false
       setIsSubmitting(false)
     }
   }

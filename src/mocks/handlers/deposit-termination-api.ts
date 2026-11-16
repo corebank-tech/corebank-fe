@@ -46,15 +46,7 @@ type TerminationQuote = Required<
   >
 > & { totalAmount: number }
 
-/**
- * 예·적금 만기해지·중도해지 MSW 목 — 예상 조회와 실행.
- *
- * 서버 규칙을 따른다. 만기해지는 만기일이 지난(MATURED) 계좌만, 중도해지는 만기 전
- * ACTIVE 계좌만 받고, 실행은 멱등키와 계좌비밀번호 인증 토큰이 모두 있어야 한다.
- * 같은 멱등키로 다시 보내면 최초 성공 응답을 그대로 돌려준다. 수취 계좌는 입출금
- * 첫 계좌로 고정한다.
- *
- */
+/** 해지 유형별 이자·세금 견적. 서버 계산을 흉내 낸 단순 단리다. */
 const quoteTermination = (
   kind: TerminationKind,
   balance: number,
@@ -262,6 +254,14 @@ const executeHandler = (kind: TerminationKind) =>
     },
   )
 
+/**
+ * 예·적금 만기해지·중도해지 MSW 목 — 예상 조회와 실행.
+ *
+ * 서버 규칙을 따른다. 만기해지는 만기일이 지난(MATURED) 계좌만, 중도해지는 만기 전
+ * ACTIVE 계좌만 받고, 실행은 멱등키와 계좌비밀번호 인증 토큰이 모두 있어야 한다.
+ * 같은 멱등키로 다시 보내면 최초 성공 응답을 그대로 돌려준다. 수취 계좌는 입출금
+ * 첫 계좌로 고정한다.
+ */
 export const depositTerminationApiHandlers = [
   previewHandler("maturity"),
   previewHandler("early"),

@@ -35,7 +35,7 @@ export const FormRow = ({
       >
         <label
           htmlFor={htmlFor}
-          className="flex items-center gap-1 text-base leading-[1.5] font-bold text-ink"
+          className="flex items-center gap-1 text-base leading-[1.5] font-bold break-keep text-ink"
         >
           {required && (
             <span className="text-2xs leading-[1.5] font-bold whitespace-nowrap text-danger">

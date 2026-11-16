@@ -16,7 +16,10 @@ import {
   useRegisterFavoriteAccountMutation,
   useTransferLimitQuery,
   isConfirmedTransferStatus,
+  clearPendingTransferKey,
   isSameTransferIntent,
+  readPendingTransferKey,
+  writePendingTransferKey,
   toOtpTransactionData,
   getTransferLimitQueryKey,
   type TransferIntent,
@@ -28,7 +31,12 @@ import {
   useVerifyAccountPasswordMutation,
 } from "@/entities/account"
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
-import { ApiError, toErrorMessage } from "@/shared/api/api-error"
+import {
+  ApiError,
+  isRequestInProgressError,
+  isUnknownOutcomeError,
+  toErrorMessage,
+} from "@/shared/api/api-error"
 import { TransferResponseStatus } from "@/entities/transfer"
 import { FREQUENT_TRANSFER_ACCOUNT_MAX } from "@/shared/config/policy"
 import {
@@ -153,10 +161,23 @@ export const InstantTransferScreen = () => {
   const [passwordAuthToken, setPasswordAuthToken] = React.useState<
     string | null
   >(null)
-  const [idempotencyKey, setIdempotencyKey] = React.useState("")
-  const [keyedIntent, setKeyedIntent] = React.useState<TransferIntent | null>(
-    null,
+  // 응답을 못 받은 이체의 키는 화면을 떠났다 돌아와도 이어 쓴다(REQ-TRSF-016).
+  const [idempotencyKey, setIdempotencyKey] = React.useState(
+    () => readPendingTransferKey()?.idempotencyKey ?? "",
   )
+  const [keyedIntent, setKeyedIntent] = React.useState<TransferIntent | null>(
+    () => readPendingTransferKey()?.intent ?? null,
+  )
+  const rememberTransferKey = (key: string, intent: TransferIntent) => {
+    setIdempotencyKey(key)
+    setKeyedIntent(intent)
+    writePendingTransferKey({ idempotencyKey: key, intent })
+  }
+  const forgetTransferKey = () => {
+    setIdempotencyKey("")
+    setKeyedIntent(null)
+    clearPendingTransferKey()
+  }
 
   // "아직 모른다" 와 "한도가 0원이다" 를 같은 값으로 만들면 조회 실패가 그대로 굳어
   // [다음]이 영영 안 눌리고 "금액을 낮추라"는 틀린 안내만 남는다.
@@ -360,8 +381,7 @@ export const InstantTransferScreen = () => {
         // 서버가 앞선 거래의 결과를 돌려주고 화면은 바뀐 내용으로 이체된 것처럼
         // 표시한다.
         if (!isSameTransferIntent(keyedIntent, currentIntent)) {
-          setIdempotencyKey(crypto.randomUUID())
-          setKeyedIntent(currentIntent)
+          rememberTransferKey(crypto.randomUUID(), currentIntent)
         }
         setOtpOpen(true)
       } catch (error) {
@@ -471,21 +491,45 @@ export const InstantTransferScreen = () => {
           queryKey: getAccountOverviewQueryKey(),
         })
       } catch (error) {
-        // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이라, 여기서 2단계에
-        // 머무르면 다음 시도가 빈 비밀번호로 나간다.
-        setAuthError(
-          error instanceof ApiError
-            ? error.message
-            : "이체 실행에 실패했습니다. 계좌비밀번호를 다시 입력해 주세요.",
-        )
         setPasswordAuthToken(null)
+
+        // 응답을 못 받으면 서버가 처리했는지 모른다. 실패로 단정해 1단계로 되돌리면 고객이
+        // 화면을 떠나 멱등키를 잃고 같은 이체가 새 키로 다시 나간다(REQ-TRSF-016).
+        // PROCESSING·TIMEOUT 과 같은 미확정 화면으로 보내고 멱등키는 지우지 않는다.
+        if (!(error instanceof ApiError) || isUnknownOutcomeError(error)) {
+          setResult({
+            status: undefined,
+            payeeBankCode: currentIntent.payeeBankCode,
+            // 서버가 아무 값도 주지 않았다. 거래번호·거래일시·잔액을 만들어내면 처리되지
+            // 않은 이체를 끝난 것처럼 보여준다(REQ-TRSF-017·018).
+            row: {
+              transactionId: "-",
+              processedAt: "",
+              fromAccountNo: displayForm.fromAccount,
+              toAccountNo: form.toAccount,
+              payeeName: form.payeeName,
+              amount,
+              fee: 0,
+              memo: form.payeeMemo || "-",
+              balanceAfter: 0,
+            },
+            failReason: isRequestInProgressError(error)
+              ? "같은 이체 요청이 아직 처리 중입니다. 이체결과조회에서 처리 상태를 확인하세요."
+              : "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+          })
+          setStep(3)
+          return
+        }
+
+        // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이다. 세션만료는
+        // toErrorMessage 가 null 을 줘 A-11 모달과 문구가 겹치지 않는다.
+        setAuthError(toErrorMessage(error))
         setStep(1)
         return
       }
       // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 으로 답했으면 요청이 접수된 것이다.
       // 다음 이체는 새 키를 쓴다.
-      setIdempotencyKey("")
-      setKeyedIntent(null)
+      forgetTransferKey()
       setPasswordAuthToken(null)
       setStep(3)
     }
@@ -699,8 +743,7 @@ export const InstantTransferScreen = () => {
           setResult(null)
           setAuthError(null)
           setFavoriteError(null)
-          setIdempotencyKey("")
-          setKeyedIntent(null)
+          forgetTransferKey()
           setStep(1)
         }}
         resultSlot={

@@ -56,6 +56,7 @@ const ReservedTransferStep1Demo = () => {
       onChange={setField}
       today={getToday()}
       perTransferLimit={perTransferLimit}
+      isLimitUnavailable={false}
       payeeName={MOCK_PAYEE_NAME}
       canSubmit={canSubmit}
       onNext={() => {}}

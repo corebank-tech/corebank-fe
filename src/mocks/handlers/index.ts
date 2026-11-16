@@ -3,6 +3,7 @@ import { accountsApiHandlers } from "@/mocks/handlers/accounts-api"
 import { accountHandlers } from "@/mocks/handlers/account"
 import { adminCustomersApiHandlers } from "@/mocks/handlers/admin-customers-api"
 import { authHandlers } from "@/mocks/handlers/auth"
+import { depositTerminationApiHandlers } from "@/mocks/handlers/deposit-termination-api"
 import { glApiHandlers } from "@/mocks/handlers/gl-api"
 import { infoApiHandlers } from "@/mocks/handlers/info-api"
 import { ledgerReconciliationApiHandlers } from "@/mocks/handlers/ledger-reconciliation-api"
@@ -23,6 +24,7 @@ import { transferApiHandlers } from "@/mocks/handlers/transfer-api"
 export const handlers = [
   ...accountsApiHandlers,
   ...accountPasswordApiHandlers,
+  ...depositTerminationApiHandlers,
   ...productsApiHandlers,
   ...productSubscriptionsApiHandlers,
   ...otpApiHandlers,

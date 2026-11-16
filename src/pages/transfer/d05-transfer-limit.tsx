@@ -35,11 +35,11 @@ export const D05TransferLimit = () => {
         "한도 변경 시 계좌비밀번호 확인과 OTP 인증이 모두 필요합니다.",
       ]}
       footerItems={[
-        "당일 사용금액과 잔여 이체가능금액은 이체 실행 즉시 갱신됩니다(REQ-TRSF-024).",
-        `한도 변경은 1회 최대 ${formatAmount(PER_TRANSFER_MAX)}, 1일 최대 ${formatAmount(PER_DAY_MAX)} 이내에서만 가능하며 계좌비밀번호 확인과 OTP 인증을 거쳐야 적용됩니다(REQ-TRSF-025).`,
+        "당일 사용금액과 잔여 이체가능금액은 이체 실행 즉시 갱신됩니다.",
+        `한도 변경은 1회 최대 ${formatAmount(PER_TRANSFER_MAX)}, 1일 최대 ${formatAmount(PER_DAY_MAX)} 이내에서만 가능하며 계좌비밀번호 확인과 OTP 인증을 거쳐야 적용됩니다.`,
         "이체한도는 고객 단위로 적용되며, 계좌비밀번호 확인에 사용한 계좌와 무관하게 전체 계좌에 반영됩니다.",
         "변경에 실패하면 계좌비밀번호 확인과 OTP 인증을 처음부터 다시 받습니다.",
-        "보안카드·OTP 실물매체 등 별도의 보안매체는 제공하지 않고 Mock OTP로 대체합니다(EX-010).",
+        "보안카드·OTP 실물매체 등 별도의 보안매체는 제공하지 않고 Mock OTP로 대체합니다.",
       ]}
     >
       {successMessage && <Alert variant="success">{successMessage}</Alert>}

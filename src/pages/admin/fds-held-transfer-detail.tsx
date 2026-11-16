@@ -480,7 +480,7 @@ export const FdsHeldTransferDetail = () => {
         <p role="status">사건 상세를 불러오는 중입니다.</p>
       </Panel>
     )
-  if (query.isError) {
+  if (query.isError && !detail) {
     const notFound =
       query.error instanceof ApiError && query.error.status === 404
     return (
@@ -537,6 +537,15 @@ export const FdsHeldTransferDetail = () => {
   }
   return (
     <div className="flex flex-col gap-5">
+      {query.isError && (
+        <div
+          role="status"
+          className="text-sm border-l-4 border-warning bg-warning-tint px-4 py-3 text-ink"
+        >
+          최신 서버 상태를 불러오지 못했습니다. 마지막으로 확인한 정보를
+          표시하고 있으며 자동으로 다시 시도합니다.
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

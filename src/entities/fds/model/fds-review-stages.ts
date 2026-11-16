@@ -73,7 +73,11 @@ export const buildFdsReviewStages = (
         : investigationRunning && historyDone && recipientDone
           ? "active"
           : "waiting",
-    risk: riskDone && agentDone ? "done" : agentDone ? "active" : "waiting",
+    risk: riskDone
+      ? "done"
+      : agentDone || investigationFailed
+        ? "active"
+        : "waiting",
     call: callDone
       ? "done"
       : riskDone && (agentDone || investigationFailed)
@@ -102,10 +106,16 @@ export const buildFdsReviewStages = (
 
 export const currentFdsReviewStage = (
   stages: FdsReviewStage[],
-): FdsReviewStage =>
-  stages.find((stage) =>
-    ["active", "failed", "recovery"].includes(stage.state),
-  ) ?? stages.at(-1)!
+): FdsReviewStage => {
+  // 최종 조치가 끝난 사건은 늦게 종료된 조사 작업의 상태보다 담당자 판정을 우선한다.
+  const decision = stages.find((stage) => stage.id === "decision")
+  if (decision?.state === "done") return decision
+  return (
+    stages.find((stage) =>
+      ["active", "failed", "recovery"].includes(stage.state),
+    ) ?? stages.at(-1)!
+  )
+}
 
 export const shouldPollFdsHoldDetail = (detail?: FdsHoldDetail): boolean =>
   detail != null &&

@@ -73,4 +73,25 @@ describe("FDS 실제 응답 처리 단계", () => {
     expect(stage(detail, "decision")).toBe("done")
     expect(shouldPollFdsHoldDetail(detail)).toBe(false)
   })
+
+  it("조사가 PENDING이어도 관리자 조치가 완료되면 담당자 판정을 현재 단계로 표시한다", () => {
+    const detail: FdsHoldDetail = {
+      investigation: { status: "PENDING" },
+      callRecords: [{ callRecordId: 1 }],
+      adminAction: { status: "COMPLETED" },
+    }
+
+    expect(currentFdsReviewStage(buildFdsReviewStages(detail)).id).toBe(
+      "decision",
+    )
+  })
+
+  it("조사가 실패해도 위험 계좌 결과가 있으면 재검증 단계를 완료로 표시한다", () => {
+    const detail: FdsHoldDetail = {
+      investigation: { status: "FAILED" },
+      riskAccountCheck: { status: "UNAVAILABLE" },
+    }
+
+    expect(stage(detail, "risk")).toBe("done")
+  })
 })

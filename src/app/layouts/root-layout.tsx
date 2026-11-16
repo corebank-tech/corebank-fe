@@ -1,4 +1,5 @@
 import { Outlet } from "react-router"
+import { DevNav } from "@/app/dev-nav"
 import { SessionExpiredGate } from "@/app/session-expired-gate"
 import { SessionProvider } from "@/features/session"
 
@@ -9,6 +10,8 @@ import { SessionProvider } from "@/features/session"
  */
 export const RootLayout = () => (
   <SessionProvider>
+    {/* 개발용 화면 목록. 프로덕션 빌드에서 제외된다. */}
+    {import.meta.env.DEV && <DevNav />}
     <SessionExpiredGate />
     <Outlet />
   </SessionProvider>

@@ -1,7 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { http, HttpResponse } from "msw"
 import { MemoryRouter, Route, Routes } from "react-router"
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest"
 import { FdsHeldTransferDetail } from "@/pages/admin/fds-held-transfer-detail"
 import { server } from "@/mocks/server"
 import { formatDateTime } from "@/shared/lib/format"
@@ -10,7 +19,7 @@ const renderPage = (id = "102") => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/admin/fds/held-transfers/${id}`]}>
         <Routes>
@@ -22,11 +31,13 @@ const renderPage = (id = "102") => {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...view, client }
 }
 
 describe("FdsHeldTransferDetail", () => {
   beforeAll(() => server.listen({ onUnhandledRequest: "error" }))
   beforeEach(() => sessionStorage.clear())
+  afterEach(() => server.resetHandlers())
   afterAll(() => server.close())
 
   it("실제 transferHoldId로 상세을 조회하고 서버 응답을 표시한다", async () => {
@@ -107,5 +118,32 @@ describe("FdsHeldTransferDetail", () => {
     expect(
       await screen.findByText("존재하지 않는 FDS 보류 사건입니다."),
     ).toBeInTheDocument()
+  })
+
+  it("폴링 재조회가 실패해도 마지막 상세를 유지하고 작은 안내만 표시한다", async () => {
+    const { client } = renderPage("103")
+    expect(await screen.findByText("사건 ID 103")).toBeInTheDocument()
+    server.use(
+      http.get("*/admin/fds/holds/:transferHoldId", () =>
+        HttpResponse.json(
+          {
+            code: "CMN9999",
+            message: "일시적으로 상세를 조회할 수 없습니다.",
+            data: null,
+          },
+          { status: 503 },
+        ),
+      ),
+    )
+
+    await client.refetchQueries()
+
+    expect(
+      await screen.findByText(/마지막으로 확인한 정보를 표시하고/),
+    ).toBeInTheDocument()
+    expect(screen.getByText("사건 ID 103")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "다시 시도" }),
+    ).not.toBeInTheDocument()
   })
 })

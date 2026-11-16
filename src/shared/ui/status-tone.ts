@@ -34,8 +34,12 @@ export const STATUS_TONE_CLASSES = {
 
 export type StatusTone = keyof typeof STATUS_TONE_CLASSES
 
-/** border + bg + text 세 클래스를 모두 합친 문자열. Badge처럼 톤이 글자색까지 물들일 때 쓴다. */
+/**
+ * bg + text 두 클래스를 합친 문자열. Badge처럼 톤이 글자색까지 물들이면서
+ * 테두리 없이 배경만으로 구분되는 표식에 쓴다. 테두리가 필요한 Alert 는
+ * STATUS_TONE_CLASSES 에서 border 를 직접 가져다 쓴다.
+ */
 export function statusToneClasses(tone: StatusTone): string {
   const t = STATUS_TONE_CLASSES[tone]
-  return cn(t.border, t.bg, t.text)
+  return cn(t.bg, t.text)
 }

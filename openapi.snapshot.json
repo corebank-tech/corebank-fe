@@ -8323,74 +8323,6 @@
         }
       }
     },
-    "/accounts/{accountId}/maturity-termination/preview": {
-      "get": {
-        "tags": [
-          "만기해지"
-        ],
-        "summary": "만기해지 예상 원리금 조회",
-        "description": "만기 도래한 본인 예·적금 계좌의 예상 지급액을 조회합니다. 계좌 잔액이나 상태를 변경하지 않으며 실제 해지 금액은 달라질 수 있습니다.",
-        "operationId": "previewMaturityTermination",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "exclusiveMinimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/accounts/{accountId}/early-termination/preview": {
-      "get": {
-        "tags": [
-          "중도해지"
-        ],
-        "summary": "중도해지 예상 원리금 조회",
-        "description": "만기 전 본인 예·적금 계좌의 중도해지 예상 지급액을 조회합니다. 중도해지이율을 적용하며 실제 해지는 실행하지 않습니다.",
-        "operationId": "previewEarlyTermination",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "exclusiveMinimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/admin/customers/{customerId}/permissions/{permission}": {
       "delete": {
         "tags": [
@@ -12102,64 +12034,6 @@
         }
       },
       "MaturityTerminationResponse": {
-        "type": "object",
-        "properties": {
-          "accountId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "withdrawalAccountId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "principal": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "grossInterest": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "tax": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "netInterest": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalTransferred": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "transactionNumber": {
-            "type": "string"
-          },
-          "tradeDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseEarlyTerminationResponse": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/EarlyTerminationResponse"
-          }
-        }
-      },
-      "EarlyTerminationResponse": {
         "type": "object",
         "properties": {
           "accountId": {
@@ -16798,68 +16672,6 @@
           "reversalId": {
             "type": "integer",
             "format": "int64"
-          }
-        }
-      },
-      "ApiResponseTerminationPreviewResponse": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/TerminationPreviewResponse"
-          }
-        }
-      },
-      "TerminationPreviewResponse": {
-        "type": "object",
-        "properties": {
-          "accountId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "terminationType": {
-            "type": "string",
-            "enum": [
-              "MATURITY",
-              "EARLY_TERMINATION"
-            ]
-          },
-          "withdrawalAccountId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "principal": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "grossInterest": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "tax": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "netInterest": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalExpectedAmount": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "calculationDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "calculatedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },

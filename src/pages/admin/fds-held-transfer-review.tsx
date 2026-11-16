@@ -13,6 +13,7 @@ import {
 import {
   buildFdsReviewStages,
   currentFdsReviewStage,
+  latestFdsCallRecord,
   type FdsReviewStage,
 } from "@/entities/fds"
 import type { FdsHoldDetail } from "@/shared/api/generated"
@@ -54,10 +55,6 @@ const labeledStatus = (value?: string) =>
 const yesNo = (value?: boolean) =>
   value == null ? "-" : value ? "예" : "아니오"
 const dateTime = (value?: string) => (value ? formatDateTime(value) : "-")
-const prefersReducedMotion = () =>
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches
-
 const StepRail = ({
   stages,
   playbackIndex,
@@ -202,7 +199,7 @@ const sceneCopy = (stage: FdsReviewStage, detail: FdsHoldDetail) => {
   const recipient = detail.toolResults?.recipientContext
   const report = detail.agentReport
   const risk = detail.riskAccountCheck
-  const latestCall = detail.callRecords?.at(-1)
+  const latestCall = latestFdsCallRecord(detail.callRecords)
   switch (stage.id) {
     case "hold":
       return {
@@ -388,34 +385,12 @@ export const FdsHeldTransferReview = ({
     0,
     stages.findIndex((stage) => stage.id === current.id),
   )
-  const reducedMotion = prefersReducedMotion()
-  const [playbackIndex, setPlaybackIndex] = React.useState(() =>
-    reducedMotion ? targetIndex : 0,
-  )
-
-  React.useEffect(() => {
-    if (reducedMotion) return
-    const timer = window.setInterval(() => {
-      setPlaybackIndex((index) => {
-        if (index >= targetIndex) {
-          window.clearInterval(timer)
-          return index
-        }
-        return index + 1
-      })
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [reducedMotion, targetIndex])
-
-  const visibleIndex = reducedMotion
-    ? targetIndex
-    : Math.min(playbackIndex, targetIndex)
-  const playbackStage = stages[visibleIndex] ?? current
+  const playbackStage = stages[targetIndex] ?? current
   return (
     <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <StepRail
         stages={stages}
-        playbackIndex={visibleIndex}
+        playbackIndex={targetIndex}
         targetIndex={targetIndex}
       />
       <div className="min-w-0 space-y-5">

@@ -1,5 +1,5 @@
-import { act, render, screen, within } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { render, screen, within } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
 import { FdsHeldTransferReview } from "@/pages/admin/fds-held-transfer-review"
 import {
   createFdsAdminDetail,
@@ -7,39 +7,28 @@ import {
 } from "@/mocks/fixtures/fds-admin"
 
 describe("FdsHeldTransferReview", () => {
-  afterEach(() => vi.useRealTimers())
-
-  it("화면 진입 시 1초마다 현재 처리 장면을 1단계부터 순차 전환한다", () => {
-    vi.useFakeTimers()
+  it("화면 진입 즉시 실제 서버의 현재 처리 단계를 표시한다", () => {
     render(
       <FdsHeldTransferReview detail={createFdsAdminDetail(102, "NO_MATCH")} />,
     )
     const firstStep = screen.getByText("이체 보류").closest("li")
-    expect(firstStep).toHaveAttribute("data-state", "active")
-    expect(firstStep?.querySelector(".fds-step-dot")).toHaveTextContent("1")
-    expect(screen.getByText("원본 이체 보류")).toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(1000))
     expect(firstStep).toHaveAttribute("data-state", "done")
     expect(firstStep?.querySelector(".fds-step-dot")).toHaveTextContent("✓")
-    expect(screen.getByText("조사 등록").closest("li")).toHaveAttribute(
+    expect(screen.getByText("담당자 판정").closest("li")).toHaveAttribute(
       "data-state",
       "active",
     )
-    expect(screen.getByText("조사 작업 등록")).toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(6000))
     expect(screen.getByText("담당자 확인 대기")).toBeInTheDocument()
     expect(screen.getByText("조치 선택 대기")).toBeInTheDocument()
     expect(screen.queryByText("· 사유 -")).not.toBeInTheDocument()
   })
 
   it("실제 조사 PENDING 응답으로 조사 등록 단계를 현재 상태로 표시한다", () => {
-    vi.useFakeTimers()
     render(
       <FdsHeldTransferReview
         detail={FDS_ADMIN_SCENARIOS.investigationPending}
       />,
     )
-    act(() => vi.advanceTimersByTime(1000))
     expect(screen.getByText("조사 작업 대기")).toBeInTheDocument()
     expect(screen.getByText("조사 등록").closest("li")).toHaveAttribute(
       "data-state",
@@ -70,13 +59,11 @@ describe("FdsHeldTransferReview", () => {
   })
 
   it("조사 실패를 실패 단계로 표시하고 JSON 코드 블록은 만들지 않는다", () => {
-    vi.useFakeTimers()
     const { container } = render(
       <FdsHeldTransferReview
         detail={FDS_ADMIN_SCENARIOS.investigationFailed}
       />,
     )
-    act(() => vi.advanceTimersByTime(4000))
     expect(screen.getByText("Agent 조사").closest("li")).toHaveAttribute(
       "data-state",
       "failed",
@@ -85,11 +72,9 @@ describe("FdsHeldTransferReview", () => {
   })
 
   it("고객 확인 단계에서는 서버 재조회가 아니라 관리자 입력 대기를 안내한다", () => {
-    vi.useFakeTimers()
     const detail = structuredClone(FDS_ADMIN_SCENARIOS.investigationCompleted)
     detail.callRecords = []
     render(<FdsHeldTransferReview detail={detail} />)
-    act(() => vi.advanceTimersByTime(6000))
     const notice = screen
       .getByText("고객 확인 결과 입력을 기다리고 있습니다.")
       .closest("div")

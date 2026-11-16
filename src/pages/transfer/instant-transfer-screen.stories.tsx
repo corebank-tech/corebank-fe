@@ -36,7 +36,7 @@ export const PolicyAHesitation: Story = {
   parameters: {
     docs: {
       description: {
-        story: `정책 A 시연: ${FDS_BEHAVIOR_SCENARIOS.policyA.eventTypes.join(" → ")}. hesitationWarning과 policyCode는 서버 fixture 값입니다.`,
+        story: `정책 A 시연 이벤트: ${FDS_BEHAVIOR_SCENARIOS.policyA.eventTypes.join(" → ")}. 현재 MSW 목은 hesitationWarning과 policyCode를 응답하지 않습니다.`,
       },
     },
   },

@@ -12,6 +12,7 @@ import {
   type FdsCallResult,
   type FdsDecision,
   type PendingFdsAdminAction,
+  latestFdsCallRecord,
 } from "@/entities/fds"
 import { ApiError, toErrorMessage } from "@/shared/api/api-error"
 import { Badge } from "@/shared/ui/badge"
@@ -392,8 +393,21 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
 }
 
 export const FdsHeldTransferDetail = () => {
-  const navigate = useNavigate()
   const { heldTransferId } = useParams()
+  return (
+    <FdsHeldTransferDetailContent
+      key={heldTransferId}
+      heldTransferId={heldTransferId}
+    />
+  )
+}
+
+const FdsHeldTransferDetailContent = ({
+  heldTransferId,
+}: {
+  heldTransferId?: string
+}) => {
+  const navigate = useNavigate()
   const transferHoldId = Number(heldTransferId)
   const validId = Number.isSafeInteger(transferHoldId) && transferHoldId > 0
   const query = useFdsHeldTransferDetail(validId ? transferHoldId : 0)
@@ -406,7 +420,7 @@ export const FdsHeldTransferDetail = () => {
   const [processing, setProcessing] = React.useState(false)
   const [message, setMessage] = React.useState<string | null>(null)
   const recoveryAttempted = React.useRef(false)
-  const latestCall = detail?.callRecords?.at(-1)?.callResult
+  const latestCall = latestFdsCallRecord(detail?.callRecords)?.callResult
   const risk = detail?.riskAccountCheck?.status
   const completed = detail?.adminAction?.status === "COMPLETED"
   const canApprove =
@@ -508,12 +522,13 @@ export const FdsHeldTransferDetail = () => {
           : "CUSTOMER_DENIED"
   const confirm = () => {
     if (!pendingDecision) return
-    const pending: PendingFdsAdminAction = {
+    const stored = readPendingFdsAdminAction(transferHoldId)
+    const pending: PendingFdsAdminAction = stored ?? {
       actionType: pendingDecision,
       reasonCode,
       idempotencyKey: crypto.randomUUID(),
     }
-    writePendingFdsAdminAction(transferHoldId, pending)
+    if (!stored) writePendingFdsAdminAction(transferHoldId, pending)
     setPendingDecision(null)
     void performAction(pending)
   }

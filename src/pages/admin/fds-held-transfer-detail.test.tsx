@@ -146,4 +146,35 @@ describe("FdsHeldTransferDetail", () => {
       screen.queryByRole("button", { name: "다시 시도" }),
     ).not.toBeInTheDocument()
   })
+
+  it("응답 유실 뒤 화면에서 다시 실행해도 저장된 관리자 조치 멱등키를 재사용한다", async () => {
+    const keys: string[] = []
+    server.use(
+      http.post("*/admin/fds/holds/:transferHoldId/reject", ({ request }) => {
+        keys.push(request.headers.get("Idempotency-Key") ?? "")
+        return HttpResponse.json(
+          {
+            code: "CMN9999",
+            message: "응답을 확인할 수 없습니다.",
+            data: null,
+          },
+          { status: 503 },
+        )
+      }),
+    )
+    renderPage()
+
+    fireEvent.click(await screen.findByRole("button", { name: "일반 거절" }))
+    fireEvent.click(screen.getByRole("button", { name: "조치 실행" }))
+    await waitFor(() => expect(keys).toHaveLength(1))
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "일반 거절" })).toBeEnabled(),
+    )
+    fireEvent.click(screen.getByRole("button", { name: "일반 거절" }))
+    fireEvent.click(screen.getByRole("button", { name: "조치 실행" }))
+    await waitFor(() => expect(keys).toHaveLength(2))
+
+    expect(keys[0]).not.toBe("")
+    expect(keys[1]).toBe(keys[0])
+  })
 })

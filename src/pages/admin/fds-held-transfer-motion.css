@@ -151,7 +151,7 @@
 }
 
 .fds-step-reveal {
-  animation: fds-step-reveal 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fds-step-reveal 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .fds-tool-pulse {

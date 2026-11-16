@@ -132,6 +132,7 @@ export const InstantTransferScreen = () => {
   const ignoreHistoryPopRef = React.useRef(false)
   const unknownExecutionIntentRef = React.useRef<TransferIntent | null>(null)
   const lastExecutionIntentRef = React.useRef<TransferIntent | null>(null)
+  const executionOwnerRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     stepRef.current = step
@@ -149,6 +150,13 @@ export const InstantTransferScreen = () => {
       document.removeEventListener("visibilitychange", onVisibilityChange)
   }, [behaviorFlow])
 
+  React.useEffect(
+    () => () => {
+      executionOwnerRef.current = null
+    },
+    [],
+  )
+
   const removeConfirmHistoryEntry = React.useCallback(() => {
     if (window.history.state?.fdsFlowId !== behaviorFlow.flowId) return
     ignoreHistoryPopRef.current = true
@@ -157,6 +165,7 @@ export const InstantTransferScreen = () => {
 
   const returnToInput = React.useCallback(
     (historyAlreadyPopped = false) => {
+      if (executionOwnerRef.current != null) return false
       // 열린 CONFIRM_ENTER를 닫은 최초 호출만 STEP_BACK을 만든다. 버튼과 popstate가
       // 같은 동작에서 연달아 와도 두 번째 호출은 false라 중복 전송되지 않는다.
       if (!behaviorFlow.returnToInput()) {
@@ -180,11 +189,17 @@ export const InstantTransferScreen = () => {
         ignoreHistoryPopRef.current = false
         return
       }
-      if (stepRef.current === 2) returnToInput(true)
+      if (stepRef.current === 2 && !returnToInput(true)) {
+        window.history.pushState(
+          { ...window.history.state, fdsFlowId: behaviorFlow.flowId },
+          "",
+          window.location.href,
+        )
+      }
     }
     window.addEventListener("popstate", onPopState)
     return () => window.removeEventListener("popstate", onPopState)
-  }, [returnToInput])
+  }, [behaviorFlow.flowId, returnToInput])
 
   const {
     accounts: withdrawAccounts,
@@ -223,6 +238,7 @@ export const InstantTransferScreen = () => {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [otpOpen, setOtpOpen] = React.useState(false)
   const [authError, setAuthError] = React.useState<string | null>(null)
+  const [isExecuting, setIsExecuting] = React.useState(false)
   const [favoriteError, setFavoriteError] = React.useState<string | null>(null)
   const [result, setResult] = React.useState<InstantTransferResultState | null>(
     null,
@@ -412,6 +428,7 @@ export const InstantTransferScreen = () => {
     }
 
     const handleTransferClick = () => {
+      if (executionOwnerRef.current != null) return
       if (!checkCurrentWithdrawable()) return
 
       setAuthError(null)
@@ -420,6 +437,7 @@ export const InstantTransferScreen = () => {
     }
 
     const handleConfirmDialogConfirm = async () => {
+      if (executionOwnerRef.current != null) return
       setConfirmOpen(false)
 
       if (!checkCurrentWithdrawable()) {
@@ -473,6 +491,8 @@ export const InstantTransferScreen = () => {
         // 실패했어도 컴포넌트 state 와 mutation variables 에 평문을 남기지 않는다.
         setField("password", "")
         verifyPasswordMutation.reset()
+        behaviorFlow.leaveConfirm()
+        removeConfirmHistoryEntry()
         setAuthError(
           error instanceof ApiError
             ? error.message
@@ -483,6 +503,7 @@ export const InstantTransferScreen = () => {
     }
 
     const handleOtpConfirm = async (otpAuthToken: string) => {
+      if (executionOwnerRef.current != null) return
       setOtpOpen(false)
 
       if (!checkCurrentWithdrawable()) {
@@ -497,177 +518,196 @@ export const InstantTransferScreen = () => {
         return
       }
       const executedAt = transactionAt ?? getNow()
+      const executionOwner = crypto.randomUUID()
+      executionOwnerRef.current = executionOwner
+      setIsExecuting(true)
+      const ownsExecution = () => executionOwnerRef.current === executionOwner
       try {
-        // OTP를 실제 제출할 때까지 D-02 확인 구간을 열어 둔다. OTP 취소는 D-02에
-        // 머무르므로 이전 버튼과 브라우저 뒤로가기가 정상적으로 STEP_BACK을 만든다.
-        let executionIntent = unknownExecutionIntentRef.current ?? currentIntent
-        if (!behaviorFlow.isSubmitted()) {
-          behaviorFlow.leaveConfirm()
-          removeConfirmHistoryEntry()
-          behaviorFlow.submitRequested()
-          try {
-            await submitFdsBehaviorEvents(
-              behaviorFlow.flowId,
-              behaviorFlow.batch(),
-              behaviorFlow.idempotencyKey,
-            )
-          } catch {
-            // 행동 이벤트 저장 장애는 이체 장애가 아니다. 서버가 모르는 flowId를
-            // 이체에 싣지 않고 이체 실행은 계속한다.
-            executionIntent = { ...currentIntent, flowId: null }
-            rememberTransferKey(idempotencyKey, executionIntent)
+        try {
+          // OTP를 실제 제출할 때까지 D-02 확인 구간을 열어 둔다. OTP 취소는 D-02에
+          // 머무르므로 이전 버튼과 브라우저 뒤로가기가 정상적으로 STEP_BACK을 만든다.
+          let executionIntent =
+            unknownExecutionIntentRef.current ?? currentIntent
+          if (!behaviorFlow.isSubmitted()) {
+            behaviorFlow.leaveConfirm()
+            removeConfirmHistoryEntry()
+            behaviorFlow.submitRequested()
+            try {
+              await submitFdsBehaviorEvents(
+                behaviorFlow.flowId,
+                behaviorFlow.batch(),
+                behaviorFlow.idempotencyKey,
+              )
+              if (!ownsExecution()) return
+            } catch {
+              if (!ownsExecution()) return
+              // 행동 이벤트 저장 장애는 이체 장애가 아니다. 서버가 모르는 flowId를
+              // 이체에 싣지 않고 이체 실행은 계속한다.
+              executionIntent = { ...currentIntent, flowId: null }
+              rememberTransferKey(idempotencyKey, executionIntent)
+            }
           }
-        }
-        lastExecutionIntentRef.current = executionIntent
-        const executed = await executeMutation.mutateAsync({
-          intent: executionIntent,
-          accountPasswordAuthToken: passwordAuthToken,
-          otpAuthToken,
-          idempotencyKey,
-        })
-
-        const settled = executed.status === TransferResponseStatus.SUCCESS
-        const failed = executed.status === TransferResponseStatus.ERROR
-        const held = executed.status == null && executed.transferHold != null
-        // 대외 응답이 없어 결과를 모르는 상태. 같은 이체를 다시 보내면 상대 은행이
-        // 두 번 입금할 수 있어 재이체를 막아야 한다
-        // (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
-        const timedOut = executed.status === TransferResponseStatus.TIMEOUT
-        if (
-          !settled &&
-          !failed &&
-          !held &&
-          !timedOut &&
-          executed.status !== TransferResponseStatus.PROCESSING
-        ) {
-          console.error("알 수 없는 이체 처리상태", executed.status)
-        }
-
-        // 미확정 건은 서버가 거래일시·이체후잔액을 주지 않는다. 화면에서 만들어내면
-        // 끝나지 않은 이체를 끝난 것처럼 보여주게 된다(REQ-TRSF-017·018).
-        const row: TransferResultRow = {
-          transactionId: executed.transactionNumber ?? "-",
-          processedAt: settled ? (executed.transferredAt ?? executedAt) : "",
-          fromAccountNo: displayForm.fromAccount,
-          toAccountNo: form.toAccount,
-          // 타행은 상대 은행이 돌려준 이름이 있으면 그것을 쓴다(인계 문서 §5). 실패·TIMEOUT 이면
-          // 응답에 이름이 없어 이체 전에 확인한 이름을 둔다.
-          payeeName: executed.payeeName ?? form.payeeName,
-          amount,
-          fee: 0,
-          memo: form.payeeMemo || "-",
-          // 미확정·실패 건은 서버가 잔액을 주지 않는다. 이체 전 잔액으로 채우면
-          // 처리되지 않은 이체를 반영된 것처럼 보여준다(REQ-TRSF-018).
-          balanceAfter: executed.withdrawalBalanceAfter ?? 0,
-        }
-
-        const payeeBankCode = currentIntent.payeeBankCode
-        // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
-        if (held) {
-          setResult({
-            status: executed.status,
-            payeeBankCode,
-            row,
-            heldResult: {
-              withdrawalAccountNumber: formatAccountNo(displayForm.fromAccount),
-              recipientBankName: bankNameOf(payeeBankCode),
-              recipientAccountNumber: formatDepositAccountNo(
-                payeeBankCode,
-                form.toAccount,
-              ),
-              recipientName: form.payeeName,
-              amount,
-              requestedAt: executedAt,
-            },
+          lastExecutionIntentRef.current = executionIntent
+          const executed = await executeMutation.mutateAsync({
+            intent: executionIntent,
+            accountPasswordAuthToken: passwordAuthToken,
+            otpAuthToken,
+            idempotencyKey,
           })
-        } else if (failed) {
-          setResult({
-            status: executed.status,
-            payeeBankCode,
-            row,
-            errorCode: executed.errorCode ?? undefined,
-            failReason:
-              executed.errorMessage ??
-              "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
-          })
-        } else if (settled) {
-          setResult({ status: executed.status, payeeBankCode, row })
-        } else {
-          setResult({
-            status: executed.status,
-            payeeBankCode,
-            row,
-            // 타행 TIMEOUT 은 상대 은행 무응답이다 — 문구는 서버 인계 문서 §5-1 을 따른다.
-            failReason:
-              timedOut && payeeBankCode != null
-                ? "상대 은행의 응답이 늦어 결과를 확인하고 있습니다. 이체 내역에서 결과를 확인해 주세요."
-                : "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
-          })
-        }
+          if (!ownsExecution()) return
 
-        // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
-        void queryClient.invalidateQueries({
-          queryKey: getLoginStatusQueryKey(),
-        })
-        void queryClient.invalidateQueries({
-          queryKey: getTransferLimitQueryKey(),
-        })
-        void queryClient.invalidateQueries({
-          queryKey: getAccountOverviewQueryKey(),
-        })
-      } catch (error) {
-        setPasswordAuthToken(null)
+          const settled = executed.status === TransferResponseStatus.SUCCESS
+          const failed = executed.status === TransferResponseStatus.ERROR
+          const held = executed.status == null && executed.transferHold != null
+          // 대외 응답이 없어 결과를 모르는 상태. 같은 이체를 다시 보내면 상대 은행이
+          // 두 번 입금할 수 있어 재이체를 막아야 한다
+          // (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
+          const timedOut = executed.status === TransferResponseStatus.TIMEOUT
+          if (
+            !settled &&
+            !failed &&
+            !held &&
+            !timedOut &&
+            executed.status !== TransferResponseStatus.PROCESSING
+          ) {
+            console.error("알 수 없는 이체 처리상태", executed.status)
+          }
 
-        // 응답을 못 받으면 서버가 처리했는지 모른다. 실패로 단정해 1단계로 되돌리면 고객이
-        // 화면을 떠나 멱등키를 잃고 같은 이체가 새 키로 다시 나간다(REQ-TRSF-016).
-        // PROCESSING·TIMEOUT 과 같은 미확정 화면으로 보내고 멱등키는 지우지 않는다.
-        if (!(error instanceof ApiError) || isUnknownOutcomeError(error)) {
-          unknownExecutionIntentRef.current =
-            lastExecutionIntentRef.current ??
-            unknownExecutionIntentRef.current ??
-            keyedIntent ??
-            currentIntent
-          setResult({
-            status: undefined,
-            payeeBankCode: currentIntent.payeeBankCode,
-            // 서버가 아무 값도 주지 않았다. 거래번호·거래일시·잔액을 만들어내면 처리되지
-            // 않은 이체를 끝난 것처럼 보여준다(REQ-TRSF-017·018).
-            row: {
-              transactionId: "-",
-              processedAt: "",
-              fromAccountNo: displayForm.fromAccount,
-              toAccountNo: form.toAccount,
-              payeeName: form.payeeName,
-              amount,
-              fee: 0,
-              memo: form.payeeMemo || "-",
-              balanceAfter: 0,
-            },
-            failReason: isRequestInProgressError(error)
-              ? "같은 이체 요청이 아직 처리 중입니다. 이체결과조회에서 처리 상태를 확인하세요."
-              : "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+          // 미확정 건은 서버가 거래일시·이체후잔액을 주지 않는다. 화면에서 만들어내면
+          // 끝나지 않은 이체를 끝난 것처럼 보여주게 된다(REQ-TRSF-017·018).
+          const row: TransferResultRow = {
+            transactionId: executed.transactionNumber ?? "-",
+            processedAt: settled ? (executed.transferredAt ?? executedAt) : "",
+            fromAccountNo: displayForm.fromAccount,
+            toAccountNo: form.toAccount,
+            // 타행은 상대 은행이 돌려준 이름이 있으면 그것을 쓴다(인계 문서 §5). 실패·TIMEOUT 이면
+            // 응답에 이름이 없어 이체 전에 확인한 이름을 둔다.
+            payeeName: executed.payeeName ?? form.payeeName,
+            amount,
+            fee: 0,
+            memo: form.payeeMemo || "-",
+            // 미확정·실패 건은 서버가 잔액을 주지 않는다. 이체 전 잔액으로 채우면
+            // 처리되지 않은 이체를 반영된 것처럼 보여준다(REQ-TRSF-018).
+            balanceAfter: executed.withdrawalBalanceAfter ?? 0,
+          }
+
+          const payeeBankCode = currentIntent.payeeBankCode
+          // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
+          if (held) {
+            setResult({
+              status: executed.status,
+              payeeBankCode,
+              row,
+              heldResult: {
+                withdrawalAccountNumber: formatAccountNo(
+                  displayForm.fromAccount,
+                ),
+                recipientBankName: bankNameOf(payeeBankCode),
+                recipientAccountNumber: formatDepositAccountNo(
+                  payeeBankCode,
+                  form.toAccount,
+                ),
+                recipientName: form.payeeName,
+                amount,
+                requestedAt: executedAt,
+              },
+            })
+          } else if (failed) {
+            setResult({
+              status: executed.status,
+              payeeBankCode,
+              row,
+              errorCode: executed.errorCode ?? undefined,
+              failReason:
+                executed.errorMessage ??
+                "이체가 처리되지 않았습니다. 잠시 후 다시 시도하세요.",
+            })
+          } else if (settled) {
+            setResult({ status: executed.status, payeeBankCode, row })
+          } else {
+            setResult({
+              status: executed.status,
+              payeeBankCode,
+              row,
+              // 타행 TIMEOUT 은 상대 은행 무응답이다 — 문구는 서버 인계 문서 §5-1 을 따른다.
+              failReason:
+                timedOut && payeeBankCode != null
+                  ? "상대 은행의 응답이 늦어 결과를 확인하고 있습니다. 이체 내역에서 결과를 확인해 주세요."
+                  : "이체 결과가 아직 확정되지 않았습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+            })
+          }
+
+          // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
+          void queryClient.invalidateQueries({
+            queryKey: getLoginStatusQueryKey(),
           })
-          setStep(3)
+          void queryClient.invalidateQueries({
+            queryKey: getTransferLimitQueryKey(),
+          })
+          void queryClient.invalidateQueries({
+            queryKey: getAccountOverviewQueryKey(),
+          })
+        } catch (error) {
+          if (!ownsExecution()) return
+          setPasswordAuthToken(null)
+
+          // 응답을 못 받으면 서버가 처리했는지 모른다. 실패로 단정해 1단계로 되돌리면 고객이
+          // 화면을 떠나 멱등키를 잃고 같은 이체가 새 키로 다시 나간다(REQ-TRSF-016).
+          // PROCESSING·TIMEOUT 과 같은 미확정 화면으로 보내고 멱등키는 지우지 않는다.
+          if (!(error instanceof ApiError) || isUnknownOutcomeError(error)) {
+            unknownExecutionIntentRef.current =
+              lastExecutionIntentRef.current ??
+              unknownExecutionIntentRef.current ??
+              keyedIntent ??
+              currentIntent
+            setResult({
+              status: undefined,
+              payeeBankCode: currentIntent.payeeBankCode,
+              // 서버가 아무 값도 주지 않았다. 거래번호·거래일시·잔액을 만들어내면 처리되지
+              // 않은 이체를 끝난 것처럼 보여준다(REQ-TRSF-017·018).
+              row: {
+                transactionId: "-",
+                processedAt: "",
+                fromAccountNo: displayForm.fromAccount,
+                toAccountNo: form.toAccount,
+                payeeName: form.payeeName,
+                amount,
+                fee: 0,
+                memo: form.payeeMemo || "-",
+                balanceAfter: 0,
+              },
+              failReason: isRequestInProgressError(error)
+                ? "같은 이체 요청이 아직 처리 중입니다. 이체결과조회에서 처리 상태를 확인하세요."
+                : "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+            })
+            setStep(3)
+            return
+          }
+
+          // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이다. 세션만료는
+          // toErrorMessage 가 null 을 줘 A-11 모달과 문구가 겹치지 않는다.
+          unknownExecutionIntentRef.current = null
+          lastExecutionIntentRef.current = null
+          setBehaviorFlow(createFdsBehaviorFlow())
+          forgetTransferKey()
+          setAuthError(toErrorMessage(error))
+          setStep(1)
           return
         }
-
-        // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이다. 세션만료는
-        // toErrorMessage 가 null 을 줘 A-11 모달과 문구가 겹치지 않는다.
+        if (!ownsExecution()) return
+        // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 또는 HELD로 답했으면 요청이 접수된 것이다.
+        // 다음 이체는 새 키를 쓴다.
         unknownExecutionIntentRef.current = null
         lastExecutionIntentRef.current = null
-        setBehaviorFlow(createFdsBehaviorFlow())
         forgetTransferKey()
-        setAuthError(toErrorMessage(error))
-        setStep(1)
-        return
+        setPasswordAuthToken(null)
+        setStep(3)
+      } finally {
+        if (ownsExecution()) {
+          executionOwnerRef.current = null
+          setIsExecuting(false)
+        }
       }
-      // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 또는 HELD로 답했으면 요청이 접수된 것이다.
-      // 다음 이체는 새 키를 쓴다.
-      unknownExecutionIntentRef.current = null
-      lastExecutionIntentRef.current = null
-      forgetTransferKey()
-      setPasswordAuthToken(null)
-      setStep(3)
     }
 
     return (
@@ -700,6 +740,7 @@ export const InstantTransferScreen = () => {
           payeeMemo={form.payeeMemo || "-"}
           myMemo={form.myMemo || "-"}
           authError={authError}
+          isExecuting={isExecuting}
           onPrev={() => returnToInput()}
           onSubmit={handleTransferClick}
         />

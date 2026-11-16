@@ -5,6 +5,7 @@ export {
   type FdsBehaviorEventBatch,
 } from "@/entities/fds/model/fds-behavior-flow"
 export { submitFdsBehaviorEvents } from "@/entities/fds/api/fds-behavior-events"
+export { latestFdsCallRecord } from "@/entities/fds/model/fds-call-record"
 export {
   buildFdsReviewStages,
   currentFdsReviewStage,

@@ -35,11 +35,12 @@ const MOCK_LATENCY_MS = 200
  * | `1234567890001` | `TRF0201` 404 (상대 `1001`) | — |
  * | `1234567890002` | `TRF0301` 409 (상대 `1002`) | — |
  * | `1234567890009` | `TRF0309` 409 (상대 무응답, corebank-server#680) | — |
+ * | `1234567890003` | 정상 | 서버가 거절 — `TRF0301` 409 (처리되지 않음, 다음 시도는 새 거래) |
+ * | `1234567890004` | 정상 | 토큰을 소비하지 않고 `CMN0301` 409 (같은 키의 앞선 요청이 아직 처리 중) |
+ * | `1234567890005` | 정상 | 처리·멱등키 기록 후 응답 없음 (같은 키 재시도 시 `SUCCESS` replay) |
  * | `1234567890006` | 정상, 1초 늦게 (늦은 응답 장면) | 200 + `SUCCESS` |
  * | `1234567890007` | 정상 | 200 + `ERROR` `TRF0308` |
  * | `1234567890008` | 정상 | 200 + `TIMEOUT` |
- * | `1234567890005` | 정상 | 처리·멱등키 기록 후 응답 없음 (같은 키 재시도 시 `SUCCESS` replay) |
- * | `1234567890004` | 정상 | `CMN0301` 409 (같은 키의 앞선 요청이 아직 처리 중) |
  * | 그 밖의 숫자 1~16자리 | 정상 | 200 + `SUCCESS` |
  *
  * 잔액은 저장하지 않는다 — 이체 후 잔액은 실행 시점 픽스처 잔액에서 뺀 값이다.
@@ -111,6 +112,7 @@ const INTERBANK_SCENARIO = {
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
   LOST_RESPONSE: "1234567890005",
+  REJECTED: "1234567890003",
   IN_PROGRESS: "1234567890004",
 } as const
 
@@ -326,6 +328,11 @@ export const transferApiHandlers = [
     const key = request.headers.get("Idempotency-Key")
     const replayed = replayOrConflict(key, req)
     if (replayed) return replayed
+
+    // 서버가 토큰을 쓰기 전에 업무 규칙으로 거절하는 장면이다. 처리되지 않았다.
+    if (req.depositAccountNumber === INTERBANK_SCENARIO.REJECTED) {
+      return fail(...TRANSFER_ERROR.PAYEE_ACCOUNT_SUSPENDED)
+    }
 
     // 같은 키의 앞선 요청이 아직 끝나지 않은 장면이다. 서버는 새로 처리하지 않고 409 를 준다.
     if (req.depositAccountNumber === INTERBANK_SCENARIO.IN_PROGRESS) {

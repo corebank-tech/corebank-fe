@@ -20,6 +20,7 @@ const INTERBANK = {
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
   LOST_RESPONSE: "1234567890005",
+  REJECTED: "1234567890003",
   IN_PROGRESS: "1234567890004",
 } as const
 
@@ -185,6 +186,37 @@ test("처리 중(CMN0301) 응답은 실패가 아니라 미확정 결과로 보�
       sessionStorage.getItem("corebank:pending-transfer-key"),
     ),
   ).not.toBeNull()
+})
+
+// 서버가 거절한 요청은 처리되지 않았다. 같은 키를 이어 쓰지 않고 다음 시도는 새 거래로 보낸다.
+test("서버가 거절하면 멱등키를 버리고 다시 보낼 때 새 키를 쓴다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      /\/transfers\/interbank$/.test(request.url())
+    ) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+
+  await confirmPayee(page, OTHER_BANK, INTERBANK.REJECTED)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+  await expect(page.locator("#it-amount")).toBeVisible()
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("corebank:pending-transfer-key"),
+    ),
+  ).toBeNull()
+
+  // 계좌비밀번호는 검증 직후 지워져 1단계에서 다시 입력해야 한다.
+  await fillAccountPassword(page)
+  await transfer(page, 30_000)
+  await expect.poll(() => idempotencyKeys.length).toBe(2)
+  expect(idempotencyKeys[1]).not.toBe(idempotencyKeys[0])
 })
 
 // 키가 화면 state 에만 있으면 이체결과조회로 갔다 돌아오는 순간 사라지고, 같은 이체가 새 키로

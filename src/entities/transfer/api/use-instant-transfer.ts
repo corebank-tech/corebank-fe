@@ -28,6 +28,7 @@ export type InstantTransferResult = Pick<
   | "errorCode"
   | "errorMessage"
   | "withdrawalBalanceAfter"
+  | "transferHold"
 > & {
   /** 오프셋 없는 KST 시각(당행 응답과 같은 모양). 실패·TIMEOUT 이면 비어 있다. */
   transferredAt?: string | null
@@ -103,6 +104,7 @@ export const executeTransferIntent = async ({
     errorCode: response.errorCode,
     errorMessage: response.errorMessage,
     withdrawalBalanceAfter: response.withdrawalBalanceAfter ?? undefined,
+    transferHold: undefined,
     payeeName: response.payeeName ?? null,
   }
 }

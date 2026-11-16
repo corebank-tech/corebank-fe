@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   isSameTransferIntent,
+  isSameTransferBusinessIntent,
   toInterbankTransferRequest,
   toOtpTransactionData,
   toTransferRequest,
@@ -8,6 +9,7 @@ import {
 } from "@/entities/transfer/lib/transfer-intent"
 
 const intent = (over: Partial<TransferIntent> = {}): TransferIntent => ({
+  flowId: "flow-1",
   withdrawalAccountId: 1,
   payeeBankCode: null,
   depositAccountNumber: "333330730135",
@@ -45,9 +47,27 @@ describe("isSameTransferIntent", () => {
   })
 })
 
+describe("isSameTransferBusinessIntent", () => {
+  it("행동 이벤트 실패로 flowId가 빠져도 같은 이체로 보아 멱등키를 유지한다", () => {
+    expect(
+      isSameTransferBusinessIntent(intent({ flowId: null }), intent()),
+    ).toBe(true)
+  })
+
+  it("결과 불명 뒤 금액을 바꾸면 다른 이체로 보아 새 flow와 키를 쓴다", () => {
+    expect(
+      isSameTransferBusinessIntent(
+        intent({ flowId: null }),
+        intent({ amount: 400_000 }),
+      ),
+    ).toBe(false)
+  })
+})
+
 describe("toTransferRequest", () => {
   it("거래 내용을 그대로 요청 본문으로 옮긴다", () => {
     expect(toTransferRequest(intent())).toEqual({
+      flowId: "flow-1",
       withdrawalAccountId: 1,
       depositAccountNumber: "333330730135",
       amount: 500_000,
@@ -106,5 +126,12 @@ describe("toOtpTransactionData", () => {
 
   it("당행이면 은행코드 키를 만들지 않는다 — 기존 당행 대조값이 그대로다", () => {
     expect(toOtpTransactionData(intent())).not.toHaveProperty("payeeBankCode")
+  })
+
+  it("FDS flowId는 OTP 대조값과 타행 요청에 싣지 않는다", () => {
+    expect(toOtpTransactionData(intent())).not.toHaveProperty("flowId")
+    expect(
+      toInterbankTransferRequest(intent({ payeeBankCode: "004" })),
+    ).not.toHaveProperty("flowId")
   })
 })

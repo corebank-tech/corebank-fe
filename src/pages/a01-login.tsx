@@ -112,10 +112,6 @@ export const A01Login = () => {
                 autoComplete="username"
                 invalid={!!failure}
               />
-              <p className="text-2xs text-ink-muted">
-                ※ 아이디·비밀번호 방식만 제공되며, 공동인증서·간편인증은
-                지원하지 않습니다.
-              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -134,10 +130,6 @@ export const A01Login = () => {
                 autoComplete="current-password"
                 invalid={!!failure}
               />
-              <p className="text-2xs text-ink-muted">
-                ※ 비밀번호를 5회 연속 잘못 입력하면 계정이 잠깁니다(관리자 확인
-                후 해제 가능).
-              </p>
             </div>
 
             <Checkbox label="아이디 저장" />
@@ -179,7 +171,7 @@ export const A01Login = () => {
           className="mt-8"
           items={[
             "회원가입 시 등록한 아이디와 비밀번호로 로그인합니다.",
-            "보안을 위해 로그인 후 10분간 이용이 없으면 자동으로 로그아웃됩니다(헤더의 [연장]으로 세션을 갱신할 수 있습니다).",
+            "보안을 위해 로그인 후 10분간 이용이 없으면 자동으로 로그아웃됩니다.",
             "비밀번호를 5회 연속 잘못 입력하면 계정이 잠기며, 잠금 해제는 고객센터를 통한 관리자 확인 후에만 가능합니다.",
             "인증서·간편인증·보안카드는 제공하지 않으며, 아이디·비밀번호 방식으로만 로그인할 수 있습니다.",
           ]}

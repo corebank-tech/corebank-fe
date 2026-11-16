@@ -25,6 +25,9 @@ type ReservedTransferStep1Props = {
   ) => void
   today: string
   perTransferLimit: number
+  isLimitUnavailable: boolean
+  /** 한도 조회가 끝나지 않았거나 실패했을 때 보여줄 안내. */
+  limitNotice?: string | null
   payeeName: string
   canSubmit: boolean
   onNext: () => void
@@ -38,6 +41,8 @@ export const ReservedTransferStep1 = ({
   onChange,
   today,
   perTransferLimit,
+  isLimitUnavailable,
+  limitNotice,
   payeeName,
   canSubmit,
   onNext,
@@ -65,6 +70,11 @@ export const ReservedTransferStep1 = ({
           </Button>
         }
       >
+        {limitNotice != null && (
+          <p role="alert" className="mb-3 text-base font-bold text-danger">
+            {limitNotice}
+          </p>
+        )}
         <FormSection title="출금정보">
           <div>
             <FormRow label="출금계좌" required htmlFor="rt-from">
@@ -111,6 +121,7 @@ export const ReservedTransferStep1 = ({
                   perTransferLimit={perTransferLimit}
                   dailyRemaining={perTransferLimit}
                   showDailyLimit={false}
+                  isLimitUnavailable={isLimitUnavailable}
                 />
                 <p className="text-2xs text-ink-muted">
                   ※ 1회 이체한도 범위 내에서 1원 이상의 정수만 입력할 수 있으며,

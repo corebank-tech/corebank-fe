@@ -20,6 +20,7 @@ const INTERBANK = {
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
   LOST_RESPONSE: "1234567890005",
+  IN_PROGRESS: "1234567890004",
 } as const
 
 async function login(page: Page) {
@@ -162,6 +163,28 @@ test("응답이 유실되면 실패로 단정하지 않고 미확정 결과로 �
   await expect(newTransferButton(page)).toHaveCount(0)
   // 1단계로 되돌리면 금액칸이 다시 보인다. 사라진 문구로 단언하면 무엇을 바꿔도 통과한다.
   await expect(page.locator("#it-amount")).toHaveCount(0)
+})
+
+// 앞선 요청이 아직 처리 중(CMN0301)이면 거절이 아니다. 1단계로 되돌리면 고객이 끝나가는 이체를
+// 실패로 읽는다(REQ-TRSF-016).
+test("처리 중(CMN0301) 응답은 실패가 아니라 미확정 결과로 보내고 멱등키를 유지한다", async ({
+  page,
+}) => {
+  await confirmPayee(page, OTHER_BANK, INTERBANK.IN_PROGRESS)
+  await expect(holderName(page, "박*준")).toBeVisible()
+  await transfer(page, 30_000)
+
+  await expect(page.getByText("이체 결과를 확인하는 중입니다.")).toBeVisible()
+  await expect(
+    page.getByText("같은 이체 요청이 아직 처리 중입니다."),
+  ).toBeVisible()
+  await expect(newTransferButton(page)).toHaveCount(0)
+  await expect(page.locator("#it-amount")).toHaveCount(0)
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("corebank:pending-transfer-key"),
+    ),
+  ).not.toBeNull()
 })
 
 // 키가 화면 state 에만 있으면 이체결과조회로 갔다 돌아오는 순간 사라지고, 같은 이체가 새 키로

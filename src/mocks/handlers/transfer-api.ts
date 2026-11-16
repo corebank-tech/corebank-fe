@@ -39,6 +39,7 @@ const MOCK_LATENCY_MS = 200
  * | `1234567890007` | 정상 | 200 + `ERROR` `TRF0308` |
  * | `1234567890008` | 정상 | 200 + `TIMEOUT` |
  * | `1234567890005` | 정상 | 처리·멱등키 기록 후 응답 없음 (같은 키 재시도 시 `SUCCESS` replay) |
+ * | `1234567890004` | 정상 | `CMN0301` 409 (같은 키의 앞선 요청이 아직 처리 중) |
  * | 그 밖의 숫자 1~16자리 | 정상 | 200 + `SUCCESS` |
  *
  * 잔액은 저장하지 않는다 — 이체 후 잔액은 실행 시점 픽스처 잔액에서 뺀 값이다.
@@ -110,6 +111,7 @@ const INTERBANK_SCENARIO = {
   NOT_PROCESSED: "1234567890007",
   TIMEOUT: "1234567890008",
   LOST_RESPONSE: "1234567890005",
+  IN_PROGRESS: "1234567890004",
 } as const
 
 const INTERBANK_PAYEE_NAME = "박*준"
@@ -324,6 +326,11 @@ export const transferApiHandlers = [
     const key = request.headers.get("Idempotency-Key")
     const replayed = replayOrConflict(key, req)
     if (replayed) return replayed
+
+    // 같은 키의 앞선 요청이 아직 끝나지 않은 장면이다. 서버는 새로 처리하지 않고 409 를 준다.
+    if (req.depositAccountNumber === INTERBANK_SCENARIO.IN_PROGRESS) {
+      return fail("CMN0301", "동일한 요청이 처리 중입니다.", 409)
+    }
 
     const withdrawalAccountId = req.withdrawalAccountId ?? -1
     const tokenError = consumeTokens(request, memberId, withdrawalAccountId, {

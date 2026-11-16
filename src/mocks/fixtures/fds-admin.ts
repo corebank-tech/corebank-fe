@@ -84,6 +84,18 @@ export const createFdsAdminDetail = (
     investigationId: `mock-${id}`,
     status: id === 103 ? "FAILED" : "COMPLETED",
     summary: id === 103 ? undefined : "고객 확인이 필요합니다.",
+    secondaryFindings:
+      id === 103
+        ? []
+        : [
+            {
+              code: "REGULAR_SPLIT_AMOUNTS",
+              description:
+                "조회된 동일 수취인 이체에서 같은 금액이 반복되었습니다.",
+              confidence: "OBSERVED",
+              evidenceTransferIds: [9001, 9002],
+            },
+          ],
     missingInformation: [],
     suggestedQuestions: ["이체를 요청하셨나요?"],
   },

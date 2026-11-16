@@ -34,6 +34,17 @@ describe("FdsHeldTransferDetail", () => {
     expect(screen.getAllByText(/고객 부인/).length).toBeGreaterThan(0)
     expect(screen.getByText("10분 이체 건수")).toBeInTheDocument()
     expect(screen.getByText("확인 화면 복귀")).toBeInTheDocument()
+    expect(screen.queryByText("수취인 관계")).not.toBeInTheDocument()
+    expect(screen.getByText(/거래 9001/)).toBeInTheDocument()
+    expect(screen.getAllByText("최종 처리 전")).toHaveLength(2)
+    expect(
+      screen.getByText("근거 수준 직접 관찰 · 근거 거래 2건"),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/신뢰도 OBSERVED/)).not.toBeInTheDocument()
+    expect(screen.getAllByText("최근 이체 이력")).toHaveLength(1)
+    expect(
+      screen.getByText("고객 질문 제안").closest(".fds-agent-question"),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/"backCount"/)).not.toBeInTheDocument()
   })
 
@@ -44,6 +55,12 @@ describe("FdsHeldTransferDetail", () => {
     expect(
       screen.getByRole("button", { name: "사기 확정 및 거절" }),
     ).toBeEnabled()
+    expect(
+      screen.getByText(/CUSTOMER_DENIED 거절만 사용할 수 있습니다/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/2026\.11\.15 09:20:00 · 고객 부인/),
+    ).toBeInTheDocument()
   })
 
   it("MATCH는 위험 계좌 일치 거절만 허용한다", async () => {

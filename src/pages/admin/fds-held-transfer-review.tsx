@@ -54,42 +54,70 @@ const labeledStatus = (value?: string) =>
 const yesNo = (value?: boolean) =>
   value == null ? "-" : value ? "예" : "아니오"
 const dateTime = (value?: string) => (value ? formatDateTime(value) : "-")
+const prefersReducedMotion = () =>
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
-const StepRail = ({ stages }: { stages: FdsReviewStage[] }) => (
+const StepRail = ({
+  stages,
+  playbackIndex,
+  targetIndex,
+}: {
+  stages: FdsReviewStage[]
+  playbackIndex: number
+  targetIndex: number
+}) => (
   <Panel className="self-start p-4 xl:sticky xl:top-4">
     <h2 className="mb-4 font-bold">처리 단계</h2>
     <ol className="fds-step-rail" aria-label="FDS 사건 처리 단계">
-      {stages.map((stage, index) => (
-        <li
-          key={stage.id}
-          className="fds-step-item"
-          data-state={stage.state}
-          data-actor={stage.actor === "담당자" ? "HUMAN" : "SYSTEM"}
-        >
-          <span className="fds-step-dot" aria-hidden="true">
-            {stage.state === "done"
-              ? "✓"
-              : stage.state === "failed"
-                ? "!"
-                : stage.state === "recovery"
-                  ? "↻"
-                  : index + 1}
-          </span>
-          <div className="min-w-0">
-            <strong>{stage.title}</strong>
-            <small>
-              {stage.actor} · {stageStateLabel[stage.state]}
-            </small>
-          </div>
-        </li>
-      ))}
+      {stages.map((stage, index) => {
+        const visibleState =
+          index > playbackIndex
+            ? "waiting"
+            : index === playbackIndex && playbackIndex < targetIndex
+              ? "active"
+              : stage.state
+        return (
+          <li
+            key={`${stage.id}-${index <= playbackIndex ? "revealed" : "future"}`}
+            className="fds-step-item fds-step-reveal"
+            data-state={visibleState}
+            data-actor={stage.actor === "담당자" ? "HUMAN" : "SYSTEM"}
+            data-playback={
+              index === playbackIndex
+                ? "current"
+                : index < playbackIndex
+                  ? "past"
+                  : "future"
+            }
+          >
+            <span className="fds-step-dot" aria-hidden="true">
+              {visibleState === "done"
+                ? "✓"
+                : visibleState === "failed"
+                  ? "!"
+                  : visibleState === "recovery"
+                    ? "↻"
+                    : index + 1}
+            </span>
+            <div className="min-w-0">
+              <strong>{stage.title}</strong>
+              <small>
+                {stage.actor} · {stageStateLabel[visibleState]}
+              </small>
+            </div>
+          </li>
+        )
+      })}
     </ol>
   </Panel>
 )
 
 const TransferTimeline = ({ detail }: { detail: FdsHoldDetail }) => {
   const history = detail.toolResults?.history
-  const items = history?.items ?? []
+  const items = [...(history?.items ?? [])].sort((left, right) =>
+    (left.transferredAt ?? "").localeCompare(right.transferredAt ?? ""),
+  )
   const current = detail.originalTransfer
   return (
     <Panel className="p-5">
@@ -248,7 +276,10 @@ const sceneCopy = (stage: FdsReviewStage, detail: FdsHoldDetail) => {
           ? `${dateTime(latestCall.recordedAt)} · ${latestCall.selectedByAction ? "최종 조치에 사용" : "미선정"}`
           : "기록 없음",
       }
-    case "decision":
+    case "decision": {
+      const actionInput = detail.adminAction
+        ? `조치 ${detail.adminAction.actionType ?? "확인 중"}${detail.adminAction.reasonCode ? ` · 사유 ${detail.adminAction.reasonCode}` : ""}`
+        : "조치 선택 대기"
       return {
         title:
           stage.state === "done"
@@ -260,9 +291,10 @@ const sceneCopy = (stage: FdsReviewStage, detail: FdsHoldDetail) => {
           stage.state === "done"
             ? "서버에 최종 관리자 조치가 반영되었습니다."
             : "서버 보류 근거, Agent 조사, 위험 계좌 판정과 고객 확인 결과를 검토합니다.",
-        input: `조치 ${detail.adminAction?.actionType ?? "선택 대기"} · 사유 ${detail.adminAction?.reasonCode ?? "-"}`,
+        input: actionInput,
         result: `${labeledStatus(detail.adminAction?.status ?? "PENDING")}${detail.adminAction?.failureReason ? ` · ${detail.adminAction.failureReason}` : ""}`,
       }
+    }
   }
 }
 
@@ -297,7 +329,7 @@ const CurrentScene = ({
               : Database
   return (
     <Panel key={`${stage.id}-${stage.state}`} className="fds-scene-enter">
-      <div className="text-sm flex justify-between border-b border-border px-5 py-3 font-bold text-ink-muted">
+      <div className="text-sm flex justify-between border-b border-border px-5 py-3 font-bold text-ink">
         <span>현재 처리 단계</span>
         <span>
           {stage.title} · {stageStateLabel[stage.state]}
@@ -352,12 +384,43 @@ export const FdsHeldTransferReview = ({
 }) => {
   const stages = buildFdsReviewStages(detail)
   const current = currentFdsReviewStage(stages)
+  const targetIndex = Math.max(
+    0,
+    stages.findIndex((stage) => stage.id === current.id),
+  )
+  const reducedMotion = prefersReducedMotion()
+  const [playbackIndex, setPlaybackIndex] = React.useState(() =>
+    reducedMotion ? targetIndex : 0,
+  )
+
+  React.useEffect(() => {
+    if (reducedMotion) return
+    const timer = window.setInterval(() => {
+      setPlaybackIndex((index) => {
+        if (index >= targetIndex) {
+          window.clearInterval(timer)
+          return index
+        }
+        return index + 1
+      })
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [reducedMotion, targetIndex])
+
+  const visibleIndex = reducedMotion
+    ? targetIndex
+    : Math.min(playbackIndex, targetIndex)
+  const playbackStage = stages[visibleIndex] ?? current
   return (
     <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <StepRail stages={stages} />
+      <StepRail
+        stages={stages}
+        playbackIndex={visibleIndex}
+        targetIndex={targetIndex}
+      />
       <div className="min-w-0 space-y-5">
         <TransferTimeline detail={detail} />
-        <CurrentScene stage={current} detail={detail} />
+        <CurrentScene stage={playbackStage} detail={detail} />
       </div>
     </div>
   )

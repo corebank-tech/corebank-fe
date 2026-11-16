@@ -45,6 +45,10 @@ const riskLabels: Record<string, string> = {
   NO_MATCH: "위험 계좌 목록과 일치하지 않음",
   UNAVAILABLE: "위험 계좌 조회 불가",
 }
+const findingConfidenceLabels: Record<string, string> = {
+  OBSERVED: "직접 관찰",
+  INFERRED: "정황 추론",
+}
 const statusVariant = (status?: string) =>
   status === "COMPLETED" || status === "AVAILABLE" || status === "ACTIVE"
     ? "success"
@@ -60,8 +64,10 @@ const DetailPanel = ({
   children: React.ReactNode
 }) => (
   <Panel className="p-5">
-    <PanelHeader title={title} />
-    <div className="mt-3">{children}</div>
+    <PanelHeader title={title} className="px-0 pb-3" />
+    <div className="fds-detail-rows mt-3 divide-y divide-border">
+      {children}
+    </div>
   </Panel>
 )
 
@@ -77,6 +83,10 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
   const tools = detail.toolResults
   const report = detail.agentReport
   const risk = detail.riskAccountCheck
+  const historyItems = [...(tools?.history?.items ?? [])].sort((left, right) =>
+    (left.transferredAt ?? "").localeCompare(right.transferredAt ?? ""),
+  )
+  const originalPending = original?.holdStatus === "HELD"
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
@@ -112,11 +122,20 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
         />
         <LabelValueRow
           label="처리 사유"
-          value={valueOrDash(original?.reasonCode)}
+          value={
+            original?.reasonCode ??
+            (originalPending ? "최종 처리 전" : "서버 기록 없음")
+          }
         />
         <LabelValueRow
           label="완료 시각"
-          value={dateTime(original?.completedAt)}
+          value={
+            original?.completedAt
+              ? dateTime(original.completedAt)
+              : originalPending
+                ? "최종 처리 전"
+                : "서버 기록 없음"
+          }
         />
       </DetailPanel>
 
@@ -243,7 +262,6 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
       </DetailPanel>
 
       <DetailPanel title="조사 Tool 결과">
-        <p className="mb-2 font-bold">최근 이체 이력</p>
         <LabelValueRow
           label="조회 실행"
           value={yesNo(tools?.history?.executed)}
@@ -257,46 +275,25 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
           }
         />
         <LabelValueRow
-          label="추가 이력"
-          value={yesNo(tools?.history?.hasMore)}
-        />
-        {tools?.history?.items?.length ? (
-          <ul className="mt-2 space-y-2 border-t border-border pt-3">
-            {tools.history.items.map((item) => (
-              <li key={item.refId} className="text-sm text-ink-muted">
-                거래 {item.refId ?? "-"} ·{" "}
-                {item.amount == null ? "금액 미상" : formatAmount(item.amount)}{" "}
-                · {dateTime(item.transferredAt)} ·{" "}
-                {item.recipientAccountMasked ?? "계좌 미상"}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm mt-2 text-ink-muted">
-            제공된 최근 이체 이력이 없습니다.
-          </p>
-        )}
-        <p className="mt-5 mb-2 border-t border-border pt-4 font-bold">
-          수취인 관계
-        </p>
-        <LabelValueRow
-          label="조회 실행"
-          value={yesNo(tools?.recipientContext?.executed)}
-        />
-        <LabelValueRow
-          label="최초 성공 이체"
-          value={dateTime(tools?.recipientContext?.firstSucceededAt)}
-        />
-        <LabelValueRow
-          label="구간 이전 거래"
-          value={yesNo(tools?.recipientContext?.hasSucceededBeforeWindow)}
-        />
-        <LabelValueRow
-          label="다른 출금계좌"
+          label="최근 이체 이력"
           value={
-            tools?.recipientContext?.otherWithdrawalAccountCount == null
-              ? "-"
-              : `${tools.recipientContext.otherWithdrawalAccountCount}개`
+            historyItems.length ? (
+              <ul className="w-full space-y-2 py-1 text-left">
+                {historyItems.map((item) => (
+                  <li key={item.refId}>
+                    거래 {item.refId ?? "-"} ·{" "}
+                    {item.amount == null
+                      ? "금액 미상"
+                      : formatAmount(item.amount)}{" "}
+                    · {dateTime(item.transferredAt)} ·{" "}
+                    {item.recipientAccountMasked ?? "계좌 미상"}
+                  </li>
+                ))}
+                {tools?.history?.hasMore && <li>이외 추가 이력이 있습니다.</li>}
+              </ul>
+            ) : (
+              "제공된 최근 이체 이력이 없습니다."
+            )
           }
         />
       </DetailPanel>
@@ -321,6 +318,7 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
         />
         <LabelValueRow
           label="고객 질문 제안"
+          className="fds-agent-question"
           value={
             report?.suggestedQuestions?.length
               ? report.suggestedQuestions.join(" / ")
@@ -328,12 +326,23 @@ const DetailInformation = ({ detail }: { detail: FdsHoldDetail }) => {
           }
         />
         {report?.secondaryFindings?.length ? (
-          <ul className="mt-3 space-y-2 border-t border-border pt-3">
+          <ul className="fds-no-divider mt-4 space-y-4">
             {report.secondaryFindings.map((finding, index) => (
               <li key={`${finding.code}-${index}`} className="text-sm">
-                <strong>{finding.code ?? "추가 발견"}</strong> ·{" "}
-                {finding.description ?? "설명 없음"}{" "}
-                {finding.confidence ? `· 신뢰도 ${finding.confidence}` : ""}
+                <p>
+                  <strong>{finding.code ?? "추가 발견"}</strong> ·{" "}
+                  {finding.description ?? "설명 없음"}
+                </p>
+                <p className="mt-2 text-ink-muted">
+                  근거 수준{" "}
+                  {finding.confidence
+                    ? (findingConfidenceLabels[finding.confidence] ??
+                      finding.confidence)
+                    : "미제공"}
+                  {finding.evidenceTransferIds?.length
+                    ? ` · 근거 거래 ${finding.evidenceTransferIds.length}건`
+                    : ""}
+                </p>
               </li>
             ))}
           </ul>
@@ -561,130 +570,139 @@ export const FdsHeldTransferDetail = () => {
           거절만 가능합니다.
         </div>
       )}
-      <FdsHeldTransferReview detail={detail} />
-      <DetailInformation detail={detail} />
-      <Panel className="p-5">
-        <PanelHeader title="고객 확인 결과 기록" />
-        <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr_auto]">
-          <Select
-            aria-label="고객 확인 결과"
-            value={callResult}
-            onChange={(event) =>
-              setCallResult(event.target.value as FdsCallResult)
-            }
-          >
-            <option value="CUSTOMER_CONFIRMED">고객 확인</option>
-            <option value="CUSTOMER_DENIED">고객 부인</option>
-            <option value="NO_ANSWER">응답 없음</option>
-            <option value="INCONCLUSIVE">판단 불가</option>
-          </Select>
-          <Input
-            aria-label="콜 기록 사유"
-            value={callReason}
-            maxLength={200}
-            onChange={(event) => setCallReason(event.target.value)}
-            placeholder="확인 내용을 입력하세요"
-          />
-          <Button
-            disabled={processing || completed || !callReason.trim()}
-            onClick={() => void saveCall()}
-          >
-            저장
-          </Button>
-        </div>
-        <div className="mt-4 space-y-2">
-          {detail.callRecords?.map((record) => (
-            <p key={record.callRecordId} className="text-sm">
-              {record.recordedAt ?? "-"} ·{" "}
-              {callLabels[record.callResult ?? ""] ?? record.callResult} ·{" "}
-              {record.investigationReason}
-            </p>
-          ))}
-        </div>
-      </Panel>
-      <Panel className="p-5">
-        <PanelHeader title="관리자 최종 조치" />
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <Button
-            variant="success"
-            disabled={processing || !canApprove}
-            onClick={() => setPendingDecision("APPROVE")}
-          >
-            승인
-          </Button>
-          <Button
-            variant="danger"
-            disabled={processing || !(canReject || canRiskReject)}
-            onClick={() => setPendingDecision("REJECT")}
-          >
-            {risk === "MATCH" ? "위험 계좌 일치로 거절" : "일반 거절"}
-          </Button>
-          <Button
-            variant="danger"
-            disabled={processing || !canReject}
-            onClick={() => setPendingDecision("FRAUD_REJECT")}
-          >
-            사기 확정 및 거절
-          </Button>
-        </div>
-        {message && (
-          <p role="alert" className="mt-3 text-danger">
-            {message}
-          </p>
-        )}
-        {detail.adminAction && (
-          <div className="mt-4">
-            <LabelValueRow
-              label="조치 상태"
-              value={
-                <Badge
-                  variant={
-                    detail.adminAction.status === "COMPLETED"
-                      ? "success"
-                      : detail.adminAction.status === "PENDING"
-                        ? "warning"
-                        : "danger"
-                  }
-                >
-                  {detail.adminAction.status}
-                </Badge>
+      <FdsHeldTransferReview key={detail.transferHoldId} detail={detail} />
+      <div className="space-y-5 xl:ml-[300px]">
+        <DetailInformation detail={detail} />
+        <Panel className="p-5">
+          <PanelHeader title="고객 확인 결과 기록" />
+          <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr_auto]">
+            <Select
+              aria-label="고객 확인 결과"
+              value={callResult}
+              onChange={(event) =>
+                setCallResult(event.target.value as FdsCallResult)
               }
+            >
+              <option value="CUSTOMER_CONFIRMED">고객 확인</option>
+              <option value="CUSTOMER_DENIED">고객 부인</option>
+              <option value="NO_ANSWER">응답 없음</option>
+              <option value="INCONCLUSIVE">판단 불가</option>
+            </Select>
+            <Input
+              aria-label="콜 기록 사유"
+              value={callReason}
+              maxLength={200}
+              onChange={(event) => setCallReason(event.target.value)}
+              placeholder="확인 내용을 입력하세요"
             />
-            <LabelValueRow
-              label="조치 유형"
-              value={detail.adminAction.actionType ?? "-"}
-            />
-            <LabelValueRow
-              label="서버 사유 코드"
-              value={detail.adminAction.reasonCode ?? "-"}
-            />
-            <LabelValueRow
-              label="복구 필요"
-              value={detail.adminAction.recoveryRequired ? "예" : "아니오"}
-            />
-            <LabelValueRow
-              label="실패 사유"
-              value={detail.adminAction.failureReason ?? "-"}
-            />
+            <Button
+              disabled={processing || completed || !callReason.trim()}
+              onClick={() => void saveCall()}
+            >
+              저장
+            </Button>
           </div>
-        )}
-        {detail.riskRegistration && (
-          <div className="mt-4 border-t border-border pt-4">
-            <LabelValueRow
-              label="위험계좌 등록 상태"
-              value={detail.riskRegistration.status ?? "-"}
-            />
-            <LabelValueRow
-              label="등록 복구 필요"
-              value={detail.riskRegistration.recoveryRequired ? "예" : "아니오"}
-            />
-            <LabelValueRow
-              label="등록 실패 사유"
-              value={detail.riskRegistration.failureReason ?? "-"}
-            />
+          <div className="mt-4 divide-y divide-border border-y border-border">
+            {detail.callRecords?.map((record) => (
+              <p key={record.callRecordId} className="text-sm py-3">
+                {dateTime(record.recordedAt)} ·{" "}
+                {callLabels[record.callResult ?? ""] ?? record.callResult} ·{" "}
+                {record.investigationReason}
+              </p>
+            ))}
           </div>
-        )}
-      </Panel>
+        </Panel>
+        <Panel className="p-5">
+          <PanelHeader title="관리자 최종 조치" />
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <Button
+              variant="success"
+              disabled={processing || !canApprove}
+              onClick={() => setPendingDecision("APPROVE")}
+            >
+              승인
+            </Button>
+            <Button
+              variant="danger"
+              disabled={processing || !(canReject || canRiskReject)}
+              onClick={() => setPendingDecision("REJECT")}
+            >
+              {risk === "MATCH" ? "위험 계좌 일치로 거절" : "일반 거절"}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={processing || !canReject}
+              onClick={() => setPendingDecision("FRAUD_REJECT")}
+            >
+              사기 확정 및 거절
+            </Button>
+          </div>
+          <p className="text-sm mt-3 border-l-4 border-border-strong bg-surface px-3 py-2 text-ink-muted">
+            {risk === "MATCH"
+              ? "현재 위험 계좌 일치 판정에서는 RISK_ACCOUNT_MATCH 거절만 사용할 수 있습니다."
+              : "현재 위험 계좌 판정에서는 최신 고객 부인 기록이 있을 때 CUSTOMER_DENIED 거절만 사용할 수 있습니다."}
+          </p>
+          {message && (
+            <p role="alert" className="mt-3 text-danger">
+              {message}
+            </p>
+          )}
+          {detail.adminAction && (
+            <div className="fds-detail-rows mt-4 divide-y divide-border">
+              <LabelValueRow
+                label="조치 상태"
+                value={
+                  <Badge
+                    variant={
+                      detail.adminAction.status === "COMPLETED"
+                        ? "success"
+                        : detail.adminAction.status === "PENDING"
+                          ? "warning"
+                          : "danger"
+                    }
+                  >
+                    {detail.adminAction.status}
+                  </Badge>
+                }
+              />
+              <LabelValueRow
+                label="조치 유형"
+                value={detail.adminAction.actionType ?? "-"}
+              />
+              <LabelValueRow
+                label="서버 사유 코드"
+                value={detail.adminAction.reasonCode ?? "-"}
+              />
+              <LabelValueRow
+                label="복구 필요"
+                value={detail.adminAction.recoveryRequired ? "예" : "아니오"}
+              />
+              <LabelValueRow
+                label="실패 사유"
+                value={detail.adminAction.failureReason ?? "-"}
+              />
+            </div>
+          )}
+          {detail.riskRegistration && (
+            <div className="fds-detail-rows mt-4 divide-y divide-border">
+              <LabelValueRow
+                label="위험계좌 등록 상태"
+                value={detail.riskRegistration.status ?? "-"}
+              />
+              <LabelValueRow
+                label="등록 복구 필요"
+                value={
+                  detail.riskRegistration.recoveryRequired ? "예" : "아니오"
+                }
+              />
+              <LabelValueRow
+                label="등록 실패 사유"
+                value={detail.riskRegistration.failureReason ?? "-"}
+              />
+            </div>
+          )}
+        </Panel>
+      </div>
       <ConfirmDialog
         open={pendingDecision != null}
         onClose={() => setPendingDecision(null)}

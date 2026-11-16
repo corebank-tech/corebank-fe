@@ -77,9 +77,12 @@ export const REQUEST_IN_PROGRESS_CODE = "CMN0301"
 export const isRequestInProgressError = (error: unknown): boolean =>
   isApiError(error) && error.code === REQUEST_IN_PROGRESS_CODE
 
+/** 게이트웨이가 서버 응답을 기다리다 끊은 경우다. 서버는 이미 처리했을 수 있다. */
+const GATEWAY_TIMEOUT_STATUSES = [408, 429]
+
 /**
- * 처리 여부를 모르는 오류인지 본다 — status 0(전송 실패), 5xx(서버가 처리 도중 터짐), 그리고
- * 앞선 요청이 아직 처리 중이라는 `CMN0301` 이다.
+ * 처리 여부를 모르는 오류인지 본다 — status 0(전송 실패), 5xx(서버가 처리 도중 터짐),
+ * 게이트웨이 시간 초과(408·429), 그리고 앞선 요청이 아직 처리 중이라는 `CMN0301` 이다.
  * 장애는 code 를 보지 않는다. envelope 에 실려 와(`CMN9999` + 500) CMN9000 을 요구하면 놓친다.
  * 모르는 건을 실패로 단정하면 고객이 같은 거래를 다시 넣어 두 번 빠져나간다(REQ-TRSF-016).
  */
@@ -87,4 +90,5 @@ export const isUnknownOutcomeError = (error: unknown): boolean =>
   isApiError(error) &&
   (error.status === NETWORK_ERROR_STATUS ||
     error.status >= 500 ||
+    GATEWAY_TIMEOUT_STATUSES.includes(error.status) ||
     isRequestInProgressError(error))

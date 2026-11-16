@@ -32,4 +32,17 @@ describe("pending-transfer-key", () => {
     sessionStorage.setItem("corebank:pending-transfer-key", "{깨진 값")
     expect(readPendingTransferKey()).toBeNull()
   })
+
+  it.each([
+    ["빈 객체", "{}"],
+    ["키가 빈 문자열", JSON.stringify({ idempotencyKey: "", intent: {} })],
+    ["거래 내용이 없는 값", JSON.stringify({ idempotencyKey: "key-1" })],
+    [
+      "거래 내용 형태가 아닌 값",
+      JSON.stringify({ idempotencyKey: "k", intent: 1 }),
+    ],
+  ])("형태가 맞지 않는 값(%s)은 없는 것으로 본다", (_label, raw) => {
+    sessionStorage.setItem("corebank:pending-transfer-key", raw)
+    expect(readPendingTransferKey()).toBeNull()
+  })
 })

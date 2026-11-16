@@ -14,10 +14,25 @@ export type PendingTransferKey = {
 
 const STORAGE_KEY = "corebank:pending-transfer-key"
 
+/** 깨졌거나 옛 형식인 값이 거래 내용 비교를 망치지 않게 형태를 확인한다. */
+const isPendingTransferKey = (value: unknown): value is PendingTransferKey => {
+  if (typeof value !== "object" || value === null) return false
+  const { idempotencyKey, intent } = value as Partial<PendingTransferKey>
+  return (
+    typeof idempotencyKey === "string" &&
+    idempotencyKey !== "" &&
+    typeof intent === "object" &&
+    intent !== null &&
+    typeof intent.depositAccountNumber === "string"
+  )
+}
+
 export const readPendingTransferKey = (): PendingTransferKey | null => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
-    return raw == null ? null : (JSON.parse(raw) as PendingTransferKey)
+    if (raw == null) return null
+    const parsed: unknown = JSON.parse(raw)
+    return isPendingTransferKey(parsed) ? parsed : null
   } catch {
     return null
   }

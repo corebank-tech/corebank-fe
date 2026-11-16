@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
 
 /**
- * 예·적금 중도해지 B-02 → 예상 지급액 → 인증·해지 → 완료. 서버 역할은 MSW 목이 한다
- * (src/mocks/handlers/deposit-termination-api.ts). 계좌 픽스처에는 만기가 지난 계좌가 없어
- * 만기해지 화면은 이 시나리오로 밟지 못한다.
+ * 예·적금 만기해지·중도해지 B-02 → 예상 지급액 → 인증·해지 → 완료. 서버 역할은 MSW 목이 한다
+ * (src/mocks/handlers/deposit-termination-api.ts). 만기해지는 만기가 지난 "만기도래 정기예금"
+ * 픽스처로, 중도해지는 만기 전 계좌로 밟는다.
  */
 const CUSTOMER = { userId: "honggildong", password: "Passw0rd!" }
 const DEPOSIT_PASSWORD = "1234"
@@ -234,6 +234,42 @@ test("서버 오류(5xx)는 실패로 단정하지 않고 결과 확인을 안�
   await expect(dialog).not.toContainText("중도해지 실패")
   await dialog.getByRole("button", { name: "확인" }).click()
 
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  await expect(page.getByText("중도해지가 완료되었습니다.")).toBeVisible()
+
+  expect(idempotencyKeys).toHaveLength(2)
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
+})
+
+test("결과 미확정 뒤 이전 단계로 갔다 돌아와도 같은 멱등키로 다시 보낸다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (/\/accounts\/\d+\/early-termination$/.test(request.url())) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "corebank-mock:termination:injected-errors",
+      JSON.stringify([{ code: "CMN9999", status: 500 }]),
+    ),
+  )
+
+  await openEarlyTermination(page)
+  await page.getByLabel(/중도해지이율 적용과 해지 후 복구할 수 없음/).check()
+  await page.getByRole("button", { name: "다음" }).click()
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  await expect(page.getByRole("dialog")).toContainText("결과 확인 필요")
+  await page.getByRole("dialog").getByRole("button", { name: "확인" }).click()
+
+  // 2단계 화면이 사라졌다 다시 만들어져도 키는 이어진다.
+  await page.getByRole("button", { name: "이전" }).click()
+  await page.getByLabel(/중도해지이율 적용과 해지 후 복구할 수 없음/).check()
+  await page.getByRole("button", { name: "다음" }).click()
   await fillAccountPassword(page, DEPOSIT_PASSWORD)
   await page.getByRole("button", { name: "중도해지하기" }).click()
   await expect(page.getByText("중도해지가 완료되었습니다.")).toBeVisible()

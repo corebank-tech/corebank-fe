@@ -33,6 +33,7 @@ import {
 import { getLoginStatusQueryKey } from "@/entities/dashboard"
 import {
   ApiError,
+  isRequestInProgressError,
   isUnknownOutcomeError,
   toErrorMessage,
 } from "@/shared/api/api-error"
@@ -512,8 +513,9 @@ export const InstantTransferScreen = () => {
               memo: form.payeeMemo || "-",
               balanceAfter: 0,
             },
-            failReason:
-              "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
+            failReason: isRequestInProgressError(error)
+              ? "같은 이체 요청이 아직 처리 중입니다. 이체결과조회에서 처리 상태를 확인하세요."
+              : "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
           })
           setStep(3)
           return

@@ -55,6 +55,7 @@ describe("isUnknownOutcomeError", () => {
     ["envelope 있는 500 — 서버가 처리 도중 터졌다", "CMN9999", 500, true],
     ["404 업무오류 — 서버가 요청을 거부했다", "TRF0201", 404, false],
     ["409 업무오류 — 서버가 상태로 막았다", "TRF0301", 409, false],
+    ["409 처리 중 — 앞선 요청이 아직 끝나지 않았다", "CMN0301", 409, true],
     ["401 세션만료 — 처리 전에 막혔다", SESSION_EXPIRED_CODE, 401, false],
   ])("%s → %s", (_label, code, status, isUnknown) => {
     expect(isUnknownOutcomeError(apiError(code, "", status))).toBe(isUnknown)

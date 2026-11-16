@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { FdsHeldTransferReview } from "@/pages/admin/fds-held-transfer-review"
 import {
   createFdsAdminDetail,
@@ -7,6 +7,8 @@ import {
 } from "@/mocks/fixtures/fds-admin"
 
 describe("FdsHeldTransferReview", () => {
+  afterEach(() => vi.useRealTimers())
+
   it("화면 진입 즉시 실제 서버의 현재 처리 단계를 표시한다", () => {
     render(
       <FdsHeldTransferReview detail={createFdsAdminDetail(102, "NO_MATCH")} />,
@@ -21,6 +23,42 @@ describe("FdsHeldTransferReview", () => {
     expect(screen.getByText("담당자 확인 대기")).toBeInTheDocument()
     expect(screen.getByText("조치 선택 대기")).toBeInTheDocument()
     expect(screen.queryByText("· 사유 -")).not.toBeInTheDocument()
+  })
+
+  it("다시 보기 버튼을 누른 경우에만 1단계부터 1초 간격으로 재생한다", () => {
+    vi.useFakeTimers()
+    render(
+      <FdsHeldTransferReview detail={createFdsAdminDetail(102, "NO_MATCH")} />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "처리 과정 다시 보기" }))
+    expect(screen.getByRole("button", { name: "재생 중" })).toBeDisabled()
+    expect(screen.getByText("원본 이체 보류")).toBeInTheDocument()
+    expect(screen.getByText("이체 보류").closest("li")).toHaveAttribute(
+      "data-state",
+      "active",
+    )
+
+    act(() => vi.advanceTimersByTime(1000))
+    expect(screen.getByText("조사 작업 대기")).toBeInTheDocument()
+    expect(screen.getByText("조사 등록").closest("li")).toHaveAttribute(
+      "data-state",
+      "active",
+    )
+
+    for (let index = 0; index < 5; index += 1) {
+      act(() => vi.advanceTimersByTime(1000))
+    }
+    const stepRail = screen.getByRole("list", { name: "FDS 사건 처리 단계" })
+    expect(
+      within(stepRail).getByText("고객 확인").closest("li"),
+    ).toHaveAttribute("data-state", "active")
+
+    act(() => vi.advanceTimersByTime(1000))
+    expect(
+      screen.getByRole("button", { name: "처리 과정 다시 보기" }),
+    ).toBeEnabled()
+    expect(screen.getByText("담당자 확인 대기")).toBeInTheDocument()
   })
 
   it("실제 조사 PENDING 응답으로 조사 등록 단계를 현재 상태로 표시한다", () => {

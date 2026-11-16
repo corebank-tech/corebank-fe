@@ -19,6 +19,7 @@ import {
 import type { FdsHoldDetail } from "@/shared/api/generated"
 import { formatAmount, formatDateTime } from "@/shared/lib/format"
 import { Badge } from "@/shared/ui/badge"
+import { Button } from "@/shared/ui/button"
 import { Panel } from "@/shared/ui/panel"
 import "@/pages/admin/fds-held-transfer-motion.css"
 
@@ -59,13 +60,28 @@ const StepRail = ({
   stages,
   playbackIndex,
   targetIndex,
+  isReplaying,
+  onReplay,
 }: {
   stages: FdsReviewStage[]
   playbackIndex: number
   targetIndex: number
+  isReplaying: boolean
+  onReplay: () => void
 }) => (
   <Panel className="self-start p-4 xl:sticky xl:top-4">
-    <h2 className="mb-4 font-bold">처리 단계</h2>
+    <div className="mb-4 flex items-center justify-between gap-2">
+      <h2 className="font-bold">처리 단계</h2>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={isReplaying || targetIndex === 0}
+        onClick={onReplay}
+      >
+        {isReplaying ? "재생 중" : "처리 과정 다시 보기"}
+      </Button>
+    </div>
     <ol className="fds-step-rail" aria-label="FDS 사건 처리 단계">
       {stages.map((stage, index) => {
         const visibleState =
@@ -385,13 +401,37 @@ export const FdsHeldTransferReview = ({
     0,
     stages.findIndex((stage) => stage.id === current.id),
   )
-  const playbackStage = stages[targetIndex] ?? current
+  const [replayIndex, setReplayIndex] = React.useState<number | null>(null)
+  const isReplaying = replayIndex != null
+
+  React.useEffect(() => {
+    if (replayIndex == null) return
+    const timer = window.setTimeout(
+      () =>
+        setReplayIndex((index) => {
+          if (index == null) return null
+          const nextIndex = index + 1
+          return nextIndex >= targetIndex ? null : nextIndex
+        }),
+      1000,
+    )
+    return () => window.clearTimeout(timer)
+  }, [replayIndex, targetIndex])
+
+  const visibleIndex = replayIndex ?? targetIndex
+  const serverStage = stages[visibleIndex] ?? current
+  const playbackStage: FdsReviewStage =
+    isReplaying && visibleIndex < targetIndex
+      ? { ...serverStage, state: "active" }
+      : serverStage
   return (
     <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <StepRail
         stages={stages}
-        playbackIndex={targetIndex}
+        playbackIndex={visibleIndex}
         targetIndex={targetIndex}
+        isReplaying={isReplaying}
+        onReplay={() => setReplayIndex(0)}
       />
       <div className="min-w-0 space-y-5">
         <TransferTimeline detail={detail} />

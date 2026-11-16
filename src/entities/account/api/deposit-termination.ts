@@ -57,10 +57,19 @@ export const useDepositTerminationPreviewQuery = (
   kind: DepositTerminationKind,
 ) => {
   const maturityPreview = usePreviewMaturityTermination(accountId, {
-    query: { enabled: kind === "maturity", gcTime: 0 },
+    query: {
+      enabled: kind === "maturity",
+      gcTime: 0,
+      // 고객이 확인한 예상 지급액이 포커스를 되찾을 때 조용히 바뀌지 않게 한다.
+      refetchOnWindowFocus: false,
+    },
   })
   const earlyPreview = usePreviewEarlyTermination(accountId, {
-    query: { enabled: kind === "early", gcTime: 0 },
+    query: {
+      enabled: kind === "early",
+      gcTime: 0,
+      refetchOnWindowFocus: false,
+    },
   })
 
   return kind === "maturity" ? maturityPreview : earlyPreview

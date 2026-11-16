@@ -7,6 +7,9 @@
  */
 import type { DepositTerminationKind } from "@/entities/account/lib/deposit-termination"
 
+/** 세션 저장소를 못 쓰는 환경(사생활 보호 모드·용량 초과)에서도 이 탭 안에서는 키를 잇는다. */
+const memoryKeys = new Map<string, string>()
+
 const storageKeyOf = (accountId: number, kind: DepositTerminationKind) =>
   `corebank:pending-termination-key:${accountId}:${kind}`
 
@@ -14,10 +17,13 @@ export const readPendingTerminationKey = (
   accountId: number,
   kind: DepositTerminationKind,
 ): string | null => {
+  const storageKey = storageKeyOf(accountId, kind)
   try {
-    return sessionStorage.getItem(storageKeyOf(accountId, kind))
+    return (
+      sessionStorage.getItem(storageKey) ?? memoryKeys.get(storageKey) ?? null
+    )
   } catch {
-    return null
+    return memoryKeys.get(storageKey) ?? null
   }
 }
 
@@ -30,10 +36,12 @@ export const getOrCreatePendingTerminationKey = (
   if (pending != null) return pending
 
   const created = crypto.randomUUID()
+  const storageKey = storageKeyOf(accountId, kind)
+  memoryKeys.set(storageKey, created)
   try {
-    sessionStorage.setItem(storageKeyOf(accountId, kind), created)
+    sessionStorage.setItem(storageKey, created)
   } catch {
-    // 저장소를 못 쓰는 환경이면 이번 화면에서만 유지된다.
+    // 저장소를 못 쓰면 메모리 키로만 잇는다.
   }
   return created
 }
@@ -42,8 +50,10 @@ export const clearPendingTerminationKey = (
   accountId: number,
   kind: DepositTerminationKind,
 ): void => {
+  const storageKey = storageKeyOf(accountId, kind)
+  memoryKeys.delete(storageKey)
   try {
-    sessionStorage.removeItem(storageKeyOf(accountId, kind))
+    sessionStorage.removeItem(storageKey)
   } catch {
     // 지울 것이 없다.
   }

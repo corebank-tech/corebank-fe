@@ -28,9 +28,15 @@ const TOKENS_KEY = "account-password-tokens"
 
 type TokenRecord = { memberId: string; accountId: number; expiresAt: number }
 
-const passwordOf = (accountNo: string) =>
-  MOCK_WITHDRAWAL_ACCOUNTS.find((account) => account.accountNo === accountNo)
-    ?.mockPassword
+/** 예·적금 상품 계좌는 가입 때 정한 비밀번호가 픽스처에 없어 하나로 통일한다. */
+const DEPOSIT_PRODUCT_MOCK_PASSWORD = "1234"
+
+const passwordOf = (accountNo: string, group: "checking" | "deposit") =>
+  group === "deposit"
+    ? DEPOSIT_PRODUCT_MOCK_PASSWORD
+    : MOCK_WITHDRAWAL_ACCOUNTS.find(
+        (account) => account.accountNo === accountNo,
+      )?.mockPassword
 
 const readErrorCount = (accountId: number): number =>
   readStore<Record<string, number>>(ERROR_COUNTS_KEY, {})[accountId] ?? 0
@@ -97,8 +103,9 @@ export const accountPasswordApiHandlers = [
 
       const accountId = Number(params.accountId)
       const entry = findMockAccount(accountId, memberId)
-      const expected = entry && passwordOf(entry.account.accountNo)
-      // 소유자가 아니거나 비밀번호 픽스처가 없는 계좌(예적금)는 서버의
+      const expected =
+        entry && passwordOf(entry.account.accountNo, entry.account.group)
+      // 소유자가 아니거나 비밀번호 픽스처가 없는 계좌는 서버의
       // ACCOUNT_NOT_FOUND_OR_FORBIDDEN 과 같은 응답으로 떨어뜨린다. 소유자 확인이
       // 오류 횟수를 쌓기 전이어야 한다 — 남의 계좌를 잠글 수 있으면 안 된다.
       if (entry == null || expected == null) {

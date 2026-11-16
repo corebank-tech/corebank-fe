@@ -4540,6 +4540,243 @@
         }
       }
     },
+    "/accounts/{accountId}/maturity-termination/preview": {
+      "get": {
+        "tags": [
+          "만기해지"
+        ],
+        "summary": "만기해지 예상 원리금 조회",
+        "description": "만기 도래한 본인 예·적금 계좌의 예상 지급액을 조회합니다. 계좌 잔액이나 상태를 변경하지 않으며 실제 해지 금액은 달라질 수 있습니다.",
+        "operationId": "previewMaturityTermination",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "description": "해지할 예·적금 계좌 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            },
+            "example": 101
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "예상 원리금 조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "계좌를 찾을 수 없거나 소유권이 없음",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "해지할 수 없는 계좌 상태",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/early-termination": {
+      "post": {
+        "tags": [
+          "중도해지"
+        ],
+        "summary": "예·적금 중도해지 실행",
+        "description": "본인 소유 ACTIVE 예·적금 계좌를 중도해지합니다. 가입 시 등록한 수취계좌로 원리금을 이체하며, Idempotency-Key와 Account-Password-Auth-Token이 필요합니다.",
+        "operationId": "earlyTerminateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "description": "해지할 예·적금 계좌 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            },
+            "example": 101
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID v4 멱등키. 동일 키와 동일 요청은 최초 응답을 재생",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          {
+            "name": "Account-Password-Auth-Token",
+            "in": "header",
+            "description": "계좌비밀번호 인증 토큰",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "중도해지 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEarlyTerminationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`CMN0001` 계좌 ID 또는 멱등키 형식 오류 · `CMN0002` Idempotency-Key 또는 Account-Password-Auth-Token 헤더 누락",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`APW0101` 계좌비밀번호 잠금 · `APW0102` 계좌비밀번호 인증 토큰 무효·만료·재사용 또는 계좌 불일치",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "계좌를 찾을 수 없거나 소유권이 없음",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "계좌 상태 불일치 또는 멱등키 충돌",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/early-termination/preview": {
+      "get": {
+        "tags": [
+          "중도해지"
+        ],
+        "summary": "중도해지 예상 원리금 조회",
+        "description": "만기 전 본인 예·적금 계좌의 중도해지 예상 지급액을 조회합니다. 중도해지이율을 적용하며 실제 해지는 실행하지 않습니다.",
+        "operationId": "previewEarlyTermination",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "description": "해지할 예·적금 계좌 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "exclusiveMinimum": 0
+            },
+            "example": 101
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "예상 원리금 조회 성공",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTerminationPreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`CMN0101` 인증정보가 없거나 세션이 만료됨",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "계좌를 찾을 수 없거나 소유권이 없음",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "해지할 수 없는 계좌 상태",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transfers/favorite-accounts/{favoriteAccountId}": {
       "delete": {
         "tags": [
@@ -10836,6 +11073,126 @@
           },
           "data": {
             "$ref": "#/components/schemas/MaturityTerminationResponse"
+          }
+        }
+      },
+      "EarlyTerminationResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "withdrawalAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "principal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grossInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tax": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalTransferred": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transactionNumber": {
+            "type": "string"
+          },
+          "tradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseEarlyTerminationResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EarlyTerminationResponse"
+          }
+        }
+      },
+      "TerminationPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "terminationType": {
+            "type": "string",
+            "enum": [
+              "MATURITY",
+              "EARLY_TERMINATION"
+            ]
+          },
+          "withdrawalAccountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "principal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grossInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tax": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "netInterest": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalExpectedAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "calculationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseTerminationPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TerminationPreviewResponse"
           }
         }
       },

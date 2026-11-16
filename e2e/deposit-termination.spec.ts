@@ -172,7 +172,10 @@ test("처리 중(CMN0301) 응답 뒤 재시도는 같은 멱등키를 쓰고, �
   await page.evaluate(() =>
     sessionStorage.setItem(
       "corebank-mock:termination:injected-errors",
-      JSON.stringify(["CMN0301", "ACC0301"]),
+      JSON.stringify([
+        { code: "CMN0301", status: 409 },
+        { code: "ACC0301", status: 409 },
+      ]),
     ),
   )
 
@@ -201,4 +204,40 @@ test("처리 중(CMN0301) 응답 뒤 재시도는 같은 멱등키를 쓰고, �
   expect(idempotencyKeys).toHaveLength(3)
   expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
   expect(idempotencyKeys[2]).not.toBe(idempotencyKeys[1])
+})
+
+test("서버 오류(5xx)는 실패로 단정하지 않고 결과 확인을 안내하며 같은 멱등키로 다시 보낸다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (/\/accounts\/\d+\/early-termination$/.test(request.url())) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "corebank-mock:termination:injected-errors",
+      JSON.stringify([{ code: "CMN9999", status: 500 }]),
+    ),
+  )
+
+  await openEarlyTermination(page)
+  await page.getByLabel(/중도해지이율 적용과 해지 후 복구할 수 없음/).check()
+  await page.getByRole("button", { name: "다음" }).click()
+
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog).toContainText("결과 확인 필요")
+  await expect(dialog).toContainText("거래내역")
+  await expect(dialog).not.toContainText("중도해지 실패")
+  await dialog.getByRole("button", { name: "확인" }).click()
+
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  await expect(page.getByText("중도해지가 완료되었습니다.")).toBeVisible()
+
+  expect(idempotencyKeys).toHaveLength(2)
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
 })

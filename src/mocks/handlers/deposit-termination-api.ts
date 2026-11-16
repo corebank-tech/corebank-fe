@@ -24,7 +24,7 @@ import {
 
 const MOCK_LATENCY_MS = 200
 const REPLAYS_KEY = "deposit-termination-replays"
-/** e2e 가 실행 응답을 주입하는 자리. 오류 코드를 담은 배열을 앞에서부터 하나씩 소비한다. */
+/** e2e 가 실행 응답을 주입하는 자리. `{ code, status }` 배열을 앞에서부터 하나씩 소비한다. */
 const INJECTED_ERRORS_KEY = "termination:injected-errors"
 /** 이자 세율(이자소득세 14% + 지방소득세 1.4%). */
 const INTEREST_TAX_RATE = 0.154
@@ -193,13 +193,12 @@ const executeHandler = (kind: TerminationKind) =>
         )
       }
 
-      const [injectedCode, ...remainingCodes] = readStore<string[]>(
-        INJECTED_ERRORS_KEY,
-        [],
-      )
-      if (injectedCode != null) {
-        writeStore(INJECTED_ERRORS_KEY, remainingCodes)
-        return fail(injectedCode, "주입한 응답", 409)
+      const [injected, ...remainingInjected] = readStore<
+        { code: string; status: number }[]
+      >(INJECTED_ERRORS_KEY, [])
+      if (injected != null) {
+        writeStore(INJECTED_ERRORS_KEY, remainingInjected)
+        return fail(injected.code, "주입한 응답", injected.status)
       }
 
       const accountId = Number(params.accountId)

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { FdsHeldTransferDetail } from "@/pages/admin/fds-held-transfer-detail"
 import { server } from "@/mocks/server"
+import { formatDateTime } from "@/shared/lib/format"
 
 const renderPage = (id = "102") => {
   const client = new QueryClient({
@@ -59,7 +60,14 @@ describe("FdsHeldTransferDetail", () => {
       screen.getByText(/CUSTOMER_DENIED 거절만 사용할 수 있습니다/),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/2026\.11\.15 09:20:00 · 고객 부인/),
+      screen.getByText((_, element) => {
+        const text = element?.textContent ?? ""
+        return (
+          element?.tagName === "P" &&
+          text.includes(formatDateTime("2026-11-15T09:20:00+09:00")) &&
+          text.includes("고객 부인")
+        )
+      }),
     ).toBeInTheDocument()
   })
 

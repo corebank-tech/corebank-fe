@@ -20,12 +20,7 @@ type FdsHeldResultProps = {
   onGoToTransferMenu: () => void
 }
 
-/**
- * 즉시이체의 서버 HELD 결과를 보여 줄 고객용 표시 컴포넌트.
- *
- * TODO(#225-follow-up): 즉시이체 API의 확정된 HELD 응답을 view model로
- * 변환한 뒤 D-03 결과 분기에 연결한다. 이 컴포넌트는 직접 API를 알지 않는다.
- */
+/** 즉시이체의 서버 HELD 결과를 보여 줄 고객용 표시 컴포넌트. */
 export const FdsHeldResult = ({
   result,
   onConfirm,

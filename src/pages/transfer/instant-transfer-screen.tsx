@@ -57,6 +57,10 @@ import {
 } from "@/pages/transfer/instant-transfer/deposit-target"
 import { InstantTransferStep2 } from "@/pages/transfer/instant-transfer/d02-confirm"
 import { InstantTransferStep3 } from "@/pages/transfer/instant-transfer/d03-result"
+import {
+  FdsHeldResult,
+  type FdsHeldResultView,
+} from "@/pages/transfer/instant-transfer/fds-held-result"
 import { createFdsBehaviorFlow, submitFdsBehaviorEvents } from "@/entities/fds"
 
 export type InstantTransferForm = {
@@ -86,6 +90,8 @@ type InstantTransferResultState = {
   row: TransferResultRow
   errorCode?: string
   failReason?: string
+  /** status=null + transferHold 응답을 고객용 보류 결과로 변환한 값. */
+  heldResult?: FdsHeldResultView
 }
 
 const INITIAL_FORM: InstantTransferForm = {
@@ -506,6 +512,7 @@ export const InstantTransferScreen = () => {
 
         const settled = executed.status === TransferResponseStatus.SUCCESS
         const failed = executed.status === TransferResponseStatus.ERROR
+        const held = executed.status == null && executed.transferHold != null
         // 대외 응답이 없어 결과를 모르는 상태. 같은 이체를 다시 보내면 상대 은행이
         // 두 번 입금할 수 있어 재이체를 막아야 한다
         // (corebank-server docs/phase2/interbank_transfer_fe_handoff.md §5-1).
@@ -513,6 +520,7 @@ export const InstantTransferScreen = () => {
         if (
           !settled &&
           !failed &&
+          !held &&
           !timedOut &&
           executed.status !== TransferResponseStatus.PROCESSING
         ) {
@@ -539,7 +547,24 @@ export const InstantTransferScreen = () => {
 
         const payeeBankCode = currentIntent.payeeBankCode
         // 200 이어도 이체 성공이 아니다. 본문 status 로 판단한다.
-        if (failed) {
+        if (held) {
+          setResult({
+            status: executed.status,
+            payeeBankCode,
+            row,
+            heldResult: {
+              withdrawalAccountNumber: formatAccountNo(displayForm.fromAccount),
+              recipientBankName: bankNameOf(payeeBankCode),
+              recipientAccountNumber: formatDepositAccountNo(
+                payeeBankCode,
+                form.toAccount,
+              ),
+              recipientName: form.payeeName,
+              amount,
+              requestedAt: executedAt,
+            },
+          })
+        } else if (failed) {
           setResult({
             status: executed.status,
             payeeBankCode,
@@ -602,7 +627,7 @@ export const InstantTransferScreen = () => {
         setStep(1)
         return
       }
-      // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 으로 답했으면 요청이 접수된 것이다.
+      // 서버가 SUCCESS·ERROR·PROCESSING·TIMEOUT 또는 HELD로 답했으면 요청이 접수된 것이다.
       // 다음 이체는 새 키를 쓴다.
       setIdempotencyKey("")
       unknownExecutionIntentRef.current = null
@@ -694,6 +719,23 @@ export const InstantTransferScreen = () => {
   }
 
   if (step === 3 && result) {
+    if (result.heldResult) {
+      return (
+        <FdsHeldResult
+          result={result.heldResult}
+          onConfirm={() => navigate("/transfer/history")}
+          onGoToTransferMenu={() => {
+            setForm(INITIAL_FORM)
+            setResult(null)
+            setAuthError(null)
+            setFavoriteError(null)
+            setBehaviorFlow(createFdsBehaviorFlow())
+            setStep(1)
+          }}
+        />
+      )
+    }
+
     const isSuccess = result.status === TransferResponseStatus.SUCCESS
     const isPending = !isConfirmedTransferStatus(result.status)
     const variant: ResultVariant = isSuccess

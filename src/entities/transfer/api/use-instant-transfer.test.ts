@@ -119,6 +119,31 @@ describe("executeTransferIntent", () => {
     })
   })
 
+  it("당행 보류 응답의 transferHold을 유실하지 않고 넘긴다", async () => {
+    server.use(
+      http.post("*/transfers", () =>
+        ok({
+          status: null,
+          transactionNumber: null,
+          transferHold: {
+            transferHoldId: 5,
+            status: "HELD",
+            releaseAt: null,
+            cancellableUntil: null,
+          },
+        }),
+      ),
+    )
+
+    const result = await executeTransferIntent({ intent: intent(), ...tokens })
+
+    expect(result).toMatchObject({
+      status: null,
+      transferHold: { transferHoldId: 5, status: "HELD" },
+      payeeName: null,
+    })
+  })
+
   it("타행이면 타행 실행 API 로 은행코드를 실어 보내고, 응답의 받는 분 이름을 옮긴다", async () => {
     let body: unknown = null
     server.use(

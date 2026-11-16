@@ -277,3 +277,35 @@ test("결과 미확정 뒤 이전 단계로 갔다 돌아와도 같은 멱등키
   expect(idempotencyKeys).toHaveLength(2)
   expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
 })
+
+test("게이트웨이 시간 초과(408)는 거절로 단정하지 않고 같은 멱등키로 다시 보낸다", async ({
+  page,
+}) => {
+  const idempotencyKeys: string[] = []
+  page.on("request", (request) => {
+    if (/\/accounts\/\d+\/early-termination$/.test(request.url())) {
+      idempotencyKeys.push(request.headers()["idempotency-key"])
+    }
+  })
+  await page.evaluate(() =>
+    sessionStorage.setItem(
+      "corebank-mock:termination:injected-errors",
+      JSON.stringify([{ code: "CMN9000", status: 408 }]),
+    ),
+  )
+
+  await openEarlyTermination(page)
+  await page.getByLabel(/중도해지이율 적용과 해지 후 복구할 수 없음/).check()
+  await page.getByRole("button", { name: "다음" }).click()
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  await expect(page.getByRole("dialog")).toContainText("결과 확인 필요")
+  await page.getByRole("dialog").getByRole("button", { name: "확인" }).click()
+
+  await fillAccountPassword(page, DEPOSIT_PASSWORD)
+  await page.getByRole("button", { name: "중도해지하기" }).click()
+  await expect(page.getByText("중도해지가 완료되었습니다.")).toBeVisible()
+
+  expect(idempotencyKeys).toHaveLength(2)
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
+})

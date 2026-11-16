@@ -7,7 +7,7 @@ import { EmptyState } from "@/shared/ui/empty-state"
 import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { FormSection } from "@/shared/ui/form-section"
 import { StepLayout } from "@/shared/ui/step-layout"
-import { ApiError, NETWORK_ERROR_CODE } from "@/shared/api/api-error"
+import { ApiError } from "@/shared/api/api-error"
 import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { AccountPasswordField } from "@/widgets/transfer"
 import {
@@ -37,7 +37,7 @@ const IN_PROGRESS_MESSAGE =
   "같은 해지 요청이 아직 처리 중입니다. 잠시 뒤 이 화면에서 다시 시도하거나 예·적금 계좌목록에서 계좌 상태를 확인하세요."
 
 const UNCONFIRMED_MESSAGE =
-  "해지 결과를 확인하지 못했습니다. 예·적금 계좌목록에서 계좌 상태를 확인한 뒤 다시 시도하세요."
+  "해지 결과를 확인하지 못했습니다. 예·적금 계좌목록에서 계좌 상태와 입금 계좌의 거래내역을 확인한 뒤 다시 시도하세요."
 
 /**
  * 해지가 끝나지 못한 이유. 서버가 거절한 건과 응답을 받지 못한 건을 한 state 로 묶어
@@ -128,13 +128,14 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
         replace: true,
       })
     } catch (error) {
-      // 응답을 받지 못한 요청과 처리 중인 요청은 서버가 끝냈는지 알 수 없어 키를 유지한 채
-      // 재시도하게 둔다. 서버가 거절한 요청은 처리되지 않았으므로 다음 시도는 새 거래다.
+      // 서버가 4xx 로 거절한 요청만 처리되지 않았다고 본다. 응답을 받지 못한 요청, 5xx, 처리 중인
+      // 요청은 서버가 끝냈는지 알 수 없어 키를 유지한 채 재시도하게 둔다(인계 문서 §6).
       const isInProgress =
         error instanceof ApiError && error.code === IN_PROGRESS_CODE
       const isRejected =
         error instanceof ApiError &&
-        error.code !== NETWORK_ERROR_CODE &&
+        error.status >= 400 &&
+        error.status < 500 &&
         !isInProgress
       if (isRejected) idempotency.reset()
       setFailure(

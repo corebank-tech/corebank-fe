@@ -8,9 +8,10 @@ import { ErrorDialog } from "@/shared/ui/error-dialog"
 import { FormSection } from "@/shared/ui/form-section"
 import { StepLayout } from "@/shared/ui/step-layout"
 import { ApiError } from "@/shared/api/api-error"
-import { useIdempotencyKey } from "@/shared/lib/hooks/use-idempotency-key"
 import { AccountPasswordField } from "@/widgets/transfer"
 import {
+  clearPendingTerminationKey,
+  getOrCreatePendingTerminationKey,
   invalidateAccountQueries,
   parseDepositTerminationKind,
   useAccountPasswordVerification,
@@ -99,7 +100,6 @@ type TerminationAuthBodyProps = {
 const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const idempotency = useIdempotencyKey()
   const label = TERMINATION_LABELS[kind]
 
   const [password, setPassword] = React.useState("")
@@ -117,10 +117,10 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
         kind,
         accountId,
         accountPasswordAuthToken,
-        idempotencyKey: idempotency.keyFor({ accountId, kind }),
+        idempotencyKey: getOrCreatePendingTerminationKey(accountId, kind),
       })
 
-      idempotency.reset()
+      clearPendingTerminationKey(accountId, kind)
       const completeState: TerminationCompleteState = { result }
       // 뒤로 가기로 인증 단계가 다시 열려 이미 끝난 해지를 재요청하지 않도록 이력을 바꾼다.
       navigate(getDepositTerminationPath(accountId, kind, 3), {
@@ -137,7 +137,7 @@ const TerminationAuthBody = ({ accountId, kind }: TerminationAuthBodyProps) => {
         error.status >= 400 &&
         error.status < 500 &&
         !isInProgress
-      if (isRejected) idempotency.reset()
+      if (isRejected) clearPendingTerminationKey(accountId, kind)
       setFailure(
         isRejected
           ? { title: `${label} 실패`, message: error.message }

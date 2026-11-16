@@ -162,16 +162,25 @@ export const InstantTransferScreen = () => {
     string | null
   >(null)
   // 응답을 못 받은 이체의 키는 화면을 떠났다 돌아와도 이어 쓴다(REQ-TRSF-016).
+  const [pendingKey] = React.useState(readPendingTransferKey)
   const [idempotencyKey, setIdempotencyKey] = React.useState(
-    () => readPendingTransferKey()?.idempotencyKey ?? "",
+    pendingKey?.idempotencyKey ?? "",
   )
   const [keyedIntent, setKeyedIntent] = React.useState<TransferIntent | null>(
-    () => readPendingTransferKey()?.intent ?? null,
+    pendingKey?.intent ?? null,
   )
   const rememberTransferKey = (key: string, intent: TransferIntent) => {
     setIdempotencyKey(key)
     setKeyedIntent(intent)
     writePendingTransferKey({ idempotencyKey: key, intent })
+  }
+  // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
+  const refreshBalanceQueries = () => {
+    void queryClient.invalidateQueries({ queryKey: getLoginStatusQueryKey() })
+    void queryClient.invalidateQueries({ queryKey: getTransferLimitQueryKey() })
+    void queryClient.invalidateQueries({
+      queryKey: getAccountOverviewQueryKey(),
+    })
   }
   const forgetTransferKey = () => {
     setIdempotencyKey("")
@@ -480,16 +489,7 @@ export const InstantTransferScreen = () => {
           })
         }
 
-        // 잔액·한도·최근 거래일시는 서버가 계산한다. 캐시만 무효화한다.
-        void queryClient.invalidateQueries({
-          queryKey: getLoginStatusQueryKey(),
-        })
-        void queryClient.invalidateQueries({
-          queryKey: getTransferLimitQueryKey(),
-        })
-        void queryClient.invalidateQueries({
-          queryKey: getAccountOverviewQueryKey(),
-        })
+        refreshBalanceQueries()
       } catch (error) {
         setPasswordAuthToken(null)
 
@@ -518,8 +518,13 @@ export const InstantTransferScreen = () => {
               : "서버 응답을 받지 못해 이체 결과를 확인할 수 없습니다. 이체결과조회에서 처리 상태를 확인하세요.",
           })
           setStep(3)
+          // 서버가 처리했을 수 있다. 이전 잔액·한도를 그대로 두면 안 된 이체로 읽고 다시 넣는다.
+          refreshBalanceQueries()
           return
         }
+
+        // 서버가 거절한 요청은 처리되지 않았다. 다음 시도는 새 거래라 키를 버린다.
+        forgetTransferKey()
 
         // 계좌비밀번호는 검증 직후 지웠고 재입력 지점이 1단계뿐이다. 세션만료는
         // toErrorMessage 가 null 을 줘 A-11 모달과 문구가 겹치지 않는다.

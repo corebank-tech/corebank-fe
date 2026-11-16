@@ -97,4 +97,15 @@ export const MOCK_OVERVIEW_ACCOUNTS: OverviewAccount[] = [
     balance: 900_000,
     isWithdrawalAccount: false,
   },
+  {
+    id: "acc-7",
+    group: "deposit",
+    alias: "만기도래 정기예금",
+    accountNo: "110330187745",
+    openedDate: daysAgo(370),
+    lastActivityDate: daysAgo(5),
+    isMaturityDate: true,
+    balance: 2_000_000,
+    isWithdrawalAccount: false,
+  },
 ]

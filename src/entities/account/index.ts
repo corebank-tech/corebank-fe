@@ -52,3 +52,25 @@ export {
   type AccountStatusLabel,
 } from "@/entities/account/lib/account-status"
 export { getMaturityNotice } from "@/entities/account/lib/maturity-notice"
+export {
+  clearPendingTerminationKey,
+  getOrCreatePendingTerminationKey,
+} from "@/entities/account/lib/pending-termination-key"
+export {
+  DEPOSIT_ACCOUNTS_PATH,
+  getDepositTerminationAction,
+  getDepositTerminationPath,
+  parseDepositTerminationKind,
+  type DepositTerminationAction,
+  type DepositTerminationKind,
+} from "@/entities/account/lib/deposit-termination"
+export {
+  invalidateAccountQueries,
+  toDepositTerminationPreview,
+  useDepositTerminationPreviewQuery,
+  useOverviewAccount,
+  useOverviewAccountLookup,
+  useTerminateDepositMutation,
+  type DepositTerminationPreview,
+  type DepositTerminationResult,
+} from "@/entities/account/api/deposit-termination"

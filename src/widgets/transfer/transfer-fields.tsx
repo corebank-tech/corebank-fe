@@ -317,8 +317,8 @@ export const AmountField = ({
       {overLimit && (
         <p className="text-xs font-bold text-danger">
           {!showDailyLimit || overPer
-            ? `1회 이체한도 ${formatAmount(perTransferLimit)}를 초과했습니다. 금액을 낮춰 다시 입력하세요.`
-            : `당일 잔여 이체가능금액 ${formatAmount(dailyRemaining)}를 초과했습니다. 금액을 낮춰 다시 입력하세요.`}
+            ? `1회 이체한도 ${formatAmount(perTransferLimit)}을 초과했습니다. 금액을 낮춰 다시 입력하세요.`
+            : `당일 잔여 이체가능금액 ${formatAmount(dailyRemaining)}을 초과했습니다. 금액을 낮춰 다시 입력하세요.`}
         </p>
       )}
     </div>
@@ -408,8 +408,10 @@ export const TransferDateField = ({
       />
       {outOfRange && (
         <p className="text-xs font-bold text-danger">
-          {rangeLabel}은 내일부터 1년 이내({min.replace(/-/g, ".")} ~{" "}
-          {max.replace(/-/g, ".")})에서 선택하세요.
+          {/* rangeLabel 은 "이체 예정일자"처럼 받침이 없을 수도 있어 뒤에 은/는을 붙이지
+              않는다. 조사는 받침이 고정된 "범위" 에 붙인다. */}
+          {rangeLabel} 선택 범위는 내일부터 1년 이내(
+          {min.replace(/-/g, ".")} ~ {max.replace(/-/g, ".")})입니다.
         </p>
       )}
     </div>

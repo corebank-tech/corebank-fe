@@ -10,10 +10,17 @@ import type {
   GroupResponse,
 } from "@/shared/api/generated"
 import { getToday } from "@/shared/config/clock"
+import { daysBetween } from "@/shared/lib/date"
 import { readSignedInMemberId, unauthorized } from "@/mocks/handlers/auth"
-import { ok } from "@/mocks/lib/envelope"
+import { fail, ok } from "@/mocks/lib/envelope"
+import { readStore } from "@/mocks/lib/mock-store"
+import {
+  readTerminatedAccountIds,
+  readTerminationPayouts,
+} from "@/mocks/lib/terminated-accounts"
 
 const MOCK_LATENCY_MS = 200
+const OVERVIEW_UNAVAILABLE_KEY = "accounts:overview-unavailable"
 
 /**
  * `GET /accounts` 목. 전체계좌조회(B-01)·예적금 계좌조회(B-02)·대시보드(A-09)가
@@ -45,9 +52,14 @@ const toAccountItem = (
   // 정본은 예금과 적금을 구분하지 않는다. 화면들이 보는 것은
   // DEMAND_DEPOSIT 여부뿐이라(B-05 출금계좌 자격) 예적금은 하나로 둔다.
   accountType: account.group === "checking" ? "DEMAND_DEPOSIT" : "TIME_DEPOSIT",
-  status: "ACTIVE",
+  // 만기일이 지난 예적금은 서버가 MATURED 로 바꿔 둔 상태다.
+  status:
+    account.isMaturityDate &&
+    daysBetween(getToday(), account.lastActivityDate) <= 0
+      ? "MATURED"
+      : "ACTIVE",
   balance: account.balance,
-  // 정본에 보류액 개념이 없고 전 계좌가 ACTIVE 라 출금가능액은 원장잔액과 같다.
+  // 정본에 보류액 개념이 없어 출금가능액은 원장잔액과 같다.
   availableBalance: account.balance,
   openedDate: account.openedDate,
   // 정본은 한 필드(lastActivityDate)에 최근거래일과 만기일을 겸해 담고
@@ -82,17 +94,42 @@ export const MOCK_ACCOUNT_OWNER_ID = MOCK_MEMBERS.find(
 
 const isOwner = (memberId: string) => memberId === MOCK_ACCOUNT_OWNER_ID
 
-export const findMockAccount = (accountId: number, memberId: string) =>
-  isOwner(memberId)
-    ? MOCK_ACCOUNT_ITEMS.find((entry) => entry.item.accountId === accountId)
-    : undefined
+/**
+ * 해지 지급액을 받은 계좌의 현재 잔액. 계좌 개요와 이체 응답처럼 잔액을 말하는 목이 같은 값을
+ * 쓰도록 계좌를 읽는 자리(`findMockAccount`·개요)에서 한 번만 더한다.
+ */
+const withTerminationPayout = (
+  item: AccountItemResponse,
+): AccountItemResponse => {
+  const payout = readTerminationPayouts()[item.accountId ?? 0] ?? 0
+  return {
+    ...item,
+    balance: (item.balance ?? 0) + payout,
+    availableBalance: (item.availableBalance ?? 0) + payout,
+  }
+}
+
+/** 해지로 종료된 계좌는 서버처럼 없는 계좌로 본다. */
+export const findMockAccount = (accountId: number, memberId: string) => {
+  if (!isOwner(memberId) || readTerminatedAccountIds().includes(accountId)) {
+    return undefined
+  }
+
+  const entry = MOCK_ACCOUNT_ITEMS.find(
+    (candidate) => candidate.item.accountId === accountId,
+  )
+  return entry && { ...entry, item: withTerminationPayout(entry.item) }
+}
 
 const buildOverview = (memberId: string): AccountOverviewResponse => {
   const items: GroupResponse[] = GROUPS.map((group) => {
+    const terminatedIds = readTerminatedAccountIds()
     const accounts = isOwner(memberId)
       ? MOCK_ACCOUNT_ITEMS.filter(
-          (entry) => entry.account.group === group.id,
-        ).map((entry) => entry.item)
+          (entry) =>
+            entry.account.group === group.id &&
+            !terminatedIds.includes(entry.item.accountId ?? 0),
+        ).map(({ item }) => withTerminationPayout(item))
       : []
 
     return {
@@ -119,6 +156,11 @@ export const accountsApiHandlers = [
 
     const memberId = readSignedInMemberId()
     if (memberId == null) return unauthorized()
+
+    // e2e 가 계좌 개요 조회 실패를 재현하는 스위치.
+    if (readStore<boolean>(OVERVIEW_UNAVAILABLE_KEY, false)) {
+      return fail("CMN9999", "일시적인 오류가 발생했습니다.", 500)
+    }
 
     return ok(buildOverview(memberId))
   }),

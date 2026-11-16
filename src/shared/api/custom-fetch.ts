@@ -13,7 +13,29 @@ import {
 } from "@/shared/api/session-events"
 import { createCorrelationId } from "@/shared/api/correlation-id"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+/** 공백과 보이지 않는 문자를 거른다. */
+const PRINTABLE_ASCII_ONLY = /^[\x21-\x7E]*$/
+
+/**
+ * 환경변수가 깨진 채로 빌드돼도 빌드는 통과한다. 값이 없으면 `undefined/auth/login` 으로,
+ * 보이지 않는 문자가 섞이면 `/api/v1%20│/customers/me` 로 요청이 나간다 — 부팅 때 막는다.
+ */
+const resolveApiBaseUrl = (): string => {
+  const rawBaseUrl = import.meta.env.VITE_API_BASE_URL
+  if (typeof rawBaseUrl !== "string" || rawBaseUrl === "") {
+    throw new Error(
+      "VITE_API_BASE_URL 이 설정되지 않았습니다. 배포 환경변수를 확인하세요.",
+    )
+  }
+  if (!PRINTABLE_ASCII_ONLY.test(rawBaseUrl)) {
+    throw new Error(
+      `VITE_API_BASE_URL 에 공백이나 보이지 않는 문자가 섞여 있습니다: ${JSON.stringify(rawBaseUrl)}`,
+    )
+  }
+  return rawBaseUrl
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 const REQUEST_TIMEOUT_MS = 30_000
 /**
  * 첨부 업로드 제한 시간. 서버는 요청 하나에 40MB까지 받는데, 30초로는 약 8Mbps 보다 느린

@@ -6,7 +6,8 @@ import { OtpModal, OtpTransactionType } from "@/entities/auth"
 // TODO: 실시간 예금주 조회(GET /transfers/payee, 즉시이체 영역)가 연동되면
 // 입금계좌번호 확인 시 실제 예금주명을 조회해서 MOCK_PAYEE_NAME 대신 써야 한다.
 // 지금은 입력한 계좌번호와 무관하게 항상 이 값이 표시된다.
-import { MOCK_TRANSFER_LIMITS, MOCK_PAYEE_NAME } from "@/entities/transfer"
+import { MOCK_PAYEE_NAME, useTransferLimitQuery } from "@/entities/transfer"
+import { toErrorMessage } from "@/shared/api/api-error"
 import {
   formatAccountNo,
   formatAmount,
@@ -74,7 +75,22 @@ export const ReservedTransferScreen = () => {
     React.useState<string | null>(null)
   const passwordVerification = useAccountPasswordVerification()
 
-  const perTransferLimit = MOCK_TRANSFER_LIMITS.perTransfer
+  // 한도는 고객 단위라 즉시이체와 같은 조회를 쓴다(REQ-TRSF-024).
+  const {
+    data: transferLimit,
+    isLoading: isLimitLoading,
+    isError: isLimitError,
+    error: limitError,
+  } = useTransferLimitQuery()
+  const isLimitUnavailable =
+    isLimitLoading || isLimitError || transferLimit == null
+  // 한도를 모르는 동안 [다음]이 막히므로 그 이유를 1단계에 적는다.
+  const limitNotice = isLimitLoading
+    ? "이체한도를 불러오는 중입니다."
+    : isLimitUnavailable
+      ? toErrorMessage(limitError)
+      : null
+  const perTransferLimit = transferLimit?.oneTimeLimit ?? 0
 
   const {
     accounts: withdrawAccounts,
@@ -108,6 +124,7 @@ export const ReservedTransferScreen = () => {
     form.toConfirmed &&
     form.amount != null &&
     form.amount > 0 &&
+    !isLimitUnavailable &&
     form.amount <= perTransferLimit &&
     dateValid
 
@@ -302,6 +319,8 @@ export const ReservedTransferScreen = () => {
       onChange={setField}
       today={TODAY}
       perTransferLimit={perTransferLimit}
+      isLimitUnavailable={isLimitUnavailable}
+      limitNotice={limitNotice}
       payeeName={MOCK_PAYEE_NAME}
       canSubmit={canSubmit}
       onNext={() => setStep(2)}

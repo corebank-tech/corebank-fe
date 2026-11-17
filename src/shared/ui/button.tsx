@@ -3,7 +3,8 @@ import { cn } from "@/shared/lib/utils"
 
 /* disabled 상태는 opacity로 흐리기보다 무채색(surface + border + ink-faint)으로
    전환한다 — 흐린 primary blue는 여전히 눌러도 될 것처럼 보이는 문제가 있었다. */
-type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger"
+type ButtonVariant =
+  "primary" | "secondary" | "outline" | "ghost" | "success" | "danger"
 type ButtonSize = "sm" | "md" | "lg"
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -15,6 +16,8 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
     "border border-primary bg-surface-elevated text-primary hover:bg-primary-tint disabled:border-border disabled:text-ink-faint",
   ghost:
     "border border-transparent bg-transparent text-ink hover:bg-surface disabled:text-ink-faint",
+  success:
+    "border border-success bg-success text-white hover:opacity-90 disabled:border-border disabled:bg-surface disabled:text-ink-faint",
   danger:
     "border border-danger bg-danger text-white hover:opacity-90 disabled:border-border disabled:bg-surface disabled:text-ink-faint",
 }

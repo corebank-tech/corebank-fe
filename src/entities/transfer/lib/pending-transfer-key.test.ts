@@ -8,6 +8,7 @@ import {
 const PENDING = {
   idempotencyKey: "key-1",
   intent: {
+    flowId: null,
     withdrawalAccountId: 1,
     payeeBankCode: "004",
     depositAccountNumber: "1234567890005",

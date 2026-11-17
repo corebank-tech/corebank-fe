@@ -87,6 +87,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         // 합성 시나리오 평가 결과(정적 수치). 심사 화면과 같은 조회 권한으로 연다.
         requiresPermission: "PAYMENT_STOP_READ",
       },
+      {
+        label: "FDS 보류 거래",
+        path: "/admin/fds/held-transfers",
+        requiresPermission: "CUSTOMER_READ",
+      },
     ],
   },
 ]

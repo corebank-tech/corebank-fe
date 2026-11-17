@@ -105,7 +105,7 @@ export const ProductCardGrid = ({
               <h3 className="line-clamp-2 h-14 text-h2 leading-7 font-bold text-ink">
                 {p.name}
               </h3>
-              <p className="mt-1 line-clamp-2 h-10 text-base leading-5 text-ink-muted">
+              <p className="mt-1 line-clamp-2 h-10 text-base leading-5 break-keep text-ink-muted">
                 {p.summary}
               </p>
 

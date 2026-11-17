@@ -73,6 +73,7 @@ describe("fetchPayeeFor", () => {
 
 describe("executeTransferIntent", () => {
   const intent = (over: Partial<TransferIntent> = {}): TransferIntent => ({
+    flowId: "flow-1",
     withdrawalAccountId: 1,
     payeeBankCode: null,
     depositAccountNumber: "333330730135",
@@ -114,6 +115,31 @@ describe("executeTransferIntent", () => {
     expect(result).toMatchObject({
       status: "SUCCESS",
       withdrawalBalanceAfter: 970_000,
+      payeeName: null,
+    })
+  })
+
+  it("당행 보류 응답의 transferHold을 유실하지 않고 넘긴다", async () => {
+    server.use(
+      http.post("*/transfers", () =>
+        ok({
+          status: null,
+          transactionNumber: null,
+          transferHold: {
+            transferHoldId: 5,
+            status: "HELD",
+            releaseAt: null,
+            cancellableUntil: null,
+          },
+        }),
+      ),
+    )
+
+    const result = await executeTransferIntent({ intent: intent(), ...tokens })
+
+    expect(result).toMatchObject({
+      status: null,
+      transferHold: { transferHoldId: 5, status: "HELD" },
       payeeName: null,
     })
   })

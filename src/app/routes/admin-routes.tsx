@@ -144,6 +144,22 @@ export const adminRoutes: RouteObject = {
             return Adm05ObjectionDetail
           }),
         },
+        {
+          path: "fds/held-transfers",
+          handle: { title: "FDS 보류 거래" },
+          lazy: guardedLazy("CUSTOMER_READ", async () => {
+            const { FdsHeldTransferList } = await import("@/pages/admin")
+            return FdsHeldTransferList
+          }),
+        },
+        {
+          path: "fds/held-transfers/:heldTransferId",
+          handle: { title: "FDS 보류 거래 상세" },
+          lazy: guardedLazy("CUSTOMER_READ", async () => {
+            const { FdsHeldTransferDetail } = await import("@/pages/admin")
+            return FdsHeldTransferDetail
+          }),
+        },
       ],
     },
   ],

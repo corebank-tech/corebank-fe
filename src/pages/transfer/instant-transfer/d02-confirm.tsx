@@ -20,6 +20,7 @@ type InstantTransferStep2Props = {
   myMemo: React.ReactNode
   /** 잔액 부족·계좌비밀번호 불일치 등 실행 직전 검증에서 발생한 오류. */
   authError?: string | null
+  isExecuting?: boolean
   onPrev: () => void
   /**
    * [이체하기] 클릭 시 호출. 거래내용 확인 모달(REQ-TRSF-031)과 계좌비밀번호
@@ -42,6 +43,7 @@ export const InstantTransferStep2 = ({
   payeeMemo,
   myMemo,
   authError,
+  isExecuting = false,
   onPrev,
   onSubmit,
 }: InstantTransferStep2Props) => {
@@ -61,6 +63,7 @@ export const InstantTransferStep2 = ({
             size="lg"
             className="min-w-30"
             onClick={onPrev}
+            disabled={isExecuting}
           >
             이전
           </Button>
@@ -69,8 +72,9 @@ export const InstantTransferStep2 = ({
             size="lg"
             className="min-w-40"
             onClick={onSubmit}
+            disabled={isExecuting}
           >
-            이체하기
+            {isExecuting ? "이체 처리 중..." : "이체하기"}
           </Button>
         </>
       }
@@ -114,6 +118,11 @@ export const InstantTransferStep2 = ({
         {authError && (
           <p role="alert" className="mt-2 text-base font-bold text-danger">
             {authError}
+          </p>
+        )}
+        {isExecuting && (
+          <p role="status" className="mt-2 text-base text-ink">
+            행동 이벤트와 이체 요청을 처리하고 있습니다. 잠시만 기다려 주세요.
           </p>
         )}
       </FormSection>

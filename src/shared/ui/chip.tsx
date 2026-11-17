@@ -17,13 +17,15 @@ const CHIP_SIZE_CLASSES: Record<ChipSize, string> = {
   lg: "h-9 px-4 text-base font-bold",
 }
 
+/* 테두리 대신 배경으로 칩을 구분한다. default 가 쓰던 흰 배경은 테두리를 떼면
+   흰 표면 위에서 사라지므로 surface 로 내린다. */
 const CHIP_TONE_CLASSES: Record<ChipTone, string> = {
-  default: "border-border-strong bg-surface-elevated text-ink hover:bg-surface",
-  active: "border-ink bg-ink font-bold text-surface-elevated",
-  primary: "border-primary bg-primary text-primary-foreground",
+  default: "bg-surface text-ink hover:bg-border",
+  active: "bg-ink font-bold text-surface-elevated",
+  primary: "bg-primary text-primary-foreground",
   "primary-tint":
-    "border-primary bg-primary-tint font-bold text-primary hover:bg-surface-elevated",
-  muted: "border-border-strong bg-surface text-ink-muted hover:bg-border",
+    "bg-primary-tint font-bold text-primary hover:bg-primary-tint-strong",
+  muted: "bg-surface text-ink-muted hover:bg-border",
 }
 
 type ChipProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -42,7 +44,7 @@ export const Chip = ({
     <button
       type={type ?? "button"}
       className={cn(
-        "inline-flex items-center justify-center rounded-pill border whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "inline-flex items-center justify-center rounded-pill whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         CHIP_SIZE_CLASSES[size],
         CHIP_TONE_CLASSES[tone],
         className,
